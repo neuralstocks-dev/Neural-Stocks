@@ -1,0 +1,441 @@
+import React, { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import api from "@/lib/api";
+import AppShell from "@/components/AppShell";
+import VerdictRing from "@/components/VerdictRing";
+import SignalBadge from "@/components/SignalBadge";
+import {
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    Tooltip,
+    ResponsiveContainer,
+    CartesianGrid,
+} from "recharts";
+import { ArrowLeft, Sparkles, Loader2, AlertTriangle, Target, Shield } from "lucide-react";
+import { formatPrice, formatPct, formatCompact, timeAgo } from "@/lib/format";
+
+export default function AnalysisReportPage() {
+    const { ticker } = useParams();
+    const t = (ticker || "").toUpperCase();
+    const [analysis, setAnalysis] = useState(null);
+    const [history, setHistory] = useState([]);
+    const [quote, setQuote] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [analyzing, setAnalyzing] = useState(false);
+    const [error, setError] = useState("");
+
+    const load = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const [quoteR, histR] = await Promise.all([
+                api.get(`/stocks/${t}/quote`),
+                api.get(`/stocks/${t}/history`, { params: { period: "6mo", interval: "1d" } }),
+            ]);
+            setQuote(quoteR.data);
+            setHistory(histR.data.points || []);
+            try {
+                const anR = await api.get(`/analysis/${t}/latest`);
+                setAnalysis(anR.data);
+            } catch {
+                setAnalysis(null);
+            }
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Failed to load");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [t]);
+
+    const runAnalysis = async () => {
+        setAnalyzing(true);
+        setError("");
+        try {
+            const r = await api.post(`/analysis/${t}`);
+            setAnalysis(r.data);
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Analysis failed");
+        } finally {
+            setAnalyzing(false);
+        }
+    };
+
+    const chartData = history.map((p) => ({
+        date: p.date?.slice(0, 10),
+        close: p.close,
+    }));
+
+    const signalColor =
+        analysis?.recommendation === "BUY"
+            ? "hsl(var(--buy))"
+            : analysis?.recommendation === "SELL"
+            ? "hsl(var(--sell))"
+            : "hsl(var(--hold))";
+
+    return (
+        <AppShell>
+            <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-8 pb-16">
+                <Link
+                    to="/dashboard"
+                    className="text-overline inline-flex items-center gap-2 mb-6 link-underline"
+                    data-testid="back-to-dashboard"
+                >
+                    <ArrowLeft size={12} strokeWidth={1.5} /> Back to dashboard
+                </Link>
+
+                {loading && (
+                    <div className="py-20 text-center">
+                        <Loader2 className="animate-spin mx-auto" size={22} />
+                        <p className="mt-3 text-sm text-[hsl(var(--text-secondary))] font-mono">
+                            Loading {t}…
+                        </p>
+                    </div>
+                )}
+
+                {error && !loading && (
+                    <div className="signal-sell p-4 font-mono text-sm" data-testid="analysis-error">
+                        {error}
+                    </div>
+                )}
+
+                {!loading && quote && (
+                    <>
+                        {/* Top masthead */}
+                        <section
+                            className="module pb-6 md:pb-10 mb-1 md:mb-4"
+                            data-testid={`analysis-header-${t}`}
+                        >
+                            <div className="p-5 md:p-8 grid grid-cols-12 gap-4 items-start">
+                                <div className="col-span-12 md:col-span-8">
+                                    <p className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
+                                        {quote.exchange || "—"} · {quote.currency || "USD"}
+                                    </p>
+                                    <div className="flex items-baseline gap-4 mt-2">
+                                        <h1
+                                            className="font-mono hero-number"
+                                            style={{ fontSize: "clamp(2.5rem, 5vw, 4.5rem)" }}
+                                            data-testid="ticker-symbol"
+                                        >
+                                            {t}
+                                        </h1>
+                                        <span
+                                            className="font-serif italic"
+                                            style={{ fontSize: "clamp(1rem, 1.5vw, 1.5rem)", color: "hsl(var(--text-secondary))" }}
+                                        >
+                                            {quote.name}
+                                        </span>
+                                    </div>
+                                    <div className="mt-5 flex flex-wrap items-baseline gap-5">
+                                        <div>
+                                            <p className="text-overline">Last price</p>
+                                            <div
+                                                className="font-mono hero-number"
+                                                style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)" }}
+                                            >
+                                                {formatPrice(quote.price, quote.currency)}
+                                            </div>
+                                        </div>
+                                        <div
+                                            className="font-mono"
+                                            style={{
+                                                color:
+                                                    (quote.change_pct ?? 0) >= 0
+                                                        ? "hsl(var(--buy))"
+                                                        : "hsl(var(--sell))",
+                                            }}
+                                        >
+                                            {quote.change != null
+                                                ? `${quote.change > 0 ? "+" : ""}${quote.change.toFixed(2)}`
+                                                : "—"}
+                                            <span className="ml-2 opacity-80">
+                                                {quote.change_pct != null
+                                                    ? formatPct(quote.change_pct)
+                                                    : ""}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-span-12 md:col-span-4 flex justify-start md:justify-end">
+                                    <button
+                                        onClick={runAnalysis}
+                                        disabled={analyzing}
+                                        className="btn-primary"
+                                        data-testid="run-analysis-button"
+                                    >
+                                        {analyzing ? (
+                                            <>
+                                                <Loader2 size={14} className="animate-spin" /> Thinking…
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles size={14} strokeWidth={1.5} /> {analysis ? "Re-analyze" : "Analyze now"}
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Chart */}
+                            <div className="px-2 md:px-4">
+                                <div style={{ width: "100%", height: 260 }}>
+                                    <ResponsiveContainer>
+                                        <LineChart data={chartData} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border-divider))" vertical={false} />
+                                            <XAxis
+                                                dataKey="date"
+                                                tick={{ fill: "hsl(var(--text-muted))", fontSize: 10, fontFamily: "IBM Plex Mono" }}
+                                                tickLine={false}
+                                                axisLine={{ stroke: "hsl(var(--border-default))" }}
+                                                minTickGap={40}
+                                            />
+                                            <YAxis
+                                                tick={{ fill: "hsl(var(--text-muted))", fontSize: 10, fontFamily: "IBM Plex Mono" }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                domain={["auto", "auto"]}
+                                                width={52}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    background: "hsl(var(--surface-elevated))",
+                                                    border: "1px solid hsl(var(--border-default))",
+                                                    fontFamily: "IBM Plex Mono",
+                                                    fontSize: 12,
+                                                    borderRadius: 2,
+                                                }}
+                                                labelStyle={{ color: "hsl(var(--text-secondary))" }}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="close"
+                                                stroke={signalColor}
+                                                strokeWidth={1.5}
+                                                dot={false}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </section>
+
+                        {!analysis && (
+                            <div
+                                className="module p-10 md:p-16 text-center grid-bg"
+                                data-testid="no-analysis-state"
+                            >
+                                <p className="text-overline">No verdict on file</p>
+                                <h2
+                                    className="font-serif mt-4"
+                                    style={{ fontSize: "clamp(1.7rem, 3vw, 2.6rem)", lineHeight: 1.05 }}
+                                >
+                                    Generate your first AI verdict for
+                                    <em className="italic ml-2" style={{ color: "hsl(var(--hold))" }}>
+                                        {t}
+                                    </em>
+                                </h2>
+                                <p className="mt-3 text-sm max-w-md mx-auto" style={{ color: "hsl(var(--text-secondary))" }}>
+                                    Claude will synthesize price action, technicals, and fundamentals into one
+                                    decisive call.
+                                </p>
+                                <button
+                                    onClick={runAnalysis}
+                                    disabled={analyzing}
+                                    className="btn-primary mt-8"
+                                    data-testid="empty-analyze-button"
+                                >
+                                    {analyzing ? (
+                                        <>
+                                            <Loader2 size={14} className="animate-spin" /> Thinking…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles size={14} strokeWidth={1.5} /> Run Analysis
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        )}
+
+                        {analysis && (
+                            <>
+                                {/* Verdict + targets */}
+                                <section className="grid grid-cols-12 gap-1 md:gap-4 mb-1 md:mb-4">
+                                    <div className="col-span-12 md:col-span-5 module p-6 md:p-8 flex flex-col md:flex-row items-center gap-6" data-testid="verdict-module">
+                                        <VerdictRing
+                                            score={analysis.confidence_score}
+                                            signal={analysis.recommendation}
+                                            size={180}
+                                        />
+                                        <div>
+                                            <p className="text-overline">AI Verdict</p>
+                                            <div className="mt-2">
+                                                <SignalBadge signal={analysis.recommendation} size="lg" />
+                                            </div>
+                                            <p
+                                                className="font-serif mt-4"
+                                                style={{ fontSize: "1.6rem", lineHeight: 1.15, letterSpacing: "-0.01em" }}
+                                            >
+                                                {analysis.executive_summary}
+                                            </p>
+                                            <p className="text-overline mt-4" style={{ fontSize: "0.56rem" }}>
+                                                Last updated {timeAgo(analysis.created_at)} · Horizon {analysis.time_horizon_weeks || 12}w
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="col-span-12 md:col-span-7 grid grid-cols-2 gap-1 md:gap-4">
+                                        <div className="module p-5 md:p-6" data-testid="price-target-module">
+                                            <p className="text-overline flex items-center gap-2">
+                                                <Target size={12} strokeWidth={1.5} /> Price Target
+                                            </p>
+                                            <div className="font-mono hero-number mt-3" style={{ fontSize: "2.2rem" }}>
+                                                {formatPrice(analysis.price_target, quote.currency)}
+                                            </div>
+                                            <p
+                                                className="text-xs font-mono mt-2"
+                                                style={{
+                                                    color:
+                                                        analysis.price_target > quote.price
+                                                            ? "hsl(var(--buy))"
+                                                            : "hsl(var(--sell))",
+                                                }}
+                                            >
+                                                {formatPct(
+                                                    ((analysis.price_target - quote.price) / quote.price) * 100
+                                                )}{" "}
+                                                from current
+                                            </p>
+                                        </div>
+                                        <div className="module p-5 md:p-6" data-testid="stop-loss-module">
+                                            <p className="text-overline flex items-center gap-2">
+                                                <Shield size={12} strokeWidth={1.5} /> Stop Loss
+                                            </p>
+                                            <div className="font-mono hero-number mt-3" style={{ fontSize: "2.2rem" }}>
+                                                {formatPrice(analysis.stop_loss, quote.currency)}
+                                            </div>
+                                            <p className="text-xs font-mono mt-2" style={{ color: "hsl(var(--sell))" }}>
+                                                {formatPct(
+                                                    ((analysis.stop_loss - quote.price) / quote.price) * 100
+                                                )}{" "}
+                                                risk cap
+                                            </p>
+                                        </div>
+                                        <div className="module p-5 md:p-6 col-span-2" data-testid="key-metrics-module">
+                                            <p className="text-overline mb-3">Key snapshot</p>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                <Metric label="P/E" value={analysis.fundamentals?.trailingPE?.toFixed(1)} />
+                                                <Metric label="Market Cap" value={formatCompact(analysis.fundamentals?.marketCap)} />
+                                                <Metric label="RSI (14)" value={analysis.technicals?.rsi_14?.toFixed(1)} />
+                                                <Metric label="SMA 20" value={analysis.technicals?.sma_20 != null ? formatPrice(analysis.technicals.sma_20, quote.currency) : "—"} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* Editorial: Reasoning */}
+                                <section className="module p-6 md:p-10 mb-1 md:mb-4" data-testid="reasoning-module">
+                                    <p className="text-overline">Reasoning</p>
+                                    <h2
+                                        className="font-serif mt-2 mb-6"
+                                        style={{ fontSize: "clamp(1.8rem, 3vw, 2.6rem)", letterSpacing: "-0.015em" }}
+                                    >
+                                        Why this verdict.
+                                    </h2>
+                                    <div
+                                        className="dropcap text-base leading-relaxed"
+                                        style={{
+                                            columnCount: chartData.length > 0 ? 1 : 1,
+                                            color: "hsl(var(--text-primary))",
+                                            maxWidth: "68ch",
+                                        }}
+                                    >
+                                        {analysis.reasoning}
+                                    </div>
+                                </section>
+
+                                {/* Technical / Fundamental / Peer */}
+                                <section className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mb-1 md:mb-4">
+                                    <article className="module p-6" data-testid="technical-module">
+                                        <p className="text-overline">Technical Analysis</p>
+                                        <h3 className="font-serif text-2xl mt-2 mb-4">Momentum</h3>
+                                        <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                            {analysis.technical_analysis}
+                                        </p>
+                                    </article>
+                                    <article className="module p-6" data-testid="fundamental-module">
+                                        <p className="text-overline">Fundamental Analysis</p>
+                                        <h3 className="font-serif text-2xl mt-2 mb-4">Quality</h3>
+                                        <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                            {analysis.fundamental_analysis}
+                                        </p>
+                                    </article>
+                                    <article className="module p-6" data-testid="peer-module">
+                                        <p className="text-overline">Peer Comparison</p>
+                                        <h3 className="font-serif text-2xl mt-2 mb-4">Relative</h3>
+                                        <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                            {analysis.peer_comparison}
+                                        </p>
+                                    </article>
+                                </section>
+
+                                {/* Risks */}
+                                <section className="module p-6 md:p-10" data-testid="risks-module">
+                                    <p className="text-overline flex items-center gap-2">
+                                        <AlertTriangle size={12} strokeWidth={1.5} /> Risk Factors
+                                    </p>
+                                    <h2
+                                        className="font-serif mt-2 mb-6"
+                                        style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", letterSpacing: "-0.015em" }}
+                                    >
+                                        What could go wrong.
+                                    </h2>
+                                    <ol className="space-y-4">
+                                        {(analysis.risk_factors || []).map((r, i) => (
+                                            <li
+                                                key={i}
+                                                className="flex gap-4 pb-4"
+                                                style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
+                                                data-testid={`risk-item-${i}`}
+                                            >
+                                                <span
+                                                    className="font-mono text-xs mt-1"
+                                                    style={{ color: "hsl(var(--sell))", minWidth: "2rem" }}
+                                                >
+                                                    R.{String(i + 1).padStart(2, "0")}
+                                                </span>
+                                                <p className="text-sm leading-relaxed flex-1">{r}</p>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                </section>
+
+                                <p
+                                    className="text-overline mt-8 text-center"
+                                    style={{ color: "hsl(var(--text-muted))", fontSize: "0.6rem" }}
+                                >
+                                    This is not financial advice. For educational use only.
+                                </p>
+                            </>
+                        )}
+                    </>
+                )}
+            </div>
+        </AppShell>
+    );
+}
+
+function Metric({ label, value }) {
+    return (
+        <div>
+            <p className="text-overline" style={{ fontSize: "0.56rem" }}>{label}</p>
+            <p className="font-mono text-lg mt-1">{value ?? "—"}</p>
+        </div>
+    );
+}

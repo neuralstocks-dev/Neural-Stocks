@@ -1,0 +1,54 @@
+{
+  "summary": "Tested all Phase 1 MVP backend endpoints of AI Stock Analysis Platform via external REACT_APP_BACKEND_URL. 35/39 tests PASSED. All auth, stock search/quote/history, watchlist CRUD (including 5-max limit, duplicate 400, invalid-ticker 404), alerts CRUD, and auth enforcement work correctly. The 4 failures are ALL AI-analysis endpoints (POST /api/analysis/{ticker}, GET /api/analysis/{ticker}/latest, GET /api/analysis/{ticker}/history, POST /api/analysis/quick/top) failing with 500 due to EMERGENT_LLM_KEY budget exceeded (not a code bug).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/analysis/{ticker}",
+        "issue": "Returns 500 Internal Server Error because Emergent LLM budget is exhausted. Error: 'litellm.BadRequestError: OpenAIException - Budget has been exceeded! Current cost: 0.023937, Max budget: 0.001'. This cascades to /api/analysis/quick/{top|bottom} and makes /latest and /history untestable (no successful analysis ever gets stored). This is an infrastructure/budget issue, not a code bug. Main agent should request a budget increase on EMERGENT_LLM_KEY to validate AI analysis flow.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/analysis/{ticker}",
+        "issue": "ChatError (LLM failure) is not caught in run_ai_analysis; it propagates and returns an opaque 500 to the client. Should be wrapped in try/except and raise HTTPException(status_code=502, detail='AI provider error: <msg>') for better UX and easier debugging."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "URGENT: Increase/reset EMERGENT_LLM_KEY budget (currently capped at $0.001, already exhausted). Without this, ALL AI analysis endpoints return 500 and the core product feature (BUY/SELL/HOLD recommendation) is non-functional end-to-end.",
+    "Wrap chat.send_message() call in try/except ChatError in run_ai_analysis() to return HTTPException(502, 'AI provider error: ...') instead of a generic 500.",
+    "After budget fix, re-run /app/backend/tests/backend_test.py to validate: shape of analysis doc (recommendation/confidence_score/price_target/stop_loss/reasoning/risk_factors/technicals/fundamentals), /latest & /history, quick/top, and auto-alert creation on confidence >= 75%."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 730 lines — acceptable for MVP but at the edge; consider splitting into routers/auth.py, routers/stocks.py, routers/watchlist.py, routers/analysis.py, services/yfinance.py, services/ai.py before Phase 2.",
+    "run_ai_analysis() can return a parsed object missing required fields (price_target, stop_loss, risk_factors, etc.). Only recommendation is validated. Should use a Pydantic model to validate the full AI response schema.",
+    "In watchlist_live, latest_analysis is returned under a nested ternary that sets it to None twice; works but is confusing.",
+    "No rate-limiting or caching on yfinance calls — every watchlist/live call hits yfinance for every ticker; could be slow and fragile. Consider 30-60s in-memory cache for quotes.",
+    "JWT secret is committed in /app/backend/.env (placeholder). Ensure a strong unique secret is set before production.",
+    "No index on db.watchlist (user_id, ticker) or db.analyses (user_id, ticker, created_at). Should add Mongo indexes for performance as data grows.",
+    "data-testid attributes: N/A (backend only testing requested).",
+    "Good: password_hash properly excluded from /auth/me; _id excluded everywhere; uses uuid ids (not ObjectId) so JSON serializes cleanly; proper async/await everywhere; Pydantic validation on inputs; auth enforcement working on all protected endpoints."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (created, 39 tests)"
+  ],
+  "success_rate": {
+    "backend": "89.7% (35/39). Non-AI endpoints: 100% (35/35). AI endpoints: 0% (0/4) due to LLM budget exhaustion."
+  },
+  "test_credentials": "Tests generate a fresh random user per run (TEST_<uuid>@example.com / Passw0rd!123) via /api/auth/register. No pre-existing credentials required.",
+  "seed_data_creation": "None. Each test run creates its own throwaway user and watchlist items; test_credentials.md not modified.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Run: `python -m pytest /app/backend/tests/backend_test.py -v --junitxml=/app/test_reports/pytest/pytest_results.xml`. All 35 non-AI tests should pass. The 4 AI tests (TestAnalysis::test_analysis_shape/test_latest/test_history/test_quick_top) require EMERGENT_LLM_KEY budget to be available — confirm by tailing /var/log/supervisor/backend.err.log for 'Budget has been exceeded'. Once budget is fixed, all 39 should pass. Also verify auto-alert creation: after a BUY/SELL analysis with confidence >=75%, GET /api/alerts should include a 'signal' alert for that ticker (not tested in this iteration because no analysis succeeded).",
+  "rca of the issue": "ROOT CAUSE (AI endpoints): EMERGENT_LLM_KEY has max_budget=0.001 USD which is already consumed (current cost 0.023937). litellm returns BadRequestError 'Budget has been exceeded' → emergentintegrations wraps as ChatError → propagates to FastAPI as unhandled 500. REPRODUCTION: POST /api/analysis/AAPL with a valid Bearer token → immediate 500. MITIGATION: (1) Have infra/main agent refresh/increase the EMERGENT_LLM_KEY budget. (2) Add try/except around chat.send_message in run_ai_analysis to raise HTTPException(502, detail=str(e)) so clients get a clearer error instead of 500."
+}

@@ -1,54 +1,73 @@
-import { useEffect } from "react";
+import React from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
+import { ThemeProvider } from "@/context/ThemeContext";
+import LoginPage from "@/pages/LoginPage";
+import SignupPage from "@/pages/SignupPage";
+import DashboardPage from "@/pages/DashboardPage";
+import AnalysisReportPage from "@/pages/AnalysisReportPage";
+import { Loader2 } from "lucide-react";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
+function Protected({ children }) {
+    const { user, bootstrapping } = useAuth();
+    if (bootstrapping) {
+        return (
+            <div className="min-h-screen grid place-items-center">
+                <Loader2 className="animate-spin" size={24} />
+            </div>
+        );
     }
-  };
+    if (!user) return <Navigate to="/login" replace />;
+    return children;
+}
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+function RootRedirect() {
+    const { user, bootstrapping } = useAuth();
+    if (bootstrapping) {
+        return (
+            <div className="min-h-screen grid place-items-center">
+                <Loader2 className="animate-spin" size={24} />
+            </div>
+        );
+    }
+    return <Navigate to={user ? "/dashboard" : "/login"} replace />;
+}
 
 function App() {
-  return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
-  );
+    return (
+        <div className="App">
+            <ThemeProvider>
+                <BrowserRouter>
+                    <AuthProvider>
+                        <Routes>
+                            <Route path="/" element={<RootRedirect />} />
+                            <Route path="/login" element={<LoginPage />} />
+                            <Route path="/signup" element={<SignupPage />} />
+                            <Route
+                                path="/dashboard"
+                                element={
+                                    <Protected>
+                                        <DashboardPage />
+                                    </Protected>
+                                }
+                            />
+                            <Route
+                                path="/analysis/:ticker"
+                                element={
+                                    <Protected>
+                                        <AnalysisReportPage />
+                                    </Protected>
+                                }
+                            />
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                    </AuthProvider>
+                </BrowserRouter>
+            </ThemeProvider>
+        </div>
+    );
 }
 
 export default App;
