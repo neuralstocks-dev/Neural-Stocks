@@ -5,6 +5,7 @@ import AppShell from "@/components/AppShell";
 import VerdictRing from "@/components/VerdictRing";
 import SignalBadge from "@/components/SignalBadge";
 import ShareVerdictButton from "@/components/ShareVerdictButton";
+import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import { useAuth } from "@/hooks/useAuth";
 import {
     LineChart,
@@ -17,10 +18,12 @@ import {
 } from "recharts";
 import { ArrowLeft, Sparkles, Loader2, AlertTriangle, Target, Shield } from "lucide-react";
 import { formatPrice, formatPct, formatCompact, timeAgo } from "@/lib/format";
+import { errMessage } from "@/lib/errors";
 
 export default function AnalysisReportPage() {
     const { ticker } = useParams();
     const { user } = useAuth();
+    const disclaimer = useDisclaimer();
     const t = (ticker || "").toUpperCase();
     const [analysis, setAnalysis] = useState(null);
     const [history, setHistory] = useState([]);
@@ -46,7 +49,7 @@ export default function AnalysisReportPage() {
                 setAnalysis(null);
             }
         } catch (err) {
-            setError(err?.response?.data?.detail || "Failed to load");
+            setError(errMessage(err?.response?.data?.detail, "Failed to load"));
         } finally {
             setLoading(false);
         }
@@ -58,16 +61,19 @@ export default function AnalysisReportPage() {
     }, [t]);
 
     const runAnalysis = async () => {
-        setAnalyzing(true);
-        setError("");
-        try {
-            const r = await api.post(`/analysis/${t}`);
-            setAnalysis(r.data);
-        } catch (err) {
-            setError(err?.response?.data?.detail || "Analysis failed");
-        } finally {
-            setAnalyzing(false);
-        }
+        disclaimer.ensureAccepted(async () => {
+            setAnalyzing(true);
+            setError("");
+            try {
+                const r = await api.post(`/analysis/${t}`);
+                setAnalysis(r.data);
+            } catch (err) {
+                if (disclaimer.promptFromError(err)) return;
+                setError(errMessage(err?.response?.data?.detail, "Analysis failed"));
+            } finally {
+                setAnalyzing(false);
+            }
+        });
     };
 
     const chartData = history.map((p) => ({
@@ -84,6 +90,11 @@ export default function AnalysisReportPage() {
 
     return (
         <AppShell>
+            <DisclaimerModal
+                open={disclaimer.open}
+                onClose={disclaimer.onClose}
+                onAccepted={disclaimer.onAccepted}
+            />
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-8 pb-16">
                 <Link
                     to="/dashboard"

@@ -6,8 +6,10 @@ import AddStockModal from "@/components/AddStockModal";
 import Sparkline from "@/components/Sparkline";
 import SignalBadge from "@/components/SignalBadge";
 import TestUnlockBanner from "@/components/TestUnlockBanner";
+import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import { useAuth } from "@/hooks/useAuth";
 import { formatPrice, formatPct, timeAgo } from "@/lib/format";
+import { errMessage } from "@/lib/errors";
 import {
     ArrowUpRight,
     Bell,
@@ -121,6 +123,7 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, analyzing }) {
 
 export default function DashboardPage() {
     const { user } = useAuth();
+    const disclaimer = useDisclaimer();
     const [items, setItems] = useState([]);
     const [sparks, setSparks] = useState({}); // ticker -> [closes]
     const [alerts, setAlerts] = useState([]);
@@ -205,18 +208,21 @@ export default function DashboardPage() {
     };
 
     const analyzeOne = async (ticker) => {
-        setActionError("");
-        setAnalyzingTicker(ticker);
-        try {
-            await api.post(`/analysis/${ticker}`);
-            await fetchWatchlist();
-            await fetchAlerts();
-            await fetchQuota();
-        } catch (err) {
-            setActionError(err?.response?.data?.detail || "Analysis failed");
-        } finally {
-            setAnalyzingTicker(null);
-        }
+        disclaimer.ensureAccepted(async () => {
+            setActionError("");
+            setAnalyzingTicker(ticker);
+            try {
+                await api.post(`/analysis/${ticker}`);
+                await fetchWatchlist();
+                await fetchAlerts();
+                await fetchQuota();
+            } catch (err) {
+                if (disclaimer.promptFromError(err)) return;
+                setActionError(errMessage(err?.response?.data?.detail, "Analysis failed"));
+            } finally {
+                setAnalyzingTicker(null);
+            }
+        });
     };
 
     const quickAnalyze = async (kind) => {
@@ -224,18 +230,27 @@ export default function DashboardPage() {
             setActionError("Add stocks to your watchlist first");
             return;
         }
-        setActionError("");
-        setQuickBusy(kind);
-        try {
-            await api.post(`/analysis/quick/${kind}`);
-            await fetchWatchlist();
-            await fetchAlerts();
-            await fetchQuota();
-        } catch (err) {
-            setActionError(err?.response?.data?.detail || "Quick analysis failed");
-        } finally {
-            setQuickBusy(null);
-        }
+        disclaimer.ensureAccepted(async () => {
+            setActionError("");
+            setQuickBusy(kind);
+            try {
+                const r = await api.post(`/analysis/quick/${kind}`);
+                const s = r.data?.summary;
+                if (s && (s.timed_out || s.errored)) {
+                    setActionError(
+                        `Quick sweep: ${s.completed} done, ${s.timed_out} timed out, ${s.errored} errored. Try single-ticker Analyze on any that didn't complete.`
+                    );
+                }
+                await fetchWatchlist();
+                await fetchAlerts();
+                await fetchQuota();
+            } catch (err) {
+                if (disclaimer.promptFromError(err)) return;
+                setActionError(errMessage(err?.response?.data?.detail, "Quick analysis failed"));
+            } finally {
+                setQuickBusy(null);
+            }
+        });
     };
 
     const markAllAlertsRead = async () => {
@@ -267,6 +282,12 @@ export default function DashboardPage() {
                 }}
             />
 
+            <DisclaimerModal
+                open={disclaimer.open}
+                onClose={disclaimer.onClose}
+                onAccepted={disclaimer.onAccepted}
+            />
+
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16">
                 {/* Hero header */}
                 <section className="mb-8 md:mb-12">
@@ -296,6 +317,12 @@ export default function DashboardPage() {
                         <span className="font-mono text-[hsl(var(--text-primary))]"> Analyze Now</span>
                         &nbsp;on any row, or let Claude sweep your movers with
                         <span className="font-mono text-[hsl(var(--text-primary))]"> Top/Bottom 3</span>.
+                    </p>
+                    <p
+                        className="mt-3 text-overline"
+                        style={{ fontSize: "0.58rem", color: "hsl(var(--text-muted))" }}
+                    >
+                        Not financial advice · Educational use only · You decide, you own the outcome
                     </p>
                 </section>
 

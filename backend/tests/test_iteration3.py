@@ -46,6 +46,8 @@ def _register_user(email: str | None = None, password: str = "Passw0rd!123", nam
     assert r.status_code == 200, f"register failed: {r.status_code} {r.text}"
     data = r.json()
     s.headers.update({"Authorization": f"Bearer {data['token']}"})
+    # Iteration 4: accept disclaimer so analysis endpoints aren't 428-gated
+    s.post(f"{API}/disclaimer/accept", timeout=SHORT)
     return s, data["user"], {"email": email, "password": password}
 
 
@@ -78,6 +80,8 @@ def _ensure_admin_session():
 @pytest.fixture(scope="module")
 def admin_client():
     s, user = _ensure_admin_session()
+    # Iteration 4: accept disclaimer so admin analyses aren't 428-gated
+    s.post(f"{API}/disclaimer/accept", timeout=SHORT)
     return {"session": s, "user": user}
 
 

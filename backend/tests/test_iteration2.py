@@ -31,6 +31,10 @@ def _register():
     assert r.status_code == 200, f"register failed: {r.status_code} {r.text}"
     data = r.json()
     s.headers.update({"Authorization": f"Bearer {data['token']}"})
+    # Iteration 4: accept disclaimer so analysis endpoints aren't 428-gated.
+    # Tests that specifically assert plan/quota gates (402/429) still work
+    # because the disclaimer gate only fires before acceptance.
+    s.post(f"{API}/disclaimer/accept", timeout=SHORT)
     return s, data["user"], creds
 
 

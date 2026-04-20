@@ -45,6 +45,8 @@ def auth(session, user_creds):
     # aren't blocked by the new free-plan (3 items) / daily-analysis quotas.
     up = session.post(f"{API}/plan/upgrade", json={"plan": "elite"}, timeout=SHORT)
     assert up.status_code == 200, f"upgrade to elite failed: {up.status_code} {up.text}"
+    # Iteration 4: accept disclaimer so analysis endpoints aren't gated by 428
+    session.post(f"{API}/disclaimer/accept", timeout=SHORT)
     return {"token": token, "user": user}
 
 

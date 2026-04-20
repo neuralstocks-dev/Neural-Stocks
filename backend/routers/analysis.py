@@ -8,8 +8,13 @@ from core.security import get_current_user, iso, now_utc
 from services.yfinance_svc import get_quote, _yf_history_sync, _yf_fundamentals_sync, compute_technicals
 from services.ai import run_ai_analysis
 from services.quota import enforce_analysis_quota, plan_for
+from routers.disclaimer import require_accepted
 
 router = APIRouter(tags=["analysis"])
+
+# Per-task wall-clock cap for the quick/top|bottom batch. Keeps us under the
+# preview ingress 60s limit even when one Claude call stalls.
+QUICK_PER_TASK_TIMEOUT = 55.0
 
 
 async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
@@ -33,6 +38,7 @@ async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
 @router.post("/analysis/{ticker}")
 async def create_analysis(ticker: str, user=Depends(get_current_user)):
     ticker = ticker.upper().strip()
+    await require_accepted(user)
     await enforce_analysis_quota(user)
     quote_task = get_quote(ticker)
     hist_task = asyncio.to_thread(_yf_history_sync, ticker, "6mo", "1d")
@@ -84,6 +90,7 @@ async def analysis_history(ticker: str, user=Depends(get_current_user)):
 async def quick_analyze(kind: str, user=Depends(get_current_user)):
     if kind not in ("top", "bottom"):
         raise HTTPException(status_code=400, detail="kind must be 'top' or 'bottom'")
+    await require_accepted(user)
     p = plan_for(user)
     if not p["quick_actions"]:
         raise HTTPException(
@@ -97,19 +104,55 @@ async def quick_analyze(kind: str, user=Depends(get_current_user)):
     quotes = await asyncio.gather(*[get_quote(t) for t in tickers])
     ranked = sorted(zip(items, quotes), key=lambda iq: (iq[1].get("change_pct") or 0), reverse=(kind == "top"))
     selected = [iq[0]["ticker"] for iq in ranked[:3]]
-    gathered = await asyncio.gather(
-        *[create_analysis(tk, user=user) for tk in selected],
-        return_exceptions=True,
+
+    # Kick off analyses as named tasks so we can identify who timed out.
+    task_to_ticker = {
+        asyncio.create_task(create_analysis(tk, user=user)): tk for tk in selected
+    }
+    done, pending = await asyncio.wait(
+        list(task_to_ticker.keys()),
+        timeout=QUICK_PER_TASK_TIMEOUT,
+        return_when=asyncio.ALL_COMPLETED,
     )
+    # Clean up anything that didn't finish in time
+    for task in pending:
+        task.cancel()
+
     results = []
-    for tk, res in zip(selected, gathered):
-        if isinstance(res, HTTPException):
-            results.append({"ticker": tk, "error": res.detail})
-        elif isinstance(res, Exception):
-            results.append({"ticker": tk, "error": str(res)[:200]})
+    completed = 0
+    timed_out = 0
+    errored = 0
+    for task, tk in task_to_ticker.items():
+        if task in done:
+            try:
+                results.append(task.result())
+                completed += 1
+            except HTTPException as e:
+                errored += 1
+                detail = e.detail if isinstance(e.detail, str) else str(e.detail)
+                results.append({"ticker": tk, "error": detail, "status_code": e.status_code})
+            except Exception as e:
+                errored += 1
+                results.append({"ticker": tk, "error": str(e)[:200]})
         else:
-            results.append(res)
-    return {"kind": kind, "analyzed": selected, "results": results}
+            timed_out += 1
+            results.append({
+                "ticker": tk,
+                "status": "timeout",
+                "error": f"Analysis did not complete within {int(QUICK_PER_TASK_TIMEOUT)}s — try the single-ticker button to continue.",
+            })
+
+    return {
+        "kind": kind,
+        "analyzed": selected,
+        "results": results,
+        "summary": {
+            "completed": completed,
+            "timed_out": timed_out,
+            "errored": errored,
+            "total": len(selected),
+        },
+    }
 
 
 # ---------- Alerts ----------

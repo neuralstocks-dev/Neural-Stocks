@@ -14,6 +14,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
     (r) => r,
     (err) => {
+        // Normalize FastAPI dict-details (e.g., 428 disclaimer_required) into a string
+        // so consumers can always setState with a safe string to render.
+        const d = err?.response?.data?.detail;
+        if (d && typeof d === "object") {
+            err.response.data._detail_object = d; // keep original for programmatic checks
+            err.response.data.detail = d.message || d.msg || d.detail || JSON.stringify(d);
+        }
         if (err?.response?.status === 401) {
             // Force relogin only if a token was present (i.e., session expired)
             if (localStorage.getItem("sai_token")) {
