@@ -35,8 +35,8 @@ export default function AddStockModal({ open, onClose, onAdded }) {
             try {
                 const r = await api.get("/stocks/search", { params: { q: query } });
                 setResults(r.data || []);
-            } catch {
-                /* ignore */
+            } catch (err) {
+                console.warn("stock search failed:", err?.message || err);
             }
         }, 180);
         return () => clearTimeout(t);

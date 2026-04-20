@@ -213,7 +213,7 @@ export default function PublicVerdictPage() {
                             <ol className="space-y-4">
                                 {(a.risk_factors || []).map((r, i) => (
                                     <li
-                                        key={i}
+                                        key={`risk-${i}-${(r || "").slice(0, 30)}`}
                                         className="flex gap-4 pb-4"
                                         style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
                                     >

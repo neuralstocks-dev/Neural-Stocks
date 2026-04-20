@@ -244,7 +244,7 @@ export default function TimelineFitModal({ ticker, onClose }) {
                                     <ul className="space-y-2" data-testid="timeline-strengths">
                                         {(data.strengths || []).map((s, i) => (
                                             <li
-                                                key={i}
+                                                key={`strength-${i}-${(s || "").slice(0, 30)}`}
                                                 className="text-sm leading-relaxed pl-4 relative"
                                                 style={{ color: "hsl(var(--text-primary))" }}
                                             >
@@ -267,7 +267,7 @@ export default function TimelineFitModal({ ticker, onClose }) {
                                     <ul className="space-y-2" data-testid="timeline-risks">
                                         {(data.risks || []).map((r, i) => (
                                             <li
-                                                key={i}
+                                                key={`risk-${i}-${(r || "").slice(0, 30)}`}
                                                 className="text-sm leading-relaxed pl-4 relative"
                                                 style={{ color: "hsl(var(--text-primary))" }}
                                             >

@@ -175,8 +175,8 @@ export default function DashboardPage() {
         try {
             const r = await api.get("/quota");
             setQuota(r.data);
-        } catch {
-            /* ignore */
+        } catch (err) {
+            console.warn("quota fetch failed:", err?.message || err);
         }
     }, []);
 

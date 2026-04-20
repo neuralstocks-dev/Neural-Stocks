@@ -54,7 +54,7 @@ export default function VerdictRing({ score = 0, signal = "HOLD", size = 200 }) 
                     const y2 = cy + Math.sin(a) * outer;
                     return (
                         <line
-                            key={i}
+                            key={`tick-${a.toFixed(4)}`}
                             x1={x1}
                             y1={y1}
                             x2={x2}

@@ -37,8 +37,8 @@ export default function ShareVerdictButton({ analysisId }) {
             await navigator.clipboard.writeText(shareUrl);
             setCopied(true);
             setTimeout(() => setCopied(false), 1800);
-        } catch {
-            // ignore
+        } catch (err) {
+            console.warn("clipboard copy failed:", err?.message || err);
         }
     };
 

@@ -416,7 +416,7 @@ export default function AnalysisReportPage() {
                                     <ol className="space-y-4">
                                         {(analysis.risk_factors || []).map((r, i) => (
                                             <li
-                                                key={i}
+                                                key={`risk-${i}-${(r || "").slice(0, 30)}`}
                                                 className="flex gap-4 pb-4"
                                                 style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
                                                 data-testid={`risk-item-${i}`}
