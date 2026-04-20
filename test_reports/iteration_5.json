@@ -1,0 +1,64 @@
+{
+  "summary": "Iteration 6 testing of Neural — PayPal sandbox subscriptions, Resend receipts, dynamic admin pricing, admin user-delete + clear-alerts, share rate limit, plan-upgrade gating. Backend: 22/22 tests pass (100%). Frontend: Pricing page renders correctly with PayPal SDK (4 iframes loaded for Pro+Elite buttons), sandbox banner visible, all 3 plan cards present. Admin page shows new pricing editor module + per-user action icons (Reset, BellOff/clear-alerts, Trash/delete) on every user row. Non-admin user (demo@stockai.io) is correctly redirected from /admin to /dashboard.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/billing/cancel",
+        "issue": "Endpoint returns 'No active subscription' for users without paypal_subscription_id, but the user.plan is left untouched. If a user's DB record has plan=pro/elite (admin-elevated) but no PayPal sub, calling /cancel returns 400 and never resets them to free. Acceptable for MVP but worth a UX note: the Cancel button is hidden for these users so it's only reachable via API."
+      },
+      {
+        "endpoint": "POST /api/billing/webhook",
+        "issue": "When PAYPAL_WEBHOOK_ID env is unset (current state), webhooks are accepted, logged to db.webhook_events with verified=false, and never mutate user/subscription state. This is by design but means recurring renewal receipts and subscription lifecycle updates from PayPal will silently no-op until WEBHOOK_ID is configured. Action: register a webhook in PayPal dashboard and set PAYPAL_WEBHOOK_ID before going live."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Pricing page — Cancel subscription button visibility",
+        "issue": "tiers@demo.io is documented as 'pro' plan in test_credentials.md, but the nav badge currently reads 'FREE PLAN' — user.plan in DB has likely been overwritten by an earlier admin/cancel flow. Because the Cancel/Downgrade buttons only render when user.plan != 'free' AND paypal_subscription_id is present, the buttons never appear for this user. Cosmetic for QA but worth a re-seed of tiers@demo.io to plan='pro' if this test fixture is meant to demo the cancel flow. Actual cancel logic (POST /api/billing/cancel returning 400 for no-sub users) tested green via API.",
+        "affected_selectors": ["[data-testid=\"cancel-pro-button\"]", "[data-testid=\"downgrade-free-button\"]"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Admin page — Subscription pricing editor",
+        "issues": ["The two pricing inputs render empty for ~500ms before useEffect populates them with current DB values. Add an initial loading skeleton or set inputs to placeholders to avoid the visual flicker."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration6.py",
+    "/app/test_reports/pytest/iteration6_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Re-seed tiers@demo.io with plan='pro' and a fake paypal_subscription_id so the Cancel button is reachable in manual QA on the Pricing page.",
+    "(Production prep) Register a PayPal webhook URL and populate PAYPAL_WEBHOOK_ID in /app/backend/.env so subscription lifecycle webhooks actually mutate state.",
+    "(Polish) Add loading skeleton to the admin pricing inputs so they don't render empty for ~500ms on first load."
+  ],
+  "critical_code_review_comments": [
+    "billing.py: /billing/config calls get_plan_ids() which lazy-creates PayPal product+plans on first hit. First request can take 5-15s. Consider warming this on startup or showing a loader on the Pricing page; currently the PayPal buttons render without a clear pending state during the cold call.",
+    "billing.py: /billing/activate awaits send_receipt_email() inline — if Resend is down or rate-limits, the activate call will block on it. The comment says 'fire-and-forget' but it is awaited. Wrap it with asyncio.create_task or try/except so a Resend failure doesn't 500 a successful subscription activation.",
+    "paypal.py: get_plan_ids() rotates plans on every price change but does NOT update existing PayPal subscribers — by design, but worth surfacing in admin UI: 'X existing subscribers stay at old price until they re-subscribe.' (Already in success message, good.)",
+    "admin.py: delete_user cascades correctly to watchlist/analyses/alerts/shared_verdicts/quick_jobs/disclaimers/subscriptions but does NOT call PayPal to cancel any active subscription — orphan PayPal subs will keep billing. Consider calling cancel_subscription(sid) before deleting if user.paypal_subscription_id exists.",
+    "analysis.py: share rate-limit check uses iso(now_utc() - timedelta(days=1)) — a sliding 24h window, not a calendar day. Spec says 'daily share-link rate limit'; sliding-window is fine but document it. Current implementation: created_at comparisons use ISO string lex order which is correct for UTC ISO timestamps.",
+    "config.py: PLANS share_per_day values are 5/50/None as spec'd. plans_with_live_pricing() only patches price_usd, share_per_day stays from PLANS — meaning admin cannot change the share limit at runtime, only the price. If admins should also tune share_per_day, add it to db.settings/pricing. (Out of scope for this iteration, just flagging.)",
+    "pricing.py: get_pricing reads from db.settings on every call — adds a mongo round-trip to every /plans, /billing/config, and /admin/pricing hit. Consider in-process caching with a small TTL (e.g., 30s) or a settings-change pubsub.",
+    "paypal.py: _token_cache is module-level dict — fine for single-worker uvicorn but breaks under multi-worker deploys. If you ever scale to >1 worker, move to redis or per-request fetch."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration6.py (NEW — 22 tests covering billing, pricing, admin user mgmt, share rate-limit, plan upgrade gating)"
+  ],
+  "success_rate": {
+    "backend": "22/22 (100%)",
+    "frontend": "All key UI elements verified visible: pricing page (3 cards + PayPal buttons + sandbox banner), admin page (pricing module + per-row action icons), non-admin redirect. Manual end-to-end PayPal checkout NOT attempted per request."
+  },
+  "test_credentials": "Admin: jolor69@gmail.com / admin1234 · Pro (per credentials file): tiers@demo.io / pass1234 (currently shows FREE in UI — see frontend issue) · Free: demo@stockai.io / demo1234. Throwaway TEST_it6_*@neural-qa.com users created/deleted per test.",
+  "seed_data_creation": "Test creates throwaway users with TEST_it6_ prefix; most are deleted by their own test. PayPal sandbox plans are created/rotated under product 'Neural AI Stock Analysis' — these accumulate in PayPal sandbox; harmless. db.settings.pricing gets read/written and restored.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run iteration 6 suite: `python -m pytest /app/backend/tests/test_iteration6.py -v`. The TestAdminPricing.test_put_pricing_updates_and_returns_plan_ids takes ~30s because it round-trips to PayPal sandbox to rotate plans. The /billing/config endpoint also takes 5-15s on cold-start (creates product+plans). PAYPAL_WEBHOOK_ID is intentionally empty in env, so webhook events log but do NOT mutate state — that is the spec'd behavior; if you set the env var, re-test webhook mutation paths (BILLING.SUBSCRIPTION.ACTIVATED → user.plan update).",
+  "rca of the issue": "tiers@demo.io showing FREE PLAN in nav: likely an earlier test (this iteration's TestPlanUpgrade.test_admin_can_upgrade_directly used admin_token, not pro_token, so didn't touch tiers; however admin pricing test rotated plans which might've caused the OPS to set wrong plan via webhook in a prior run). Recommend: db.users.update_one({email:'tiers@demo.io'}, {$set:{plan:'pro'}}) to restore the seed."
+}

@@ -1,12 +1,21 @@
-"""Admin: user management, test-unlock, login events."""
+"""Admin: user management, test-unlock, login events, pricing."""
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
 from core.config import UNLOCK_DURATIONS, ADMIN_EMAILS
 from core.db import db
 from core.models import UnlockReq
 from core.security import admin_required, iso, now_utc, is_admin_email
+from services.pricing import get_pricing, set_pricing
+from services.paypal import get_plan_ids, PayPalError
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+class PricingReq(BaseModel):
+    pro_price: float = Field(gt=0, le=9999)
+    elite_price: float = Field(gt=0, le=9999)
 
 
 def _sanitize_user(u: dict) -> dict:
@@ -100,4 +109,69 @@ async def reset_user(user_id: str, _admin=Depends(admin_required)):
         "user_id": user_id,
         "email": target["email"],
         "message": f"{target['email']} reset to Free plan. User must log out & log back in to see changes.",
+    }
+
+
+# ---------- User deletion ----------
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: str, admin=Depends(admin_required)):
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if is_admin_email(target.get("email")):
+        raise HTTPException(status_code=403, detail="Cannot delete an admin account")
+    if target["id"] == admin["id"]:
+        raise HTTPException(status_code=403, detail="Cannot delete yourself")
+    # Cascade delete owned data
+    await db.watchlist.delete_many({"user_id": user_id})
+    await db.analyses.delete_many({"user_id": user_id})
+    await db.alerts.delete_many({"user_id": user_id})
+    await db.shared_verdicts.delete_many({"owner_id": user_id})
+    await db.quick_jobs.delete_many({"user_id": user_id})
+    await db.disclaimers.delete_many({"user_id": user_id})
+    await db.subscriptions.delete_many({"user_id": user_id})
+    await db.users.delete_one({"id": user_id})
+    return {
+        "ok": True,
+        "user_id": user_id,
+        "email": target["email"],
+        "message": f"{target['email']} and all associated data deleted.",
+    }
+
+
+# ---------- Alert list removal ----------
+@router.delete("/users/{user_id}/alerts")
+async def delete_user_alerts(user_id: str, _admin=Depends(admin_required)):
+    target = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    res = await db.alerts.delete_many({"user_id": user_id})
+    return {
+        "ok": True,
+        "user_id": user_id,
+        "email": target["email"],
+        "removed": res.deleted_count,
+        "message": f"Cleared {res.deleted_count} alerts for {target['email']}.",
+    }
+
+
+# ---------- Pricing management ----------
+@router.get("/pricing")
+async def get_admin_pricing(_admin=Depends(admin_required)):
+    return await get_pricing()
+
+
+@router.put("/pricing")
+async def update_admin_pricing(req: PricingReq, _admin=Depends(admin_required)):
+    prices = await set_pricing(req.pro_price, req.elite_price)
+    # Rotate PayPal plans so new checkouts charge the new price
+    try:
+        plan_ids = await get_plan_ids(prices)
+    except PayPalError as e:
+        raise HTTPException(status_code=502, detail=f"Price saved but PayPal plan rotation failed: {e}")
+    return {
+        "ok": True,
+        "prices": prices,
+        "plan_ids": plan_ids,
+        "message": f"Updated pricing: Pro ${prices['pro']:.2f}/mo · Elite ${prices['elite']:.2f}/mo. New checkouts will use the updated prices; existing subscribers continue at their current rate until they resubscribe.",
     }

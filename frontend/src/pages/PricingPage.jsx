@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
-import { Check, Loader2, X, Sparkles, Crown, Zap } from "lucide-react";
+import { Check, Loader2, X, Sparkles, Crown, Zap, ShieldCheck } from "lucide-react";
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 const ORDER = ["free", "pro", "elite"];
 
@@ -13,6 +13,7 @@ const FEATURE_MATRIX = [
     { label: "Analyses / week", key: "analyses_per_week" },
     { label: "Quick Top/Bottom 5 sweep", key: "quick_actions", type: "bool" },
     { label: "Public share verdicts", key: "share_verdicts", type: "bool" },
+    { label: "Shares / day", key: "share_per_day" },
     { label: "Analysis history retention", key: "analysis_history_days", suffix: " days" },
 ];
 
@@ -33,29 +34,74 @@ function renderValue(plan, feat) {
 
 export default function PricingPage() {
     const { user, refreshUser } = useAuth();
-    const navigate = useNavigate();
     const [plans, setPlans] = useState(null);
-    const [upgrading, setUpgrading] = useState(null);
+    const [billingConfig, setBillingConfig] = useState(null);
     const [message, setMessage] = useState("");
+    const [error, setError] = useState("");
+    const [processing, setProcessing] = useState(null); // planKey
+    const [cancelling, setCancelling] = useState(false);
 
     useEffect(() => {
-        api.get("/plans").then((r) => setPlans(r.data));
+        (async () => {
+            try {
+                const [plansRes, cfgRes] = await Promise.all([
+                    api.get("/plans"),
+                    api.get("/billing/config"),
+                ]);
+                setPlans(plansRes.data);
+                setBillingConfig(cfgRes.data);
+            } catch (err) {
+                setError(err?.response?.data?.detail || "Failed to load pricing");
+            }
+        })();
     }, []);
 
-    const onUpgrade = async (planKey) => {
-        setUpgrading(planKey);
+    const downgradeToFree = async () => {
+        setError("");
         setMessage("");
+        setProcessing("free");
         try {
-            const r = await api.post("/plan/upgrade", { plan: planKey });
+            if (user?.plan !== "free") {
+                // Cancel PayPal subscription if active
+                await api.post("/billing/cancel");
+            }
             await refreshUser();
-            setMessage(r.data.message || "Plan updated");
-            setTimeout(() => setMessage(""), 4000);
+            setMessage("You are now on the Free plan. Subscription cancelled.");
+            setTimeout(() => setMessage(""), 5000);
         } catch (err) {
-            setMessage(err?.response?.data?.detail || "Upgrade failed");
+            setError(err?.response?.data?.detail || "Downgrade failed");
         } finally {
-            setUpgrading(null);
+            setProcessing(null);
         }
     };
+
+    const cancelSubscription = async () => {
+        if (!window.confirm("Cancel your subscription and downgrade to Free?")) return;
+        setCancelling(true);
+        setError("");
+        setMessage("");
+        try {
+            const r = await api.post("/billing/cancel");
+            await refreshUser();
+            setMessage(r.data.message);
+            setTimeout(() => setMessage(""), 5000);
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Cancel failed");
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const paypalOptions = useMemo(() => {
+        if (!billingConfig?.client_id) return null;
+        return {
+            "client-id": billingConfig.client_id,
+            vault: true,
+            intent: "subscription",
+            currency: "USD",
+            "disable-funding": "credit",
+        };
+    }, [billingConfig]);
 
     return (
         <AppShell>
@@ -69,24 +115,44 @@ export default function PricingPage() {
                 </h1>
                 <p className="mt-4 max-w-2xl text-base" style={{ color: "hsl(var(--text-secondary))" }}>
                     Start free. Scale your watchlist, unlock quick batch sweeps, and shareable
-                    verdicts as you grow. This is a demo — upgrades apply immediately, no card
-                    required.
+                    verdicts as you grow. Paid plans billed monthly via PayPal — cancel anytime.
                 </p>
+
+                {billingConfig?.env === "sandbox" && (
+                    <div
+                        className="mt-6 px-4 py-3 font-mono text-xs"
+                        style={{
+                            border: "1px solid hsl(var(--hold))",
+                            color: "hsl(var(--hold))",
+                            background: "hsla(38, 45%, 45%, 0.06)",
+                            borderRadius: 2,
+                        }}
+                        data-testid="sandbox-banner"
+                    >
+                        <ShieldCheck size={12} className="inline mr-2" strokeWidth={1.5} />
+                        SANDBOX MODE · Use a PayPal sandbox buyer account. No real charge.
+                    </div>
+                )}
 
                 {message && (
                     <div className="signal-buy px-4 py-3 mt-6 font-mono text-sm" data-testid="upgrade-message">
                         {message}
                     </div>
                 )}
+                {error && (
+                    <div className="signal-sell px-4 py-3 mt-6 font-mono text-sm" data-testid="upgrade-error">
+                        {error}
+                    </div>
+                )}
 
-                {!plans && (
+                {(!plans || !billingConfig) && !error && (
                     <div className="py-20 text-center">
                         <Loader2 className="animate-spin mx-auto" size={22} />
                     </div>
                 )}
 
-                {plans && (
-                    <>
+                {plans && billingConfig && paypalOptions && (
+                    <PayPalScriptProvider options={paypalOptions}>
                         <section className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mt-10">
                             {ORDER.map((key) => {
                                 const p = plans[key];
@@ -140,10 +206,7 @@ export default function PricingPage() {
                                             {p.name}
                                         </h3>
                                         <div className="mt-4 flex items-baseline gap-2">
-                                            <span
-                                                className="font-mono hero-number"
-                                                style={{ fontSize: "3rem" }}
-                                            >
+                                            <span className="font-mono hero-number" style={{ fontSize: "3rem" }}>
                                                 ${p.price_usd.toFixed(2)}
                                             </span>
                                             <span
@@ -170,7 +233,9 @@ export default function PricingPage() {
                                                 Quick batch sweep (Top / Bottom 5)
                                             </FeatureLi>
                                             <FeatureLi enabled={p.share_verdicts}>
-                                                Public shareable verdict pages
+                                                {p.share_per_day === null
+                                                    ? "Unlimited share verdicts"
+                                                    : `${p.share_per_day} share verdicts / day`}
                                             </FeatureLi>
                                             <FeatureLi>
                                                 {p.analysis_history_days >= 365
@@ -179,83 +244,170 @@ export default function PricingPage() {
                                             </FeatureLi>
                                         </ul>
 
-                                        <button
-                                            onClick={() => onUpgrade(key)}
-                                            disabled={isCurrent || upgrading}
-                                            className={isCurrent ? "btn-ghost w-full mt-8" : "btn-primary w-full mt-8"}
-                                            data-testid={`upgrade-${key}-button`}
-                                        >
-                                            {upgrading === key ? (
-                                                <Loader2 size={14} className="animate-spin" />
-                                            ) : isCurrent ? (
-                                                "Your current plan"
-                                            ) : p.price_usd === 0 ? (
-                                                "Downgrade to Free"
+                                        <div className="mt-8">
+                                            {isCurrent ? (
+                                                key !== "free" ? (
+                                                    <button
+                                                        onClick={cancelSubscription}
+                                                        disabled={cancelling}
+                                                        className="btn-ghost w-full"
+                                                        data-testid={`cancel-${key}-button`}
+                                                    >
+                                                        {cancelling ? (
+                                                            <Loader2 size={14} className="animate-spin" />
+                                                        ) : (
+                                                            "Cancel subscription"
+                                                        )}
+                                                    </button>
+                                                ) : (
+                                                    <button disabled className="btn-ghost w-full" data-testid={`current-${key}-button`}>
+                                                        Your current plan
+                                                    </button>
+                                                )
+                                            ) : key === "free" ? (
+                                                <button
+                                                    onClick={downgradeToFree}
+                                                    disabled={processing === "free"}
+                                                    className="btn-ghost w-full"
+                                                    data-testid="downgrade-free-button"
+                                                >
+                                                    {processing === "free" ? (
+                                                        <Loader2 size={14} className="animate-spin" />
+                                                    ) : (
+                                                        "Downgrade to Free"
+                                                    )}
+                                                </button>
                                             ) : (
-                                                `Switch to ${p.name}`
+                                                <PayPalSubscribeButton
+                                                    planKey={key}
+                                                    planId={billingConfig.plan_ids[key]}
+                                                    planName={p.name}
+                                                    processing={processing === key}
+                                                    setProcessing={(v) => setProcessing(v ? key : null)}
+                                                    onSuccess={(msg) => {
+                                                        setMessage(msg);
+                                                        refreshUser();
+                                                        setTimeout(() => setMessage(""), 6000);
+                                                    }}
+                                                    onError={(m) => setError(m)}
+                                                />
                                             )}
-                                        </button>
+                                        </div>
                                     </div>
                                 );
                             })}
                         </section>
+                    </PayPalScriptProvider>
+                )}
 
-                        <section className="module mt-6 md:mt-10 p-5 md:p-8" data-testid="feature-matrix">
-                            <p className="text-overline">Feature matrix</p>
-                            <h3
-                                className="font-serif mt-2 mb-6"
-                                style={{ fontSize: "1.8rem", letterSpacing: "-0.01em" }}
-                            >
-                                Side-by-side.
-                            </h3>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
-                                    <thead>
-                                        <tr>
-                                            <th className="text-left text-overline py-3"></th>
+                {plans && (
+                    <section className="module mt-6 md:mt-10 p-5 md:p-8" data-testid="feature-matrix">
+                        <p className="text-overline">Feature matrix</p>
+                        <h3
+                            className="font-serif mt-2 mb-6"
+                            style={{ fontSize: "1.8rem", letterSpacing: "-0.01em" }}
+                        >
+                            Side-by-side.
+                        </h3>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+                                <thead>
+                                    <tr>
+                                        <th className="text-left text-overline py-3"></th>
+                                        {ORDER.map((key) => (
+                                            <th
+                                                key={key}
+                                                className="text-right text-overline py-3 px-4"
+                                                style={{ color: "hsl(var(--text-secondary))" }}
+                                            >
+                                                {plans[key].name}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {FEATURE_MATRIX.map((feat) => (
+                                        <tr
+                                            key={feat.key}
+                                            style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                                        >
+                                            <td className="py-3 pr-4" style={{ color: "hsl(var(--text-secondary))" }}>
+                                                {feat.label}
+                                            </td>
                                             {ORDER.map((key) => (
-                                                <th
+                                                <td
                                                     key={key}
-                                                    className="text-right text-overline py-3 px-4"
-                                                    style={{ color: "hsl(var(--text-secondary))" }}
+                                                    className="py-3 px-4 text-right"
+                                                    style={{ color: "hsl(var(--text-primary))" }}
                                                 >
-                                                    {plans[key].name}
-                                                </th>
+                                                    {renderValue(plans[key], feat)}
+                                                </td>
                                             ))}
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        {FEATURE_MATRIX.map((feat) => (
-                                            <tr
-                                                key={feat.key}
-                                                style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
-                                            >
-                                                <td className="py-3 pr-4" style={{ color: "hsl(var(--text-secondary))" }}>
-                                                    {feat.label}
-                                                </td>
-                                                {ORDER.map((key) => (
-                                                    <td
-                                                        key={key}
-                                                        className="py-3 px-4 text-right"
-                                                        style={{ color: "hsl(var(--text-primary))" }}
-                                                    >
-                                                        {renderValue(plans[key], feat)}
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-
-                        <p className="text-overline mt-8" style={{ color: "hsl(var(--text-muted))", fontSize: "0.6rem" }}>
-                            Demo pricing · no payment processor attached yet. Stripe checkout lands in Phase 2.
-                        </p>
-                    </>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 )}
+
+                <p className="text-overline mt-8 max-w-3xl leading-relaxed" style={{ color: "hsl(var(--text-muted))", fontSize: "0.62rem" }}>
+                    Neural is an AI-assisted analysis tool. Content is for educational and informational
+                    purposes only and is not investment advice. Payment processing by PayPal. Cancel
+                    anytime — no refunds for partial months.
+                </p>
             </div>
         </AppShell>
+    );
+}
+
+function PayPalSubscribeButton({ planKey, planId, planName, processing, setProcessing, onSuccess, onError }) {
+    return (
+        <div className="relative" data-testid={`paypal-${planKey}-button-wrap`}>
+            {processing && (
+                <div
+                    className="absolute inset-0 grid place-items-center z-10 font-mono text-xs"
+                    style={{ background: "rgba(11,11,11,0.75)", color: "hsl(var(--hold))" }}
+                >
+                    <Loader2 size={16} className="animate-spin" />
+                </div>
+            )}
+            <PayPalButtons
+                style={{
+                    layout: "vertical",
+                    color: "gold",
+                    shape: "rect",
+                    label: "subscribe",
+                    height: 42,
+                }}
+                disabled={processing}
+                createSubscription={(data, actions) => {
+                    return actions.subscription.create({
+                        plan_id: planId,
+                    });
+                }}
+                onApprove={async (data) => {
+                    setProcessing(true);
+                    try {
+                        const r = await api.post("/billing/activate", {
+                            subscription_id: data.subscriptionID,
+                            plan: planKey,
+                        });
+                        onSuccess(r.data.message || `${planName} activated.`);
+                    } catch (err) {
+                        onError(err?.response?.data?.detail || "Activation failed");
+                    } finally {
+                        setProcessing(false);
+                    }
+                }}
+                onError={(err) => {
+                    onError(err?.message || "PayPal error");
+                }}
+                onCancel={() => {
+                    onError("Checkout cancelled");
+                }}
+            />
+        </div>
     );
 }
 

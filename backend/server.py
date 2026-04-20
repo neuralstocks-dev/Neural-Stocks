@@ -5,7 +5,7 @@ from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 
 from core.db import client
-from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer
+from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +31,7 @@ api_router.include_router(analysis.router)
 api_router.include_router(admin.router)
 api_router.include_router(scorecard.router)
 api_router.include_router(disclaimer.router)
+api_router.include_router(billing.router)
 
 app.include_router(api_router)
 

@@ -3,7 +3,7 @@ import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Loader2, ShieldCheck, Clock, RotateCcw, Search } from "lucide-react";
+import { Loader2, ShieldCheck, Clock, RotateCcw, Search, Trash2, BellOff, DollarSign } from "lucide-react";
 import { timeAgo } from "@/lib/format";
 
 const DURATIONS = [
@@ -41,6 +41,10 @@ export default function AdminPage() {
     const [error, setError] = useState("");
     const [query, setQuery] = useState("");
     const [pendingDuration, setPendingDuration] = useState({}); // user_id -> duration value
+    const [pricing, setPricing] = useState(null);
+    const [proForm, setProForm] = useState("");
+    const [eliteForm, setEliteForm] = useState("");
+    const [savingPrice, setSavingPrice] = useState(false);
 
     const loadAll = async () => {
         setLoading(true);
@@ -100,6 +104,59 @@ export default function AdminPage() {
         }
     };
 
+    const deleteUser = async (uid, email) => {
+        if (!window.confirm(`Permanently delete ${email} and ALL their data (watchlist, analyses, alerts, shares)? This cannot be undone.`)) return;
+        setError("");
+        setMessage("");
+        setBusy(uid);
+        try {
+            const r = await api.delete(`/admin/users/${uid}`);
+            setMessage(r.data.message);
+            await loadAll();
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Delete failed");
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    const clearAlerts = async (uid, email) => {
+        if (!window.confirm(`Remove all alerts for ${email}?`)) return;
+        setError("");
+        setMessage("");
+        setBusy(uid);
+        try {
+            const r = await api.delete(`/admin/users/${uid}/alerts`);
+            setMessage(r.data.message);
+            await loadAll();
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Clear alerts failed");
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    const savePricing = async () => {
+        setError("");
+        setMessage("");
+        const pro = parseFloat(proForm);
+        const elite = parseFloat(eliteForm);
+        if (!(pro > 0) || !(elite > 0)) {
+            setError("Prices must be positive numbers");
+            return;
+        }
+        setSavingPrice(true);
+        try {
+            const r = await api.put("/admin/pricing", { pro_price: pro, elite_price: elite });
+            setMessage(r.data.message);
+            setPricing(r.data.prices);
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Pricing update failed");
+        } finally {
+            setSavingPrice(false);
+        }
+    };
+
     return (
         <AppShell>
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="admin-page">
@@ -136,8 +193,72 @@ export default function AdminPage() {
 
                 {!loading && (
                     <>
+                        {/* Pricing editor */}
+                        <section className="module mt-10" data-testid="admin-pricing-module">
+                            <div className="p-5 md:p-6" style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
+                                <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
+                                    <DollarSign size={12} className="inline mr-1" strokeWidth={1.5} /> Subscription pricing
+                                </p>
+                                <h2 className="font-serif text-2xl mt-1" style={{ letterSpacing: "-0.01em" }}>
+                                    Monthly plan pricing (USD)
+                                </h2>
+                                <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                                    Saving rotates PayPal billing plans. New checkouts use the updated price;
+                                    existing subscribers stay on their current price until they re-subscribe.
+                                </p>
+                            </div>
+                            <div className="p-5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                <label className="flex flex-col gap-2">
+                                    <span className="text-overline">Pro / month</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono" style={{ color: "hsl(var(--text-muted))" }}>$</span>
+                                        <input
+                                            type="number"
+                                            min="0.01"
+                                            step="0.01"
+                                            value={proForm}
+                                            onChange={(e) => setProForm(e.target.value)}
+                                            className="input-base font-mono"
+                                            data-testid="admin-price-pro-input"
+                                        />
+                                    </div>
+                                </label>
+                                <label className="flex flex-col gap-2">
+                                    <span className="text-overline">Elite / month</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono" style={{ color: "hsl(var(--text-muted))" }}>$</span>
+                                        <input
+                                            type="number"
+                                            min="0.01"
+                                            step="0.01"
+                                            value={eliteForm}
+                                            onChange={(e) => setEliteForm(e.target.value)}
+                                            className="input-base font-mono"
+                                            data-testid="admin-price-elite-input"
+                                        />
+                                    </div>
+                                </label>
+                                <button
+                                    onClick={savePricing}
+                                    disabled={savingPrice}
+                                    className="btn-primary"
+                                    data-testid="admin-save-pricing-button"
+                                >
+                                    {savingPrice ? <Loader2 size={14} className="animate-spin" /> : "Save pricing"}
+                                </button>
+                            </div>
+                            {pricing && (
+                                <div
+                                    className="px-5 md:px-6 pb-5 font-mono text-xs"
+                                    style={{ color: "hsl(var(--text-muted))" }}
+                                >
+                                    Current live: Pro ${pricing.pro.toFixed(2)} / mo · Elite ${pricing.elite.toFixed(2)} / mo
+                                </div>
+                            )}
+                        </section>
+
                         {/* Users table */}
-                        <section className="module mt-10" data-testid="admin-users-module">
+                        <section className="module mt-6 md:mt-10" data-testid="admin-users-module">
                             <div
                                 className="p-5 md:p-6 flex items-center justify-between flex-wrap gap-4"
                                 style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
@@ -296,6 +417,27 @@ export default function AdminPage() {
                                                             >
                                                                 <RotateCcw size={12} strokeWidth={1.5} />
                                                             </button>
+                                                            <button
+                                                                onClick={() => clearAlerts(u.id, u.email)}
+                                                                className="btn-ghost !py-1 !px-2 !text-xs"
+                                                                disabled={busy === u.id}
+                                                                title="Remove alert list"
+                                                                data-testid={`clear-alerts-${u.email}-button`}
+                                                            >
+                                                                <BellOff size={12} strokeWidth={1.5} />
+                                                            </button>
+                                                            {!u.is_admin && (
+                                                                <button
+                                                                    onClick={() => deleteUser(u.id, u.email)}
+                                                                    className="btn-ghost !py-1 !px-2 !text-xs"
+                                                                    disabled={busy === u.id}
+                                                                    title="Delete user & all data"
+                                                                    style={{ color: "hsl(var(--sell))" }}
+                                                                    data-testid={`delete-${u.email}-button`}
+                                                                >
+                                                                    <Trash2 size={12} strokeWidth={1.5} />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>

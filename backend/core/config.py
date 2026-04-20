@@ -21,6 +21,27 @@ ADMIN_EMAILS = {
     if e.strip()
 }
 
+# ---------- PayPal ----------
+PAYPAL_ENV = os.environ.get("PAYPAL_ENV", "sandbox").lower()
+if PAYPAL_ENV == "live":
+    PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_LIVE_CLIENT_ID", "")
+    PAYPAL_SECRET = os.environ.get("PAYPAL_LIVE_SECRET", "")
+    PAYPAL_API_BASE = "https://api-m.paypal.com"
+else:
+    PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_SANDBOX_CLIENT_ID", "")
+    PAYPAL_SECRET = os.environ.get("PAYPAL_SANDBOX_SECRET", "")
+    PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
+PAYPAL_WEBHOOK_ID = os.environ.get("PAYPAL_WEBHOOK_ID", "")
+
+# ---------- Resend ----------
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+
+# ---------- Plans ----------
+# Default monthly prices — overridable dynamically via db.settings by admin.
+DEFAULT_PRO_PRICE = 9.0
+DEFAULT_ELITE_PRICE = 29.0
+
 PLANS = {
     "free": {
         "name": "Free",
@@ -32,10 +53,11 @@ PLANS = {
         "share_verdicts": True,
         "analysis_history_days": 30,
         "tag": "Starter",
+        "share_per_day": 5,
     },
     "pro": {
         "name": "Pro",
-        "price_usd": 9.99,
+        "price_usd": DEFAULT_PRO_PRICE,
         "watchlist_limit": 10,
         "analyses_per_day": 15,
         "analyses_per_week": 60,
@@ -43,10 +65,11 @@ PLANS = {
         "share_verdicts": True,
         "analysis_history_days": 365,
         "tag": "Most popular",
+        "share_per_day": 50,
     },
     "elite": {
         "name": "Elite",
-        "price_usd": 29.99,
+        "price_usd": DEFAULT_ELITE_PRICE,
         "watchlist_limit": 25,
         "analyses_per_day": None,
         "analyses_per_week": None,
@@ -54,6 +77,7 @@ PLANS = {
         "share_verdicts": True,
         "analysis_history_days": 3650,
         "tag": "Institutional",
+        "share_per_day": None,
     },
 }
 
