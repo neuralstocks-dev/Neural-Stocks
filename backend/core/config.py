@@ -29,7 +29,7 @@ PLANS = {
         "analyses_per_day": 1,
         "analyses_per_week": 2,
         "quick_actions": False,
-        "share_verdicts": False,
+        "share_verdicts": True,
         "analysis_history_days": 30,
         "tag": "Starter",
     },

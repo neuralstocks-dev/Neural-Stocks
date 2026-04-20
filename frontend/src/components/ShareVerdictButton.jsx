@@ -1,19 +1,19 @@
 import React, { useState } from "react";
 import api from "@/lib/api";
-import { Share2, Copy, Check, X, Loader2, Lock } from "lucide-react";
+import { Share2, Copy, Check, X, Loader2 } from "lucide-react";
 
 /**
  * ShareVerdictButton — gated behind Pro/Elite plan.
  * Renders a button in the report page action row; opens a modal with copyable URL.
  */
-export default function ShareVerdictButton({ analysisId, userPlan }) {
+export default function ShareVerdictButton({ analysisId }) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [shareUrl, setShareUrl] = useState("");
     const [copied, setCopied] = useState(false);
 
-    const gated = !analysisId || userPlan === "free";
+    const gated = !analysisId;
 
     const start = async () => {
         setOpen(true);
@@ -47,14 +47,11 @@ export default function ShareVerdictButton({ analysisId, userPlan }) {
             <button
                 onClick={start}
                 className="btn-ghost"
-                title={gated ? "Pro/Elite feature" : "Share verdict publicly"}
+                title="Share verdict publicly"
+                disabled={gated}
                 data-testid="share-verdict-button"
             >
-                {gated ? (
-                    <Lock size={14} strokeWidth={1.5} />
-                ) : (
-                    <Share2 size={14} strokeWidth={1.5} />
-                )}
+                <Share2 size={14} strokeWidth={1.5} />
                 Share
             </button>
 
@@ -75,9 +72,9 @@ export default function ShareVerdictButton({ analysisId, userPlan }) {
                             style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
                         >
                             <div>
-                                <p className="text-overline">Share verdict</p>
+                                <p className="text-overline">Your public link</p>
                                 <h3 className="font-serif text-2xl mt-1" style={{ letterSpacing: "-0.01em" }}>
-                                    {gated ? "Locked on Free plan" : "Your public link"}
+                                    Share this verdict
                                 </h3>
                             </div>
                             <button
@@ -91,38 +88,20 @@ export default function ShareVerdictButton({ analysisId, userPlan }) {
                         </div>
 
                         <div className="p-5 md:p-6">
-                            {gated && (
-                                <div>
-                                    <p className="text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                                        Public shareable verdict pages are unlocked on{" "}
-                                        <span style={{ color: "hsl(var(--buy))" }}>Pro</span> and{" "}
-                                        <span style={{ color: "hsl(var(--hold))" }}>Elite</span> plans. Upgrade to
-                                        send a no-auth link to friends, clients, or advisors.
-                                    </p>
-                                    <a
-                                        href="/pricing"
-                                        className="btn-primary mt-6 inline-flex"
-                                        data-testid="share-upgrade-cta"
-                                    >
-                                        See plans →
-                                    </a>
+                            {!loading && error && (
+                                <div className="signal-sell px-3 py-2 text-sm font-mono" data-testid="share-modal-error">
+                                    {error}
                                 </div>
                             )}
 
-                            {!gated && loading && (
+                            {loading && (
                                 <div className="py-6 text-center">
                                     <Loader2 className="animate-spin mx-auto" size={20} />
                                     <p className="text-overline mt-3">Minting link…</p>
                                 </div>
                             )}
 
-                            {!gated && error && (
-                                <div className="signal-sell px-3 py-2 text-sm font-mono" data-testid="share-modal-error">
-                                    {error}
-                                </div>
-                            )}
-
-                            {!gated && !loading && shareUrl && (
+                            {!loading && shareUrl && (
                                 <>
                                     <p className="text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
                                         Anyone with this link can view your verdict, reasoning, and risk factors
