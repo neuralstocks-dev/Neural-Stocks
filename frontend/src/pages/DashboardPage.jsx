@@ -5,6 +5,7 @@ import AppShell from "@/components/AppShell";
 import AddStockModal from "@/components/AddStockModal";
 import Sparkline from "@/components/Sparkline";
 import SignalBadge from "@/components/SignalBadge";
+import TestUnlockBanner from "@/components/TestUnlockBanner";
 import { useAuth } from "@/hooks/useAuth";
 import { formatPrice, formatPct, timeAgo } from "@/lib/format";
 import {
@@ -297,6 +298,9 @@ export default function DashboardPage() {
                         <span className="font-mono text-[hsl(var(--text-primary))]"> Top/Bottom 3</span>.
                     </p>
                 </section>
+
+                {/* Test-unlock banner (admin-granted) */}
+                <TestUnlockBanner quota={quota} />
 
                 {/* Quota banner */}
                 {quota && (

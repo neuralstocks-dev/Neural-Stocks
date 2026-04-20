@@ -11,6 +11,8 @@ import AnalysisReportPage from "@/pages/AnalysisReportPage";
 import PricingPage from "@/pages/PricingPage";
 import PublicVerdictPage from "@/pages/PublicVerdictPage";
 import AuthCallback from "@/pages/AuthCallback";
+import AdminPage from "@/pages/AdminPage";
+import ScorecardPage from "@/pages/ScorecardPage";
 import { Loader2 } from "lucide-react";
 
 function Protected({ children }) {
@@ -71,6 +73,22 @@ function AppRoutes() {
                 element={
                     <Protected>
                         <PricingPage />
+                    </Protected>
+                }
+            />
+            <Route
+                path="/scorecard"
+                element={
+                    <Protected>
+                        <ScorecardPage />
+                    </Protected>
+                }
+            />
+            <Route
+                path="/admin"
+                element={
+                    <Protected>
+                        <AdminPage />
                     </Protected>
                 }
             />

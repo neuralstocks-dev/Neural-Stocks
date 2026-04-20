@@ -1,0 +1,60 @@
+{
+  "summary": "Iteration 3 backend testing for Neural (AI Stock Analysis). Validated the big refactor from monolithic server.py into routers/ + services/ + core/ packages, admin auto-elevation via ADMIN_EMAILS env, admin user management + test-unlock grant/reset flows, login tracking, unlock enforcement across quota gates, and the new AI Accuracy Scorecard (per-user + global). Added 24 new tests in /app/backend/tests/test_iteration3.py. Full suite result: 82/84 pass (97.6%). Iteration-1 + Iteration-2 regression is clean (no refactor regressions except the pre-existing intermittent quick_top ingress 502 — same issue flagged in iteration 2, caused by cumulative LLM wall time, not logic). One NEW finding: GET /api/scorecard/global does NOT require auth in the current implementation, which contradicts the review request that explicitly says 'auth required in this impl, via get_current_user'. Everything else works as specified: admin is auto-elevated to elite, login_count + login_events recorded, unlock durations (1h/forever) work, reset clears the unlock and restores Free plan, 402 gates are lifted/re-applied correctly, and fresh analyses show status='pending' on the scorecard.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/scorecard/global",
+        "issue": "Endpoint is PUBLIC (no auth). Returns 200 for unauthenticated requests. Review request says 'auth required in this impl (via get_current_user)'. Code (routers/scorecard.py line 139) declares `async def global_scorecard():` with no Depends(get_current_user). Its docstring says 'safe to expose publicly someday' which suggests the author intentionally made it public — but this contradicts the spec. Either (a) add `user=Depends(get_current_user)` to match the spec, or (b) update the spec & frontend to treat it as public. Response body itself correctly scrubs user_id and email, so there's no PII leak either way.",
+        "priority": "LOW"
+      },
+      {
+        "endpoint": "POST /api/analysis/quick/top",
+        "issue": "Pre-existing from iteration 2 — still intermittently returns 502 'preview environment is not responding'. Iteration-3 fix (cap to 3 tickers + asyncio.gather) IS applied in /app/backend/routers/analysis.py (lines 99-103). Still fails when any one of the 3 parallel Claude calls takes >60s (e.g., cold start or slow ticker). Mitigation options: reduce to 2 tickers, add per-call timeout+fallback (partial results), or convert to async job + polling endpoint."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_iteration2.py",
+    "/app/backend/tests/test_iteration3.py",
+    "/app/test_reports/pytest/iteration3_results.xml",
+    "/app/test_reports/pytest/iteration3_full.xml"
+  ],
+  "action_items": [
+    "Decide + fix: either add `user=Depends(get_current_user)` to /api/scorecard/global or update the spec/docs to call it public. Current state is ambiguous.",
+    "(Carryover from iter 2) Harden /api/analysis/quick/top against intermittent 502 — e.g., return partial results when any single-ticker task times out (use asyncio.wait with timeout instead of gather)."
+  ],
+  "critical_code_review_comments": [
+    "Refactor is clean and correct: server.py is now a thin bootstrap (60-ish lines) mounting routers/*; core/security.py centralizes auth primitives; services/quota.py cleanly separates plan/test_unlock/quota_snapshot logic. No duplicate code, no circular imports, all endpoints still return proper statuses + pydantic-validated bodies.",
+    "core/security.get_current_user correctly strips password_hash via the find_one projection and derives is_admin dynamically — good.",
+    "services/quota.effective_plan_key() treats both admin and active test_unlock as elite — matches spec. plan_for() + quota_snapshot() + enforce_analysis_quota() all correctly route through this.",
+    "routers/admin.list_users uses a proper _sanitize_user whitelist instead of blacklisting fields — defensive.",
+    "routers/admin.unlock_user/reset_user correctly return 404 on missing target; UnlockReq uses pydantic Literal so invalid durations auto-return 422 — verified.",
+    "routers/auth._record_login writes to BOTH login_events AND increments users.login_count atomically per call — verified both via register and subsequent login (login_count >=2 after register+login).",
+    "routers/scorecard._score_one correctly implements hit/miss/pending logic with MIN_AGE_DAYS=7 and HIT_THRESHOLD_PCT=5. Global endpoint excludes user_id from the projection ({_id:0, user_id:0}) — good.",
+    "MINOR INCONSISTENCY: /api/scorecard/global is unauthenticated despite the review request saying 'auth required'. This is the single notable deviation from the iteration-3 spec.",
+    "MINOR: routers/admin has no /me/self-check endpoint — an admin frontend has to call /auth/me to tell if current user is an admin. Not a bug, just UX note.",
+    "MINOR: _sanitize_user exposes google_linked which is fine, but consider also exposing `test_unlock_duration` (already persisted) for richer UI.",
+    "MINOR: core/config.ADMIN_EMAILS defaults to 'jolor69@gmail.com' in code even when env var is missing. Fine for this product but usually prod code would fail closed (empty set).",
+    "MINOR: routers/analysis.quick_analyze still does NOT enforce per-user daily quota for each of the 3 parallel analyses (noted in iter-2 review). A pro user doing quick/top burns 3 of their daily budget in one click — acceptable but should be documented."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration3.py (NEW — 24 tests covering login tracking, admin auto-elevation, admin endpoints auth, admin users/logins listing, unlock 1h/forever/invalid/404, reset, unlock enforcement on watchlist + quick_actions, scorecard me+global shape + pending status verification)"
+  ],
+  "success_rate": {
+    "backend": "97.6% (82/84). Iter-3 new tests: 23/24 (one failure is a spec mismatch — scorecard/global auth). Iter-1+2 regression: 59/60 (same pre-existing quick_top 502). Refactor did NOT regress anything.",
+    "frontend": "skipped per request"
+  },
+  "test_credentials": "Admin: jolor69@gmail.com / admin1234 (verified working — existing account). Regular: TEST_it3_<uuid>@example.com / Passw0rd!123 (fresh per test).",
+  "seed_data_creation": "None persistent. Each test registers throwaway TEST_it3_* users. Login events accumulate (not cleaned up) but all are harmless TEST_ rows.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: `python -m pytest /app/backend/tests/ -v --junitxml=/app/test_reports/pytest/results.xml` (takes ~3-4 min). Admin credentials jolor69@gmail.com/admin1234 are seeded. If admin password gets out of sync, delete via: `mongosh test_database --eval \"db.users.deleteOne({email:'jolor69@gmail.com'})\"` then re-run (the admin fixture auto-registers). The scorecard pending test depends on LLM availability — if 503 'budget', it will auto-skip. The 2 known failures to expect: (1) quick_top 502 ingress timeout (infra, not logic), (2) scorecard_global_requires_auth (spec mismatch, see action_items). Everything else must stay green.",
+  "rca of the issue": "scorecard_global auth failure — RCA: /app/backend/routers/scorecard.py line 139: `async def global_scorecard():` has NO Depends(get_current_user). The review request explicitly specifies 'GET /api/scorecard/global (auth required in this impl, via get_current_user)'. The code author apparently decided to make it public (see docstring 'safe to expose publicly someday'). FIX (1-line): add `, user=Depends(get_current_user)` to the signature OR delete 'auth required' from the spec. Response body correctly scrubs user_id and email so either decision is safe; it's purely a policy/spec choice. Reproduction: `curl -i https://p1-builder.preview.emergentagent.com/api/scorecard/global` → HTTP 200 today, should be 401 per spec."
+}

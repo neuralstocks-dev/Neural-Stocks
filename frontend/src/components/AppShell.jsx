@@ -65,6 +65,15 @@ export default function AppShell({ children }) {
                             Dashboard
                         </Link>
                         <Link
+                            to="/scorecard"
+                            className={`text-sm font-medium link-underline ${
+                                loc.pathname.startsWith("/scorecard") ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"
+                            }`}
+                            data-testid="nav-scorecard"
+                        >
+                            Scorecard
+                        </Link>
+                        <Link
                             to="/pricing"
                             className={`text-sm font-medium link-underline ${
                                 loc.pathname.startsWith("/pricing") ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"
@@ -73,10 +82,35 @@ export default function AppShell({ children }) {
                         >
                             Pricing
                         </Link>
+                        {user?.is_admin && (
+                            <Link
+                                to="/admin"
+                                className={`text-sm font-medium link-underline ${
+                                    loc.pathname.startsWith("/admin") ? "text-[hsl(var(--hold))]" : "text-[hsl(var(--text-secondary))]"
+                                }`}
+                                data-testid="nav-admin"
+                            >
+                                Admin
+                            </Link>
+                        )}
                     </nav>
 
                     <div className="flex items-center gap-2">
-                        {user?.plan && (
+                        {user?.is_admin && (
+                            <span
+                                className="text-overline hidden sm:inline-flex items-center px-2 py-1"
+                                style={{
+                                    border: "1px solid hsl(var(--hold))",
+                                    color: "hsl(var(--hold))",
+                                    borderRadius: 2,
+                                    fontSize: "0.56rem",
+                                }}
+                                data-testid="admin-badge"
+                            >
+                                ADMIN
+                            </span>
+                        )}
+                        {user?.plan && !user?.is_admin && (
                             <Link
                                 to="/pricing"
                                 className="text-overline mr-1 hidden sm:inline-flex items-center px-2 py-1"
