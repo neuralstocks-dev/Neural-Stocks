@@ -95,16 +95,19 @@ async def activate_subscription(req: ActivateReq, user=Depends(get_current_user)
         upsert=True,
     )
 
-    # Fire-and-forget receipt email (non-blocking-ish; we await but don't fail on email errors)
+    # Fire-and-forget receipt email — never fail activation if email service hiccups
     plan_name = "Pro" if req.plan == "pro" else "Elite"
-    await send_receipt_email(
-        to_email=user["email"],
-        full_name=user.get("full_name") or "",
-        plan_name=plan_name,
-        amount=float(amount_val),
-        subscription_id=req.subscription_id,
-        next_billing=next_billing,
-    )
+    try:
+        await send_receipt_email(
+            to_email=user["email"],
+            full_name=user.get("full_name") or "",
+            plan_name=plan_name,
+            amount=float(amount_val),
+            subscription_id=req.subscription_id,
+            next_billing=next_billing,
+        )
+    except Exception as e:
+        logger.warning("Receipt email failed (activation still succeeded): %s", e)
 
     return {
         "ok": True,

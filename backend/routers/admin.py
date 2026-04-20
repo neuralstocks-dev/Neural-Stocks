@@ -122,6 +122,14 @@ async def delete_user(user_id: str, admin=Depends(admin_required)):
         raise HTTPException(status_code=403, detail="Cannot delete an admin account")
     if target["id"] == admin["id"]:
         raise HTTPException(status_code=403, detail="Cannot delete yourself")
+    # Cancel any active PayPal subscription so we don't leave orphans billing
+    sid = target.get("paypal_subscription_id")
+    if sid:
+        try:
+            from services.paypal import cancel_subscription, PayPalError
+            await cancel_subscription(sid, reason="User account deleted by admin")
+        except Exception:
+            pass  # best-effort — proceed with local delete regardless
     # Cascade delete owned data
     await db.watchlist.delete_many({"user_id": user_id})
     await db.analyses.delete_many({"user_id": user_id})
