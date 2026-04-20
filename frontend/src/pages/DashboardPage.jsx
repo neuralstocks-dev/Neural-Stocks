@@ -293,7 +293,8 @@ export default function DashboardPage() {
                     >
                         Five positions, reasoned verdicts, signal-grade alerts. Tap
                         <span className="font-mono text-[hsl(var(--text-primary))]"> Analyze Now</span>
-                        &nbsp;on any row, or let Claude sweep your top & bottom movers.
+                        &nbsp;on any row, or let Claude sweep your movers with
+                        <span className="font-mono text-[hsl(var(--text-primary))]"> Top/Bottom 3</span>.
                     </p>
                 </section>
 
@@ -359,7 +360,7 @@ export default function DashboardPage() {
                         data-testid="analyze-top-button"
                     >
                         <span>
-                            {!canQuickActions ? "Top 5 · Pro" : quickBusy === "top" ? "Analyzing…" : "Analyze Top 5"}
+                            {!canQuickActions ? "Top 3 · Pro" : quickBusy === "top" ? "Analyzing…" : "Analyze Top 3"}
                         </span>
                         {!canQuickActions ? (
                             <Lock size={14} strokeWidth={1.5} />
@@ -377,7 +378,7 @@ export default function DashboardPage() {
                         data-testid="analyze-bottom-button"
                     >
                         <span>
-                            {!canQuickActions ? "Bottom 5 · Pro" : quickBusy === "bottom" ? "Analyzing…" : "Analyze Bottom 5"}
+                            {!canQuickActions ? "Bottom 3 · Pro" : quickBusy === "bottom" ? "Analyzing…" : "Analyze Bottom 3"}
                         </span>
                         {!canQuickActions ? (
                             <Lock size={14} strokeWidth={1.5} />

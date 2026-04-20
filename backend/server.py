@@ -882,15 +882,20 @@ async def quick_analyze(kind: str, user=Depends(get_current_user)):
         key=lambda iq: (iq[1].get("change_pct") or 0),
         reverse=(kind == "top"),
     )
-    selected = [iq[0]["ticker"] for iq in ranked[:5]]
-    # Run analyses sequentially to avoid LLM rate-limit spikes
+    selected = [iq[0]["ticker"] for iq in ranked[:3]]
+    # Run analyses concurrently to stay within preview ingress timeout
+    gathered = await asyncio.gather(
+        *[create_analysis(tk, user=user) for tk in selected],
+        return_exceptions=True,
+    )
     results = []
-    for tk in selected:
-        try:
-            res = await create_analysis(tk, user=user)
+    for tk, res in zip(selected, gathered):
+        if isinstance(res, HTTPException):
+            results.append({"ticker": tk, "error": res.detail})
+        elif isinstance(res, Exception):
+            results.append({"ticker": tk, "error": str(res)[:200]})
+        else:
             results.append(res)
-        except HTTPException as e:
-            results.append({"ticker": tk, "error": e.detail})
     return {"kind": kind, "analyzed": selected, "results": results}
 
 

@@ -1,85 +1,80 @@
-# Lucid — AI Stock Analysis Platform (Phase 1 MVP)
+# Neural — AI Stock Analysis Platform
 
 ## Original Problem Statement
-Build Phase 1 of AI Stock Analysis Agent Platform per uploaded PRD (PRD_AI_Stock_Analysis_v1.1). Core goal: democratize institutional-grade stock insights for retail investors by providing Claude-powered BUY/SELL/HOLD recommendations with explainable reasoning.
+Build Phase 1 of AI Stock Analysis Agent Platform per uploaded PRD. Core goal: democratize institutional-grade stock insights for retail investors with Claude-powered BUY/SELL/HOLD recommendations plus explainable reasoning.
 
-## User Choices (locked in Jan-2026 kickoff)
+## User Choices
 - AI Model: Claude Sonnet 4.5 via Emergent Universal LLM Key
-- Stock data source: yfinance (free, no key required)
-- News/social: skipped for MVP (faster ship)
-- Auth: JWT email/password
-- Alerts: in-app only (no email provider)
+- Stock data source: yfinance (free)
+- News/social: skipped for MVP
+- Auth: JWT email/password **+ Emergent-managed Google OAuth** (both supported)
+- Alerts: in-app only
 
 ## Architecture
-- Backend: FastAPI + MongoDB (Motor) + yfinance + emergentintegrations LlmChat
-- Frontend: React 19 + Tailwind + shadcn components + recharts + lucide-react
-- Design: "Old Money Tech" — dark-mode first, Cormorant Garamond + Outfit + IBM Plex Mono, sharp Swiss-brutalist modules with editorial serif hero numbers
+- Backend: FastAPI + MongoDB (Motor) + yfinance + emergentintegrations (Claude Sonnet 4.5) + httpx + bcrypt + PyJWT
+- Frontend: React 19 + Tailwind + shadcn/ui + recharts + lucide-react
+- Design: "Old Money Tech" — dark-first, Cormorant Garamond + Outfit + IBM Plex Mono
 
-## Core Requirements (static)
-- Watchlist management (max 5 stocks, NYSE/NASDAQ/SGX, category tags)
-- AI analysis engine returning recommendation + confidence + price target + stop loss + 200-500-word reasoning + 3-5 risk factors + technical/fundamental/peer analyses
-- Real-time alert system (in-app, auto-created on BUY/SELL with >=75% confidence)
-- Dashboard with watchlist overview, alerts feed, performance summary, quick actions (Top 5 / Bottom 5 / Refresh / Add)
-- Detailed analysis report page with executive summary, price chart, verdict ring, reasoning (editorial drop-cap), technical/fundamental/peer modules, risk factors
+## Core Features (Phase 1 shipped)
+
+### Iteration 1 (Apr 20, 2026)
+- Watchlist management (max N per plan, NYSE/NASDAQ/SGX, category tags)
+- AI analysis engine (Claude Sonnet 4.5) → recommendation + confidence + price target + stop loss + reasoning + risk factors + technical/fundamental/peer analyses
+- Real-time alert system (in-app, auto-created on BUY/SELL @ ≥75% confidence)
+- Dashboard: watchlist bento, alerts feed, performance summary, quick-actions
+- Detailed report page: verdict ring, price chart (recharts), editorial reasoning w/ drop-cap, risk factors
+- JWT auth (register/login/me) + bcrypt + axios interceptor auto-logout on 401
+- Dark/light theme toggle
+
+### Iteration 2 (Apr 20, 2026)
+- **Rebrand**: Lucid → **Neural** (all surfaces)
+- **Emergent Google OAuth** side-by-side with email/password. `POST /api/auth/google/session` exchanges Emergent session_id for a Neural JWT. Frontend AuthCallback handles `#session_id=` fragment with race-safe `useRef` guard.
+- **Subscription tiers** (Free / Pro $9.99 / Elite $29.99):
+  - Free: 3 stocks, 1 analysis/day, 2/week, no quick-actions, no share, 30-day history
+  - Pro: 10 stocks, 15/day, 60/week, quick-actions + share enabled, 1-year history
+  - Elite: 25 stocks, unlimited analyses, all Pro features, 10-year history
+  - Backend enforcement on all gated endpoints returns HTTP 402 with upgrade messaging
+  - Pricing page with 3 plan cards + side-by-side feature matrix + MVP instant-switch upgrade stub (`POST /api/plan/upgrade`)
+  - Dashboard shows live quota banner (plan badge, watchlist X/Y, analyses today/week)
+- **Share Verdict**:
+  - `POST /api/analysis/{analysis_id}/share` (Pro/Elite only, idempotent per analysis)
+  - Public route `GET /api/public/verdict/{share_id}` (**no auth**) sanitized to strip user_id/email/plan
+  - Frontend `/v/:shareId` public page with own minimal header, shareable URL modal, "Get your own verdicts →" CTA
+  - "Share" button on AnalysisReportPage (padlock for Free users → upgrade flow)
+- **Parallel quick-analyze**: `quick/top|bottom` now runs up to 3 concurrent Claude calls via `asyncio.gather` (was sequential / timing out at ingress)
 
 ## User Personas
 - Busy professional (wants automated analysis)
-- Novice investor (wants clear guidance & simplified visuals)
-- Active trader (wants AI-augmented insights)
+- Novice investor (wants clear guidance + simplified visuals)
+- Active trader (wants AI-augmented insights + quick sweeps)
 
-## What's been implemented (Apr 20, 2026 — Iteration 1)
-### Backend (/app/backend/server.py)
-- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` (JWT, bcrypt)
-- `GET /api/stocks/search?q=` — curated popular tickers (NYSE/NASDAQ/SGX)
-- `GET /api/stocks/{ticker}/quote` — yfinance live quote
-- `GET /api/stocks/{ticker}/history?period=&interval=` — price series
-- `GET/POST/DELETE /api/watchlist` + `GET /api/watchlist/live` (embeds quotes + latest analysis)
-- `POST /api/analysis/{ticker}` — Claude Sonnet 4.5 analysis (JSON response, auto-alert on conf≥75%)
-- `GET /api/analysis/{ticker}/latest` + `/history`
-- `POST /api/analysis/quick/{top|bottom}` — bulk analyze top/bottom performers
-- `GET /api/alerts`, `POST /api/alerts/{id}/read`, `POST /api/alerts/read_all`
-- yfinance helpers compute RSI(14), SMA20/50, EMA12/26, MACD from 6mo history
-- Graceful 503 on Emergent LLM budget exhaustion
+## Testing Status
+- **Iteration 1**: 35/39 backend (non-AI 100%; AI blocked by LLM budget at that time)
+- **Iteration 2**: **59/60 backend (98.3%)**. Only failure was quick_top ingress timeout; FIXED by parallelizing with `asyncio.gather` + cap to 3 tickers. AI analysis + share verdict flow manually verified end-to-end after fix.
+- Frontend: login, signup, dashboard, add AAPL, analyze AAPL, share verdict, public view, pricing page — all rendered and verified via screenshot.
 
-### Frontend (/app/frontend/src)
-- Login + Signup pages with full-bleed cinematic slate/ambient background + asymmetric frosted sign-in panel + huge Cormorant italic hero ("An analyst in your pocket.")
-- Dashboard with hero headline, 4 quick-action buttons, watchlist bento module, terminal-style alerts feed (left-border signal color), performance summary (avg change / gainers·losers / verdicts / unread)
-- Watchlist rows: mono ticker + hero-number price + trend sparkline + signal badge + analyze/view/remove actions
-- Analysis Report page: price chart (recharts), VerdictRing SVG component with tick marks, price target + stop loss modules, editorial drop-cap reasoning, 3-column technical/fundamental/peer cards, risks list with R.XX prefix
-- Dark/light theme toggle (persisted in localStorage)
-- Protected routes, axios interceptor with auto-logout on 401
+## Known Issues / Backlog
 
-## Testing Status (iteration_1.json)
-- Backend: 35/39 passed (100% non-AI). AI endpoints failing due to EMERGENT_LLM_KEY budget exhaustion — NOT a code bug. Manually verified earlier: Claude analysis returned correct JSON for AAPL.
-- Frontend: Manually verified — login → signup → dashboard with live AAPL quote working
+### Optional hardening (post-ship)
+- Split server.py into routers + services (now 1040+ lines)
+- Add Pydantic validation for full AI analysis response (currently only recommendation is validated)
+- Anonymize `shared_by_name` on public verdict (first name + last initial) to prevent accidental PII leakage
+- Cache yfinance quotes with 30-60s TTL
+- Mongo indexes on shared_verdicts.share_id, analyses(user_id,ticker,created_at)
 
-## Known Issues / Action Items (prioritized)
-### P0 — Unblock AI
-1. **EMERGENT_LLM_KEY budget exhausted.** User needs to top up via Profile → Universal Key → Add Balance. All AI endpoints then become functional immediately.
+### Phase 2 backlog (from PRD)
+- Stripe checkout for Pro/Elite (currently stub)
+- Portfolio tracking, backtesting, PDF export, SMS/Telegram alerts
+- NewsAPI + Reddit/Twitter sentiment
+- Mobile apps (iOS/Android)
+- Historical AI accuracy scorecard
 
-### P1 — Phase 1 polish
-2. Split server.py into routers (auth/stocks/watchlist/analysis) for maintainability
-3. Add Pydantic validation to AI response (price_target, stop_loss, risk_factors etc.)
-4. Cache yfinance quotes (30-60s TTL) to reduce latency on /watchlist/live
-5. Add Mongo indexes on watchlist(user_id,ticker) and analyses(user_id,ticker,created_at)
-
-### P2 — Phase 2 backlog (from PRD)
-- Scale watchlist to 20 stocks
-- Portfolio tracking with P&L
-- Backtesting engine
-- PDF export of reports
-- SMS / email / Telegram alert channels
-- Historical accuracy scorecard for AI recommendations
-- News sentiment analysis (NewsAPI + Reddit/Twitter)
-- Mobile apps (iOS / Android)
-
-### P3 — Phase 3 backlog
-- Multi-asset (Forex / Commodities / REITs / ETFs)
-- Brokerage integration (Tiger / IBKR)
-- Community features
+### Phase 3 backlog
+- Multi-asset (Forex/Commodities/REITs/ETFs)
+- Brokerage integration (Tiger/IBKR)
 - Developer API + white-label
-- Paid tiers (Pro $9.99, Elite $29.99)
 
-## Next Actions
-1. User to top up Emergent LLM key budget → re-run testing_agent to verify all 39 tests green
-2. Gather feedback on Phase 1 UI/UX → iterate
+## Next Action Items
+1. Top up Emergent LLM key budget if it runs low again (Profile → Universal Key → Add Balance)
+2. Wire Stripe checkout to replace the `POST /api/plan/upgrade` stub (Phase 2)
+3. Gather Phase 1 user feedback, iterate
