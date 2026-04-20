@@ -1,0 +1,181 @@
+{
+  "theme_strategy": {
+    "primary_theme": "dark",
+    "secondary_theme": "light",
+    "archetype": "Archetype 5 (Jewel & Luxury) blended with Archetype 4 (Swiss & High-Contrast)",
+    "description": "An 'Old Money Tech' aesthetic. Avoids standard SaaS fintech looks (no purple gradients, no soft bubbly cards). Uses editorial tension: highly dense, analytical data mixed with premium cinematic typography. Sharp, authoritative, and cinematic.",
+    "forbidden_elements": [
+      "Inter, Roboto, Space Grotesk fonts",
+      "Purple or Teal gradients",
+      "Uniform equal-sized card grids",
+      "Soft large border-radii (>8px)",
+      "Generic 'AI sparkles' or emoji icons"
+    ]
+  },
+  "typography": {
+    "strategy": "The 'Old Money Tech' Pairing. Extreme contrast between classical authority and digital precision.",
+    "fonts": {
+      "headings": {
+        "family": "Cormorant Garamond",
+        "fallback": "Playfair Display, serif",
+        "usage": "H1, H2, Hero numbers, Report titles. Must be used to create an editorial, Wall Street Journal feel."
+      },
+      "ui_body": {
+        "family": "Cabinet Grotesk",
+        "fallback": "Outfit, sans-serif",
+        "usage": "Standard UI text, buttons, navigational elements. Brings a modern, premium punch."
+      },
+      "data_tabular": {
+        "family": "IBM Plex Mono",
+        "fallback": "JetBrains Mono, monospace",
+        "usage": "Tickers (e.g., AAPL), live prices, timestamps, tabular data, confidence scores."
+      }
+    },
+    "scale_and_spacing": {
+      "h1": "text-5xl sm:text-6xl tracking-tighter leading-none font-light",
+      "h2": "text-3xl sm:text-4xl tracking-tight leading-tight",
+      "h3": "text-xl sm:text-2xl tracking-tight",
+      "body": "text-sm sm:text-base leading-relaxed tracking-normal",
+      "data_large": "text-4xl font-mono tracking-tighter",
+      "overline": "text-xs uppercase tracking-[0.2em] font-mono font-medium"
+    }
+  },
+  "colors": {
+    "dark_mode": {
+      "background": {
+        "base": "#0A0C10",
+        "surface": "#12151A",
+        "surface_elevated": "#1A1D24",
+        "overlay": "rgba(10, 12, 16, 0.7)"
+      },
+      "border": {
+        "default": "#262A33",
+        "focus": "#D4D4D8",
+        "divider": "#1E222A"
+      },
+      "text": {
+        "primary": "#F8FAFC",
+        "secondary": "#94A3B8",
+        "muted": "#475569"
+      },
+      "signals": {
+        "buy": {
+          "text": "#10B981",
+          "bg": "rgba(16, 185, 129, 0.1)",
+          "border": "rgba(16, 185, 129, 0.3)"
+        },
+        "sell": {
+          "text": "#EF4444",
+          "bg": "rgba(239, 68, 68, 0.1)",
+          "border": "rgba(239, 68, 68, 0.3)"
+        },
+        "hold": {
+          "text": "#F59E0B",
+          "bg": "rgba(245, 158, 11, 0.1)",
+          "border": "rgba(245, 158, 11, 0.3)"
+        }
+      }
+    },
+    "light_mode": {
+      "background": {
+        "base": "#F8FAFC",
+        "surface": "#FFFFFF",
+        "surface_elevated": "#F1F5F9",
+        "overlay": "rgba(255, 255, 255, 0.7)"
+      },
+      "border": {
+        "default": "#E2E8F0",
+        "focus": "#0F172A",
+        "divider": "#F1F5F9"
+      },
+      "text": {
+        "primary": "#0F172A",
+        "secondary": "#475569",
+        "muted": "#94A3B8"
+      },
+      "signals": {
+        "buy": {
+          "text": "#059669",
+          "bg": "#ECFDF5",
+          "border": "#A7F3D0"
+        },
+        "sell": {
+          "text": "#DC2626",
+          "bg": "#FEF2F2",
+          "border": "#FECACA"
+        },
+        "hold": {
+          "text": "#D97706",
+          "bg": "#FFFBEB",
+          "border": "#FDE68A"
+        }
+      }
+    }
+  },
+  "layout_and_spacing": {
+    "philosophy": "Generous Spacing + High Density Data. Mix large dramatic whitespace around sections with tightly packed, grid-aligned data modules.",
+    "radii": "rounded-none or max rounded-sm (2px to 4px). Keep edges sharp to enforce the 'Swiss Brutalist' and 'Authoritative' feel.",
+    "dashboard_grid": {
+      "base": "grid-cols-1 md:grid-cols-12 gap-1 md:gap-4",
+      "strategy": "The 'Control Room' grid. Complete screen utilization. Use border-collapse styles or tight 1px borders between modules to feel like a unified terminal."
+    },
+    "containers": "Use padding scales like p-6 or p-8 inside bordered modules to prevent text collision."
+  },
+  "component_guidelines": {
+    "buttons": {
+      "primary": "Sharp edges (rounded-none). Background matches text-primary (inverted). Hover: slight background shift, text color remains high contrast. Add a 1px inner border for optical crispness.",
+      "quick_actions": "For 'Analyze Top 5', 'Analyze Now'. Use 'The Tracing Beam' (Aceternity look) effect on hover—a subtle glowing border traveling around the sharp container edge."
+    },
+    "login_signup": {
+      "layout": "Split screen or full-bleed abstract background with an off-center, asymmetrical frosted glass panel (Glassmorphism: backdrop-blur-2xl, bg-black/60, 1px subtle white/10 border).",
+      "typography": "Massive 'Cormorant Garamond' heading welcoming the user, creating a private-banking feel."
+    },
+    "dashboard_main": {
+      "structure": "Bento Grid. Watchlist is the Hero (col-span-12 lg:col-span-8). Alerts Feed is a tall narrow column (col-span-12 lg:col-span-4 row-span-2). Performance summary spans the bottom."
+    },
+    "watchlist_cards": {
+      "design": "Cardless or strictly rectangular (border-b border-r only). Features a large Mono font ticker, aggressive visual hierarchy for the current price, and a minimal Recharts sparkline taking up the background or right-side of the cell.",
+      "states": "Hover states must include a slight lift (-translate-y-[1px]) and border color shift to #D4D4D8."
+    },
+    "ai_verdict_component": {
+      "design": "Premium, authoritative. NOT a basic progress bar. Use a typographic lockup: Massive Mono font number (e.g., '89%') sitting inside a thin, precise SVG radial ring. The ring's stroke color matches the Buy/Sell/Hold signal color.",
+      "text": "The recommendation (BUY/SELL/HOLD) must be an uppercase badge (text-xs) with the corresponding signal background/border from the color tokens."
+    },
+    "analysis_report": {
+      "layout": "Editorial newspaper structure. 2 or 3-column CSS grid for text content (AI Reasoning) to prevent overly long line lengths. Large serif drop-caps for the executive summary.",
+      "data_viz": "Recharts for Historical Performance. Charts must use the specific signal colors, with a transparent background and no grid lines (or very subtle #1E222A grid lines)."
+    },
+    "alerts_feed": {
+      "design": "Terminal-style feed. Dense. Mono-spaced timestamps. Each item has a 2px solid left border in the signal color (Emerald/Ruby/Amber) to immediately identify the alert type on scan."
+    },
+    "empty_states": {
+      "design": "Cinematic. Use the secondary generated image as a dim background. Very minimal text, sharp CTA button to 'Add Stock'. Do not use cute/playful illustrations."
+    }
+  },
+  "motion_and_interactions": {
+    "live_data": "Use 'animate-pulse' sparingly. When a stock price updates, flash a subtle background color (green or red at 10% opacity) that fades out over 1s.",
+    "page_load": "Staggered reveals using Framer Motion (e.g., transition: { staggerChildren: 0.1 }). Watchlist cards appear sequentially from bottom to top.",
+    "hover": "Always explicitly define hover text colors. e.g., hover:bg-white hover:text-black."
+  },
+  "assets": {
+    "icons": {
+      "library": "lucide-react",
+      "instructions": "Use sharp, stroke-width: 1.5 icons. DO NOT use emoji."
+    },
+    "images": [
+      {
+        "category": "login_background",
+        "url": "https://static.prod-images.emergentagent.com/jobs/449d5842-eb76-413d-bd7e-07775c2311fa/images/da6e03e36e932405f471d2bb00616910cb10e5c8d593c7714da3cd482bc97e88.png",
+        "description": "Abstract slate stone texture with glowing emerald/amber ambient light. Perfect for full-bleed login screens."
+      },
+      {
+        "category": "empty_state_report_bg",
+        "url": "https://static.prod-images.emergentagent.com/jobs/449d5842-eb76-413d-bd7e-07775c2311fa/images/6e9665ba2fc60ad249a5836ff1e3a1b0c76617700261a0f3fc55308b5ed7fafc.png",
+        "description": "Ultra-minimalist dark geometric pattern. Use as a masked background for empty states or the header of the Analysis Report."
+      }
+    ]
+  },
+  "testing": {
+    "requirements": "All interactive elements, forms, and key data points MUST include a 'data-testid' attribute in kebab-case. Examples: 'login-submit-button', 'watchlist-card-aapl', 'ai-verdict-score'."
+  }
+}
