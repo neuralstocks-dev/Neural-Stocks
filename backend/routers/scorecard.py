@@ -136,8 +136,8 @@ async def my_scorecard(user=Depends(get_current_user)):
 
 
 @router.get("/global")
-async def global_scorecard():
-    """Anonymous platform-wide stats — safe to expose publicly someday."""
+async def global_scorecard(_user=Depends(get_current_user)):
+    """Platform-wide stats (auth required). Response is scrubbed of user_id/email."""
     analyses = await db.analyses.find({}, {"_id": 0, "user_id": 0}).sort("created_at", -1).to_list(2000)
     tickers = [a.get("ticker") for a in analyses]
     current = await _resolve_quotes(tickers)

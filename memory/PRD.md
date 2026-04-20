@@ -1,80 +1,88 @@
 # Neural — AI Stock Analysis Platform
 
 ## Original Problem Statement
-Build Phase 1 of AI Stock Analysis Agent Platform per uploaded PRD. Core goal: democratize institutional-grade stock insights for retail investors with Claude-powered BUY/SELL/HOLD recommendations plus explainable reasoning.
+Phase 1 MVP of an AI Stock Analysis Agent Platform (per uploaded PRD). Later extended with admin console, subscription tiers, shareable verdicts, Google OAuth, and an accuracy scorecard.
 
-## User Choices
-- AI Model: Claude Sonnet 4.5 via Emergent Universal LLM Key
-- Stock data source: yfinance (free)
-- News/social: skipped for MVP
-- Auth: JWT email/password **+ Emergent-managed Google OAuth** (both supported)
-- Alerts: in-app only
-
-## Architecture
-- Backend: FastAPI + MongoDB (Motor) + yfinance + emergentintegrations (Claude Sonnet 4.5) + httpx + bcrypt + PyJWT
-- Frontend: React 19 + Tailwind + shadcn/ui + recharts + lucide-react
+## Tech
+- Backend: FastAPI (split into `core/` `services/` `routers/`) + MongoDB (Motor) + yfinance + emergentintegrations (Claude Sonnet 4.5) + httpx + bcrypt + PyJWT
+- Frontend: React 19 + Tailwind + shadcn/ui + recharts + lucide-react + react-router-dom
 - Design: "Old Money Tech" — dark-first, Cormorant Garamond + Outfit + IBM Plex Mono
 
-## Core Features (Phase 1 shipped)
+## Backend Module Layout (post-iteration-3 refactor)
+```
+/app/backend/
+├── server.py                 # thin app bootstrap (mount routers, CORS)
+├── core/
+│   ├── config.py             # env vars, PLANS, UNLOCK_DURATIONS, ADMIN_EMAILS
+│   ├── db.py                 # Mongo client singleton
+│   ├── security.py           # JWT, bcrypt, get_current_user, admin_required
+│   └── models.py             # Pydantic request/response
+├── services/
+│   ├── yfinance_svc.py       # quote / history / fundamentals / technicals
+│   ├── ai.py                 # Claude Sonnet 4.5 wrapper + system prompt
+│   └── quota.py              # plan_for / effective_plan_key / test_unlock_active
+└── routers/
+    ├── auth.py               # /auth/register, /auth/login, /auth/google/session, /auth/me (+ login tracking)
+    ├── plans.py              # /plans, /quota, /plan/upgrade
+    ├── stocks.py             # /stocks/search, /stocks/{t}/quote, /stocks/{t}/history
+    ├── watchlist.py          # /watchlist CRUD + /watchlist/live
+    ├── analysis.py           # /analysis/{t}, /analysis/{t}/latest|history, /analysis/quick/{kind}, /alerts/*, /analysis/{id}/share, /public/verdict/{share_id}
+    ├── admin.py              # /admin/users, /admin/logins, /admin/users/{id}/unlock|reset
+    └── scorecard.py          # /scorecard/me, /scorecard/global
+```
 
-### Iteration 1 (Apr 20, 2026)
-- Watchlist management (max N per plan, NYSE/NASDAQ/SGX, category tags)
-- AI analysis engine (Claude Sonnet 4.5) → recommendation + confidence + price target + stop loss + reasoning + risk factors + technical/fundamental/peer analyses
-- Real-time alert system (in-app, auto-created on BUY/SELL @ ≥75% confidence)
-- Dashboard: watchlist bento, alerts feed, performance summary, quick-actions
-- Detailed report page: verdict ring, price chart (recharts), editorial reasoning w/ drop-cap, risk factors
-- JWT auth (register/login/me) + bcrypt + axios interceptor auto-logout on 401
-- Dark/light theme toggle
+## Core Features
 
-### Iteration 2 (Apr 20, 2026)
-- **Rebrand**: Lucid → **Neural** (all surfaces)
-- **Emergent Google OAuth** side-by-side with email/password. `POST /api/auth/google/session` exchanges Emergent session_id for a Neural JWT. Frontend AuthCallback handles `#session_id=` fragment with race-safe `useRef` guard.
-- **Subscription tiers** (Free / Pro $9.99 / Elite $29.99):
-  - Free: 3 stocks, 1 analysis/day, 2/week, no quick-actions, no share, 30-day history
-  - Pro: 10 stocks, 15/day, 60/week, quick-actions + share enabled, 1-year history
-  - Elite: 25 stocks, unlimited analyses, all Pro features, 10-year history
-  - Backend enforcement on all gated endpoints returns HTTP 402 with upgrade messaging
-  - Pricing page with 3 plan cards + side-by-side feature matrix + MVP instant-switch upgrade stub (`POST /api/plan/upgrade`)
-  - Dashboard shows live quota banner (plan badge, watchlist X/Y, analyses today/week)
-- **Share Verdict**:
-  - `POST /api/analysis/{analysis_id}/share` (Pro/Elite only, idempotent per analysis)
-  - Public route `GET /api/public/verdict/{share_id}` (**no auth**) sanitized to strip user_id/email/plan
-  - Frontend `/v/:shareId` public page with own minimal header, shareable URL modal, "Get your own verdicts →" CTA
-  - "Share" button on AnalysisReportPage (padlock for Free users → upgrade flow)
-- **Parallel quick-analyze**: `quick/top|bottom` now runs up to 3 concurrent Claude calls via `asyncio.gather` (was sequential / timing out at ingress)
+### Iteration 1 (Apr 20)
+- Watchlist (max per plan), Claude verdict engine, in-app alerts, dashboard w/ performance summary, detailed report page, JWT auth
+
+### Iteration 2 (Apr 20)
+- Rebrand Lucid → **Neural**
+- Emergent-managed Google OAuth side-by-side with email/password
+- Free / Pro $9.99 / Elite $29.99 subscription tiers with real backend enforcement (HTTP 402 on gated endpoints)
+- Public **Share Verdict** pages (`/v/:shareId`, no auth)
+
+### Iteration 3 (Apr 20)
+- **Refactor**: `server.py` → `core/ + services/ + routers/` (zero regressions, 82/84 backend tests)
+- **Admin system**:
+  - `ADMIN_EMAILS` env (default `jolor69@gmail.com`) auto-elevates any matching user to `is_admin=true` and effective plan = Elite
+  - Login tracking: `login_events` collection + `users.last_login_at` + `users.login_count`
+  - Admin console page with users table, per-row duration select, Unlock + Reset buttons, recent logins panel
+  - Endpoints: `GET /admin/users`, `GET /admin/logins`, `POST /admin/users/{id}/unlock {duration}`, `POST /admin/users/{id}/reset`
+  - Durations: 1h, 2h, 4h, 12h, 1d, 3d, 1w, 2w, 3w, 4w, forever
+  - Granted unlock sets `test_unlock_expires_at` (ISO or "forever"); `plan_for()` returns Elite while active
+  - Test-unlock banner on dashboard (amber, shows "Xd remaining · base plan: FREE")
+  - Instruction in every admin response: "User must log out & log back in to see changes"
+- **AI Accuracy Scorecard** (`/scorecard`):
+  - `/scorecard/me` and `/scorecard/global` (both auth-required)
+  - Verdicts <7 days old → `pending`. Older: BUY hit if +≥5%, SELL hit if ≤-5%, HOLD hit if |Δ|≤5%
+  - Per-recommendation breakdown, platform benchmark row, verdict history table
 
 ## User Personas
-- Busy professional (wants automated analysis)
-- Novice investor (wants clear guidance + simplified visuals)
-- Active trader (wants AI-augmented insights + quick sweeps)
+- Busy professional / novice investor / active trader / **admin (QA / internal team)**
 
 ## Testing Status
-- **Iteration 1**: 35/39 backend (non-AI 100%; AI blocked by LLM budget at that time)
-- **Iteration 2**: **59/60 backend (98.3%)**. Only failure was quick_top ingress timeout; FIXED by parallelizing with `asyncio.gather` + cap to 3 tickers. AI analysis + share verdict flow manually verified end-to-end after fix.
-- Frontend: login, signup, dashboard, add AAPL, analyze AAPL, share verdict, public view, pricing page — all rendered and verified via screenshot.
+| Iteration | Backend | Notes |
+|-----------|---------|-------|
+| 1 | 35/39 (100% non-AI) | AI blocked by LLM budget |
+| 2 | 59/60 (98.3%) | quick/top timeout → fixed |
+| 3 | **82/84 (97.6%)** | Scorecard/global auth fixed post-test (1-liner). Pre-existing quick/top 502 on slow LLM calls remains. |
 
-## Known Issues / Backlog
+## Known non-blockers
+- `quick/top` can hit preview ingress 60s limit if 3 parallel Claude calls all cold-start. Mitigation: switch to `asyncio.wait` with per-task timeout, or convert to async job + polling (P1)
+- `services/quota.enforce_analysis_quota` is NOT called inside `quick/top`'s 3 sub-analyses individually — they share the single pre-check. Acceptable but document.
+- ADMIN_EMAILS has a default of `jolor69@gmail.com` in code even when env is missing (fine for product, prod should fail-closed)
 
-### Optional hardening (post-ship)
-- Split server.py into routers + services (now 1040+ lines)
-- Add Pydantic validation for full AI analysis response (currently only recommendation is validated)
-- Anonymize `shared_by_name` on public verdict (first name + last initial) to prevent accidental PII leakage
-- Cache yfinance quotes with 30-60s TTL
-- Mongo indexes on shared_verdicts.share_id, analyses(user_id,ticker,created_at)
+## Backlog
+### Phase 2
+- Stripe for Pro/Elite (currently stub)
+- Portfolio P&L, backtesting, PDF export, SMS / Telegram alerts, NewsAPI sentiment, mobile apps
+- Historical accuracy hardening: evaluate at exact time_horizon_weeks end-date instead of today
 
-### Phase 2 backlog (from PRD)
-- Stripe checkout for Pro/Elite (currently stub)
-- Portfolio tracking, backtesting, PDF export, SMS/Telegram alerts
-- NewsAPI + Reddit/Twitter sentiment
-- Mobile apps (iOS/Android)
-- Historical AI accuracy scorecard
+### Phase 3
+- Multi-asset (Forex/Commodities/REITs/ETFs), brokerage integration, developer API, white-label
 
-### Phase 3 backlog
-- Multi-asset (Forex/Commodities/REITs/ETFs)
-- Brokerage integration (Tiger/IBKR)
-- Developer API + white-label
-
-## Next Action Items
-1. Top up Emergent LLM key budget if it runs low again (Profile → Universal Key → Add Balance)
-2. Wire Stripe checkout to replace the `POST /api/plan/upgrade` stub (Phase 2)
-3. Gather Phase 1 user feedback, iterate
+## Next Actions
+1. Decide between `asyncio.wait` vs background-jobs approach to fully harden quick_analyze
+2. Wire Stripe checkout to replace `POST /api/plan/upgrade`
+3. Anonymize `shared_by_name` on public verdict (first-name + last-initial) to avoid accidental PII
