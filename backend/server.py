@@ -567,7 +567,17 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
             + json.dumps(payload, default=str)
         )
     )
-    raw = await chat.send_message(msg)
+    try:
+        raw = await chat.send_message(msg)
+    except Exception as e:
+        # Budget / provider / network error from LLM
+        err_msg = str(e)
+        if "Budget has been exceeded" in err_msg or "budget" in err_msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="AI analysis temporarily unavailable — LLM budget exceeded. Please top up your Emergent Universal Key (Profile → Universal Key → Add Balance).",
+            )
+        raise HTTPException(status_code=502, detail=f"AI provider error: {err_msg[:200]}")
     text = raw if isinstance(raw, str) else str(raw)
     # Extract JSON
     m = re.search(r"\{[\s\S]*\}", text)
