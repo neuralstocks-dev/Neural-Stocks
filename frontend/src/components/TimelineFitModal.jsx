@@ -30,11 +30,18 @@ export default function TimelineFitModal({ ticker, onClose }) {
         return () => { cancelled = true; };
     }, [ticker]);
 
+    // Close on Escape key
+    useEffect(() => {
+        const onKey = (e) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [onClose]);
+
     return (
         <div
-            className="fixed inset-0 z-50 grid place-items-center p-4"
-            style={{ background: "rgba(6,6,6,0.72)", backdropFilter: "blur(6px)" }}
-            onClick={onClose}
+            className="fixed inset-0 grid place-items-center p-4"
+            style={{ background: "rgba(6,6,6,0.72)", backdropFilter: "blur(6px)", zIndex: 100 }}
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             data-testid="timeline-fit-modal"
         >
             <div
