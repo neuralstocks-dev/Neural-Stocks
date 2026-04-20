@@ -40,6 +40,7 @@ Background-job quick-analyze + mandatory disclaimer gate
 | 3 | 82/84 (97.6%) | scorecard/global auth fixed |
 | 4 | **13/13 (100%)** | bg-job & disclaimer gate |
 | **5** | **22/22 backend (100%) + frontend verified** | PayPal sandbox + Resend + admin pricing + delete + share limit |
+| **6** | **14/14 backend (100%) + frontend verified** | Yearly billing (20% off) + admin login-event deletion + Top/Bottom 3 rename |
 
 ## Known non-blockers
 - `PAYPAL_WEBHOOK_ID` intentionally unset — webhooks log to `db.webhook_events` but don't mutate state. Set env var and register webhook in PayPal dashboard before going live.
