@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from core.db import db
 from core.security import get_current_user, iso, now_utc
 from services.yfinance_svc import get_quote, _yf_history_sync, _yf_fundamentals_sync, compute_technicals
-from services.ai import run_ai_analysis
+from services.ai import run_ai_analysis, run_timeline_analysis
 from services.quota import enforce_analysis_quota, plan_for
 from routers.disclaimer import require_accepted
 
@@ -90,6 +90,85 @@ async def analysis_history(ticker: str, user=Depends(get_current_user)):
         .sort("created_at", -1)
         .to_list(20)
     )
+
+
+# ---------- Timeline Recommendation (Pro/Elite) ----------
+@router.post("/analysis/timeline/{ticker}")
+async def timeline_recommendation(ticker: str, user=Depends(get_current_user)):
+    """Evaluate a single watchlist stock across short/medium/long term horizons
+    and recommend the best-fit timeline. Pro & Elite only."""
+    ticker = ticker.upper().strip()
+    await require_accepted(user)
+    p = plan_for(user)
+    if not p["quick_actions"]:  # same gate as other Pro/Elite AI features
+        raise HTTPException(
+            status_code=402,
+            detail=f"Timeline Fit is a Pro/Elite feature. Upgrade from {p['name']} to unlock horizon recommendations.",
+        )
+    # Must be in watchlist
+    in_wl = await db.watchlist.find_one({"user_id": user["id"], "ticker": ticker}, {"_id": 0})
+    if not in_wl:
+        raise HTTPException(status_code=400, detail=f"{ticker} is not in your watchlist. Add it first.")
+
+    # 24h cache
+    since = iso(now_utc() - timedelta(hours=24))
+    cached = await db.timeline_recos.find_one(
+        {"user_id": user["id"], "ticker": ticker, "created_at": {"$gte": since}},
+        sort=[("created_at", -1)],
+        projection={"_id": 0},
+    )
+    if cached:
+        return {**cached, "cached": True}
+
+    # Enforce quota (counts toward analysis quota)
+    await enforce_analysis_quota(user)
+
+    quote_task = get_quote(ticker)
+    hist_task = asyncio.to_thread(_yf_history_sync, ticker, "2y", "1d")
+    fund_task = asyncio.to_thread(_yf_fundamentals_sync, ticker)
+    quote, history, fundamentals = await asyncio.gather(quote_task, hist_task, fund_task)
+    if quote.get("price") is None:
+        raise HTTPException(status_code=404, detail=f"No data for ticker {ticker}")
+    technicals = compute_technicals(history)
+    reco = await run_timeline_analysis(ticker, quote, history, fundamentals, technicals)
+    doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "ticker": ticker,
+        "name": quote.get("name") or fundamentals.get("shortName") or fundamentals.get("longName"),
+        "price_at_analysis": quote.get("price"),
+        "currency": quote.get("currency"),
+        "created_at": iso(now_utc()),
+        **reco,
+    }
+    # Record as a regular analysis too so it counts toward quota
+    await db.analyses.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "ticker": ticker,
+        "created_at": doc["created_at"],
+        "price_at_analysis": quote.get("price"),
+        "quote_snapshot": quote,
+        "kind": "timeline",
+        "recommendation": "HOLD",  # timeline reco is informational, not BUY/SELL
+        "confidence_score": doc.get("confidence_score", 0),
+        "executive_summary": doc.get("summary", "")[:500],
+    })
+    await db.timeline_recos.insert_one(doc)
+    doc.pop("_id", None)
+    return {**doc, "cached": False}
+
+
+@router.get("/analysis/timeline/{ticker}/latest")
+async def timeline_latest(ticker: str, user=Depends(get_current_user)):
+    doc = await db.timeline_recos.find_one(
+        {"user_id": user["id"], "ticker": ticker.upper()},
+        sort=[("created_at", -1)],
+        projection={"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="No timeline recommendation yet")
+    return doc
 
 
 @router.post("/analysis/quick/{kind}")

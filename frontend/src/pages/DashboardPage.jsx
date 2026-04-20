@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import AddStockModal from "@/components/AddStockModal";
+import TimelineFitModal from "@/components/TimelineFitModal";
 import Sparkline from "@/components/Sparkline";
 import SignalBadge from "@/components/SignalBadge";
 import TestUnlockBanner from "@/components/TestUnlockBanner";
@@ -21,9 +22,10 @@ import {
     TrendingUp,
     Loader2,
     Lock,
+    Clock,
 } from "lucide-react";
 
-function WatchlistRow({ item, sparkline, onRemove, onAnalyze, analyzing }) {
+function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyzing, canTimeline }) {
     const q = item.quote || {};
     const up = (q.change_pct ?? 0) >= 0;
     return (
@@ -100,6 +102,23 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, analyzing }) {
                         <Sparkles size={12} strokeWidth={1.5} />
                     )}
                 </button>
+                <button
+                    onClick={() => onTimeline(item.ticker)}
+                    className="btn-ghost !py-1.5 !px-2 !text-xs"
+                    title={canTimeline ? "Timeline Fit (Pro/Elite)" : "Timeline Fit — Pro/Elite only"}
+                    disabled={!canTimeline}
+                    style={{
+                        opacity: canTimeline ? 1 : 0.5,
+                        color: canTimeline ? "hsl(var(--hold))" : undefined,
+                    }}
+                    data-testid={`timeline-${item.ticker}-button`}
+                >
+                    {canTimeline ? (
+                        <Clock size={12} strokeWidth={1.5} />
+                    ) : (
+                        <Lock size={12} strokeWidth={1.5} />
+                    )}
+                </button>
                 <Link
                     to={`/analysis/${item.ticker}`}
                     className="btn-ghost !py-1.5 !px-2 !text-xs"
@@ -133,6 +152,7 @@ export default function DashboardPage() {
     const [analyzingTicker, setAnalyzingTicker] = useState(null);
     const [quickBusy, setQuickBusy] = useState(null); // 'top' | 'bottom' | null
     const [modalOpen, setModalOpen] = useState(false);
+    const [timelineTicker, setTimelineTicker] = useState(null);
     const [actionError, setActionError] = useState("");
 
     const plan = user?.plan || "free";
@@ -299,6 +319,13 @@ export default function DashboardPage() {
                     refresh();
                 }}
             />
+
+            {timelineTicker && (
+                <TimelineFitModal
+                    ticker={timelineTicker}
+                    onClose={() => setTimelineTicker(null)}
+                />
+            )}
 
             <DisclaimerModal
                 open={disclaimer.open}
@@ -517,6 +544,8 @@ export default function DashboardPage() {
                                         sparkline={sparks[item.ticker] || []}
                                         onRemove={removeTicker}
                                         onAnalyze={analyzeOne}
+                                        onTimeline={(t) => disclaimer.ensureAccepted(() => setTimelineTicker(t))}
+                                        canTimeline={canQuickActions}
                                         analyzing={analyzingTicker === item.ticker}
                                     />
                                 ))}
