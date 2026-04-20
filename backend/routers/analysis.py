@@ -12,9 +12,11 @@ from routers.disclaimer import require_accepted
 
 router = APIRouter(tags=["analysis"])
 
-# Per-task wall-clock cap for the quick/top|bottom batch. Keeps us under the
-# preview ingress 60s limit even when one Claude call stalls.
-QUICK_PER_TASK_TIMEOUT = 55.0
+# Per-task wall-clock cap for the quick/top|bottom batch. Since quick jobs
+# now run in the background (fire-and-forget), this no longer competes with
+# the ingress 60s budget — we can afford a realistic window per Claude call.
+QUICK_PER_TASK_TIMEOUT = 90.0
+QUICK_BATCH_SIZE = 3
 
 
 async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
@@ -88,6 +90,8 @@ async def analysis_history(ticker: str, user=Depends(get_current_user)):
 
 @router.post("/analysis/quick/{kind}")
 async def quick_analyze(kind: str, user=Depends(get_current_user)):
+    """Fire-and-forget: kicks off a background quick-sweep and returns a job_id
+    immediately. Client polls /api/analysis/quick/jobs/{job_id} for progress."""
     if kind not in ("top", "bottom"):
         raise HTTPException(status_code=400, detail="kind must be 'top' or 'bottom'")
     await require_accepted(user)
@@ -97,62 +101,122 @@ async def quick_analyze(kind: str, user=Depends(get_current_user)):
             status_code=402,
             detail=f"Quick batch analysis is a Pro/Elite feature. Upgrade from {p['name']} to unlock Top/Bottom sweeps.",
         )
-    items = await db.watchlist.find({"user_id": user["id"]}, {"_id": 0, "user_id": 0}).to_list(50)
-    if not items:
+    if await db.watchlist.count_documents({"user_id": user["id"]}) == 0:
         raise HTTPException(status_code=400, detail="Watchlist is empty")
-    tickers = [i["ticker"] for i in items]
-    quotes = await asyncio.gather(*[get_quote(t) for t in tickers])
-    ranked = sorted(zip(items, quotes), key=lambda iq: (iq[1].get("change_pct") or 0), reverse=(kind == "top"))
-    selected = [iq[0]["ticker"] for iq in ranked[:3]]
 
-    # Kick off analyses as named tasks so we can identify who timed out.
-    task_to_ticker = {
-        asyncio.create_task(create_analysis(tk, user=user)): tk for tk in selected
-    }
-    done, pending = await asyncio.wait(
-        list(task_to_ticker.keys()),
-        timeout=QUICK_PER_TASK_TIMEOUT,
-        return_when=asyncio.ALL_COMPLETED,
-    )
-    # Clean up anything that didn't finish in time
-    for task in pending:
-        task.cancel()
-
-    results = []
-    completed = 0
-    timed_out = 0
-    errored = 0
-    for task, tk in task_to_ticker.items():
-        if task in done:
-            try:
-                results.append(task.result())
-                completed += 1
-            except HTTPException as e:
-                errored += 1
-                detail = e.detail if isinstance(e.detail, str) else str(e.detail)
-                results.append({"ticker": tk, "error": detail, "status_code": e.status_code})
-            except Exception as e:
-                errored += 1
-                results.append({"ticker": tk, "error": str(e)[:200]})
-        else:
-            timed_out += 1
-            results.append({
-                "ticker": tk,
-                "status": "timeout",
-                "error": f"Analysis did not complete within {int(QUICK_PER_TASK_TIMEOUT)}s — try the single-ticker button to continue.",
-            })
-
-    return {
+    job_id = str(uuid.uuid4())
+    await db.quick_jobs.insert_one({
+        "id": job_id,
+        "user_id": user["id"],
         "kind": kind,
-        "analyzed": selected,
-        "results": results,
-        "summary": {
-            "completed": completed,
-            "timed_out": timed_out,
-            "errored": errored,
-            "total": len(selected),
-        },
-    }
+        "status": "running",
+        "progress": {"completed": 0, "timed_out": 0, "errored": 0, "total": 0},
+        "analyzed": [],
+        "results": [],
+        "started_at": iso(now_utc()),
+        "finished_at": None,
+    })
+    asyncio.create_task(_run_quick_job(job_id, user, kind))
+    return {"job_id": job_id, "status": "running", "kind": kind}
+
+
+async def _run_quick_job(job_id: str, user: dict, kind: str):
+    """Background worker — writes progress to db.quick_jobs as it executes."""
+    try:
+        items = await db.watchlist.find(
+            {"user_id": user["id"]}, {"_id": 0, "user_id": 0}
+        ).to_list(50)
+        tickers = [i["ticker"] for i in items]
+        quotes = await asyncio.gather(*[get_quote(t) for t in tickers])
+        ranked = sorted(
+            zip(items, quotes),
+            key=lambda iq: (iq[1].get("change_pct") or 0),
+            reverse=(kind == "top"),
+        )
+        selected = [iq[0]["ticker"] for iq in ranked[:QUICK_BATCH_SIZE]]
+        await db.quick_jobs.update_one(
+            {"id": job_id},
+            {"$set": {"analyzed": selected, "progress.total": len(selected)}},
+        )
+
+        task_to_ticker = {
+            asyncio.create_task(create_analysis(tk, user=user)): tk for tk in selected
+        }
+        done, pending = await asyncio.wait(
+            list(task_to_ticker.keys()),
+            timeout=QUICK_PER_TASK_TIMEOUT,
+            return_when=asyncio.ALL_COMPLETED,
+        )
+        for task in pending:
+            task.cancel()
+
+        results = []
+        completed = 0
+        timed_out = 0
+        errored = 0
+        for task, tk in task_to_ticker.items():
+            if task in done:
+                try:
+                    r = task.result()
+                    # Strip mongo _id just in case, keep compact result
+                    results.append({
+                        "ticker": r.get("ticker"),
+                        "recommendation": r.get("recommendation"),
+                        "confidence_score": r.get("confidence_score"),
+                        "executive_summary": r.get("executive_summary"),
+                        "price_target": r.get("price_target"),
+                        "stop_loss": r.get("stop_loss"),
+                        "analysis_id": r.get("id"),
+                    })
+                    completed += 1
+                except HTTPException as e:
+                    errored += 1
+                    detail = e.detail if isinstance(e.detail, str) else str(e.detail)
+                    results.append({"ticker": tk, "error": detail, "status_code": e.status_code})
+                except Exception as e:
+                    errored += 1
+                    results.append({"ticker": tk, "error": str(e)[:200]})
+            else:
+                timed_out += 1
+                results.append({
+                    "ticker": tk,
+                    "status": "timeout",
+                    "error": f"Exceeded {int(QUICK_PER_TASK_TIMEOUT)}s — run single-ticker Analyze to continue.",
+                })
+
+        await db.quick_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "done",
+                "results": results,
+                "progress": {
+                    "completed": completed,
+                    "timed_out": timed_out,
+                    "errored": errored,
+                    "total": len(selected),
+                },
+                "finished_at": iso(now_utc()),
+            }},
+        )
+    except Exception as e:
+        await db.quick_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "failed",
+                "error": str(e)[:300],
+                "finished_at": iso(now_utc()),
+            }},
+        )
+
+
+@router.get("/analysis/quick/jobs/{job_id}")
+async def quick_job_status(job_id: str, user=Depends(get_current_user)):
+    job = await db.quick_jobs.find_one(
+        {"id": job_id, "user_id": user["id"]}, {"_id": 0, "user_id": 0}
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 # ---------- Alerts ----------

@@ -234,19 +234,37 @@ export default function DashboardPage() {
             setActionError("");
             setQuickBusy(kind);
             try {
-                const r = await api.post(`/analysis/quick/${kind}`);
-                const s = r.data?.summary;
-                if (s && (s.timed_out || s.errored)) {
-                    setActionError(
-                        `Quick sweep: ${s.completed} done, ${s.timed_out} timed out, ${s.errored} errored. Try single-ticker Analyze on any that didn't complete.`
-                    );
+                const start = await api.post(`/analysis/quick/${kind}`);
+                const jobId = start.data.job_id;
+                // Poll until done/failed or 3 minutes pass
+                const started = Date.now();
+                let last = null;
+                // eslint-disable-next-line no-constant-condition
+                while (true) {
+                    if (Date.now() - started > 180000) {
+                        throw new Error("Quick sweep took too long — refresh and try again");
+                    }
+                    await new Promise((r) => setTimeout(r, 2500));
+                    const p = await api.get(`/analysis/quick/jobs/${jobId}`);
+                    last = p.data;
+                    if (last.status === "done" || last.status === "failed") break;
+                }
+                if (last?.status === "failed") {
+                    setActionError(errMessage(last.error, "Quick sweep failed"));
+                } else {
+                    const s = last?.progress || {};
+                    if (s.timed_out || s.errored) {
+                        setActionError(
+                            `Quick sweep: ${s.completed} done, ${s.timed_out} timed out, ${s.errored} errored. Run single-ticker Analyze on any that didn't complete.`
+                        );
+                    }
                 }
                 await fetchWatchlist();
                 await fetchAlerts();
                 await fetchQuota();
             } catch (err) {
                 if (disclaimer.promptFromError(err)) return;
-                setActionError(errMessage(err?.response?.data?.detail, "Quick analysis failed"));
+                setActionError(errMessage(err?.response?.data?.detail, err?.message || "Quick analysis failed"));
             } finally {
                 setQuickBusy(null);
             }
