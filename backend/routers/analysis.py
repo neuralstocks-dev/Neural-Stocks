@@ -14,9 +14,12 @@ router = APIRouter(tags=["analysis"])
 
 # Per-task wall-clock cap for the quick/top|bottom batch. Since quick jobs
 # now run in the background (fire-and-forget), this no longer competes with
-# the ingress 60s budget — we can afford a realistic window per Claude call.
+# the ingress 60s budget. We run tickers sequentially inside the job to
+# avoid saturating the single-worker event loop with concurrent LLM calls.
 QUICK_PER_TASK_TIMEOUT = 90.0
 QUICK_BATCH_SIZE = 3
+# Strong references to outstanding bg tasks so the GC doesn't drop them
+_BG_TASKS: set = set()
 
 
 async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
@@ -116,7 +119,9 @@ async def quick_analyze(kind: str, user=Depends(get_current_user)):
         "started_at": iso(now_utc()),
         "finished_at": None,
     })
-    asyncio.create_task(_run_quick_job(job_id, user, kind))
+    task = asyncio.create_task(_run_quick_job(job_id, user, kind))
+    _BG_TASKS.add(task)
+    task.add_done_callback(_BG_TASKS.discard)
     return {"job_id": job_id, "status": "running", "kind": kind}
 
 
@@ -139,62 +144,62 @@ async def _run_quick_job(job_id: str, user: dict, kind: str):
             {"$set": {"analyzed": selected, "progress.total": len(selected)}},
         )
 
-        task_to_ticker = {
-            asyncio.create_task(create_analysis(tk, user=user)): tk for tk in selected
-        }
-        done, pending = await asyncio.wait(
-            list(task_to_ticker.keys()),
-            timeout=QUICK_PER_TASK_TIMEOUT,
-            return_when=asyncio.ALL_COMPLETED,
-        )
-        for task in pending:
-            task.cancel()
-
+        # Sequential processing: keeps peak event-loop pressure at 1 LLM call
+        # at a time. POST already returned fast; no point in racing here.
         results = []
         completed = 0
         timed_out = 0
         errored = 0
-        for task, tk in task_to_ticker.items():
-            if task in done:
-                try:
-                    r = task.result()
-                    # Strip mongo _id just in case, keep compact result
-                    results.append({
-                        "ticker": r.get("ticker"),
-                        "recommendation": r.get("recommendation"),
-                        "confidence_score": r.get("confidence_score"),
-                        "executive_summary": r.get("executive_summary"),
-                        "price_target": r.get("price_target"),
-                        "stop_loss": r.get("stop_loss"),
-                        "analysis_id": r.get("id"),
-                    })
-                    completed += 1
-                except HTTPException as e:
-                    errored += 1
-                    detail = e.detail if isinstance(e.detail, str) else str(e.detail)
-                    results.append({"ticker": tk, "error": detail, "status_code": e.status_code})
-                except Exception as e:
-                    errored += 1
-                    results.append({"ticker": tk, "error": str(e)[:200]})
-            else:
+        for tk in selected:
+            try:
+                r = await asyncio.wait_for(
+                    create_analysis(tk, user=user),
+                    timeout=QUICK_PER_TASK_TIMEOUT,
+                )
+                results.append({
+                    "ticker": r.get("ticker"),
+                    "recommendation": r.get("recommendation"),
+                    "confidence_score": r.get("confidence_score"),
+                    "executive_summary": r.get("executive_summary"),
+                    "price_target": r.get("price_target"),
+                    "stop_loss": r.get("stop_loss"),
+                    "analysis_id": r.get("id"),
+                })
+                completed += 1
+            except asyncio.TimeoutError:
                 timed_out += 1
                 results.append({
                     "ticker": tk,
                     "status": "timeout",
                     "error": f"Exceeded {int(QUICK_PER_TASK_TIMEOUT)}s — run single-ticker Analyze to continue.",
                 })
+            except HTTPException as e:
+                errored += 1
+                detail = e.detail if isinstance(e.detail, str) else str(e.detail)
+                results.append({"ticker": tk, "error": detail, "status_code": e.status_code})
+            except Exception as e:
+                errored += 1
+                results.append({"ticker": tk, "error": str(e)[:200]})
+            # Update DB after each ticker so clients polling see live progress
+            await db.quick_jobs.update_one(
+                {"id": job_id},
+                {"$set": {
+                    "results": results,
+                    "progress": {
+                        "completed": completed,
+                        "timed_out": timed_out,
+                        "errored": errored,
+                        "total": len(selected),
+                    },
+                }},
+            )
+            # Yield briefly so other endpoints get scheduled between LLM calls
+            await asyncio.sleep(0)
 
         await db.quick_jobs.update_one(
             {"id": job_id},
             {"$set": {
                 "status": "done",
-                "results": results,
-                "progress": {
-                    "completed": completed,
-                    "timed_out": timed_out,
-                    "errored": errored,
-                    "total": len(selected),
-                },
                 "finished_at": iso(now_utc()),
             }},
         )
