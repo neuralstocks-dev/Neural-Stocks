@@ -6,6 +6,12 @@ import { LineChart, Lock, Mail } from "lucide-react";
 const BG_IMAGE =
     "https://static.prod-images.emergentagent.com/jobs/449d5842-eb76-413d-bd7e-07775c2311fa/images/da6e03e36e932405f471d2bb00616910cb10e5c8d593c7714da3cd482bc97e88.png";
 
+// REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+function googleSignIn() {
+    const redirectUrl = window.location.origin + "/dashboard";
+    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+}
+
 export default function LoginPage() {
     const { user, login, bootstrapping } = useAuth();
     const navigate = useNavigate();
@@ -64,7 +70,7 @@ export default function LoginPage() {
                             <LineChart size={16} strokeWidth={1.5} />
                         </div>
                         <div className="flex flex-col leading-none">
-                            <span className="font-serif italic text-xl tracking-tight">Lucid</span>
+                            <span className="font-serif italic text-xl tracking-tight">Neural</span>
                             <span
                                 className="text-overline"
                                 style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.58rem" }}
@@ -105,7 +111,7 @@ export default function LoginPage() {
                         className="text-overline"
                         style={{ color: "rgba(255,255,255,0.4)" }}
                     >
-                        © 2026 Lucid Labs · Not financial advice
+                        © 2026 Neural Labs · Not financial advice
                     </div>
                 </div>
 
@@ -136,7 +142,34 @@ export default function LoginPage() {
                             Sign in to review your watchlist & verdicts.
                         </p>
 
-                        <form onSubmit={onSubmit} className="mt-8 space-y-4">
+                        <button
+                            type="button"
+                            onClick={googleSignIn}
+                            className="w-full mt-6 flex items-center justify-center gap-3 py-3 font-ui font-medium text-sm transition-colors"
+                            style={{
+                                background: "#fff",
+                                color: "#0A0C10",
+                                borderRadius: 2,
+                                border: "1px solid #fff",
+                            }}
+                            data-testid="google-signin-button"
+                        >
+                            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                                <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.9 32.4 29.4 35.5 24 35.5c-6.3 0-11.5-5.2-11.5-11.5S17.7 12.5 24 12.5c2.9 0 5.5 1.1 7.5 2.9l5.7-5.7C33.7 6.3 29.1 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.4-3.5z"/>
+                                <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8c1.8-4.3 6-7 10.9-7 2.9 0 5.5 1.1 7.5 2.9l5.7-5.7C33.7 6.3 29.1 4.5 24 4.5 16.6 4.5 10.2 8.6 6.3 14.7z"/>
+                                <path fill="#4CAF50" d="M24 43.5c5 0 9.5-1.7 13-4.7l-6-5c-2 1.4-4.5 2.2-7 2.2-5.4 0-9.9-3.1-11.3-7.5l-6.6 5.1C9.4 39.2 16 43.5 24 43.5z"/>
+                                <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.7 2.1-2 3.9-3.8 5.3l6 5c-.4.3 6.5-4.7 6.5-14.3 0-1.2-.1-2.4-.4-3.5z"/>
+                            </svg>
+                            Sign in with Google
+                        </button>
+
+                        <div className="my-6 flex items-center gap-3" style={{ color: "rgba(255,255,255,0.35)" }}>
+                            <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.1)" }} />
+                            <span className="text-overline" style={{ fontSize: "0.56rem" }}>or with email</span>
+                            <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.1)" }} />
+                        </div>
+
+                        <form onSubmit={onSubmit} className="space-y-4">
                             <div>
                                 <label className="text-overline block mb-2" style={{ color: "#94A3B8" }}>
                                     Email

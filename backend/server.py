@@ -17,6 +17,7 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt as pyjwt
 import yfinance as yf
+import httpx
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
@@ -27,9 +28,47 @@ MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 JWT_SECRET = os.environ["JWT_SECRET"]
 EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
+EMERGENT_AUTH_SESSION_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 JWT_ALG = "HS256"
 JWT_EXPIRE_HOURS = 24 * 7  # 7 days
 MAX_WATCHLIST = 5
+
+# ---------- Subscription Plans ----------
+PLANS = {
+    "free": {
+        "name": "Free",
+        "price_usd": 0,
+        "watchlist_limit": 3,
+        "analyses_per_day": 1,
+        "analyses_per_week": 2,
+        "quick_actions": False,
+        "share_verdicts": False,
+        "analysis_history_days": 30,
+        "tag": "Starter",
+    },
+    "pro": {
+        "name": "Pro",
+        "price_usd": 9.99,
+        "watchlist_limit": 10,
+        "analyses_per_day": 15,
+        "analyses_per_week": 60,
+        "quick_actions": True,
+        "share_verdicts": True,
+        "analysis_history_days": 365,
+        "tag": "Most popular",
+    },
+    "elite": {
+        "name": "Elite",
+        "price_usd": 29.99,
+        "watchlist_limit": 25,
+        "analyses_per_day": None,  # unlimited
+        "analyses_per_week": None,
+        "quick_actions": True,
+        "share_verdicts": True,
+        "analysis_history_days": 3650,
+        "tag": "Institutional",
+    },
+}
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -87,7 +126,61 @@ async def get_current_user(
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    # Ensure plan default for legacy users
+    if not user.get("plan"):
+        user["plan"] = "free"
     return user
+
+
+def plan_for(user: dict) -> dict:
+    return PLANS.get(user.get("plan") or "free", PLANS["free"])
+
+
+async def count_analyses(user_id: str, since: datetime) -> int:
+    return await db.analyses.count_documents(
+        {"user_id": user_id, "created_at": {"$gte": iso(since)}}
+    )
+
+
+async def quota_snapshot(user: dict) -> dict:
+    p = plan_for(user)
+    now = now_utc()
+    day_ago = now - timedelta(days=1)
+    week_ago = now - timedelta(days=7)
+    used_day = await count_analyses(user["id"], day_ago)
+    used_week = await count_analyses(user["id"], week_ago)
+    watchlist_used = await db.watchlist.count_documents({"user_id": user["id"]})
+    return {
+        "plan": user.get("plan") or "free",
+        "plan_name": p["name"],
+        "watchlist_used": watchlist_used,
+        "watchlist_limit": p["watchlist_limit"],
+        "analyses_today": used_day,
+        "analyses_day_limit": p["analyses_per_day"],
+        "analyses_this_week": used_week,
+        "analyses_week_limit": p["analyses_per_week"],
+        "quick_actions": p["quick_actions"],
+        "share_verdicts": p["share_verdicts"],
+    }
+
+
+async def enforce_analysis_quota(user: dict):
+    p = plan_for(user)
+    now = now_utc()
+    if p["analyses_per_day"] is not None:
+        used_day = await count_analyses(user["id"], now - timedelta(days=1))
+        if used_day >= p["analyses_per_day"]:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Daily analysis limit reached ({p['analyses_per_day']}/day on {p['name']} plan). Upgrade to unlock more.",
+            )
+    if p["analyses_per_week"] is not None:
+        used_week = await count_analyses(user["id"], now - timedelta(days=7))
+        if used_week >= p["analyses_per_week"]:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Weekly analysis limit reached ({p['analyses_per_week']}/week on {p['name']} plan). Upgrade to unlock more.",
+            )
 
 
 # ---------- Models ----------
@@ -346,6 +439,8 @@ async def register(req: SignupReq):
         "email": req.email.lower(),
         "full_name": req.full_name,
         "password_hash": hash_password(req.password),
+        "plan": "free",
+        "google_linked": False,
         "created_at": iso(now_utc()),
     }
     await db.users.insert_one(doc)
@@ -356,6 +451,7 @@ async def register(req: SignupReq):
             "id": user_id,
             "email": doc["email"],
             "full_name": doc["full_name"],
+            "plan": "free",
         },
     }
 
@@ -363,7 +459,7 @@ async def register(req: SignupReq):
 @api_router.post("/auth/login", response_model=AuthResp)
 async def login(req: LoginReq):
     user = await db.users.find_one({"email": req.email.lower()}, {"_id": 0})
-    if not user or not verify_password(req.password, user["password_hash"]):
+    if not user or not user.get("password_hash") or not verify_password(req.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_jwt(user["id"])
     return {
@@ -372,6 +468,73 @@ async def login(req: LoginReq):
             "id": user["id"],
             "email": user["email"],
             "full_name": user["full_name"],
+            "plan": user.get("plan") or "free",
+        },
+    }
+
+
+# REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+class GoogleSessionReq(BaseModel):
+    session_id: str
+
+
+@api_router.post("/auth/google/session", response_model=AuthResp)
+async def google_session(req: GoogleSessionReq):
+    """Exchange an Emergent OAuth session_id for our own JWT + find/create user."""
+    if not req.session_id:
+        raise HTTPException(status_code=400, detail="session_id required")
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as hc:
+            r = await hc.get(
+                EMERGENT_AUTH_SESSION_URL,
+                headers={"X-Session-ID": req.session_id},
+            )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Emergent auth unreachable: {e}")
+    if r.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid or expired Google session")
+    data = r.json()
+    email = (data.get("email") or "").lower().strip()
+    name = data.get("name") or email.split("@")[0]
+    if not email:
+        raise HTTPException(status_code=400, detail="Google profile missing email")
+
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        user_id = existing["id"]
+        # Ensure legacy users pick up plan + google_linked
+        updates = {}
+        if not existing.get("plan"):
+            updates["plan"] = "free"
+        if not existing.get("google_linked"):
+            updates["google_linked"] = True
+        if updates:
+            await db.users.update_one({"id": user_id}, {"$set": updates})
+        full_name = existing.get("full_name") or name
+        plan = existing.get("plan") or "free"
+    else:
+        user_id = str(uuid.uuid4())
+        full_name = name
+        plan = "free"
+        await db.users.insert_one(
+            {
+                "id": user_id,
+                "email": email,
+                "full_name": full_name,
+                "plan": plan,
+                "google_linked": True,
+                "password_hash": None,
+                "created_at": iso(now_utc()),
+            }
+        )
+    token = create_jwt(user_id)
+    return {
+        "token": token,
+        "user": {
+            "id": user_id,
+            "email": email,
+            "full_name": full_name,
+            "plan": plan,
         },
     }
 
@@ -379,6 +542,30 @@ async def login(req: LoginReq):
 @api_router.get("/auth/me")
 async def me(user=Depends(get_current_user)):
     return user
+
+
+@api_router.get("/plans")
+async def list_plans():
+    return PLANS
+
+
+@api_router.get("/quota")
+async def get_quota(user=Depends(get_current_user)):
+    return await quota_snapshot(user)
+
+
+class UpgradeReq(BaseModel):
+    plan: Literal["free", "pro", "elite"]
+
+
+@api_router.post("/plan/upgrade")
+async def upgrade_plan(req: UpgradeReq, user=Depends(get_current_user)):
+    """MVP stub: immediately switches the user's plan. In Phase 2 this will
+    gate behind a Stripe checkout. No payment collected yet — pure demo/upgrade."""
+    if req.plan not in PLANS:
+        raise HTTPException(status_code=400, detail="Unknown plan")
+    await db.users.update_one({"id": user["id"]}, {"$set": {"plan": req.plan}})
+    return {"ok": True, "plan": req.plan, "message": f"Switched to {PLANS[req.plan]['name']} (demo · no charge)"}
 
 
 # ---------- Routes: Stocks ----------
@@ -457,9 +644,13 @@ async def get_watchlist(user=Depends(get_current_user)):
 @api_router.post("/watchlist")
 async def add_to_watchlist(req: AddStockReq, user=Depends(get_current_user)):
     ticker = req.ticker.upper().strip()
+    p = plan_for(user)
     count = await db.watchlist.count_documents({"user_id": user["id"]})
-    if count >= MAX_WATCHLIST:
-        raise HTTPException(status_code=400, detail=f"Watchlist limit of {MAX_WATCHLIST} reached")
+    if count >= p["watchlist_limit"]:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Watchlist limit of {p['watchlist_limit']} reached on {p['name']} plan. Upgrade to add more.",
+        )
     existing = await db.watchlist.find_one({"user_id": user["id"], "ticker": ticker})
     if existing:
         raise HTTPException(status_code=400, detail="Ticker already in watchlist")
@@ -617,6 +808,7 @@ async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
 @api_router.post("/analysis/{ticker}")
 async def create_analysis(ticker: str, user=Depends(get_current_user)):
     ticker = ticker.upper().strip()
+    await enforce_analysis_quota(user)
     # Gather data in parallel
     quote_task = get_quote(ticker)
     hist_task = asyncio.to_thread(_yf_history_sync, ticker, "6mo", "1d")
@@ -674,6 +866,12 @@ async def analysis_history(ticker: str, user=Depends(get_current_user)):
 async def quick_analyze(kind: str, user=Depends(get_current_user)):
     if kind not in ("top", "bottom"):
         raise HTTPException(status_code=400, detail="kind must be 'top' or 'bottom'")
+    p = plan_for(user)
+    if not p["quick_actions"]:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Quick batch analysis is a Pro/Elite feature. Upgrade from {p['name']} to unlock Top/Bottom sweeps.",
+        )
     items = await db.watchlist.find({"user_id": user["id"]}, {"_id": 0, "user_id": 0}).to_list(20)
     if not items:
         raise HTTPException(status_code=400, detail="Watchlist is empty")
@@ -721,6 +919,101 @@ async def mark_alert_read(alert_id: str, user=Depends(get_current_user)):
 async def mark_all_alerts_read(user=Depends(get_current_user)):
     await db.alerts.update_many({"user_id": user["id"]}, {"$set": {"read": True}})
     return {"ok": True}
+
+
+# ---------- Share Verdict ----------
+def _public_view(analysis: dict) -> dict:
+    """Strip out private/internal fields and keep the report essentials."""
+    return {
+        "ticker": analysis.get("ticker"),
+        "created_at": analysis.get("created_at"),
+        "price_at_analysis": analysis.get("price_at_analysis"),
+        "recommendation": analysis.get("recommendation"),
+        "confidence_score": analysis.get("confidence_score"),
+        "price_target": analysis.get("price_target"),
+        "stop_loss": analysis.get("stop_loss"),
+        "executive_summary": analysis.get("executive_summary"),
+        "reasoning": analysis.get("reasoning"),
+        "technical_analysis": analysis.get("technical_analysis"),
+        "fundamental_analysis": analysis.get("fundamental_analysis"),
+        "peer_comparison": analysis.get("peer_comparison"),
+        "risk_factors": analysis.get("risk_factors") or [],
+        "time_horizon_weeks": analysis.get("time_horizon_weeks"),
+        "technicals": {
+            k: v for k, v in (analysis.get("technicals") or {}).items()
+            if k in ("rsi_14", "sma_20", "sma_50", "macd")
+        },
+        "fundamentals": {
+            k: v for k, v in (analysis.get("fundamentals") or {}).items()
+            if k in ("sector", "industry", "marketCap", "trailingPE", "shortName", "longName")
+        },
+        "quote_snapshot": {
+            k: v for k, v in (analysis.get("quote_snapshot") or {}).items()
+            if k in ("name", "currency", "exchange")
+        },
+    }
+
+
+@api_router.post("/analysis/{analysis_id}/share")
+async def share_analysis(analysis_id: str, user=Depends(get_current_user)):
+    p = plan_for(user)
+    if not p["share_verdicts"]:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Sharing verdicts is a Pro/Elite feature. Upgrade from {p['name']} to unlock public share links.",
+        )
+    analysis = await db.analyses.find_one(
+        {"id": analysis_id, "user_id": user["id"]}, {"_id": 0}
+    )
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    # Re-use existing share link if any
+    existing = await db.shared_verdicts.find_one(
+        {"analysis_id": analysis_id, "owner_id": user["id"]}, {"_id": 0}
+    )
+    if existing:
+        return {
+            "share_id": existing["share_id"],
+            "url_path": f"/v/{existing['share_id']}",
+            "created_at": existing["created_at"],
+        }
+    share_id = uuid.uuid4().hex[:12]
+    await db.shared_verdicts.insert_one(
+        {
+            "share_id": share_id,
+            "analysis_id": analysis_id,
+            "owner_id": user["id"],
+            "ticker": analysis["ticker"],
+            "created_at": iso(now_utc()),
+        }
+    )
+    return {
+        "share_id": share_id,
+        "url_path": f"/v/{share_id}",
+        "created_at": iso(now_utc()),
+    }
+
+
+@api_router.get("/public/verdict/{share_id}")
+async def get_shared_verdict(share_id: str):
+    """Public read-only endpoint — no auth required."""
+    share = await db.shared_verdicts.find_one({"share_id": share_id}, {"_id": 0})
+    if not share:
+        raise HTTPException(status_code=404, detail="Shared verdict not found")
+    analysis = await db.analyses.find_one(
+        {"id": share["analysis_id"]}, {"_id": 0}
+    )
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Underlying analysis no longer exists")
+    owner = await db.users.find_one(
+        {"id": share["owner_id"]}, {"_id": 0, "password_hash": 0, "google_linked": 0, "plan": 0}
+    )
+    return {
+        "share_id": share_id,
+        "shared_at": share["created_at"],
+        "shared_by_name": owner.get("full_name") if owner else "A Neural user",
+        "analysis": _public_view(analysis),
+    }
 
 
 # ---------- Mount router ----------

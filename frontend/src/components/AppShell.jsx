@@ -46,7 +46,7 @@ export default function AppShell({ children }) {
                         </div>
                         <div className="flex flex-col leading-none">
                             <span className="font-serif italic text-lg" style={{ letterSpacing: "-0.01em" }}>
-                                Lucid
+                                Neural
                             </span>
                             <span className="text-overline" style={{ fontSize: "0.56rem", marginTop: 2 }}>
                                 Stock Intelligence
@@ -64,11 +64,40 @@ export default function AppShell({ children }) {
                         >
                             Dashboard
                         </Link>
+                        <Link
+                            to="/pricing"
+                            className={`text-sm font-medium link-underline ${
+                                loc.pathname.startsWith("/pricing") ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"
+                            }`}
+                            data-testid="nav-pricing"
+                        >
+                            Pricing
+                        </Link>
                     </nav>
 
                     <div className="flex items-center gap-2">
+                        {user?.plan && (
+                            <Link
+                                to="/pricing"
+                                className="text-overline mr-1 hidden sm:inline-flex items-center px-2 py-1"
+                                style={{
+                                    border: "1px solid hsl(var(--border-default))",
+                                    borderRadius: 2,
+                                    color:
+                                        user.plan === "elite"
+                                            ? "hsl(var(--hold))"
+                                            : user.plan === "pro"
+                                            ? "hsl(var(--buy))"
+                                            : "hsl(var(--text-secondary))",
+                                    fontSize: "0.56rem",
+                                }}
+                                data-testid="plan-badge"
+                            >
+                                {user.plan.toUpperCase()} PLAN
+                            </Link>
+                        )}
                         {user && (
-                            <span className="hidden sm:inline text-overline mr-2" data-testid="current-user-email">
+                            <span className="hidden md:inline text-overline mr-2" data-testid="current-user-email">
                                 {user.email}
                             </span>
                         )}

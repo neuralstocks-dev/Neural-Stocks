@@ -1,0 +1,61 @@
+{
+  "summary": "Iteration 2 backend testing for Neural (AI Stock Analysis). Extended iteration-1 regression suite and added 21 new tests covering plans, quota, Google OAuth endpoint shape, plan upgrade (stub), free-tier enforcement (watchlist/quick-actions/analysis quota), share verdict (pro-only, idempotent), and public read-only verdict endpoint. Result: 59/60 pass (98.3%). LLM budget is NOW working (iteration 1's critical blocker is resolved — AI analyses, latest, history, and share flows all succeed end-to-end). Sole failure is POST /api/analysis/quick/top returning 502 from the ingress (gateway timeout) because it runs 2-5 sequential Claude calls and exceeds the preview proxy timeout.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/analysis/quick/top",
+        "issue": "Times out at the ingress (502 'preview environment is not responding') when run sequentially over a watchlist. Each Claude analysis takes ~10-25s and quick_analyze awaits them one-by-one for up to 5 tickers — total can exceed the preview proxy's ~60s window. Suggest (a) reduce default top-N from 5 to 3, (b) run analyses with asyncio.gather concurrently (LLM provider can handle it), or (c) return 202 + background-job id and poll."
+      },
+      {
+        "endpoint": "GET /api/public/verdict/{share_id}",
+        "issue": "`shared_by_name` falls back to owner.full_name which can be a real user-entered name. If the user ever puts an email-like string into full_name it will leak. Consider stripping/anonymizing (first name + last initial). Not a bug, just hardening."
+      },
+      {
+        "endpoint": "POST /api/analysis/{analysis_id}/share",
+        "issue": "The returned `created_at` on the idempotent (existing) path uses the original share's created_at, but on the newly-created path uses a freshly-computed iso(now_utc()) instead of the value written to Mongo — cosmetic, but means the two timestamps could diverge by a few ms. Low impact."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_iteration2.py",
+    "/app/test_reports/pytest/iteration2_results.xml",
+    "/app/test_reports/pytest/iteration1_rerun.xml"
+  ],
+  "action_items": [
+    "Fix POST /api/analysis/quick/top ingress timeout: parallelize the per-ticker analysis loop with asyncio.gather (preserving plan quota checks), or cap selected tickers to 3, or convert to a background job pattern.",
+    "(Optional hardening) Anonymize `shared_by_name` on public verdict endpoint so users can't accidentally expose their full email/name.",
+    "(Optional) Persist and reuse the exact `created_at` written to Mongo when returning a newly-created share link."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 1032 lines — strongly recommend splitting into routers/ (auth.py, plans.py, stocks.py, watchlist.py, analysis.py, share.py) and services/ (yfinance.py, ai.py, quota.py) before Phase 2. Current size hurts navigability and violates the 700-line guideline.",
+    "Quota enforcement (enforce_analysis_quota) runs before data fetch but quick_analyze bypasses it since it calls create_analysis() in a loop — meaning a Pro user doing quick/top consumes daily quota 5x in one request. Acceptable for MVP but should be documented.",
+    "run_ai_analysis still only validates `recommendation` field; fields like price_target/stop_loss/risk_factors are trusted blindly from the LLM — a Pydantic model for the AI response would prevent bad data hitting Mongo.",
+    "No index on db.shared_verdicts.share_id (used in public lookup) or db.analyses.(user_id, ticker, created_at). Add Mongo indexes for performance as data grows.",
+    "Google OAuth flow uses `httpx.AsyncClient(timeout=15.0)` which is reasonable, but there is no cookie/session set — the returned JWT is sent as a body token. Frontend must remember to use Authorization: Bearer header, not cookies.",
+    "`_public_view` correctly scrubs private fields (user_id, email, password_hash, google_linked, plan) — verified by test. Good.",
+    "Share endpoint is properly idempotent by (analysis_id, owner_id) — verified by test.",
+    "Plan-tier enforcement is consistent across watchlist (402), quick_actions (402), analysis daily/weekly (402), share (402) — good uniform UX.",
+    "Good: all new endpoints use async/await, exclude _id, use uuid ids, Pydantic validation (Literal for plan), and proper HTTP status codes."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (updated auth fixture to upgrade user to elite so iteration-1 watchlist/analysis tests work under new plan system)",
+    "/app/backend/tests/test_iteration2.py (new, 21 tests: plans, quota, Google OAuth shape, plan upgrade, free-tier enforcement, share verdict + public read-only)"
+  ],
+  "success_rate": {
+    "backend": "98.3% (59/60). New iteration-2 tests: 100% (21/21). Iteration-1 regression: 97.4% (38/39, only quick_top fails with ingress 502).",
+    "frontend": "skipped per request"
+  },
+  "test_credentials": "Each test generates a fresh user: TEST_it2_<uuid>@example.com / Passw0rd!123 via POST /api/auth/register. No shared credentials required.",
+  "seed_data_creation": "None persistent. Each test run creates throwaway users + watchlist items + analyses + shared_verdicts. Not cleaned up explicitly — all rows are TEST_-prefixed emails.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run both suites: `python -m pytest /app/backend/tests/ -v --junitxml=/app/test_reports/pytest/results.xml`. Iteration-2 share-verdict tests depend on an analysis POST succeeding (LLM budget required). If budget runs out again, those share tests will auto-skip with 'LLM budget exhausted' — that's expected behavior. The quick_top failure is an ingress timeout, not a logic bug; can be reproduced by POST /api/analysis/quick/top with 2+ tickers in watchlist. If fixed by parallelizing, retest with a watchlist of 5 tickers.",
+  "rca of the issue": "quick_top 502: `quick_analyze` sequentially awaits create_analysis() for up to 5 tickers. Each call = yfinance quote + history + fundamentals + 1 Claude Sonnet 4.5 round-trip (~10-25s). Total can easily exceed 60s preview ingress timeout → 502 from gateway, not FastAPI. Mitigation: (1) `await asyncio.gather(*[create_analysis(tk, user=user) for tk in selected])` would run all 5 concurrently (Claude handles concurrency fine and it brings wall time down to max-of-one instead of sum). (2) Alternatively cap to 3 tickers. (3) Or turn into background job with polling. The endpoint logic itself is correct; it's a latency/timeout problem."
+}

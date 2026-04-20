@@ -4,6 +4,8 @@ import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import VerdictRing from "@/components/VerdictRing";
 import SignalBadge from "@/components/SignalBadge";
+import ShareVerdictButton from "@/components/ShareVerdictButton";
+import { useAuth } from "@/hooks/useAuth";
 import {
     LineChart,
     Line,
@@ -18,6 +20,7 @@ import { formatPrice, formatPct, formatCompact, timeAgo } from "@/lib/format";
 
 export default function AnalysisReportPage() {
     const { ticker } = useParams();
+    const { user } = useAuth();
     const t = (ticker || "").toUpperCase();
     const [analysis, setAnalysis] = useState(null);
     const [history, setHistory] = useState([]);
@@ -162,7 +165,13 @@ export default function AnalysisReportPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-span-12 md:col-span-4 flex justify-start md:justify-end">
+                                <div className="col-span-12 md:col-span-4 flex justify-start md:justify-end items-center gap-2">
+                                    {analysis && (
+                                        <ShareVerdictButton
+                                            analysisId={analysis.id}
+                                            userPlan={user?.plan || "free"}
+                                        />
+                                    )}
                                     <button
                                         onClick={runAnalysis}
                                         disabled={analyzing}

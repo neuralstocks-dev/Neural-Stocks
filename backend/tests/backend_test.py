@@ -41,6 +41,10 @@ def auth(session, user_creds):
     token = data["token"]
     user = data["user"]
     session.headers.update({"Authorization": f"Bearer {token}"})
+    # Upgrade to elite so legacy iteration-1 tests (which expect a 5-item watchlist)
+    # aren't blocked by the new free-plan (3 items) / daily-analysis quotas.
+    up = session.post(f"{API}/plan/upgrade", json={"plan": "elite"}, timeout=SHORT)
+    assert up.status_code == 200, f"upgrade to elite failed: {up.status_code} {up.text}"
     return {"token": token, "user": user}
 
 
@@ -161,14 +165,13 @@ class TestWatchlist:
         assert r.status_code == 404
 
     def test_fill_to_max_then_exceed(self, session, auth):
-        # Already have AAPL (1). Add 4 more to hit limit of 5.
+        # User was upgraded to elite (limit=25). Add AAPL is already there from test_add_aapl.
         for tk in ["MSFT", "GOOGL", "TSLA", "NVDA"]:
             r = session.post(f"{API}/watchlist", json={"ticker": tk, "category": "tech"}, timeout=MED)
             assert r.status_code == 200, f"add {tk} failed: {r.status_code} {r.text}"
-        # 6th should be rejected
-        r = session.post(f"{API}/watchlist", json={"ticker": "AMZN", "category": "tech"}, timeout=MED)
+        # Duplicate should 400
+        r = session.post(f"{API}/watchlist", json={"ticker": "AAPL", "category": "tech"}, timeout=MED)
         assert r.status_code == 400
-        assert "limit" in r.json().get("detail", "").lower()
 
     def test_live_watchlist(self, session, auth):
         r = session.get(f"{API}/watchlist/live", timeout=MED)

@@ -5,7 +5,8 @@ import AppShell from "@/components/AppShell";
 import AddStockModal from "@/components/AddStockModal";
 import Sparkline from "@/components/Sparkline";
 import SignalBadge from "@/components/SignalBadge";
-import { formatPrice, formatPct, timeAgo, formatCompact } from "@/lib/format";
+import { useAuth } from "@/hooks/useAuth";
+import { formatPrice, formatPct, timeAgo } from "@/lib/format";
 import {
     ArrowUpRight,
     Bell,
@@ -16,7 +17,7 @@ import {
     TrendingDown,
     TrendingUp,
     Loader2,
-    Check,
+    Lock,
 } from "lucide-react";
 
 function WatchlistRow({ item, sparkline, onRemove, onAnalyze, analyzing }) {
@@ -118,14 +119,22 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, analyzing }) {
 }
 
 export default function DashboardPage() {
+    const { user } = useAuth();
     const [items, setItems] = useState([]);
     const [sparks, setSparks] = useState({}); // ticker -> [closes]
     const [alerts, setAlerts] = useState([]);
+    const [quota, setQuota] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [analyzingTicker, setAnalyzingTicker] = useState(null);
     const [quickBusy, setQuickBusy] = useState(null); // 'top' | 'bottom' | null
     const [modalOpen, setModalOpen] = useState(false);
+    const [actionError, setActionError] = useState("");
+
+    const plan = user?.plan || "free";
+    const canQuickActions = quota?.quick_actions ?? (plan !== "free");
+    const watchlistLimit = quota?.watchlist_limit ?? (plan === "free" ? 3 : plan === "pro" ? 10 : 25);
+    const watchlistFull = items.length >= watchlistLimit;
 
     const fetchWatchlist = useCallback(async () => {
         const r = await api.get("/watchlist/live");
@@ -136,6 +145,15 @@ export default function DashboardPage() {
     const fetchAlerts = useCallback(async () => {
         const r = await api.get("/alerts");
         setAlerts(r.data || []);
+    }, []);
+
+    const fetchQuota = useCallback(async () => {
+        try {
+            const r = await api.get("/quota");
+            setQuota(r.data);
+        } catch {
+            /* ignore */
+        }
     }, []);
 
     const fetchSparks = useCallback(async (tickers) => {
@@ -159,18 +177,20 @@ export default function DashboardPage() {
             try {
                 const wl = await fetchWatchlist();
                 await fetchAlerts();
+                await fetchQuota();
                 if (wl.length) await fetchSparks(wl.map((i) => i.ticker));
             } finally {
                 setLoading(false);
             }
         })();
-    }, [fetchWatchlist, fetchAlerts, fetchSparks]);
+    }, [fetchWatchlist, fetchAlerts, fetchQuota, fetchSparks]);
 
     const refresh = async () => {
         setRefreshing(true);
         try {
             const wl = await fetchWatchlist();
             await fetchAlerts();
+            await fetchQuota();
             if (wl.length) await fetchSparks(wl.map((i) => i.ticker));
         } finally {
             setRefreshing(false);
@@ -180,16 +200,19 @@ export default function DashboardPage() {
     const removeTicker = async (ticker) => {
         await api.delete(`/watchlist/${ticker}`);
         setItems((prev) => prev.filter((i) => i.ticker !== ticker));
+        await fetchQuota();
     };
 
     const analyzeOne = async (ticker) => {
+        setActionError("");
         setAnalyzingTicker(ticker);
         try {
             await api.post(`/analysis/${ticker}`);
             await fetchWatchlist();
             await fetchAlerts();
+            await fetchQuota();
         } catch (err) {
-            alert(err?.response?.data?.detail || "Analysis failed");
+            setActionError(err?.response?.data?.detail || "Analysis failed");
         } finally {
             setAnalyzingTicker(null);
         }
@@ -197,16 +220,18 @@ export default function DashboardPage() {
 
     const quickAnalyze = async (kind) => {
         if (items.length === 0) {
-            alert("Add stocks to your watchlist first");
+            setActionError("Add stocks to your watchlist first");
             return;
         }
+        setActionError("");
         setQuickBusy(kind);
         try {
             await api.post(`/analysis/quick/${kind}`);
             await fetchWatchlist();
             await fetchAlerts();
+            await fetchQuota();
         } catch (err) {
-            alert(err?.response?.data?.detail || "Quick analysis failed");
+            setActionError(err?.response?.data?.detail || "Quick analysis failed");
         } finally {
             setQuickBusy(null);
         }
@@ -236,7 +261,9 @@ export default function DashboardPage() {
             <AddStockModal
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
-                onAdded={refresh}
+                onAdded={() => {
+                    refresh();
+                }}
             />
 
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16">
@@ -270,18 +297,73 @@ export default function DashboardPage() {
                     </p>
                 </section>
 
+                {/* Quota banner */}
+                {quota && (
+                    <section
+                        className="module px-5 py-4 mb-4 flex items-center justify-between flex-wrap gap-3"
+                        data-testid="quota-banner"
+                    >
+                        <div className="flex flex-wrap items-center gap-5 md:gap-8">
+                            <div>
+                                <p className="text-overline" style={{ fontSize: "0.56rem" }}>Plan</p>
+                                <p className="font-mono text-sm mt-1" style={{ color: plan === "elite" ? "hsl(var(--hold))" : plan === "pro" ? "hsl(var(--buy))" : "hsl(var(--text-primary))" }}>
+                                    {quota.plan_name.toUpperCase()}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-overline" style={{ fontSize: "0.56rem" }}>Watchlist</p>
+                                <p className="font-mono text-sm mt-1">{quota.watchlist_used} / {quota.watchlist_limit}</p>
+                            </div>
+                            <div>
+                                <p className="text-overline" style={{ fontSize: "0.56rem" }}>Analyses · today</p>
+                                <p className="font-mono text-sm mt-1">
+                                    {quota.analyses_today}
+                                    {" / "}
+                                    {quota.analyses_day_limit === null ? "∞" : quota.analyses_day_limit}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-overline" style={{ fontSize: "0.56rem" }}>Analyses · week</p>
+                                <p className="font-mono text-sm mt-1">
+                                    {quota.analyses_this_week}
+                                    {" / "}
+                                    {quota.analyses_week_limit === null ? "∞" : quota.analyses_week_limit}
+                                </p>
+                            </div>
+                        </div>
+                        {plan !== "elite" && (
+                            <Link
+                                to="/pricing"
+                                className="btn-ghost !text-xs"
+                                data-testid="upgrade-link"
+                            >
+                                Upgrade →
+                            </Link>
+                        )}
+                    </section>
+                )}
+
+                {actionError && (
+                    <div className="signal-sell px-4 py-3 mb-4 font-mono text-sm" data-testid="action-error">
+                        {actionError}
+                    </div>
+                )}
+
                 {/* Quick Actions */}
                 <section className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-8">
                     <button
                         onClick={() => quickAnalyze("top")}
                         className="btn-quick flex items-center justify-between"
-                        disabled={!!quickBusy}
+                        disabled={!!quickBusy || !canQuickActions}
+                        title={!canQuickActions ? "Pro/Elite feature" : undefined}
                         data-testid="analyze-top-button"
                     >
                         <span>
-                            {quickBusy === "top" ? "Analyzing…" : "Analyze Top 5"}
+                            {!canQuickActions ? "Top 5 · Pro" : quickBusy === "top" ? "Analyzing…" : "Analyze Top 5"}
                         </span>
-                        {quickBusy === "top" ? (
+                        {!canQuickActions ? (
+                            <Lock size={14} strokeWidth={1.5} />
+                        ) : quickBusy === "top" ? (
                             <Loader2 size={14} className="animate-spin" />
                         ) : (
                             <TrendingUp size={14} strokeWidth={1.5} />
@@ -290,13 +372,16 @@ export default function DashboardPage() {
                     <button
                         onClick={() => quickAnalyze("bottom")}
                         className="btn-quick flex items-center justify-between"
-                        disabled={!!quickBusy}
+                        disabled={!!quickBusy || !canQuickActions}
+                        title={!canQuickActions ? "Pro/Elite feature" : undefined}
                         data-testid="analyze-bottom-button"
                     >
                         <span>
-                            {quickBusy === "bottom" ? "Analyzing…" : "Analyze Bottom 5"}
+                            {!canQuickActions ? "Bottom 5 · Pro" : quickBusy === "bottom" ? "Analyzing…" : "Analyze Bottom 5"}
                         </span>
-                        {quickBusy === "bottom" ? (
+                        {!canQuickActions ? (
+                            <Lock size={14} strokeWidth={1.5} />
+                        ) : quickBusy === "bottom" ? (
                             <Loader2 size={14} className="animate-spin" />
                         ) : (
                             <TrendingDown size={14} strokeWidth={1.5} />
@@ -314,11 +399,11 @@ export default function DashboardPage() {
                     <button
                         onClick={() => setModalOpen(true)}
                         className="btn-quick flex items-center justify-between"
-                        disabled={items.length >= 5}
+                        disabled={watchlistFull}
                         data-testid="add-stock-button"
                     >
                         <span>
-                            {items.length >= 5 ? "Watchlist Full" : "Add Stock"}
+                            {watchlistFull ? "Watchlist Full" : "Add Stock"}
                         </span>
                         <Plus size={14} strokeWidth={1.5} />
                     </button>
@@ -330,7 +415,7 @@ export default function DashboardPage() {
                     <div className="lg:col-span-8 module">
                         <div className="p-5 md:p-6 flex items-center justify-between" style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
                             <div>
-                                <p className="text-overline">Watchlist · {items.length} / 5</p>
+                                <p className="text-overline">Watchlist · {items.length} / {watchlistLimit}</p>
                                 <h2 className="font-serif text-2xl md:text-3xl mt-1" style={{ letterSpacing: "-0.015em" }}>
                                     Positions under watch
                                 </h2>
