@@ -16,6 +16,11 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 class PricingReq(BaseModel):
     pro_price: float = Field(gt=0, le=9999)
     elite_price: float = Field(gt=0, le=9999)
+    annual_discount_pct: float = Field(ge=0, le=90)
+
+
+class LoginDeleteReq(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=500)
 
 
 def _sanitize_user(u: dict) -> dict:
@@ -171,7 +176,7 @@ async def get_admin_pricing(_admin=Depends(admin_required)):
 
 @router.put("/pricing")
 async def update_admin_pricing(req: PricingReq, _admin=Depends(admin_required)):
-    prices = await set_pricing(req.pro_price, req.elite_price)
+    prices = await set_pricing(req.pro_price, req.elite_price, req.annual_discount_pct)
     # Rotate PayPal plans so new checkouts charge the new price
     try:
         plan_ids = await get_plan_ids(prices)
@@ -181,5 +186,18 @@ async def update_admin_pricing(req: PricingReq, _admin=Depends(admin_required)):
         "ok": True,
         "prices": prices,
         "plan_ids": plan_ids,
-        "message": f"Updated pricing: Pro ${prices['pro']:.2f}/mo · Elite ${prices['elite']:.2f}/mo. New checkouts will use the updated prices; existing subscribers continue at their current rate until they resubscribe.",
+        "message": f"Updated pricing: Pro ${prices['pro_monthly']:.2f}/mo (${prices['pro_yearly']:.2f}/yr) · Elite ${prices['elite_monthly']:.2f}/mo (${prices['elite_yearly']:.2f}/yr) · Annual discount {prices['annual_discount_pct']:.0f}%. New checkouts use the updated prices; existing subscribers continue at their current rate until they resubscribe.",
     }
+
+
+# ---------- Login event management ----------
+@router.delete("/logins")
+async def delete_all_logins(_admin=Depends(admin_required)):
+    res = await db.login_events.delete_many({})
+    return {"ok": True, "removed": res.deleted_count, "message": f"Cleared {res.deleted_count} login events."}
+
+
+@router.post("/logins/delete")
+async def delete_selected_logins(req: LoginDeleteReq, _admin=Depends(admin_required)):
+    res = await db.login_events.delete_many({"id": {"$in": req.ids}})
+    return {"ok": True, "removed": res.deleted_count, "message": f"Deleted {res.deleted_count} login events."}

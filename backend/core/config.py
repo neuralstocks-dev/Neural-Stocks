@@ -41,6 +41,7 @@ SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
 # Default monthly prices — overridable dynamically via db.settings by admin.
 DEFAULT_PRO_PRICE = 9.0
 DEFAULT_ELITE_PRICE = 29.0
+DEFAULT_ANNUAL_DISCOUNT_PCT = 20.0  # yearly price = monthly * 12 * (1 - pct/100)
 
 PLANS = {
     "free": {

@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 7 testing of Neural AI Stock Analysis Platform — yearly billing with 20% discount, admin login-event deletion (bulk + selected), 4 PayPal plan IDs (monthly + yearly for Pro/Elite), activate cycle param, Top/Bottom 3 rename, CTA visual balance. Backend: 14/14 new tests pass (100%). Frontend: Pricing page cycle toggle + yearly prices ($86.40 Pro, $278.40 Elite) + SAVE 20% badge + 'Save $X vs monthly' label all verified. Admin page pricing editor (3 inputs + live yearly readout) and login events section (select-all/delete-selected/clear-all buttons + per-row checkboxes) all verified with correct data-testids.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Pricing page — card CTA balance",
+        "issues": ["CTA min-height (150px) is now applied but on Monthly view the Pro card's 'Cancel subscription' block is visibly shorter than the Elite card's PayPal Subscribe + Debit/Credit + 'Powered by PayPal' block. Overall card heights still differ by ~60-80px because Pro's CTA is a single button centered vertically while Elite has two stacked buttons + PayPal chip. Functional, but the user-reported 'visual balance' goal is only partially met — consider making Pro CTA visually match Elite (e.g., add 'Powered by PayPal' chip under Cancel, or pad bottom of Pro CTA block to match)."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration7.py",
+    "/app/test_reports/pytest/iteration7_results.xml"
+  ],
+  "action_items": [
+    "(Polish, optional) Improve visual height balance between Pro and Elite CTA blocks on the Pricing page. Currently Pro Pro-member state ('Cancel subscription' only) is shorter than Elite's PayPal + Debit/Credit + chip stack. Consider matching bottom padding or adding a ghost element.",
+    "(Carryover from iter5) Register PayPal webhook and set PAYPAL_WEBHOOK_ID — still unset."
+  ],
+  "critical_code_review_comments": [
+    "services/pricing.py get_pricing reads db.settings on every call — adds a Mongo round-trip to every /plans, /billing/config, /admin/pricing, and (now) yearly-toggle page load. Consider a 30s in-process cache or settings-change pubsub.",
+    "services/paypal.py get_plan_ids now creates/rotates up to 4 plans. First cold /billing/config can take 10-15s. Consider warming on startup or showing a loader in the PayPal button container (the PricingPage already handles this, verify on slow networks).",
+    "routers/admin.py PricingReq validates annual_discount_pct Field(ge=0, le=90) — spec says 'validates discount must be 0-90'. PR matches spec.",
+    "routers/admin.py DELETE /admin/logins has no confirmation gate on the backend — by design (UI confirms with window.confirm). Consider a soft-delete / archive table if audit trail matters.",
+    "routers/billing.py ActivateReq.cycle Literal['monthly','yearly'] default='monthly' — good. However 'amount_val' resolution uses f'{plan}_{cycle}' key into get_pricing() dict which returns {pro_monthly, elite_monthly, pro_yearly, elite_yearly, annual_discount_pct}. Works. No plan='free' branch risk because plan Literal restricts to pro/elite.",
+    "services/paypal.py _PLAN_VARIANTS — 4 plans created in a loop; when price or discount changes all 4 are rotated in sequence. This could race if two admin saves land concurrently. Low risk for an admin-only endpoint, but worth a note.",
+    "services/pricing.py _yearly_from_monthly rounds to 2 decimals — banker's/standard rounding. $9 × 12 × 0.8 = $86.40 exactly, no rounding artifact for spec defaults."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration7.py (NEW — 14 tests)"
+  ],
+  "success_rate": {
+    "backend": "14/14 (100%)",
+    "frontend": "Pricing page: cycle toggle + yearly prices + SAVE 20% badge + Save $X labels + no '5' remaining → all PASS. Admin page: pricing editor 3 inputs + live display + logins select-all/delete-selected/clear-all + per-row checkboxes → all PASS. data-testid names: admin-price-pro-input, admin-price-elite-input, admin-discount-input, admin-save-pricing-button, logins-select-all-button, logins-delete-selected-button, logins-clear-all-button, login-event-{id}, cycle-monthly, cycle-yearly, yearly-discount-badge."
+  },
+  "test_credentials": "Admin: jolor69@gmail.com/admin1234 · Pro (now shows PRO PLAN in nav, iter5 regression fixed): tiers@demo.io/pass1234 · Free: demo@stockai.io/demo1234. New QA users deleted at test end.",
+  "seed_data_creation": "Created ~6 extra login_events (admin + free + pro test logins) that got cleared by the clear-all test. PayPal sandbox has 4 rotating plans under product 'Neural AI Stock Analysis' (pro_monthly, pro_yearly, elite_monthly, elite_yearly) — harmless accumulation.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run both iteration 6 and 7 suites: `REACT_APP_BACKEND_URL=https://p1-builder.preview.emergentagent.com python -m pytest backend/tests/test_iteration6.py backend/tests/test_iteration7.py -v`. iter7 takes ~6s total — PayPal plans already cached from iter6 test run so put_pricing_updates_and_returns_four_plan_ids is fast after first warm. The test_clear_all_login_events test wipes the login_events collection — run it AFTER any test that inspects/depends on login events. The admin-logins-module data-testid names are: logins-select-all-button / logins-delete-selected-button / logins-clear-all-button and login-event-{id}. Pricing editor inputs are: admin-price-pro-input / admin-price-elite-input / admin-discount-input / admin-save-pricing-button. PayPal sandbox 4 plans auto-created on first /billing/config.",
+  "rca of the issue": "No bugs found in iteration 7 scope. All backend endpoints return documented shapes with correct validation. All frontend elements render with correct data-testids. Only cosmetic feedback: Pro CTA block is visually shorter than Elite CTA block on the Pricing page; min-height 150px helps but two-button-plus-PayPal-chip stack in Elite card pushes its card taller than Pro's single-button card by ~60-80px. Non-blocking; flagged as minor design_issue."
+}

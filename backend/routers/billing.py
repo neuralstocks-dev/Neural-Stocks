@@ -25,6 +25,7 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 class ActivateReq(BaseModel):
     subscription_id: str
     plan: Literal["pro", "elite"]
+    cycle: Literal["monthly", "yearly"] = "monthly"
 
 
 @router.get("/config")
@@ -63,7 +64,8 @@ async def activate_subscription(req: ActivateReq, user=Depends(get_current_user)
     amount_val = (last_payment.get("amount") or {}).get("value")
     if not amount_val:
         prices = await get_pricing()
-        amount_val = f"{prices[req.plan]:.2f}"
+        key = f"{req.plan}_{req.cycle}"
+        amount_val = f"{prices[key]:.2f}"
     next_billing = billing_info.get("next_billing_time")
 
     # Upgrade user
@@ -73,6 +75,7 @@ async def activate_subscription(req: ActivateReq, user=Depends(get_current_user)
             "plan": req.plan,
             "paypal_subscription_id": req.subscription_id,
             "paypal_plan": req.plan,
+            "paypal_cycle": req.cycle,
             "subscription_status": status,
             "subscription_activated_at": iso(now_utc()),
         }},
@@ -87,6 +90,7 @@ async def activate_subscription(req: ActivateReq, user=Depends(get_current_user)
             "user_id": user["id"],
             "email": user["email"],
             "plan": req.plan,
+            "cycle": req.cycle,
             "status": status,
             "amount": float(amount_val),
             "next_billing_time": next_billing,
@@ -96,7 +100,7 @@ async def activate_subscription(req: ActivateReq, user=Depends(get_current_user)
     )
 
     # Fire-and-forget receipt email — never fail activation if email service hiccups
-    plan_name = "Pro" if req.plan == "pro" else "Elite"
+    plan_name = ("Pro" if req.plan == "pro" else "Elite") + (" · Yearly" if req.cycle == "yearly" else " · Monthly")
     try:
         await send_receipt_email(
             to_email=user["email"],

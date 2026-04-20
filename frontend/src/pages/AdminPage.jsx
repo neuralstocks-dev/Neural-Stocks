@@ -3,7 +3,7 @@ import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Loader2, ShieldCheck, Clock, RotateCcw, Search, Trash2, BellOff, DollarSign } from "lucide-react";
+import { Loader2, ShieldCheck, Clock, RotateCcw, Search, Trash2, BellOff, DollarSign, CheckSquare, Square } from "lucide-react";
 import { timeAgo } from "@/lib/format";
 
 const DURATIONS = [
@@ -44,14 +44,26 @@ export default function AdminPage() {
     const [pricing, setPricing] = useState(null);
     const [proForm, setProForm] = useState("");
     const [eliteForm, setEliteForm] = useState("");
+    const [discountForm, setDiscountForm] = useState("");
     const [savingPrice, setSavingPrice] = useState(false);
+    const [selectedLogins, setSelectedLogins] = useState(new Set());
+    const [loginBusy, setLoginBusy] = useState(false);
 
     const loadAll = async () => {
         setLoading(true);
         try {
-            const [u, l] = await Promise.all([api.get("/admin/users"), api.get("/admin/logins")]);
+            const [u, l, pr] = await Promise.all([
+                api.get("/admin/users"),
+                api.get("/admin/logins"),
+                api.get("/admin/pricing"),
+            ]);
             setUsers(u.data || []);
             setLogins(l.data || []);
+            setPricing(pr.data || null);
+            setProForm(String(pr.data?.pro_monthly ?? ""));
+            setEliteForm(String(pr.data?.elite_monthly ?? ""));
+            setDiscountForm(String(pr.data?.annual_discount_pct ?? ""));
+            setSelectedLogins(new Set());
         } finally {
             setLoading(false);
         }
@@ -141,13 +153,22 @@ export default function AdminPage() {
         setMessage("");
         const pro = parseFloat(proForm);
         const elite = parseFloat(eliteForm);
+        const discount = parseFloat(discountForm);
         if (!(pro > 0) || !(elite > 0)) {
             setError("Prices must be positive numbers");
             return;
         }
+        if (!(discount >= 0) || discount > 90) {
+            setError("Annual discount must be between 0 and 90");
+            return;
+        }
         setSavingPrice(true);
         try {
-            const r = await api.put("/admin/pricing", { pro_price: pro, elite_price: elite });
+            const r = await api.put("/admin/pricing", {
+                pro_price: pro,
+                elite_price: elite,
+                annual_discount_pct: discount,
+            });
             setMessage(r.data.message);
             setPricing(r.data.prices);
         } catch (err) {
@@ -155,6 +176,44 @@ export default function AdminPage() {
         } finally {
             setSavingPrice(false);
         }
+    };
+
+    const toggleLogin = (id) => {
+        const next = new Set(selectedLogins);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        setSelectedLogins(next);
+    };
+
+    const toggleAllLogins = () => {
+        if (selectedLogins.size === logins.length) setSelectedLogins(new Set());
+        else setSelectedLogins(new Set(logins.map((l) => l.id)));
+    };
+
+    const deleteSelectedLogins = async () => {
+        if (selectedLogins.size === 0) return;
+        if (!window.confirm(`Delete ${selectedLogins.size} selected login event${selectedLogins.size > 1 ? "s" : ""}?`)) return;
+        setLoginBusy(true); setError(""); setMessage("");
+        try {
+            const r = await api.post("/admin/logins/delete", { ids: Array.from(selectedLogins) });
+            setMessage(r.data.message);
+            setSelectedLogins(new Set());
+            await loadAll();
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Delete failed");
+        } finally { setLoginBusy(false); }
+    };
+
+    const clearAllLogins = async () => {
+        if (!window.confirm(`Clear ALL ${logins.length} login events? This cannot be undone.`)) return;
+        setLoginBusy(true); setError(""); setMessage("");
+        try {
+            const r = await api.delete("/admin/logins");
+            setMessage(r.data.message);
+            setSelectedLogins(new Set());
+            await loadAll();
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Clear failed");
+        } finally { setLoginBusy(false); }
     };
 
     return (
@@ -207,7 +266,7 @@ export default function AdminPage() {
                                     existing subscribers stay on their current price until they re-subscribe.
                                 </p>
                             </div>
-                            <div className="p-5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div className="p-5 md:p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                 <label className="flex flex-col gap-2">
                                     <span className="text-overline">Pro / month</span>
                                     <div className="flex items-center gap-2">
@@ -238,6 +297,22 @@ export default function AdminPage() {
                                         />
                                     </div>
                                 </label>
+                                <label className="flex flex-col gap-2">
+                                    <span className="text-overline">Annual discount</span>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="90"
+                                            step="1"
+                                            value={discountForm}
+                                            onChange={(e) => setDiscountForm(e.target.value)}
+                                            className="input-base font-mono"
+                                            data-testid="admin-discount-input"
+                                        />
+                                        <span className="font-mono" style={{ color: "hsl(var(--text-muted))" }}>%</span>
+                                    </div>
+                                </label>
                                 <button
                                     onClick={savePricing}
                                     disabled={savingPrice}
@@ -252,7 +327,7 @@ export default function AdminPage() {
                                     className="px-5 md:px-6 pb-5 font-mono text-xs"
                                     style={{ color: "hsl(var(--text-muted))" }}
                                 >
-                                    Current live: Pro ${pricing.pro.toFixed(2)} / mo · Elite ${pricing.elite.toFixed(2)} / mo
+                                    Live: Pro ${pricing.pro_monthly.toFixed(2)}/mo (${pricing.pro_yearly.toFixed(2)}/yr) · Elite ${pricing.elite_monthly.toFixed(2)}/mo (${pricing.elite_yearly.toFixed(2)}/yr) · Annual discount {Math.round(pricing.annual_discount_pct)}%
                                 </div>
                             )}
                         </section>
@@ -457,45 +532,104 @@ export default function AdminPage() {
 
                         {/* Login events */}
                         <section className="module mt-6 md:mt-8" data-testid="admin-logins-module">
-                            <div className="p-5 md:p-6" style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
-                                <p className="text-overline">Recent sign-ins · {logins.length}</p>
-                                <h3 className="font-serif text-xl mt-1" style={{ letterSpacing: "-0.01em" }}>
-                                    Login events
-                                </h3>
+                            <div
+                                className="p-5 md:p-6 flex items-center justify-between flex-wrap gap-3"
+                                style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
+                            >
+                                <div>
+                                    <p className="text-overline">Recent sign-ins · {logins.length}</p>
+                                    <h3 className="font-serif text-xl mt-1" style={{ letterSpacing: "-0.01em" }}>
+                                        Login events
+                                    </h3>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={toggleAllLogins}
+                                        disabled={logins.length === 0 || loginBusy}
+                                        className="btn-ghost !py-1 !px-3 !text-xs flex items-center gap-2"
+                                        data-testid="logins-select-all-button"
+                                    >
+                                        {selectedLogins.size > 0 && selectedLogins.size === logins.length ? (
+                                            <CheckSquare size={12} strokeWidth={1.5} />
+                                        ) : (
+                                            <Square size={12} strokeWidth={1.5} />
+                                        )}
+                                        {selectedLogins.size === logins.length && logins.length > 0
+                                            ? "Deselect all"
+                                            : "Select all"}
+                                    </button>
+                                    <button
+                                        onClick={deleteSelectedLogins}
+                                        disabled={selectedLogins.size === 0 || loginBusy}
+                                        className="btn-ghost !py-1 !px-3 !text-xs"
+                                        data-testid="logins-delete-selected-button"
+                                    >
+                                        {loginBusy ? (
+                                            <Loader2 size={12} className="animate-spin" />
+                                        ) : (
+                                            `Delete selected (${selectedLogins.size})`
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={clearAllLogins}
+                                        disabled={logins.length === 0 || loginBusy}
+                                        className="btn-ghost !py-1 !px-3 !text-xs"
+                                        style={{ color: "hsl(var(--sell))" }}
+                                        data-testid="logins-clear-all-button"
+                                    >
+                                        <Trash2 size={12} strokeWidth={1.5} className="inline mr-1" />
+                                        Clear all
+                                    </button>
+                                </div>
                             </div>
                             <div className="max-h-[400px] overflow-y-auto">
-                                {logins.map((l) => (
-                                    <div
-                                        key={l.id}
-                                        className="py-3 px-5 md:px-6 flex items-center justify-between text-sm"
-                                        style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
-                                    >
-                                        <div>
-                                            <span className="font-mono text-sm">{l.email}</span>
-                                            <span
-                                                className="ml-3 text-overline"
-                                                style={{
-                                                    fontSize: "0.56rem",
-                                                    color:
-                                                        l.method === "google"
-                                                            ? "hsl(var(--buy))"
-                                                            : "hsl(var(--text-secondary))",
-                                                }}
-                                            >
-                                                via {l.method}
-                                            </span>
-                                        </div>
-                                        <span
-                                            className="text-overline"
+                                {logins.map((l) => {
+                                    const selected = selectedLogins.has(l.id);
+                                    return (
+                                        <div
+                                            key={l.id}
+                                            className="py-3 px-5 md:px-6 flex items-center gap-3 text-sm cursor-pointer hover:bg-[hsl(var(--surface-elevated))]"
                                             style={{
-                                                color: "hsl(var(--text-muted))",
-                                                fontSize: "0.56rem",
+                                                borderBottom: "1px solid hsl(var(--border-divider))",
+                                                background: selected ? "hsla(38, 45%, 45%, 0.08)" : undefined,
                                             }}
+                                            onClick={() => toggleLogin(l.id)}
+                                            data-testid={`login-event-${l.id}`}
                                         >
-                                            {timeAgo(l.at)}
-                                        </span>
-                                    </div>
-                                ))}
+                                            {selected ? (
+                                                <CheckSquare size={14} strokeWidth={1.5} style={{ color: "hsl(var(--hold))" }} />
+                                            ) : (
+                                                <Square size={14} strokeWidth={1.5} style={{ color: "hsl(var(--text-muted))" }} />
+                                            )}
+                                            <div className="flex-1 flex items-center justify-between">
+                                                <div>
+                                                    <span className="font-mono text-sm">{l.email}</span>
+                                                    <span
+                                                        className="ml-3 text-overline"
+                                                        style={{
+                                                            fontSize: "0.56rem",
+                                                            color:
+                                                                l.method === "google"
+                                                                    ? "hsl(var(--buy))"
+                                                                    : "hsl(var(--text-secondary))",
+                                                        }}
+                                                    >
+                                                        via {l.method}
+                                                    </span>
+                                                </div>
+                                                <span
+                                                    className="text-overline"
+                                                    style={{
+                                                        color: "hsl(var(--text-muted))",
+                                                        fontSize: "0.56rem",
+                                                    }}
+                                                >
+                                                    {timeAgo(l.at)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                                 {logins.length === 0 && (
                                     <p className="p-8 text-center text-[hsl(var(--text-muted))] text-sm">
                                         No sign-ins recorded yet.

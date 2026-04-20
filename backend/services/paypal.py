@@ -92,15 +92,16 @@ async def _ensure_product() -> str:
     return product_id
 
 
-async def _create_plan(product_id: str, name: str, price_usd: float) -> str:
+async def _create_plan(product_id: str, name: str, price_usd: float,
+                       interval_unit: str = "MONTH", interval_count: int = 1) -> str:
     body = {
         "product_id": product_id,
         "name": name,
-        "description": f"{name} monthly subscription",
+        "description": name,
         "status": "ACTIVE",
         "billing_cycles": [
             {
-                "frequency": {"interval_unit": "MONTH", "interval_count": 1},
+                "frequency": {"interval_unit": interval_unit, "interval_count": interval_count},
                 "tenure_type": "REGULAR",
                 "sequence": 1,
                 "total_cycles": 0,  # infinite
@@ -138,9 +139,19 @@ async def _deactivate_plan(plan_id: str):
         logger.warning("Failed to deactivate plan %s: %s", plan_id, e)
 
 
+# Variants: 4 billing plans total (pro_monthly, pro_yearly, elite_monthly, elite_yearly)
+_PLAN_VARIANTS = [
+    # (key, tier, cycle, price_field, name_suffix, interval_unit)
+    ("pro_monthly", "pro", "monthly", "pro_monthly", "Pro Monthly", "MONTH"),
+    ("pro_yearly", "pro", "yearly", "pro_yearly", "Pro Yearly", "YEAR"),
+    ("elite_monthly", "elite", "monthly", "elite_monthly", "Elite Monthly", "MONTH"),
+    ("elite_yearly", "elite", "yearly", "elite_yearly", "Elite Yearly", "YEAR"),
+]
+
+
 async def get_plan_ids(prices: dict) -> dict:
-    """Ensure PayPal plans exist for current prices. Creates / rotates as needed.
-    Returns {'pro': plan_id, 'elite': plan_id}."""
+    """Ensure PayPal plans exist for current prices (monthly + yearly for both tiers).
+    Creates / rotates as needed. Returns {pro_monthly, pro_yearly, elite_monthly, elite_yearly}."""
     doc = await db.settings.find_one({"id": PLAN_IDS_SETTINGS_ID}, {"_id": 0}) or {
         "id": PLAN_IDS_SETTINGS_ID
     }
@@ -149,21 +160,21 @@ async def get_plan_ids(prices: dict) -> dict:
     product_id = await _ensure_product()
     changed = False
 
-    for tier in ("pro", "elite"):
-        want_price = float(prices[tier])
-        current = bucket.get(tier) or {}
+    for key, tier, cycle, price_field, name_suffix, interval_unit in _PLAN_VARIANTS:
+        want_price = float(prices[price_field])
+        current = bucket.get(key) or {}
         if current.get("price") == want_price and current.get("plan_id"):
             continue
-        # Need to create a new plan
         new_plan_id = await _create_plan(
             product_id,
-            f"Neural {tier.capitalize()} Monthly",
+            f"Neural {name_suffix}",
             want_price,
+            interval_unit=interval_unit,
+            interval_count=1,
         )
-        # Deactivate previous
         if current.get("plan_id"):
             await _deactivate_plan(current["plan_id"])
-        bucket[tier] = {"plan_id": new_plan_id, "price": want_price}
+        bucket[key] = {"plan_id": new_plan_id, "price": want_price, "cycle": cycle, "tier": tier}
         changed = True
 
     if changed:
@@ -171,7 +182,7 @@ async def get_plan_ids(prices: dict) -> dict:
         await db.settings.update_one(
             {"id": PLAN_IDS_SETTINGS_ID}, {"$set": doc}, upsert=True
         )
-    return {tier: bucket[tier]["plan_id"] for tier in ("pro", "elite")}
+    return {key: bucket[key]["plan_id"] for key, *_ in _PLAN_VARIANTS}
 
 
 async def get_subscription(subscription_id: str) -> dict:
