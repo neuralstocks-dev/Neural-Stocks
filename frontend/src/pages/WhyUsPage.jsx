@@ -200,7 +200,7 @@ export default function WhyUsPage() {
                     </h1>
                     <p className="mt-6 max-w-2xl text-base md:text-lg" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.65 }}>
                         Every trade you make without full reasoning is a coin flip.
-                        Neural is the AI analyst that reads the same balance sheets, charts, and macro signals
+                        Neural Stock Intelligence&trade; is the AI analyst that reads the same balance sheets, charts, and macro signals
                         that institutional desks pay <span className="font-mono" style={{ color: "hsl(var(--text-primary))" }}>$2,400+/month</span>
                         {" "}to access — and hands you the verdict, the evidence, and the risks in under 30 seconds.
                     </p>
@@ -246,7 +246,7 @@ export default function WhyUsPage() {
                             {
                                 icon: Telescope,
                                 title: "Horizon-fit recommendations",
-                                body: "Is this a 3-month trade or a 5-year hold? Neural scores every stock across short, medium, and long-term and tells you which profile fits best.",
+                                body: "Is this a 3-month trade or a 5-year hold? Neural Stock Intelligence\u2122 scores every stock across short, medium, and long-term and tells you which profile fits best.",
                             },
                             {
                                 icon: Eye,
@@ -284,7 +284,7 @@ export default function WhyUsPage() {
                 <section className="mt-20" data-testid="why-built">
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-12">
                         <div className="md:col-span-2">
-                            <p className="text-overline">Why Neural exists</p>
+                            <p className="text-overline">Why Neural Stock Intelligence&trade; exists</p>
                             <h2
                                 className="font-serif mt-2"
                                 style={{ fontSize: "clamp(2rem, 3.5vw, 2.8rem)", letterSpacing: "-0.02em", lineHeight: 1.05 }}
@@ -309,7 +309,7 @@ export default function WhyUsPage() {
                                 className="text-base leading-relaxed mt-4"
                                 style={{ color: "hsl(var(--text-secondary))" }}
                             >
-                                We built Neural because AI — the same Claude Sonnet 4.5 model that
+                                We built Neural Stock Intelligence&trade; because AI — the same Claude Sonnet 4.5 model that
                                 powers enterprise research assistants — can now synthesize fundamentals,
                                 technicals, and macro in seconds. For{" "}
                                 <strong className="font-mono" style={{ color: "hsl(var(--hold))" }}>$9/month</strong>.
@@ -476,7 +476,7 @@ export default function WhyUsPage() {
                             style={{ fontSize: "clamp(1.8rem, 3.2vw, 2.6rem)", letterSpacing: "-0.02em", lineHeight: 1.1 }}
                         >
                             One mis-timed trade costs more<br />
-                            than <em>ten years</em> of Neural.
+                            than <em>ten years</em> of Neural Stock Intelligence&trade;.
                         </h2>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
                             <div>
@@ -498,7 +498,7 @@ export default function WhyUsPage() {
                                     $108
                                 </p>
                                 <p className="text-sm mt-1" style={{ color: "hsl(var(--text-secondary))" }}>
-                                    Full year of Neural Pro ($9 × 12) — less than 9% of one bad trade
+                                    Full year of Neural Stock Intelligence&trade; Pro ($9 × 12) — less than 9% of one bad trade
                                 </p>
                             </div>
                             <div>
@@ -519,7 +519,7 @@ export default function WhyUsPage() {
                         >
                             Every day you trade without <strong>full insight</strong>, you pay an invisible tax —
                             in overpaid entries, missed exits, and conviction you didn't actually have.
-                            Neural doesn't guarantee profits. It guarantees you'll
+                            Neural Stock Intelligence&trade; doesn't guarantee profits. It guarantees you'll
                             <em style={{ color: "hsl(var(--hold))" }}> never be the last one to know </em>
                             why a stock is moving.
                         </p>
