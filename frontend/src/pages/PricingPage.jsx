@@ -146,8 +146,9 @@ export default function PricingPage() {
                                 <span
                                     className="ml-2 text-overline"
                                     style={{
-                                        color: cycle === "yearly" ? "hsl(var(--surface-base))" : "hsl(var(--buy))",
+                                        color: cycle === "yearly" ? "hsl(0 0% 8%)" : "hsl(var(--buy))",
                                         fontSize: "0.56rem",
+                                        fontWeight: cycle === "yearly" ? 800 : 500,
                                     }}
                                     data-testid="yearly-discount-badge"
                                 >
@@ -255,26 +256,53 @@ export default function PricingPage() {
                                         </ul>
 
                                         {/* Uniform CTA slot — same min-height across all tiers for visual balance */}
-                                        <div className="mt-8 flex flex-col" style={{ minHeight: 150 }}>
-                                            {isCurrent ? (
-                                                key !== "free" ? (
-                                                    <CTAButton variant="ghost"
-                                                        onClick={cancelSubscription} disabled={cancelling}
-                                                        testid={`cancel-${key}-button`}>
-                                                        {cancelling ? <Loader2 size={14} className="animate-spin" /> : "Cancel subscription"}
-                                                    </CTAButton>
-                                                ) : (
+                                        <div className="mt-8 flex flex-col justify-end" style={{ minHeight: 150 }}>
+                                            {key === "free" ? (
+                                                // Free tier: no button. Free is the default — users land here automatically.
+                                                isCurrent ? (
                                                     <CTAButton variant="current" testid={`current-${key}-button`}>
                                                         Your current plan
                                                     </CTAButton>
+                                                ) : (
+                                                    <p
+                                                        className="text-overline text-center"
+                                                        style={{
+                                                            color: "hsl(var(--text-muted))",
+                                                            fontSize: "0.58rem",
+                                                            lineHeight: 1.6,
+                                                        }}
+                                                        data-testid="free-tier-info"
+                                                    >
+                                                        Always free. Cancel a paid plan to revert to Free.
+                                                    </p>
                                                 )
-                                            ) : key === "free" ? (
-                                                <CTAButton variant="ghost"
-                                                    onClick={downgradeToFree} disabled={processing === "free"}
-                                                    testid="downgrade-free-button">
-                                                    {processing === "free" ? <Loader2 size={14} className="animate-spin" /> : "Downgrade to Free"}
-                                                </CTAButton>
+                                            ) : isCurrent ? (
+                                                // Pro/Elite when currently subscribed: prominent cancel button (sized like PayPal block for balance)
+                                                <button
+                                                    onClick={cancelSubscription}
+                                                    disabled={cancelling}
+                                                    className="w-full font-mono text-sm transition-all"
+                                                    style={{
+                                                        background: "hsl(var(--surface-elevated))",
+                                                        border: "1px solid hsl(var(--sell))",
+                                                        color: "hsl(var(--sell))",
+                                                        height: 98,
+                                                        borderRadius: 2,
+                                                        letterSpacing: "0.04em",
+                                                        textTransform: "uppercase",
+                                                        fontSize: "0.75rem",
+                                                        fontWeight: 600,
+                                                    }}
+                                                    data-testid={`cancel-${key}-button`}
+                                                >
+                                                    {cancelling ? (
+                                                        <Loader2 size={14} className="animate-spin mx-auto" />
+                                                    ) : (
+                                                        "Cancel Subscription"
+                                                    )}
+                                                </button>
                                             ) : (
+                                                // Pro/Elite (not current): PayPal subscribe button
                                                 <PayPalSubscribeButton
                                                     planKey={key}
                                                     cycle={cycle}
@@ -349,12 +377,15 @@ function CycleTab({ active, onClick, children, testid }) {
     return (
         <button
             onClick={onClick}
-            className="font-mono text-xs px-5 py-2 transition-colors"
+            className="px-5 py-2 transition-colors"
             style={{
-                background: active ? "hsl(var(--text-primary))" : "transparent",
-                color: active ? "hsl(var(--surface-base))" : "hsl(var(--text-secondary))",
+                background: active ? "hsl(38 92% 50%)" : "transparent",
+                color: active ? "hsl(0 0% 8%)" : "hsl(var(--text-secondary))",
                 borderRadius: 2,
                 letterSpacing: "0.04em",
+                fontFamily: "IBM Plex Mono, monospace",
+                fontSize: "0.75rem",
+                fontWeight: active ? 700 : 500,
             }}
             data-testid={testid}
         >

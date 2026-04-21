@@ -358,9 +358,9 @@ export default function DashboardPage() {
                         className="mt-4 text-base max-w-2xl"
                         style={{ color: "hsl(var(--text-secondary))" }}
                     >
-                        Five positions, reasoned verdicts, signal-grade alerts. Tap
-                        <span className="font-mono text-[hsl(var(--text-primary))]"> Analyze Now</span>
-                        &nbsp;on any row, or let Claude sweep your movers with
+                        Three positions, reasoned verdicts, signal-grade alerts. Tap{" "}
+                        <span className="font-mono text-[hsl(var(--text-primary))]">Analyze&nbsp;Now</span>{" "}
+                        on any row, or let Claude sweep your movers with
                         <span className="font-mono text-[hsl(var(--text-primary))]"> Top/Bottom 3</span>.
                     </p>
                     <p

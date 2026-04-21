@@ -51,6 +51,17 @@ export default function AppShell({ children }) {
                             <span className="text-overline" style={{ fontSize: "0.56rem", marginTop: 2 }}>
                                 Stock Intelligence
                             </span>
+                            <span
+                                className="text-overline hidden md:inline"
+                                style={{
+                                    fontSize: "0.48rem",
+                                    marginTop: 3,
+                                    color: "hsl(var(--text-muted))",
+                                    letterSpacing: "0.12em",
+                                }}
+                            >
+                                Powered by Neural Labs Inc
+                            </span>
                         </div>
                     </Link>
 
