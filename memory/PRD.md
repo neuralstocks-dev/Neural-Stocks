@@ -1,63 +1,171 @@
-# Neural — AI Stock Analysis Platform
+# Neural Stock Intelligence™ — PRD
 
-## Original Problem Statement
-Phase 1 MVP per uploaded PRD: AI Stock Analysis Agent with Claude-powered verdicts + explainable reasoning. Later extended with admin console, subscription tiers, share verdicts, Google OAuth, accuracy scorecard, mandatory disclaimer gate, background-job quick-analyze, and **PayPal subscription billing + Resend email receipts + dynamic admin pricing**.
+Owner: Emergent Labs Inc. · Product: Neural Stock Intelligence™
+Last updated: Feb 2026
 
-## Tech
-- Backend: FastAPI (split into `core/` `services/` `routers/`) + MongoDB (Motor) + yfinance + emergentintegrations (Claude Sonnet 4.5) + httpx + bcrypt + PyJWT + **resend (email) + PayPal REST via httpx**
-- Frontend: React 19 + Tailwind + shadcn/ui + recharts + lucide-react + react-router-dom + **@paypal/react-paypal-js**
-- Design: "Old Money Tech" — dark-first, Cormorant Garamond + Outfit + IBM Plex Mono
+---
 
-## Feature Log
+## 1. Original Problem Statement
 
-### Iteration 1
+Build an AI Stock Analysis Platform (Phase 1 MVP):
+- Institutional-grade AI reasoning accessible to retail investors
+- Watchlist-based workflow with AI verdicts (BUY/SELL/HOLD)
+- Tiered monetization (Free / Pro / Elite)
+- Public share verdicts + transparent accuracy scorecard
+- Admin console for user management + pricing control
+- PayPal subscriptions + Resend email receipts
+
+## 2. Tech Stack
+
+| Layer | Tech |
+|---|---|
+| Backend | FastAPI · MongoDB (Motor) · yfinance · emergentintegrations (Claude Sonnet 4.5) · httpx · PyJWT · bcrypt · Resend |
+| Frontend | React 19 · Tailwind · shadcn/ui · recharts · lucide-react · react-router-dom · @paypal/react-paypal-js |
+| Auth | JWT email/password + Emergent Google OAuth |
+| Design | "Old Money Tech" — dark-first, Cormorant Garamond + Outfit + IBM Plex Mono |
+
+## 3. Architecture
+
+```
+/app/
+├── backend/
+│   ├── core/            # config, db, models, security (JWT + admin elevation + auto-downgrade)
+│   ├── routers/         # auth, plans, stocks, watchlist, analysis, admin, scorecard,
+│   │                    # disclaimer, billing
+│   ├── services/        # ai, quota (resolved limits), pricing, paypal, email, yfinance_svc
+│   ├── tests/           # iteration1..iteration8 + backend_test
+│   └── server.py
+├── frontend/src/
+│   ├── pages/           # Dashboard, AnalysisReport, Login, Signup, Pricing, PublicVerdict,
+│   │                    # AuthCallback, Admin, Scorecard, WhyUs
+│   ├── components/      # AppShell, AddStockModal, TimelineFitModal, DisclaimerModal,
+│   │                    # VerdictRing, SignalBadge, ShareVerdictButton, Sparkline, ui/*
+│   ├── context/         # AuthContext (memoized), ThemeContext (memoized)
+│   └── lib/             # api, errors, format
+└── memory/              # PRD.md + test_credentials.md
+```
+
+## 4. Key API Endpoints
+
+- **Auth**: `POST /api/auth/register`, `/login`, `/google/session`, `GET /me`
+- **Plans + Quota**: `GET /api/plans` (live prices + limits), `GET /quota`, `POST /plan/upgrade`
+- **Stocks**: `GET /stocks/search` (category + exchange filters), `/stocks/exchanges`, `/stocks/{t}/quote`, `/stocks/{t}/history`
+- **Watchlist**: `GET/POST/DELETE /api/watchlist`, `GET /watchlist/live` (batched aggregation)
+- **Analysis**: `POST /analysis/{ticker}`, `POST /analysis/quick/{kind}` (bg-job), `GET /analysis/job/{id}`, `POST /analysis/{id}/share`, `GET /analysis/share/{id}` (public), `POST /analysis/timeline/{ticker}` (Pro+), `GET /analysis/timeline/{t}/latest`
+- **Disclaimer**: `GET /disclaimer`, `POST /disclaimer/accept`
+- **Billing**: `GET /billing/config`, `POST /billing/activate`, `POST /billing/cancel`, `POST /billing/webhook`
+- **Admin**: `GET /admin/users`, `/logins`, `/pricing`, `/tier-limits` · `PUT /admin/pricing`, `/tier-limits` · `POST /admin/users/{id}/unlock`, `/reset`, `/users/delete` (bulk), `/logins/delete` (bulk) · `DELETE /admin/users/{id}`, `/users/{id}/alerts`, `/logins`
+- **Scorecard**: `GET /scorecard`
+
+## 5. Data Model
+
+- `users`, `watchlist`, `analyses`, `timeline_recos`, `shared_verdicts`, `quick_jobs`, `alerts`, `disclaimers`, `subscriptions`, `webhook_events`, `login_events`, `settings` (pricing + tier_limits + PayPal plan IDs)
+
+---
+
+## 6. Feature Log
+
+### ✅ Iteration 1 — MVP (shipped + deployed)
 Watchlist, Claude verdict engine, in-app alerts, dashboard, detailed report, JWT auth
 
-### Iteration 2
-Lucid → **Neural** rebrand · Emergent Google OAuth · Free/Pro/Elite tiers · Share Verdict
+### ✅ Iteration 2 — Neural rebrand + tiers (shipped + deployed)
+Lucid → Neural rebrand · Emergent Google OAuth · Free/Pro/Elite tiers · Share Verdict
 
-### Iteration 3
+### ✅ Iteration 3 — Admin + Scorecard (shipped + deployed)
 Backend refactor (core/services/routers) · Admin auto-elevation (ADMIN_EMAILS) · Admin console (users, logins, unlock/reset) · AI Accuracy Scorecard
 
-### Iteration 4
+### ✅ Iteration 4 — Bg jobs + disclaimer (shipped + deployed)
 Background-job quick-analyze + mandatory disclaimer gate
 
-### Iteration 5 (current — Feb 2026)
-- **PayPal Subscriptions (sandbox)**: `/api/billing/config` returns client_id + auto-created PayPal plan_ids. `/api/billing/activate` verifies subscriptions via PayPal, upgrades plan, sends receipt. `/api/billing/cancel` cancels via PayPal + downgrades to Free. `/api/billing/webhook` handles BILLING.SUBSCRIPTION.* + PAYMENT.SALE.COMPLETED (signature-verified when `PAYPAL_WEBHOOK_ID` set).
-- **Resend email receipts**: Branded HTML receipts with plan / amount / subscription ID + mandatory financial disclaimer footer sent from `onboarding@resend.dev` on activation and recurring renewals.
-- **Dynamic admin pricing**: `PUT /api/admin/pricing` rotates PayPal billing plans. Current subscribers keep old price; new checkouts use new price.
-- **Admin user deletion**: `DELETE /api/admin/users/{id}` cascades watchlist/analyses/alerts/shares/subscriptions + cancels any live PayPal sub. Blocks admins + self.
-- **Admin alert-list removal**: `DELETE /api/admin/users/{id}/alerts` clears alerts for any user.
-- **Share rate limit**: `/api/analysis/{id}/share` daily limits — Free 5, Pro 50, Elite unlimited. Returns HTTP 429 on exceed.
-- **Plan upgrade gating**: `/plan/upgrade` blocks free→paid for non-admins (forces PayPal checkout).
-- **Frontend**: PayPal Smart Subscribe buttons on Pricing page · Admin pricing editor + per-user Reset/ClearAlerts/Delete icons · sandbox banner.
+### ✅ Iteration 5 — PayPal + Resend + Admin (deployed)
+PayPal sandbox subscriptions · Resend receipts · Admin dynamic pricing · Admin user delete · Admin alert-list clear · Share rate limit (5/50/∞) · Plan upgrade gating
 
-## Testing Status
+### ✅ Iteration 6 — Yearly billing (deployed)
+Yearly plans + 20% annual discount · Admin-configurable discount · Bulk login-event delete · "Top/Bottom 3" rename
+
+### ✅ Iteration 7 — Timeline Fit (deployed)
+Pro/Elite · Claude scores short/medium/long-term horizons · 24h cache · Modal UI with best-fit highlighting
+
+### 🚀 Iteration 8 — Pending deploy (READY, not yet live)
+*(tested locally, lint clean, ready to click Deploy)*
+- **Cancellation grace period** — `/billing/cancel` keeps access until `next_billing_time`, auto-downgrade on expiry via `get_current_user`
+- **Admin tier-limits editor** — configure analyses/day, analyses/week, shares/day per tier; blank = unlimited
+- **Bulk user delete** — `POST /admin/users/delete` with PayPal cancellation cascade + paid-subscriber warning UI
+- **Paid-subscriber warning banner** in admin before destructive delete
+- **Expanded stocks catalog** — 90+ curated tickers across NASDAQ/NYSE/NYSEARCA/LSE/SGX/HKEX/TSE/TSX · category + exchange filters · "+N more exchanges" toggle · dynamic result caption
+- **Why Us page** (`/why`) — product pitch + 10×7 competitive matrix vs moomoo/Tiger/TradingView/StashAway/TradeIdeas/DBSVickers · persuasion architecture (loss aversion, authority anchor, transparent scorecard) · trademarked branding
+- **Test-unlock / admin banner** on pricing page explaining all-features-unlocked state
+- **Cancellation banner** on pricing page showing cancels-at date
+- **Elite card now renders PayPal Subscribe + Card buttons** (same as Pro) when not an active paid subscriber
+- **Dashboard copy** — "Three positions" · "Analyze Now" (nbsp) · "Add up to three symbols"
+- **AppShell header** — "Powered by Neural Labs Inc"
+- **TimelineFitModal** — "AI RECOMMENDATION" label
+- **Feature matrix alignment** — check/X icons right-aligned
+- **Code review follow-ups** — memoized AuthContext + ThemeContext values, hoisted recharts config, fixed 3 empty catch blocks, fixed 5 array-index React keys
+- **Removed `.env` from .gitignore** — required for deploy
+- **N+1 removal in `/watchlist/live`** — single `$group` aggregation
+
+## 7. Deployment Priority
+
+🔴 **P0 — Deploy now**
+1. All of Iteration 8 (listed above) — tested, lint clean, approved by deployment agent
+
+🟡 **P1 — Set up before real-money launch**
+2. Register PayPal webhook URL at `POST /api/billing/webhook` in PayPal Dashboard
+3. Set `PAYPAL_WEBHOOK_ID` in `/app/backend/.env` — without this, recurring renewal receipts and lifecycle mutations stay in log-only mode
+4. Flip `PAYPAL_ENV=live` when ready for real money (currently `sandbox`)
+
+🟢 **P2 — Nice to have**
+5. Verify custom domain in Resend → replace `onboarding@resend.dev`
+6. Mobile responsiveness audit (tested desktop thoroughly, mobile not regression-tested)
+
+## 8. Pending / Backlog (deferred per user)
+
+### Phase 2 (deferred Feb 2026)
+- Portfolio P&L tracking + CSV import/export
+- Backtesting engine
+- PDF export of analysis reports
+- SMS / Telegram alert channels
+- NewsAPI sentiment integration
+
+### Phase 3 (future)
+- Multi-asset support (crypto, forex)
+- Brokerage execution integration
+- Public developer API
+- White-label / team plans
+- Referral / "free month" mechanic
+
+## 9. Testing Log
+
 | Iter | Score | Notes |
-|------|-------|-------|
-| 1 | 35/39 (100% non-AI) | LLM budget blocked |
-| 2 | 59/60 (98.3%) | quick/top ingress fixed |
-| 3 | 82/84 (97.6%) | scorecard/global auth fixed |
-| 4 | **13/13 (100%)** | bg-job & disclaimer gate |
-| **5** | **22/22 backend (100%) + frontend verified** | PayPal sandbox + Resend + admin pricing + delete + share limit |
-| **6** | **14/14 backend (100%) + frontend verified** | Yearly billing (20% off) + admin login-event deletion + Top/Bottom 3 rename |
-| **7** | **14/14 backend (100%) + 12/12 frontend (after fix)** | Timeline Fit Recommendation (Pro/Elite) |
+|---|---|---|
+| 1 | 35/39 | non-AI 100%; LLM budget blocked |
+| 2 | 59/60 | 98.3% |
+| 3 | 82/84 | 97.6% |
+| 4 | 13/13 | 100% |
+| 5 | 22/22 | 100% |
+| 6 | 14/14 | 100% |
+| 7 | 14/14 backend + 12/12 frontend | 100% |
+| 8 | Manual smoke tested · pending full regression on prod | Ready to deploy |
 
-## Known non-blockers
-- `PAYPAL_WEBHOOK_ID` intentionally unset — webhooks log to `db.webhook_events` but don't mutate state. Set env var and register webhook in PayPal dashboard before going live.
-- No TTL on `quick_jobs` / `webhook_events` collections.
-- First `/billing/config` hit takes 5-15s (cold PayPal product+plan creation); subsequent calls are fast.
-- `db.settings.pricing` read on every `/plans` call — fine for current scale; add TTL cache if >1k RPM.
-- Sliding 24h share window (not calendar day) — acceptable.
+## 10. Known Non-Blockers
 
-## Backlog
-### Phase 2 (deferred per user Feb 2026)
-- Portfolio P&L, backtesting, PDF export, SMS/Telegram alerts, NewsAPI sentiment, CSV import/export
-- Mobile responsiveness audit
-- Yearly plan / annual discount (PayPal yearly billing cycle)
-- Webhook signature verification flow (requires `PAYPAL_WEBHOOK_ID` setup)
-- Switch `PAYPAL_ENV=live` when ready
-- Custom sender domain in Resend (replace `onboarding@resend.dev`)
+- `PAYPAL_WEBHOOK_ID` unset — webhook events logged to `db.webhook_events` but don't mutate state. Lifecycle fallbacks handled by on-activation + auto-downgrade. Register before going live.
+- No TTL on `quick_jobs` or `webhook_events` collections — low priority; volume is small.
+- First `/billing/config` call is cold (~10-15s) because it lazy-creates 4 PayPal plans. Subsequent calls are fast.
+- Resend still using `onboarding@resend.dev` sender — emails only deliver to verified address in Resend test mode. Verify custom domain before going wide.
+- Sliding 24h share window (not calendar day) — acceptable for MVP.
+- Auth uses JWT in localStorage. Architectural, not a bug. Future migration to httpOnly cookies is a separate P2 task.
 
-### Phase 3
-- Multi-asset, brokerage integration, developer API, white-label
+## 11. Test Credentials
+
+See `/app/memory/test_credentials.md`.
+
+Primary test accounts:
+- `jolor69@gmail.com` / `admin1234` — admin, auto-elevated to Elite via ADMIN_EMAILS
+- `tiers@demo.io` / `pass1234` — regular Pro user
+- `demo@stockai.io` / `demo1234` — Free user
+
+---
+
+*This document is the single source of truth for product scope. Update before each deploy.*
