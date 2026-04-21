@@ -75,9 +75,9 @@ export default function SignupPage() {
                             <LineChart size={16} strokeWidth={1.5} />
                         </div>
                         <div className="flex flex-col leading-none">
-                            <span className="font-serif italic text-xl tracking-tight">Neural</span>
+                            <span className="font-serif text-xl tracking-wide" style={{ letterSpacing: "0.08em", fontWeight: 600 }}>NEULAB</span>
                             <span className="text-overline" style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.58rem" }}>
-                                Stock Intelligence
+                                Neural Stock Intelligence&trade;
                             </span>
                         </div>
                     </div>
@@ -103,7 +103,7 @@ export default function SignupPage() {
                     </div>
 
                     <div className="text-overline" style={{ color: "rgba(255,255,255,0.4)" }}>
-                        © 2026 Neural Labs · Not financial advice
+                        © 2026 Neulab · Neural Stock Intelligence™ · Not financial advice
                     </div>
                 </div>
 

@@ -45,22 +45,14 @@ export default function AppShell({ children }) {
                             <LineChart size={14} strokeWidth={1.5} />
                         </div>
                         <div className="flex flex-col leading-none">
-                            <span className="font-serif italic text-lg" style={{ letterSpacing: "-0.01em" }}>
-                                Neural
-                            </span>
-                            <span className="text-overline" style={{ fontSize: "0.56rem", marginTop: 2 }}>
-                                Stock Intelligence
-                            </span>
                             <span
-                                className="text-overline hidden md:inline"
-                                style={{
-                                    fontSize: "0.48rem",
-                                    marginTop: 3,
-                                    color: "hsl(var(--text-muted))",
-                                    letterSpacing: "0.12em",
-                                }}
+                                className="font-serif text-lg tracking-wide"
+                                style={{ letterSpacing: "0.08em", fontWeight: 600 }}
                             >
-                                Powered by Neural Labs Inc
+                                NEULAB
+                            </span>
+                            <span className="text-overline" style={{ fontSize: "0.56rem", marginTop: 3 }}>
+                                Neural Stock Intelligence&trade;
                             </span>
                         </div>
                     </Link>

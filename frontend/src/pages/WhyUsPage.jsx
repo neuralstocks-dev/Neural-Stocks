@@ -2,25 +2,79 @@ import React from "react";
 import { Link } from "react-router-dom";
 import AppShell from "@/components/AppShell";
 import {
-    Brain,
-    Eye,
-    Compass,
-    Telescope,
-    Shield,
-    Zap,
+    Activity,
+    Binary,
+    Radar,
+    ShieldAlert,
+    BarChart3,
+    Filter,
+    MessageSquareText,
+    BellRing,
+    Crown,
     Check,
     X,
-    TrendingUp,
-    AlertTriangle,
-    Sparkles,
     ArrowRight,
-    BookOpen,
-    Crown,
+    Sparkles,
+    ChevronRight,
+    Zap,
+    Telescope,
 } from "lucide-react";
 
-// ---------- Competitive matrix data ----------
+// ---------- Product modules ----------
+const MODULES = [
+    {
+        icon: Activity,
+        title: "Signal Engine",
+        status: "available",
+        body: "Core AI system that generates and ranks BUY / SELL / HOLD signals from multi-factor data — technicals, fundamentals, and price action — with confidence-weighted context.",
+    },
+    {
+        icon: Binary,
+        title: "Alpha Score",
+        status: "available",
+        body: "Composite confidence score showing relative opportunity strength with transparent factor breakdowns across technicals and fundamentals.",
+    },
+    {
+        icon: Radar,
+        title: "Catalyst Radar",
+        status: "coming",
+        body: "Identifies abnormal volume, scheduled earnings, corporate events, and momentum regime shifts — so you see moves before they're obvious.",
+    },
+    {
+        icon: ShieldAlert,
+        title: "Risk Guard",
+        status: "available",
+        body: "Surfaces concrete risk factors per position — valuation stretch, technical exhaustion, leverage, and sector-specific pressure points.",
+    },
+    {
+        icon: BarChart3,
+        title: "Market Pulse",
+        status: "coming",
+        body: "High-level snapshot of market breadth, sector rotation, and sentiment regime — context for individual signals.",
+    },
+    {
+        icon: Filter,
+        title: "Screener Studio",
+        status: "coming",
+        body: "Custom stock screening across technical, fundamental, and behavioral factors. Build your own hypothesis, test it against the market.",
+    },
+    {
+        icon: MessageSquareText,
+        title: "Explain Panel",
+        status: "available",
+        body: "Transparent, cited explanations showing why a signal was generated — the specific numbers, ratios, and technical conditions behind every verdict.",
+    },
+    {
+        icon: BellRing,
+        title: "Watchlists & Alerts",
+        status: "available",
+        body: "Rule-based notifications for score changes, breakouts, and risk events — across your tracked positions, with horizon-fit recommendations.",
+    },
+];
+
+// ---------- Competitive matrix ----------
 const COMPETITORS = [
-    { key: "neural", name: "Neural Stock Intelligence", tag: "You deserve this" },
+    { key: "nsi", name: "Neural Stock Intelligence", tag: "By Neulab" },
     { key: "moomoo", name: "moomoo", tag: "Retail-heavy broker" },
     { key: "tiger", name: "Tiger Brokers", tag: "Execution-first" },
     { key: "tradingview", name: "TradingView · Finviz", tag: "Technical screeners" },
@@ -30,152 +84,62 @@ const COMPETITORS = [
 ];
 
 const FEATURES = [
-    {
-        label: "Explainable AI reasoning (not just signals)",
-        values: {
-            neural: "full",
-            moomoo: "none",
-            tiger: "none",
-            tradingview: "none",
-            stashaway: "none",
-            tradeideas: "partial",
-            dbsvickers: "none",
-        },
-    },
-    {
-        label: "Short / Medium / Long-term horizon fit",
-        values: {
-            neural: "full",
-            moomoo: "none",
-            tiger: "none",
-            tradingview: "none",
-            stashaway: "partial",
-            tradeideas: "partial",
-            dbsvickers: "none",
-        },
-    },
-    {
-        label: "Top / Bottom batch sweep across watchlist",
-        values: {
-            neural: "full",
-            moomoo: "none",
-            tiger: "none",
-            tradingview: "partial",
-            stashaway: "none",
-            tradeideas: "partial",
-            dbsvickers: "none",
-        },
-    },
-    {
-        label: "Broker-agnostic (no lock-in)",
-        values: {
-            neural: "full",
-            moomoo: "none",
-            tiger: "none",
-            tradingview: "full",
-            stashaway: "none",
-            tradeideas: "full",
-            dbsvickers: "none",
-        },
-    },
-    {
-        label: "Beginner-friendly narrative insight",
-        values: {
-            neural: "full",
-            moomoo: "partial",
-            tiger: "none",
-            tradingview: "none",
-            stashaway: "full",
-            tradeideas: "none",
-            dbsvickers: "none",
-        },
-    },
-    {
-        label: "Public AI Accuracy Scorecard (transparent track record)",
-        values: {
-            neural: "full",
-            moomoo: "none",
-            tiger: "none",
-            tradingview: "none",
-            stashaway: "none",
-            tradeideas: "none",
-            dbsvickers: "none",
-        },
-    },
-    {
-        label: "Shareable verdict links (socially provable theses)",
-        values: {
-            neural: "full",
-            moomoo: "partial",
-            tiger: "none",
-            tradingview: "partial",
-            stashaway: "none",
-            tradeideas: "none",
-            dbsvickers: "none",
-        },
-    },
-    {
-        label: "Signal-grade alerts without spammy promotions",
-        values: {
-            neural: "full",
-            moomoo: "partial",
-            tiger: "partial",
-            tradingview: "full",
-            stashaway: "none",
-            tradeideas: "full",
-            dbsvickers: "none",
-        },
-    },
-    {
-        label: "Web-first · runs anywhere · no install",
-        values: {
-            neural: "full",
-            moomoo: "partial",
-            tiger: "partial",
-            tradingview: "full",
-            stashaway: "full",
-            tradeideas: "partial",
-            dbsvickers: "partial",
-        },
-    },
-    {
-        label: "Starts at $0 · Pro $9/mo",
-        values: {
-            neural: "full",
-            moomoo: "none",
-            tiger: "none",
-            tradingview: "partial",
-            stashaway: "none",
-            tradeideas: "none",
-            dbsvickers: "partial",
-        },
-    },
+    { label: "Explainable AI reasoning (not just signals)", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
+    { label: "Short / Medium / Long-term horizon fit", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "partial", tradeideas: "partial", dbsvickers: "none" } },
+    { label: "Top / Bottom batch sweep across watchlist", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
+    { label: "Broker-agnostic (no lock-in)", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "full", stashaway: "none", tradeideas: "full", dbsvickers: "none" } },
+    { label: "Beginner-friendly narrative insight", values: { nsi: "full", moomoo: "partial", tiger: "none", tradingview: "none", stashaway: "full", tradeideas: "none", dbsvickers: "none" } },
+    { label: "Public AI Accuracy Scorecard", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "none", tradeideas: "none", dbsvickers: "none" } },
+    { label: "Shareable verdict links", values: { nsi: "full", moomoo: "partial", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "none" } },
+    { label: "Signal-grade alerts, no promotions", values: { nsi: "full", moomoo: "partial", tiger: "partial", tradingview: "full", stashaway: "none", tradeideas: "full", dbsvickers: "none" } },
+    { label: "Web-first · runs anywhere · no install", values: { nsi: "full", moomoo: "partial", tiger: "partial", tradingview: "full", stashaway: "full", tradeideas: "partial", dbsvickers: "partial" } },
+    { label: "Starts at $0 · Pro $9/mo", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "partial" } },
 ];
 
 function Cell({ v }) {
     if (v === "full") {
-        return (
-            <div className="flex justify-center items-center">
-                <Check size={16} strokeWidth={1.8} style={{ color: "hsl(var(--buy))" }} />
-            </div>
-        );
+        return <div className="flex justify-center"><Check size={16} strokeWidth={1.8} style={{ color: "hsl(var(--buy))" }} /></div>;
     }
     if (v === "partial") {
-        return (
-            <div className="flex justify-center items-center">
-                <div
-                    style={{
-                        width: 10,
-                        height: 2,
-                        background: "hsl(var(--hold))",
-                    }}
-                />
-            </div>
-        );
+        return <div className="flex justify-center"><div style={{ width: 10, height: 2, background: "hsl(var(--hold))" }} /></div>;
     }
+    return <div className="flex justify-center"><X size={14} strokeWidth={1.5} style={{ color: "hsl(var(--text-muted))", opacity: 0.45 }} /></div>;
+}
+
+// ---------- Module card ----------
+function ModuleCard({ mod }) {
+    const Icon = mod.icon;
+    const isComing = mod.status === "coming";
     return (
-        <div className="flex justify-center items-center">
-            <X size={14} strokeWidth={1.5} style={{ color: "hsl(var(--text-muted))", opacity: 0.45 }} />
+        <div
+            className="module p-6 md:p-7 flex flex-col h-full"
+            style={{
+                background: "hsl(var(--surface))",
+                opacity: isComing ? 0.92 : 1,
+            }}
+            data-testid={`module-${mod.title.toLowerCase().replace(/\s+/g, "-")}`}
+        >
+            <div className="flex items-start justify-between gap-3">
+                <Icon size={20} strokeWidth={1.5} style={{ color: "hsl(var(--hold))" }} />
+                <span
+                    className="text-overline px-2 py-0.5"
+                    style={{
+                        fontSize: "0.5rem",
+                        border: "1px solid " + (isComing ? "hsl(var(--border-default))" : "hsl(var(--buy))"),
+                        color: isComing ? "hsl(var(--text-muted))" : "hsl(var(--buy))",
+                        borderRadius: 2,
+                        letterSpacing: "0.14em",
+                    }}
+                >
+                    {isComing ? "Coming soon" : "Available"}
+                </span>
+            </div>
+            <h3 className="font-serif mt-5" style={{ fontSize: "1.35rem", letterSpacing: "-0.005em" }}>
+                {mod.title}
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                {mod.body}
+            </p>
         </div>
     );
 }
@@ -183,160 +147,122 @@ function Cell({ v }) {
 export default function WhyUsPage() {
     return (
         <AppShell>
-            <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-20" data-testid="why-us-page">
-                {/* Hero */}
-                <section className="relative">
-                    <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
-                        <Sparkles size={11} className="inline mr-1" strokeWidth={1.5} /> Neural Stock Intelligence&trade;
+            <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="why-us-page">
+                {/* ------------------- Hero ------------------- */}
+                <section>
+                    <p className="text-overline" style={{ color: "hsl(var(--hold))", letterSpacing: "0.16em" }}>
+                        <Sparkles size={11} className="inline mr-1" strokeWidth={1.5} /> NEULAB · neulab.xyz
                     </p>
                     <h1
-                        className="font-serif mt-3 hero-number"
+                        className="font-serif mt-4 hero-number"
                         style={{ fontSize: "clamp(2.6rem, 6vw, 5rem)", lineHeight: 1.02, letterSpacing: "-0.025em" }}
                     >
-                        Most investors lose money <br />
-                        <em style={{ color: "hsl(var(--hold))" }}>not because they're wrong.</em>
-                        <br />
-                        <span style={{ color: "hsl(var(--text-secondary))" }}>Because they're guessing.</span>
+                        AI stock intelligence,<br />
+                        <em style={{ color: "hsl(var(--hold))" }}>without the noise.</em>
                     </h1>
                     <p className="mt-6 max-w-2xl text-base md:text-lg" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.65 }}>
-                        Every trade you make without full reasoning is a coin flip.
-                        Neural Stock Intelligence&trade; is the AI analyst that reads the same balance sheets, charts, and macro signals
-                        that institutional desks pay <span className="font-mono" style={{ color: "hsl(var(--text-primary))" }}>$2,400+/month</span>
-                        {" "}to access — and hands you the verdict, the evidence, and the risks in under 30 seconds.
+                        <strong style={{ color: "hsl(var(--text-primary))" }}>Neural Stock Intelligence&trade;</strong>{" "}
+                        turns market data into clear, explainable signals — so you can identify opportunities,
+                        understand risk, and act with confidence.
                     </p>
+
                     <div className="mt-8 flex flex-wrap items-center gap-4">
                         <Link
                             to="/dashboard"
                             className="btn-primary !px-8 !py-3"
-                            data-testid="why-cta-dashboard"
+                            data-testid="hero-cta-launch"
                         >
-                            <Zap size={14} strokeWidth={1.8} /> Analyze a stock now — free
+                            <Zap size={14} strokeWidth={1.8} /> Launch Neural Stock Intelligence
                             <ArrowRight size={14} strokeWidth={1.8} />
                         </Link>
-                        <Link
-                            to="/pricing"
-                            className="btn-ghost !px-6 !py-3"
-                            data-testid="why-cta-pricing"
-                        >
-                            See pricing · Pro $9/mo
-                        </Link>
-                        <span
-                            className="text-overline"
-                            style={{ color: "hsl(var(--text-muted))", fontSize: "0.58rem" }}
-                        >
-                            No credit card required · cancel anytime
-                        </span>
+                        <a href="#how-it-works" className="btn-ghost !px-6 !py-3" data-testid="hero-cta-how">
+                            See how it works
+                        </a>
                     </div>
+
+                    <p
+                        className="mt-6 text-overline"
+                        style={{
+                            color: "hsl(var(--text-muted))",
+                            fontSize: "0.6rem",
+                            letterSpacing: "0.12em",
+                        }}
+                    >
+                        Explainable signals · Risk-aware analytics · Built for disciplined decision-making
+                    </p>
                 </section>
 
-                {/* What it is — 3 pillars */}
-                <section className="mt-16 md:mt-24" data-testid="what-it-is">
-                    <p className="text-overline">What it is</p>
-                    <h2 className="font-serif mt-2" style={{ fontSize: "clamp(2rem, 4vw, 3rem)", letterSpacing: "-0.02em" }}>
-                        An institutional analyst.<br />
-                        <span style={{ color: "hsl(var(--text-muted))" }}>Compressed into a web app.</span>
+                {/* ------------------- Inside NSI (Modules) ------------------- */}
+                <section className="mt-20 md:mt-28" data-testid="inside-nsi">
+                    <p className="text-overline">The product</p>
+                    <h2
+                        className="font-serif mt-2"
+                        style={{ fontSize: "clamp(2rem, 4vw, 3rem)", letterSpacing: "-0.02em", lineHeight: 1.1 }}
+                    >
+                        Inside Neural Stock Intelligence<span className="text-overline align-super" style={{ fontSize: "0.35em" }}>&trade;</span>
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mt-8">
+                    <p className="mt-4 max-w-3xl text-base" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.65 }}>
+                        A modular AI system built around explainability and discipline.
+                        Each module is scoped tightly, cites its reasoning, and can be used independently or composed.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1 md:gap-4 mt-8">
+                        {MODULES.map((m) => <ModuleCard key={m.title} mod={m} />)}
+                    </div>
+                </section>
+
+                {/* ------------------- How it works ------------------- */}
+                <section className="mt-20 md:mt-28" id="how-it-works" data-testid="how-it-works">
+                    <p className="text-overline">How it works</p>
+                    <h2
+                        className="font-serif mt-2"
+                        style={{ fontSize: "clamp(1.8rem, 3.4vw, 2.6rem)", letterSpacing: "-0.02em", lineHeight: 1.1 }}
+                    >
+                        Three steps. No black box.
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-6 mt-8">
                         {[
-                            {
-                                icon: Brain,
-                                title: "AI-reasoned verdicts",
-                                body: "Every BUY · SELL · HOLD comes with 150+ words of evidence: multiples, growth, technicals, and catalysts — cited with specific numbers, not vibes.",
-                            },
-                            {
-                                icon: Telescope,
-                                title: "Horizon-fit recommendations",
-                                body: "Is this a 3-month trade or a 5-year hold? Neural Stock Intelligence\u2122 scores every stock across short, medium, and long-term and tells you which profile fits best.",
-                            },
-                            {
-                                icon: Eye,
-                                title: "Public accuracy scorecard",
-                                body: "Every verdict we issue is tracked and graded against the market. Full transparency — no cherry-picked screenshots, no survivor-bias marketing.",
-                            },
-                        ].map((b) => {
-                            const Icon = b.icon;
-                            return (
-                                <div
-                                    key={b.title}
-                                    className="module p-6 md:p-8"
-                                    style={{ background: "hsl(var(--surface))" }}
+                            { step: "01", title: "Ingest", body: "Price, volume, fundamentals, technical indicators, and sentiment — gathered across exchanges in real time." },
+                            { step: "02", title: "Score & rank", body: "Claude-powered AI models weigh multi-factor data and produce BUY / SELL / HOLD signals with composite Alpha Scores." },
+                            { step: "03", title: "Explain", body: "Every signal comes with cited reasoning, confidence context, strengths, and risks — so you understand the thesis before acting." },
+                        ].map((s) => (
+                            <div
+                                key={s.step}
+                                className="module p-6 md:p-8"
+                                style={{ background: "hsl(var(--surface))" }}
+                                data-testid={`step-${s.step}`}
+                            >
+                                <p
+                                    className="font-mono"
+                                    style={{ fontSize: "0.95rem", color: "hsl(var(--hold))", letterSpacing: "0.2em" }}
                                 >
-                                    <Icon size={22} strokeWidth={1.5} style={{ color: "hsl(var(--hold))" }} />
-                                    <h3
-                                        className="font-serif mt-4"
-                                        style={{ fontSize: "1.4rem", letterSpacing: "-0.01em" }}
-                                    >
-                                        {b.title}
-                                    </h3>
-                                    <p
-                                        className="mt-3 text-sm leading-relaxed"
-                                        style={{ color: "hsl(var(--text-secondary))" }}
-                                    >
-                                        {b.body}
-                                    </p>
-                                </div>
-                            );
-                        })}
+                                    {s.step}
+                                </p>
+                                <h3 className="font-serif mt-3" style={{ fontSize: "1.5rem", letterSpacing: "-0.01em" }}>
+                                    {s.title}
+                                </h3>
+                                <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                    {s.body}
+                                </p>
+                            </div>
+                        ))}
                     </div>
                 </section>
 
-                {/* Why we built it */}
-                <section className="mt-20" data-testid="why-built">
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-12">
-                        <div className="md:col-span-2">
-                            <p className="text-overline">Why Neural Stock Intelligence&trade; exists</p>
-                            <h2
-                                className="font-serif mt-2"
-                                style={{ fontSize: "clamp(2rem, 3.5vw, 2.8rem)", letterSpacing: "-0.02em", lineHeight: 1.05 }}
-                            >
-                                Retail traders are <em style={{ color: "hsl(var(--sell))" }}>structurally</em> disadvantaged.
-                            </h2>
-                        </div>
-                        <div className="md:col-span-3">
-                            <p
-                                className="text-base leading-relaxed"
-                                style={{ color: "hsl(var(--text-secondary))" }}
-                            >
-                                Bloomberg terminals cost{" "}
-                                <strong style={{ color: "hsl(var(--text-primary))" }}>$2,400 / month</strong>.
-                                FactSet, $1,800. Institutional research desks employ entire floors of analysts.
-                                The tools that generate <em>edge</em> have always been gated behind institutional
-                                budgets — which is why{" "}
-                                <strong style={{ color: "hsl(var(--sell))" }}>80% of retail traders underperform the S&P over 5 years</strong>{" "}
-                                (Dalbar, 2023).
-                            </p>
-                            <p
-                                className="text-base leading-relaxed mt-4"
-                                style={{ color: "hsl(var(--text-secondary))" }}
-                            >
-                                We built Neural Stock Intelligence&trade; because AI — the same Claude Sonnet 4.5 model that
-                                powers enterprise research assistants — can now synthesize fundamentals,
-                                technicals, and macro in seconds. For{" "}
-                                <strong className="font-mono" style={{ color: "hsl(var(--hold))" }}>$9/month</strong>.
-                            </p>
-                            <p
-                                className="text-base leading-relaxed mt-4"
-                                style={{ color: "hsl(var(--text-primary))" }}
-                            >
-                                The asymmetry is over. You just need to be on the right side of it.
-                            </p>
-                        </div>
-                    </div>
-                </section>
-
-                {/* Competitive matrix */}
-                <section className="mt-20 md:mt-24" data-testid="competitive-matrix">
-                    <p className="text-overline">How we compare</p>
+                {/* ------------------- Competitive matrix ------------------- */}
+                <section className="mt-20 md:mt-28" data-testid="competitive-matrix">
+                    <p className="text-overline">How it compares</p>
                     <h2
                         className="font-serif mt-2"
                         style={{ fontSize: "clamp(2rem, 4vw, 3rem)", letterSpacing: "-0.02em", lineHeight: 1.05 }}
                     >
-                        Everyone else built <em>tools</em>.<br />
-                        <span style={{ color: "hsl(var(--hold))" }}>We built an analyst.</span>
+                        Most platforms execute.<br />
+                        <span style={{ color: "hsl(var(--hold))" }}>Neulab explains.</span>
                     </h2>
                     <p className="mt-4 max-w-3xl text-base" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Brokers execute trades. Screeners filter lists. Robo-advisors rebalance index funds.
-                        None of them <em>reason</em> with you. Compare what you're getting — row by row.
+                        Brokers execute trades. Screeners filter lists. Robo-advisors rebalance indices.
+                        None of them reason with you. Compare row by row.
                     </p>
 
                     <div className="module mt-8 overflow-x-auto" data-testid="competitive-table">
@@ -355,7 +281,7 @@ export default function WhyUsPage() {
                                         Feature
                                     </th>
                                     {COMPETITORS.map((c) => {
-                                        const isUs = c.key === "neural";
+                                        const isUs = c.key === "nsi";
                                         return (
                                             <th
                                                 key={c.key}
@@ -367,13 +293,11 @@ export default function WhyUsPage() {
                                                 }}
                                             >
                                                 <div className="flex flex-col items-center gap-1">
-                                                    {isUs && (
-                                                        <Crown size={12} strokeWidth={1.5} style={{ color: "hsl(var(--hold))" }} />
-                                                    )}
+                                                    {isUs && <Crown size={12} strokeWidth={1.5} style={{ color: "hsl(var(--hold))" }} />}
                                                     <span
                                                         className="font-serif"
                                                         style={{
-                                                            fontSize: isUs ? "0.95rem" : "0.78rem",
+                                                            fontSize: isUs ? "0.9rem" : "0.78rem",
                                                             color: isUs ? "hsl(var(--hold))" : "hsl(var(--text-primary))",
                                                             letterSpacing: "-0.005em",
                                                             lineHeight: 1.15,
@@ -382,13 +306,7 @@ export default function WhyUsPage() {
                                                     >
                                                         {c.name}
                                                     </span>
-                                                    <span
-                                                        className="text-overline"
-                                                        style={{
-                                                            fontSize: "0.5rem",
-                                                            color: "hsl(var(--text-muted))",
-                                                        }}
-                                                    >
+                                                    <span className="text-overline" style={{ fontSize: "0.5rem", color: "hsl(var(--text-muted))" }}>
                                                         {c.tag}
                                                     </span>
                                                 </div>
@@ -423,7 +341,7 @@ export default function WhyUsPage() {
                                                 key={c.key}
                                                 className="py-3 px-3"
                                                 style={{
-                                                    background: c.key === "neural" ? "hsla(38, 45%, 45%, 0.04)" : "transparent",
+                                                    background: c.key === "nsi" ? "hsla(38, 45%, 45%, 0.04)" : "transparent",
                                                 }}
                                             >
                                                 <Cell v={feat.values[c.key]} />
@@ -433,7 +351,6 @@ export default function WhyUsPage() {
                                 ))}
                             </tbody>
                         </table>
-
                         <div
                             className="py-4 px-5 flex items-center gap-6 flex-wrap font-mono"
                             style={{
@@ -453,14 +370,13 @@ export default function WhyUsPage() {
                             </span>
                         </div>
                     </div>
-
                     <p className="mt-4 text-xs font-mono" style={{ color: "hsl(var(--text-muted))" }}>
                         Data reflects publicly documented features as of Feb 2026. Competitor products evolve — please verify current capabilities directly.
                     </p>
                 </section>
 
-                {/* Cost of inaction */}
-                <section className="mt-20 md:mt-24" data-testid="cost-inaction">
+                {/* ------------------- About Neulab ------------------- */}
+                <section className="mt-20 md:mt-28" data-testid="about-neulab">
                     <div
                         className="module p-8 md:p-12"
                         style={{
@@ -468,88 +384,55 @@ export default function WhyUsPage() {
                             border: "1px solid hsl(var(--hold))",
                         }}
                     >
-                        <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
-                            <AlertTriangle size={11} className="inline mr-1" strokeWidth={1.5} /> The real cost
-                        </p>
+                        <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>About</p>
                         <h2
                             className="font-serif mt-2"
-                            style={{ fontSize: "clamp(1.8rem, 3.2vw, 2.6rem)", letterSpacing: "-0.02em", lineHeight: 1.1 }}
+                            style={{ fontSize: "clamp(2rem, 3.6vw, 2.8rem)", letterSpacing: "-0.02em", lineHeight: 1.1 }}
                         >
-                            One mis-timed trade costs more<br />
-                            than <em>ten years</em> of Neural Stock Intelligence&trade;.
+                            Neulab is an AI research-driven fintech lab.
                         </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
-                            <div>
-                                <p
-                                    className="hero-number font-mono"
-                                    style={{ fontSize: "2.8rem", color: "hsl(var(--sell))" }}
-                                >
-                                    $1,247
-                                </p>
-                                <p className="text-sm mt-1" style={{ color: "hsl(var(--text-secondary))" }}>
-                                    Average retail loss per wrong-sided position (FINRA, 2024)
-                                </p>
-                            </div>
-                            <div>
-                                <p
-                                    className="hero-number font-mono"
-                                    style={{ fontSize: "2.8rem", color: "hsl(var(--hold))" }}
-                                >
-                                    $108
-                                </p>
-                                <p className="text-sm mt-1" style={{ color: "hsl(var(--text-secondary))" }}>
-                                    Full year of Neural Stock Intelligence&trade; Pro ($9 × 12) — less than 9% of one bad trade
-                                </p>
-                            </div>
-                            <div>
-                                <p
-                                    className="hero-number font-mono"
-                                    style={{ fontSize: "2.8rem", color: "hsl(var(--buy))" }}
-                                >
-                                    30s
-                                </p>
-                                <p className="text-sm mt-1" style={{ color: "hsl(var(--text-secondary))" }}>
-                                    From "is this a good idea?" to institutional-grade answer
-                                </p>
-                            </div>
-                        </div>
                         <p
-                            className="mt-8 text-base leading-relaxed"
+                            className="mt-5 text-base md:text-lg leading-relaxed max-w-3xl"
                             style={{ color: "hsl(var(--text-primary))" }}
                         >
-                            Every day you trade without <strong>full insight</strong>, you pay an invisible tax —
-                            in overpaid entries, missed exits, and conviction you didn't actually have.
-                            Neural Stock Intelligence&trade; doesn't guarantee profits. It guarantees you'll
-                            <em style={{ color: "hsl(var(--hold))" }}> never be the last one to know </em>
-                            why a stock is moving.
+                            Neulab builds AI systems that transform complex market data into structured,
+                            explainable intelligence — so disciplined investors can move beyond guessing
+                            and into reasoned decisions.
+                        </p>
+                        <p
+                            className="mt-4 text-sm leading-relaxed max-w-3xl"
+                            style={{ color: "hsl(var(--text-secondary))" }}
+                        >
+                            <strong style={{ color: "hsl(var(--text-primary))" }}>Neural Stock Intelligence&trade;</strong> is
+                            our flagship product, available at <span className="font-mono">neulab.xyz</span>.
                         </p>
                     </div>
                 </section>
 
-                {/* Final CTA */}
+                {/* ------------------- Final CTA ------------------- */}
                 <section className="mt-20 md:mt-28 text-center" data-testid="final-cta">
                     <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
-                        <Compass size={11} className="inline mr-1" strokeWidth={1.5} /> Your next trade
+                        <Telescope size={11} className="inline mr-1" strokeWidth={1.5} /> Start now
                     </p>
                     <h2
                         className="font-serif mt-3"
-                        style={{ fontSize: "clamp(2.4rem, 5vw, 4rem)", letterSpacing: "-0.025em", lineHeight: 1.02 }}
+                        style={{ fontSize: "clamp(2.2rem, 4.5vw, 3.6rem)", letterSpacing: "-0.025em", lineHeight: 1.02 }}
                     >
-                        Stop guessing.<br />
-                        <em style={{ color: "hsl(var(--buy))" }}>Start knowing.</em>
+                        Clear signals. Explained reasoning.<br />
+                        <em style={{ color: "hsl(var(--buy))" }}>Confident decisions.</em>
                     </h2>
                     <p className="mt-6 max-w-2xl mx-auto text-base md:text-lg" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.65 }}>
                         Free tier includes 3 watchlist positions and 1 full AI analysis per day.
-                        No credit card. No broker lock-in. No noise.
+                        No credit card. Cancel anytime.
                     </p>
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                         <Link
                             to="/dashboard"
                             className="btn-primary !px-10 !py-4"
                             style={{ fontSize: "1rem" }}
-                            data-testid="final-cta-dashboard"
+                            data-testid="final-cta-launch"
                         >
-                            <TrendingUp size={16} strokeWidth={1.8} /> Run my first analysis
+                            Launch Neural Stock Intelligence
                             <ArrowRight size={16} strokeWidth={1.8} />
                         </Link>
                         <Link
@@ -558,19 +441,67 @@ export default function WhyUsPage() {
                             style={{ fontSize: "0.9rem" }}
                             data-testid="final-cta-scorecard"
                         >
-                            <BookOpen size={14} strokeWidth={1.5} /> See our AI track record
+                            See our AI track record <ChevronRight size={14} strokeWidth={1.5} />
                         </Link>
                     </div>
-                    <p
-                        className="mt-10 text-overline max-w-3xl mx-auto leading-relaxed"
-                        style={{ color: "hsl(var(--text-muted))", fontSize: "0.58rem" }}
-                    >
-                        <Shield size={10} className="inline mr-1" strokeWidth={1.5} />
-                        Neural Stock Intelligence&trade; is an AI-assisted research tool. Content is for educational and
-                        informational purposes only and is not investment advice. Markets are volatile; past performance
-                        does not guarantee future results. You decide, you own the outcome.
-                    </p>
                 </section>
+
+                {/* ------------------- Footer ------------------- */}
+                <footer
+                    className="mt-24 pt-10 pb-4"
+                    style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                    data-testid="neulab-footer"
+                >
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div>
+                            <p
+                                className="font-serif"
+                                style={{ fontSize: "1.2rem", letterSpacing: "0.08em", fontWeight: 600 }}
+                            >
+                                NEULAB
+                            </p>
+                            <p className="mt-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                                AI research-driven fintech lab.
+                            </p>
+                            <p className="mt-1 font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                                neulab.xyz
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-overline">Product</p>
+                            <ul className="mt-3 space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                                <li><Link to="/dashboard" className="link-underline">Dashboard</Link></li>
+                                <li><Link to="/scorecard" className="link-underline">AI Scorecard</Link></li>
+                                <li><Link to="/pricing" className="link-underline">Pricing</Link></li>
+                            </ul>
+                        </div>
+                        <div>
+                            <p className="text-overline">Legal</p>
+                            <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                    Neural Stock Intelligence&trade; by Neulab
+                                </strong>
+                            </p>
+                            <p
+                                className="mt-2 text-xs leading-relaxed"
+                                style={{ color: "hsl(var(--text-muted))" }}
+                            >
+                                For research and informational purposes only. Not financial advice.
+                                Markets are volatile; past performance does not guarantee future results.
+                            </p>
+                        </div>
+                    </div>
+                    <p
+                        className="mt-8 text-overline"
+                        style={{
+                            color: "hsl(var(--text-muted))",
+                            fontSize: "0.56rem",
+                            letterSpacing: "0.16em",
+                        }}
+                    >
+                        &copy; 2026 Neulab · All rights reserved
+                    </p>
+                </footer>
             </div>
         </AppShell>
     );
