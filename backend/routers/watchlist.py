@@ -57,14 +57,25 @@ async def remove_from_watchlist(ticker: str, user=Depends(get_current_user)):
 async def watchlist_live(user=Depends(get_current_user)):
     items = await db.watchlist.find({"user_id": user["id"]}, {"_id": 0, "user_id": 0}).to_list(50)
     tickers = [i["ticker"] for i in items]
-    quotes = await asyncio.gather(*[get_quote(t) for t in tickers]) if tickers else []
+    if not tickers:
+        return []
+    # Batch: fetch quotes in parallel + latest analysis per ticker via single aggregation
+    quotes_task = asyncio.gather(*[get_quote(t) for t in tickers])
+    latest_task = db.analyses.aggregate([
+        {"$match": {"user_id": user["id"], "ticker": {"$in": tickers}}},
+        {"$sort": {"created_at": -1}},
+        {"$group": {
+            "_id": "$ticker",
+            "recommendation": {"$first": "$recommendation"},
+            "confidence_score": {"$first": "$confidence_score"},
+            "created_at": {"$first": "$created_at"},
+        }},
+    ]).to_list(50)
+    quotes, latest_docs = await asyncio.gather(quotes_task, latest_task)
+    latest_by_ticker = {d["_id"]: d for d in latest_docs}
     merged = []
     for item, q in zip(items, quotes):
-        latest = await db.analyses.find_one(
-            {"user_id": user["id"], "ticker": item["ticker"]},
-            sort=[("created_at", -1)],
-            projection={"_id": 0},
-        )
+        latest = latest_by_ticker.get(item["ticker"])
         merged.append({
             **item,
             "quote": q,
