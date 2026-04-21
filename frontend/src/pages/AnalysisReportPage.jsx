@@ -20,6 +20,21 @@ import { ArrowLeft, Sparkles, Loader2, AlertTriangle, Target, Shield } from "luc
 import { formatPrice, formatPct, formatCompact, timeAgo } from "@/lib/format";
 import { errMessage } from "@/lib/errors";
 
+// Hoisted chart config objects — prevent new reference identity on every render,
+// which would otherwise force recharts sub-components to re-render needlessly.
+const CHART_MARGIN = { top: 10, right: 24, left: 0, bottom: 0 };
+const AXIS_TICK_STYLE = { fill: "hsl(var(--text-muted))", fontSize: 10, fontFamily: "IBM Plex Mono" };
+const X_AXIS_LINE_STYLE = { stroke: "hsl(var(--border-default))" };
+const Y_DOMAIN = ["auto", "auto"];
+const TOOLTIP_CONTENT_STYLE = {
+    background: "hsl(var(--surface-elevated))",
+    border: "1px solid hsl(var(--border-default))",
+    fontFamily: "IBM Plex Mono",
+    fontSize: 12,
+    borderRadius: 2,
+};
+const TOOLTIP_LABEL_STYLE = { color: "hsl(var(--text-secondary))" };
+
 export default function AnalysisReportPage() {
     const { ticker } = useParams();
     const { user } = useAuth();
@@ -203,31 +218,25 @@ export default function AnalysisReportPage() {
                             <div className="px-2 md:px-4">
                                 <div style={{ width: "100%", height: 260 }}>
                                     <ResponsiveContainer>
-                                        <LineChart data={chartData} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+                                        <LineChart data={chartData} margin={CHART_MARGIN}>
                                             <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border-divider))" vertical={false} />
                                             <XAxis
                                                 dataKey="date"
-                                                tick={{ fill: "hsl(var(--text-muted))", fontSize: 10, fontFamily: "IBM Plex Mono" }}
+                                                tick={AXIS_TICK_STYLE}
                                                 tickLine={false}
-                                                axisLine={{ stroke: "hsl(var(--border-default))" }}
+                                                axisLine={X_AXIS_LINE_STYLE}
                                                 minTickGap={40}
                                             />
                                             <YAxis
-                                                tick={{ fill: "hsl(var(--text-muted))", fontSize: 10, fontFamily: "IBM Plex Mono" }}
+                                                tick={AXIS_TICK_STYLE}
                                                 tickLine={false}
                                                 axisLine={false}
-                                                domain={["auto", "auto"]}
+                                                domain={Y_DOMAIN}
                                                 width={52}
                                             />
                                             <Tooltip
-                                                contentStyle={{
-                                                    background: "hsl(var(--surface-elevated))",
-                                                    border: "1px solid hsl(var(--border-default))",
-                                                    fontFamily: "IBM Plex Mono",
-                                                    fontSize: 12,
-                                                    borderRadius: 2,
-                                                }}
-                                                labelStyle={{ color: "hsl(var(--text-secondary))" }}
+                                                contentStyle={TOOLTIP_CONTENT_STYLE}
+                                                labelStyle={TOOLTIP_LABEL_STYLE}
                                             />
                                             <Line
                                                 type="monotone"

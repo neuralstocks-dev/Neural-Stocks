@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useEffect, useState, useCallback, useMemo } from "react";
 
 export const ThemeContext = createContext(null);
 
@@ -17,7 +17,9 @@ export function ThemeProvider({ children }) {
         []
     );
 
+    const value = useMemo(() => ({ theme, toggle }), [theme, toggle]);
+
     return (
-        <ThemeContext.Provider value={{ theme, toggle }}>{children}</ThemeContext.Provider>
+        <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
     );
 }
