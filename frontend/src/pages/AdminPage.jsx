@@ -3,7 +3,7 @@ import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Loader2, ShieldCheck, Clock, RotateCcw, Search, Trash2, BellOff, DollarSign, CheckSquare, Square, AlertTriangle } from "lucide-react";
+import { Loader2, ShieldCheck, Clock, RotateCcw, Search, Trash2, BellOff, DollarSign, CheckSquare, Square, AlertTriangle, Sparkles } from "lucide-react";
 import { timeAgo } from "@/lib/format";
 
 const DURATIONS = [
@@ -50,14 +50,18 @@ export default function AdminPage() {
     const [loginBusy, setLoginBusy] = useState(false);
     const [selectedUsers, setSelectedUsers] = useState(new Set());
     const [userBulkBusy, setUserBulkBusy] = useState(false);
+    const [tierLimits, setTierLimits] = useState(null);
+    const [tierLimitsForm, setTierLimitsForm] = useState(null);
+    const [savingLimits, setSavingLimits] = useState(false);
 
     const loadAll = async () => {
         setLoading(true);
         try {
-            const [u, l, pr] = await Promise.all([
+            const [u, l, pr, tl] = await Promise.all([
                 api.get("/admin/users"),
                 api.get("/admin/logins"),
                 api.get("/admin/pricing"),
+                api.get("/admin/tier-limits"),
             ]);
             setUsers(u.data || []);
             setLogins(l.data || []);
@@ -67,6 +71,28 @@ export default function AdminPage() {
             setDiscountForm(String(pr.data?.annual_discount_pct ?? ""));
             setSelectedLogins(new Set());
             setSelectedUsers(new Set());
+            setTierLimits(tl.data || null);
+            // Initialize form strings (empty string = unlimited)
+            if (tl.data) {
+                const toStr = (v) => (v === null || v === undefined ? "" : String(v));
+                setTierLimitsForm({
+                    free: {
+                        analyses_per_day: toStr(tl.data.free.analyses_per_day),
+                        analyses_per_week: toStr(tl.data.free.analyses_per_week),
+                        share_per_day: toStr(tl.data.free.share_per_day),
+                    },
+                    pro: {
+                        analyses_per_day: toStr(tl.data.pro.analyses_per_day),
+                        analyses_per_week: toStr(tl.data.pro.analyses_per_week),
+                        share_per_day: toStr(tl.data.pro.share_per_day),
+                    },
+                    elite: {
+                        analyses_per_day: toStr(tl.data.elite.analyses_per_day),
+                        analyses_per_week: toStr(tl.data.elite.analyses_per_week),
+                        share_per_day: toStr(tl.data.elite.share_per_day),
+                    },
+                });
+            }
         } finally {
             setLoading(false);
         }
@@ -149,6 +175,45 @@ export default function AdminPage() {
         } finally {
             setBusy(null);
         }
+    };
+
+    const saveTierLimits = async () => {
+        setError("");
+        setMessage("");
+        setSavingLimits(true);
+        try {
+            const payload = { free: {}, pro: {}, elite: {} };
+            for (const tier of ["free", "pro", "elite"]) {
+                for (const k of ["analyses_per_day", "analyses_per_week", "share_per_day"]) {
+                    const raw = tierLimitsForm[tier][k];
+                    if (raw === "" || raw === null) {
+                        payload[tier][k] = null; // unlimited
+                    } else {
+                        const n = parseInt(raw, 10);
+                        if (!Number.isFinite(n) || n < 0) {
+                            setError(`${tier} · ${k} must be a non-negative integer or blank for unlimited`);
+                            setSavingLimits(false);
+                            return;
+                        }
+                        payload[tier][k] = n;
+                    }
+                }
+            }
+            const r = await api.put("/admin/tier-limits", payload);
+            setMessage(r.data.message);
+            setTierLimits(r.data.limits);
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Tier limits update failed");
+        } finally {
+            setSavingLimits(false);
+        }
+    };
+
+    const updateTierLimit = (tier, key, value) => {
+        setTierLimitsForm((prev) => ({
+            ...prev,
+            [tier]: { ...prev[tier], [key]: value },
+        }));
     };
 
     const savePricing = async () => {
@@ -376,6 +441,122 @@ export default function AdminPage() {
                                 </div>
                             )}
                         </section>
+
+                        {/* Tier limits editor */}
+                        {tierLimitsForm && (
+                            <section className="module mt-6 md:mt-10" data-testid="admin-tier-limits-module">
+                                <div
+                                    className="p-5 md:p-6"
+                                    style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
+                                >
+                                    <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
+                                        <Sparkles size={12} className="inline mr-1" strokeWidth={1.5} /> Tier limits
+                                    </p>
+                                    <h2 className="font-serif text-2xl mt-1" style={{ letterSpacing: "-0.01em" }}>
+                                        Per-tier quotas
+                                    </h2>
+                                    <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                                        Adjust the daily &amp; weekly analysis caps plus daily share-verdict caps for Free, Pro, and Elite.
+                                        Leave a field empty to mark that limit as <span style={{ color: "hsl(var(--hold))" }}>Unlimited</span>.
+                                    </p>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+                                        <thead>
+                                            <tr>
+                                                <th
+                                                    className="text-left text-overline py-3 px-5"
+                                                    style={{
+                                                        background: "hsl(var(--surface-elevated))",
+                                                        fontSize: "0.56rem",
+                                                    }}
+                                                >
+                                                    Tier
+                                                </th>
+                                                {["Analyses / day", "Analyses / week", "Shares / day"].map((h) => (
+                                                    <th
+                                                        key={h}
+                                                        className="text-left text-overline py-3 px-4"
+                                                        style={{
+                                                            background: "hsl(var(--surface-elevated))",
+                                                            fontSize: "0.56rem",
+                                                        }}
+                                                    >
+                                                        {h}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {["free", "pro", "elite"].map((tier) => {
+                                                const tierColor =
+                                                    tier === "elite"
+                                                        ? "hsl(var(--hold))"
+                                                        : tier === "pro"
+                                                        ? "hsl(var(--buy))"
+                                                        : "hsl(var(--text-secondary))";
+                                                return (
+                                                    <tr
+                                                        key={tier}
+                                                        style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                                                        data-testid={`tier-limits-row-${tier}`}
+                                                    >
+                                                        <td className="py-3 px-5">
+                                                            <span
+                                                                className="font-serif text-base capitalize"
+                                                                style={{ color: tierColor }}
+                                                            >
+                                                                {tier}
+                                                            </span>
+                                                        </td>
+                                                        {[
+                                                            "analyses_per_day",
+                                                            "analyses_per_week",
+                                                            "share_per_day",
+                                                        ].map((k) => (
+                                                            <td key={k} className="py-3 px-4">
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="1"
+                                                                    value={tierLimitsForm[tier][k]}
+                                                                    onChange={(e) => updateTierLimit(tier, k, e.target.value)}
+                                                                    placeholder="Unlimited"
+                                                                    className="input-base font-mono"
+                                                                    style={{ width: 140 }}
+                                                                    data-testid={`tier-limit-${tier}-${k}`}
+                                                                />
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div
+                                    className="px-5 md:px-6 py-4 flex items-center justify-between gap-3 flex-wrap"
+                                    style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                                >
+                                    <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                                        Applied to all users from next request — no restart needed.
+                                    </p>
+                                    <button
+                                        onClick={saveTierLimits}
+                                        disabled={savingLimits}
+                                        className="btn-primary"
+                                        data-testid="admin-save-tier-limits-button"
+                                    >
+                                        {savingLimits ? (
+                                            <Loader2 size={14} className="animate-spin" />
+                                        ) : (
+                                            "Save tier limits"
+                                        )}
+                                    </button>
+                                </div>
+                            </section>
+                        )}
+
 
                         {/* Users table */}
                         <section className="module mt-6 md:mt-10" data-testid="admin-users-module">

@@ -20,10 +20,14 @@ const FEATURE_MATRIX = [
 function renderValue(plan, feat) {
     const v = plan[feat.key];
     if (feat.type === "bool") {
-        return v ? (
-            <Check size={16} strokeWidth={1.5} style={{ color: "hsl(var(--buy))" }} />
-        ) : (
-            <X size={16} strokeWidth={1.5} style={{ color: "hsl(var(--text-muted))" }} />
+        return (
+            <div className="flex justify-end">
+                {v ? (
+                    <Check size={16} strokeWidth={1.5} style={{ color: "hsl(var(--buy))" }} />
+                ) : (
+                    <X size={16} strokeWidth={1.5} style={{ color: "hsl(var(--text-muted))" }} />
+                )}
+            </div>
         );
     }
     if (v === null || v === undefined) {
@@ -480,7 +484,7 @@ export default function PricingPage() {
                 )}
 
                 <p className="text-overline mt-8 max-w-3xl leading-relaxed" style={{ color: "hsl(var(--text-muted))", fontSize: "0.62rem" }}>
-                    Neural is an AI-assisted analysis tool. Content is for educational and informational
+                    Neural Stock Intelligence&trade; is an AI-assisted analysis tool. Content is for educational and informational
                     purposes only and is not investment advice. Payment processing by PayPal. Cancel
                     anytime — no refunds for partial billing cycles.
                 </p>

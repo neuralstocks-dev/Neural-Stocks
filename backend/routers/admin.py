@@ -1,14 +1,18 @@
 """Admin: user management, test-unlock, login events, pricing."""
+import logging
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from typing import Optional
 
 from core.config import UNLOCK_DURATIONS, ADMIN_EMAILS
 from core.db import db
 from core.models import UnlockReq
 from core.security import admin_required, iso, now_utc, is_admin_email
-from services.pricing import get_pricing, set_pricing
+from services.pricing import get_pricing, set_pricing, get_tier_limits, set_tier_limits
 from services.paypal import get_plan_ids, PayPalError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -17,6 +21,18 @@ class PricingReq(BaseModel):
     pro_price: float = Field(gt=0, le=9999)
     elite_price: float = Field(gt=0, le=9999)
     annual_discount_pct: float = Field(ge=0, le=90)
+
+
+class TierLimitBlock(BaseModel):
+    analyses_per_day: Optional[int] = Field(default=None, ge=0, le=100000)
+    analyses_per_week: Optional[int] = Field(default=None, ge=0, le=1000000)
+    share_per_day: Optional[int] = Field(default=None, ge=0, le=100000)
+
+
+class TierLimitsReq(BaseModel):
+    free: TierLimitBlock
+    pro: TierLimitBlock
+    elite: TierLimitBlock
 
 
 class LoginDeleteReq(BaseModel):
@@ -235,6 +251,28 @@ async def update_admin_pricing(req: PricingReq, _admin=Depends(admin_required)):
         "prices": prices,
         "plan_ids": plan_ids,
         "message": f"Updated pricing: Pro ${prices['pro_monthly']:.2f}/mo (${prices['pro_yearly']:.2f}/yr) · Elite ${prices['elite_monthly']:.2f}/mo (${prices['elite_yearly']:.2f}/yr) · Annual discount {prices['annual_discount_pct']:.0f}%. New checkouts use the updated prices; existing subscribers continue at their current rate until they resubscribe.",
+    }
+
+
+
+# ---------- Tier limits management ----------
+@router.get("/tier-limits")
+async def get_admin_tier_limits(_admin=Depends(admin_required)):
+    return await get_tier_limits()
+
+
+@router.put("/tier-limits")
+async def update_admin_tier_limits(req: TierLimitsReq, _admin=Depends(admin_required)):
+    tiers = {
+        "free": req.free.model_dump(exclude_none=False),
+        "pro": req.pro.model_dump(exclude_none=False),
+        "elite": req.elite.model_dump(exclude_none=False),
+    }
+    limits = await set_tier_limits(tiers)
+    return {
+        "ok": True,
+        "limits": limits,
+        "message": "Tier limits updated. Leave a field empty to mark it as Unlimited.",
     }
 
 

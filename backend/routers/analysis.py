@@ -8,7 +8,7 @@ from core.db import db
 from core.security import get_current_user, iso, now_utc
 from services.yfinance_svc import get_quote, _yf_history_sync, _yf_fundamentals_sync, compute_technicals
 from services.ai import run_ai_analysis, run_timeline_analysis
-from services.quota import enforce_analysis_quota, plan_for
+from services.quota import enforce_analysis_quota, plan_for, resolved_plan_for
 from routers.disclaimer import require_accepted
 
 router = APIRouter(tags=["analysis"])
@@ -356,7 +356,7 @@ def _public_view(analysis: dict) -> dict:
 
 @router.post("/analysis/{analysis_id}/share")
 async def share_analysis(analysis_id: str, user=Depends(get_current_user)):
-    p = plan_for(user)
+    p = await resolved_plan_for(user)
     if not p["share_verdicts"]:
         raise HTTPException(
             status_code=402,

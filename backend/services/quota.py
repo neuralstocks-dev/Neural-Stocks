@@ -6,6 +6,12 @@ from core.security import iso, now_utc
 from core.db import db
 
 
+async def _plan_overrides() -> dict:
+    """Load saved tier-limit overrides from db.settings. Returns {tier: {key: value|None}}."""
+    doc = await db.settings.find_one({"id": "tier_limits"}, {"_id": 0}) or {}
+    return doc.get("tiers") or {}
+
+
 def _parse_unlock(expires_at):
     if not expires_at:
         return None
@@ -37,7 +43,21 @@ def effective_plan_key(user: dict) -> str:
 
 
 def plan_for(user: dict) -> dict:
+    """Return plan definition (static — doesn't include live overrides).
+    Use resolved_plan_for() for enforcement to pick up admin-set overrides."""
     return PLANS.get(effective_plan_key(user), PLANS["free"])
+
+
+async def resolved_plan_for(user: dict) -> dict:
+    """Same as plan_for but with db.settings overrides for analyses/day, analyses/week, share/day."""
+    base = dict(plan_for(user))
+    eff = effective_plan_key(user)
+    overrides = await _plan_overrides()
+    tier_over = overrides.get(eff) or {}
+    for k in ("analyses_per_day", "analyses_per_week", "share_per_day"):
+        if k in tier_over:
+            base[k] = tier_over[k]
+    return base
 
 
 async def count_analyses(user_id: str, since: datetime) -> int:
@@ -47,7 +67,7 @@ async def count_analyses(user_id: str, since: datetime) -> int:
 
 
 async def quota_snapshot(user: dict) -> dict:
-    p = plan_for(user)
+    p = await resolved_plan_for(user)
     eff = effective_plan_key(user)
     now = now_utc()
     used_day = await count_analyses(user["id"], now - timedelta(days=1))
@@ -76,7 +96,7 @@ async def quota_snapshot(user: dict) -> dict:
 
 
 async def enforce_analysis_quota(user: dict):
-    p = plan_for(user)
+    p = await resolved_plan_for(user)
     now = now_utc()
     if p["analyses_per_day"] is not None:
         used_day = await count_analyses(user["id"], now - timedelta(days=1))
