@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Search, X, Loader2 } from "lucide-react";
+import { Search, X, Loader2, ChevronDown } from "lucide-react";
 
 const CATEGORIES = [
+    { v: "", label: "All" },
     { v: "tech", label: "Technology" },
     { v: "finance", label: "Finance" },
     { v: "healthcare", label: "Healthcare" },
@@ -11,42 +12,60 @@ const CATEGORIES = [
     { v: "other", label: "Other" },
 ];
 
+const PRIMARY_EXCHANGES = ["NASDAQ", "NYSE", "NYSEARCA"];
+
 export default function AddStockModal({ open, onClose, onAdded }) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
-    const [category, setCategory] = useState("tech");
+    const [category, setCategory] = useState(""); // "" = all categories
+    const [exchange, setExchange] = useState(""); // "" = all exchanges
+    const [saveCategory, setSaveCategory] = useState("tech"); // category stored on watchlist item
     const [adding, setAdding] = useState(null);
     const [error, setError] = useState("");
+    const [exchanges, setExchanges] = useState([]);
+    const [exchangesPanelOpen, setExchangesPanelOpen] = useState(false);
 
     useEffect(() => {
         if (!open) {
             setQuery("");
             setResults([]);
             setError("");
+            setCategory("");
+            setExchange("");
+            setExchangesPanelOpen(false);
             return;
         }
-        // Load popular list
-        api.get("/stocks/search", { params: { q: "" } }).then((r) => setResults(r.data || []));
+        (async () => {
+            try {
+                const [ex] = await Promise.all([api.get("/stocks/exchanges")]);
+                setExchanges(ex.data || []);
+            } catch (err) {
+                console.warn("load exchanges failed:", err?.message || err);
+            }
+        })();
     }, [open]);
 
+    // Fetch results when filters / query change
     useEffect(() => {
         if (!open) return;
         const t = setTimeout(async () => {
             try {
-                const r = await api.get("/stocks/search", { params: { q: query } });
+                const r = await api.get("/stocks/search", {
+                    params: { q: query, category, exchange, limit: 10 },
+                });
                 setResults(r.data || []);
             } catch (err) {
                 console.warn("stock search failed:", err?.message || err);
             }
         }, 180);
         return () => clearTimeout(t);
-    }, [query, open]);
+    }, [query, category, exchange, open]);
 
-    const addTicker = async (ticker) => {
+    const addTicker = async (ticker, suggestedCategory) => {
         setError("");
         setAdding(ticker);
         try {
-            await api.post("/watchlist", { ticker, category });
+            await api.post("/watchlist", { ticker, category: suggestedCategory || saveCategory || "other" });
             onAdded?.(ticker);
             onClose?.();
         } catch (err) {
@@ -58,6 +77,8 @@ export default function AddStockModal({ open, onClose, onAdded }) {
 
     if (!open) return null;
 
+    const visibleExchanges = exchangesPanelOpen ? exchanges : exchanges.filter((e) => PRIMARY_EXCHANGES.includes(e.exchange));
+
     return (
         <div
             className="fixed inset-0 z-50 flex items-start md:items-center justify-center p-4"
@@ -67,7 +88,7 @@ export default function AddStockModal({ open, onClose, onAdded }) {
         >
             <div
                 onClick={(e) => e.stopPropagation()}
-                className="module-elevated w-full max-w-xl mt-16 md:mt-0"
+                className="module-elevated w-full max-w-2xl mt-16 md:mt-0"
                 style={{ background: "hsl(var(--surface))" }}
             >
                 <div className="p-5 flex items-center justify-between" style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
@@ -96,25 +117,101 @@ export default function AddStockModal({ open, onClose, onAdded }) {
                         />
                     </div>
 
+                    {/* Category filter */}
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-overline mr-1">Category</span>
-                        {CATEGORIES.map((c) => (
+                        {CATEGORIES.map((c) => {
+                            const active = category === c.v;
+                            return (
+                                <button
+                                    key={c.v || "all"}
+                                    onClick={() => setCategory(c.v)}
+                                    className="text-xs px-2 py-1 font-mono uppercase transition-colors"
+                                    style={{
+                                        borderRadius: 2,
+                                        letterSpacing: "0.1em",
+                                        border: "1px solid " + (active ? "hsl(var(--text-primary))" : "hsl(var(--border-default))"),
+                                        background: active ? "hsl(var(--text-primary))" : "transparent",
+                                        color: active ? "hsl(var(--background))" : "hsl(var(--text-secondary))",
+                                    }}
+                                    data-testid={`category-${c.v || "all"}-option`}
+                                >
+                                    {c.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Exchange filter */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-overline mr-1">Exchange</span>
+                        <button
+                            onClick={() => setExchange("")}
+                            className="text-xs px-2 py-1 font-mono uppercase transition-colors"
+                            style={{
+                                borderRadius: 2,
+                                letterSpacing: "0.1em",
+                                border: "1px solid " + (exchange === "" ? "hsl(var(--text-primary))" : "hsl(var(--border-default))"),
+                                background: exchange === "" ? "hsl(var(--text-primary))" : "transparent",
+                                color: exchange === "" ? "hsl(var(--background))" : "hsl(var(--text-secondary))",
+                            }}
+                            data-testid="exchange-all-option"
+                        >
+                            All
+                        </button>
+                        {visibleExchanges.map((ex) => {
+                            const active = exchange === ex.exchange;
+                            return (
+                                <button
+                                    key={ex.exchange}
+                                    onClick={() => setExchange(ex.exchange)}
+                                    className="text-xs px-2 py-1 font-mono uppercase transition-colors inline-flex items-center gap-1.5"
+                                    style={{
+                                        borderRadius: 2,
+                                        letterSpacing: "0.1em",
+                                        border: "1px solid " + (active ? "hsl(var(--text-primary))" : "hsl(var(--border-default))"),
+                                        background: active ? "hsl(var(--text-primary))" : "transparent",
+                                        color: active ? "hsl(var(--background))" : "hsl(var(--text-secondary))",
+                                    }}
+                                    data-testid={`exchange-${ex.exchange}-option`}
+                                >
+                                    {ex.exchange}
+                                    <span
+                                        className="font-mono"
+                                        style={{
+                                            fontSize: "0.54rem",
+                                            opacity: 0.7,
+                                        }}
+                                    >
+                                        {ex.ticker_count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                        {exchanges.length > PRIMARY_EXCHANGES.length && (
                             <button
-                                key={c.v}
-                                onClick={() => setCategory(c.v)}
-                                className="text-xs px-2 py-1 font-mono uppercase transition-colors"
+                                onClick={() => setExchangesPanelOpen((v) => !v)}
+                                className="text-xs px-2 py-1 font-mono uppercase transition-colors inline-flex items-center gap-1"
                                 style={{
                                     borderRadius: 2,
                                     letterSpacing: "0.1em",
-                                    border: "1px solid " + (category === c.v ? "hsl(var(--text-primary))" : "hsl(var(--border-default))"),
-                                    background: category === c.v ? "hsl(var(--text-primary))" : "transparent",
-                                    color: category === c.v ? "hsl(var(--background))" : "hsl(var(--text-secondary))",
+                                    border: "1px dashed hsl(var(--border-default))",
+                                    color: "hsl(var(--hold))",
+                                    background: "transparent",
                                 }}
-                                data-testid={`category-${c.v}-option`}
+                                data-testid="toggle-all-exchanges-button"
                             >
-                                {c.label}
+                                {exchangesPanelOpen ? "Hide" : `+ ${exchanges.length - PRIMARY_EXCHANGES.length} more`}
+                                <ChevronDown
+                                    size={10}
+                                    strokeWidth={1.5}
+                                    style={{
+                                        transform: exchangesPanelOpen ? "rotate(180deg)" : "rotate(0)",
+                                        transition: "transform 200ms",
+                                    }}
+                                />
                             </button>
-                        ))}
+                        )}
                     </div>
 
                     {error && (
@@ -123,6 +220,19 @@ export default function AddStockModal({ open, onClose, onAdded }) {
                         </div>
                     )}
 
+                    {/* Results header caption */}
+                    <p className="text-overline" style={{ color: "hsl(var(--text-muted))", fontSize: "0.56rem" }}>
+                        {query
+                            ? `Matching "${query}"`
+                            : category && exchange
+                            ? `Top ${Math.min(results.length, 10)} ${category} on ${exchange}`
+                            : category
+                            ? `Top ${Math.min(results.length, 10)} most-traded · ${CATEGORIES.find((c) => c.v === category)?.label}`
+                            : exchange
+                            ? `Top ${Math.min(results.length, 10)} most-traded on ${exchange}`
+                            : `Top ${Math.min(results.length, 10)} most-traded globally`}
+                    </p>
+
                     <div className="max-h-80 overflow-y-auto" style={{ borderTop: "1px solid hsl(var(--border-divider))" }}>
                         {results.length === 0 && (
                             <p className="text-sm text-[hsl(var(--text-muted))] py-6 text-center">No results</p>
@@ -130,7 +240,7 @@ export default function AddStockModal({ open, onClose, onAdded }) {
                         {results.map((s) => (
                             <button
                                 key={s.ticker}
-                                onClick={() => addTicker(s.ticker)}
+                                onClick={() => addTicker(s.ticker, s.category)}
                                 disabled={!!adding}
                                 className="w-full flex items-center justify-between py-3 px-2 text-left hover:bg-[hsl(var(--surface-elevated))] transition-colors"
                                 style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
@@ -141,6 +251,17 @@ export default function AddStockModal({ open, onClose, onAdded }) {
                                     <div className="text-xs text-[hsl(var(--text-secondary))] mt-0.5">{s.name}</div>
                                 </div>
                                 <div className="flex items-center gap-3">
+                                    {s.category && s.category !== "other" && (
+                                        <span
+                                            className="text-overline"
+                                            style={{
+                                                fontSize: "0.52rem",
+                                                color: "hsl(var(--text-muted))",
+                                            }}
+                                        >
+                                            {s.category}
+                                        </span>
+                                    )}
                                     <span className="text-overline">{s.exchange || "—"}</span>
                                     {adding === s.ticker ? (
                                         <Loader2 size={14} className="animate-spin" />
