@@ -228,9 +228,6 @@ async def verify_webhook_signature(headers: dict, raw_body: bytes) -> bool:
         "webhook_id": PAYPAL_WEBHOOK_ID,
         "webhook_event": body_obj,
     }
-    # Temp debug: which headers are present, what PayPal returns
-    hdr_dbg = {k: (bool(v)) for k, v in payload.items() if k != "webhook_event"}
-    logger.info("PayPal verify request headers present: %s", hdr_dbg)
     try:
         async with httpx.AsyncClient(timeout=15.0) as hc:
             r = await hc.post(
@@ -238,9 +235,10 @@ async def verify_webhook_signature(headers: dict, raw_body: bytes) -> bool:
                 headers=await _auth_headers(),
                 json=payload,
             )
-        logger.info("PayPal verify API status=%s body=%s", r.status_code, r.text[:500])
         if r.status_code == 200 and r.json().get("verification_status") == "SUCCESS":
             return True
+        # Log non-success so we can diagnose real-event failures later
+        logger.warning("PayPal verify non-success: status=%s body=%s", r.status_code, r.text[:300])
     except Exception as e:
         logger.warning("Webhook verify failed: %s", e)
     return False
