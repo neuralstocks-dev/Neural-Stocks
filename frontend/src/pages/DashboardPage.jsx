@@ -523,7 +523,7 @@ export default function DashboardPage() {
                                     </em>
                                 </h3>
                                 <p className="mt-3 text-sm max-w-md mx-auto" style={{ color: "hsl(var(--text-secondary))" }}>
-                                    Add up to five symbols to unlock live prices, AI verdicts, and real-time alerts.
+                                    Add up to three symbols to unlock live prices, AI verdicts, and real-time alerts.
                                 </p>
                                 <button
                                     onClick={() => setModalOpen(true)}
