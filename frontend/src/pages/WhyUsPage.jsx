@@ -30,8 +30,9 @@ const MODULES = [
     },
     {
         icon: Binary,
-        title: "Alpha Score",
+        title: "Score Card",
         status: "available",
+        link: "/scorecard",
         body: "Composite confidence score showing relative opportunity strength with transparent factor breakdowns across technicals and fundamentals.",
     },
     {
@@ -60,9 +61,9 @@ const MODULES = [
     },
     {
         icon: MessageSquareText,
-        title: "Explain Panel",
+        title: "AI Explain Panels",
         status: "available",
-        body: "Transparent, cited explanations showing why a signal was generated — the specific numbers, ratios, and technical conditions behind every verdict.",
+        body: "AI recommendation and verdict with confidence % level on the stock and also if the stock is suitable for short, medium or long term performance.",
     },
     {
         icon: BellRing,
@@ -110,15 +111,11 @@ function Cell({ v }) {
 function ModuleCard({ mod }) {
     const Icon = mod.icon;
     const isComing = mod.status === "coming";
-    return (
-        <div
-            className="module p-6 md:p-7 flex flex-col h-full"
-            style={{
-                background: "hsl(var(--surface))",
-                opacity: isComing ? 0.92 : 1,
-            }}
-            data-testid={`module-${mod.title.toLowerCase().replace(/\s+/g, "-")}`}
-        >
+    const isLinked = Boolean(mod.link);
+    const testId = `module-${mod.title.toLowerCase().replace(/\s+/g, "-")}`;
+
+    const inner = (
+        <>
             <div className="flex items-start justify-between gap-3">
                 <Icon size={20} strokeWidth={1.5} style={{ color: "hsl(var(--hold))" }} />
                 <span
@@ -134,12 +131,52 @@ function ModuleCard({ mod }) {
                     {isComing ? "Coming soon" : "Available"}
                 </span>
             </div>
-            <h3 className="font-serif mt-5" style={{ fontSize: "1.35rem", letterSpacing: "-0.005em" }}>
+            <h3 className="font-serif mt-5 flex items-center gap-2" style={{ fontSize: "1.35rem", letterSpacing: "-0.005em" }}>
                 {mod.title}
+                {isLinked && (
+                    <ArrowRight
+                        size={14}
+                        strokeWidth={1.8}
+                        style={{ color: "hsl(var(--hold))", opacity: 0.7 }}
+                    />
+                )}
             </h3>
             <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                 {mod.body}
             </p>
+            {isLinked && (
+                <p
+                    className="mt-4 text-overline"
+                    style={{ color: "hsl(var(--hold))", fontSize: "0.56rem" }}
+                >
+                    Open Score Card &rarr;
+                </p>
+            )}
+        </>
+    );
+
+    const baseClass = "module p-6 md:p-7 flex flex-col h-full";
+    const baseStyle = {
+        background: "hsl(var(--surface))",
+        opacity: isComing ? 0.92 : 1,
+    };
+
+    if (isLinked) {
+        return (
+            <Link
+                to={mod.link}
+                className={baseClass + " transition-colors hover:border-[hsl(var(--hold))]"}
+                style={{ ...baseStyle, textDecoration: "none", cursor: "pointer" }}
+                data-testid={testId}
+            >
+                {inner}
+            </Link>
+        );
+    }
+
+    return (
+        <div className={baseClass} style={baseStyle} data-testid={testId}>
+            {inner}
         </div>
     );
 }
@@ -224,7 +261,7 @@ export default function WhyUsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-6 mt-8">
                         {[
                             { step: "01", title: "Ingest", body: "Price, volume, fundamentals, technical indicators, and sentiment — gathered across exchanges in real time." },
-                            { step: "02", title: "Score & rank", body: "Claude-powered AI models weigh multi-factor data and produce BUY / SELL / HOLD signals with composite Alpha Scores." },
+                            { step: "02", title: "Score & rank", body: "Claude-powered AI models weigh multi-factor data and produce BUY / SELL / HOLD signals with composite Score Card ratings." },
                             { step: "03", title: "Explain", body: "Every signal comes with cited reasoning, confidence context, strengths, and risks — so you understand the thesis before acting." },
                         ].map((s) => (
                             <div

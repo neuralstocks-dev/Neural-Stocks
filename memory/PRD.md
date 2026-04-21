@@ -15,6 +15,13 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 - Admin console for user management + pricing control
 - PayPal subscriptions + Resend email receipts
 
+## 1a. Recent Changes (Feb 2026)
+
+- Scorecard **timeframe filter** (7 days / 1 month / 3 months). Backend `/api/scorecard/me` and `/api/scorecard/global` accept `?timeframe=7|30|90` overriding `min_age_days`.
+- WhyUs module rename: **"Alpha Score" → "Score Card"** (clickable — routes to `/scorecard`).
+- WhyUs module rename: **"Explain Panel" → "AI Explain Panels"** with new description referencing confidence % + short/medium/long-term fit.
+- WhyUs "How it works" step 02 updated: "composite Score Card ratings".
+
 ## 2. Tech Stack
 
 | Layer | Tech |
@@ -147,6 +154,7 @@ Pro/Elite · Claude scores short/medium/long-term horizons · 24h cache · Modal
 | 6 | 14/14 | 100% |
 | 7 | 14/14 backend + 12/12 frontend | 100% |
 | 8 | Manual smoke tested · pending full regression on prod | Ready to deploy |
+| 9 | Manual smoke (Feb 2026) — scorecard timeframe filter + Why Us module rename verified | ✅ |
 
 ## 10. Known Non-Blockers
 

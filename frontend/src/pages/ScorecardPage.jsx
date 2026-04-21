@@ -31,22 +31,38 @@ function StatusPill({ status }) {
     );
 }
 
+const TIMEFRAME_OPTIONS = [
+    { value: 7, label: "7 days", short: "7D" },
+    { value: 30, label: "1 month", short: "1M" },
+    { value: 90, label: "3 months", short: "3M" },
+];
+
 export default function ScorecardPage() {
     const [me, setMe] = useState(null);
     const [global, setGlobal] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [timeframe, setTimeframe] = useState(7);
 
     useEffect(() => {
+        let cancelled = false;
         (async () => {
+            setLoading(true);
             try {
-                const [m, g] = await Promise.all([api.get("/scorecard/me"), api.get("/scorecard/global")]);
+                const [m, g] = await Promise.all([
+                    api.get(`/scorecard/me?timeframe=${timeframe}`),
+                    api.get(`/scorecard/global?timeframe=${timeframe}`),
+                ]);
+                if (cancelled) return;
                 setMe(m.data);
                 setGlobal(g.data);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         })();
-    }, []);
+        return () => {
+            cancelled = true;
+        };
+    }, [timeframe]);
 
     const s = me?.summary;
     const gs = global?.summary;
@@ -65,6 +81,57 @@ export default function ScorecardPage() {
                     A BUY is a hit if the stock gained ≥ {me?.summary?.threshold_pct || 5}%. A SELL is a hit if
                     it dropped by the same. HOLD hits when price stays inside that band.
                 </p>
+
+                {/* Timeframe filter */}
+                <div
+                    className="mt-6 flex items-center gap-3 flex-wrap"
+                    data-testid="scorecard-timeframe-filter"
+                >
+                    <span
+                        className="text-overline"
+                        style={{ color: "hsl(var(--text-muted))", fontSize: "0.58rem" }}
+                    >
+                        Evaluate after
+                    </span>
+                    <div
+                        className="inline-flex"
+                        style={{
+                            border: "1px solid hsl(var(--border-default))",
+                            borderRadius: 2,
+                            overflow: "hidden",
+                        }}
+                    >
+                        {TIMEFRAME_OPTIONS.map((opt, i) => {
+                            const active = timeframe === opt.value;
+                            return (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setTimeframe(opt.value)}
+                                    data-testid={`scorecard-timeframe-${opt.value}`}
+                                    className="font-mono text-xs px-4 py-2 transition-colors"
+                                    style={{
+                                        background: active
+                                            ? "hsl(var(--hold))"
+                                            : "hsl(var(--surface))",
+                                        color: active
+                                            ? "hsl(var(--surface))"
+                                            : "hsl(var(--text-primary))",
+                                        borderLeft:
+                                            i === 0
+                                                ? "none"
+                                                : "1px solid hsl(var(--border-default))",
+                                        letterSpacing: "0.08em",
+                                        fontWeight: active ? 600 : 400,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    {opt.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
 
                 {loading && (
                     <div className="py-20 text-center">
