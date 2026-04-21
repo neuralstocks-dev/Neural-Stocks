@@ -13,6 +13,7 @@ import PublicVerdictPage from "@/pages/PublicVerdictPage";
 import AuthCallback from "@/pages/AuthCallback";
 import AdminPage from "@/pages/AdminPage";
 import ScorecardPage from "@/pages/ScorecardPage";
+import WhyUsPage from "@/pages/WhyUsPage";
 import { Loader2 } from "lucide-react";
 
 function Protected({ children }) {
@@ -81,6 +82,14 @@ function AppRoutes() {
                 element={
                     <Protected>
                         <ScorecardPage />
+                    </Protected>
+                }
+            />
+            <Route
+                path="/why"
+                element={
+                    <Protected>
+                        <WhyUsPage />
                     </Protected>
                 }
             />
