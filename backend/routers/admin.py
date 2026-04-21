@@ -23,6 +23,10 @@ class LoginDeleteReq(BaseModel):
     ids: list[str] = Field(min_length=1, max_length=500)
 
 
+class UserDeleteReq(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=200)
+
+
 def _sanitize_user(u: dict) -> dict:
     return {
         "id": u.get("id"),
@@ -150,6 +154,50 @@ async def delete_user(user_id: str, admin=Depends(admin_required)):
         "email": target["email"],
         "message": f"{target['email']} and all associated data deleted.",
     }
+
+
+# ---------- Bulk user deletion ----------
+@router.post("/users/delete")
+async def delete_selected_users(req: UserDeleteReq, admin=Depends(admin_required)):
+    """Bulk delete. Skips admins and the requesting admin themselves.
+    Cancels any active PayPal subscription before deleting the account."""
+    targets = await db.users.find(
+        {"id": {"$in": req.ids}}, {"_id": 0, "password_hash": 0}
+    ).to_list(len(req.ids))
+    deleted = []
+    skipped = []
+    for target in targets:
+        uid = target["id"]
+        if is_admin_email(target.get("email")):
+            skipped.append({"id": uid, "email": target["email"], "reason": "admin"})
+            continue
+        if uid == admin["id"]:
+            skipped.append({"id": uid, "email": target["email"], "reason": "self"})
+            continue
+        sid = target.get("paypal_subscription_id")
+        if sid:
+            try:
+                from services.paypal import cancel_subscription
+                await cancel_subscription(sid, reason="User account deleted by admin")
+            except Exception:
+                pass
+        await db.watchlist.delete_many({"user_id": uid})
+        await db.analyses.delete_many({"user_id": uid})
+        await db.alerts.delete_many({"user_id": uid})
+        await db.shared_verdicts.delete_many({"owner_id": uid})
+        await db.quick_jobs.delete_many({"user_id": uid})
+        await db.disclaimers.delete_many({"user_id": uid})
+        await db.subscriptions.delete_many({"user_id": uid})
+        await db.timeline_recos.delete_many({"user_id": uid})
+        await db.users.delete_one({"id": uid})
+        deleted.append({"id": uid, "email": target["email"]})
+    return {
+        "ok": True,
+        "deleted": deleted,
+        "skipped": skipped,
+        "message": f"Deleted {len(deleted)} user(s). Skipped {len(skipped)} (admins or self). Any active PayPal subscriptions were cancelled.",
+    }
+
 
 
 # ---------- Alert list removal ----------

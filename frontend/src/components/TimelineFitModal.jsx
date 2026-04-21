@@ -113,7 +113,7 @@ export default function TimelineFitModal({ ticker, onClose }) {
                                 data-testid="timeline-recommendation-label"
                             >
                                 <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
-                                    Recommendation
+                                    AI Recommendation
                                 </p>
                                 <h3
                                     className="font-serif mt-2"

@@ -3,7 +3,7 @@ import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Loader2, ShieldCheck, Clock, RotateCcw, Search, Trash2, BellOff, DollarSign, CheckSquare, Square } from "lucide-react";
+import { Loader2, ShieldCheck, Clock, RotateCcw, Search, Trash2, BellOff, DollarSign, CheckSquare, Square, AlertTriangle } from "lucide-react";
 import { timeAgo } from "@/lib/format";
 
 const DURATIONS = [
@@ -48,6 +48,8 @@ export default function AdminPage() {
     const [savingPrice, setSavingPrice] = useState(false);
     const [selectedLogins, setSelectedLogins] = useState(new Set());
     const [loginBusy, setLoginBusy] = useState(false);
+    const [selectedUsers, setSelectedUsers] = useState(new Set());
+    const [userBulkBusy, setUserBulkBusy] = useState(false);
 
     const loadAll = async () => {
         setLoading(true);
@@ -64,6 +66,7 @@ export default function AdminPage() {
             setEliteForm(String(pr.data?.elite_monthly ?? ""));
             setDiscountForm(String(pr.data?.annual_discount_pct ?? ""));
             setSelectedLogins(new Set());
+            setSelectedUsers(new Set());
         } finally {
             setLoading(false);
         }
@@ -216,6 +219,48 @@ export default function AdminPage() {
         } finally { setLoginBusy(false); }
     };
 
+    const toggleUser = (id) => {
+        const next = new Set(selectedUsers);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        setSelectedUsers(next);
+    };
+    // Deletable = non-admin users that match the current search filter
+    const deletable = filtered.filter((u) => !u.is_admin);
+    const toggleAllUsers = () => {
+        if (selectedUsers.size >= deletable.length && deletable.length > 0) setSelectedUsers(new Set());
+        else setSelectedUsers(new Set(deletable.map((u) => u.id)));
+    };
+
+    const deleteSelectedUsers = async () => {
+        if (selectedUsers.size === 0) return;
+        // Flag paid subscribers for extra visibility
+        const selectedEmails = users
+            .filter((u) => selectedUsers.has(u.id))
+            .map((u) => u.email);
+        const paidSelected = users.filter(
+            (u) => selectedUsers.has(u.id) && u.plan && u.plan !== "free"
+        );
+        let warning = `You are about to permanently delete ${selectedUsers.size} user${selectedUsers.size > 1 ? "s" : ""}:\n\n• ${selectedEmails.slice(0, 10).join("\n• ")}`;
+        if (selectedEmails.length > 10) warning += `\n... and ${selectedEmails.length - 10} more`;
+        warning += `\n\nThis will:\n• Cascade delete watchlist, analyses, alerts, shares, timeline recos\n• Auto-cancel any active PayPal subscription`;
+        if (paidSelected.length > 0) {
+            warning += `\n\n⚠️ ${paidSelected.length} user${paidSelected.length > 1 ? "s are" : " is"} on a PAID plan (${paidSelected.map((u) => `${u.email} · ${u.plan}`).join(", ")}).\n\nVerify you have:\n  1. Cancelled their PayPal subscription (auto-attempted, but confirm in PayPal dashboard)\n  2. Refunded any outstanding partial period if applicable\n  3. Documented the cancellation in your records\n\nProceed with deletion?`;
+        } else {
+            warning += `\n\nProceed with deletion?`;
+        }
+        if (!window.confirm(warning)) return;
+
+        setUserBulkBusy(true); setError(""); setMessage("");
+        try {
+            const r = await api.post("/admin/users/delete", { ids: Array.from(selectedUsers) });
+            setMessage(r.data.message);
+            setSelectedUsers(new Set());
+            await loadAll();
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Bulk delete failed");
+        } finally { setUserBulkBusy(false); }
+    };
+
     return (
         <AppShell>
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="admin-page">
@@ -344,37 +389,86 @@ export default function AdminPage() {
                                         Registered accounts
                                     </h2>
                                 </div>
-                                <div className="relative">
-                                    <Search
-                                        size={14}
-                                        strokeWidth={1.5}
-                                        className="absolute left-3 top-1/2 -translate-y-1/2"
-                                        style={{ color: "hsl(var(--text-muted))" }}
-                                    />
-                                    <input
-                                        type="text"
-                                        value={query}
-                                        onChange={(e) => setQuery(e.target.value)}
-                                        placeholder="Search email or name"
-                                        className="input-base pl-9 font-mono"
-                                        style={{ width: 280 }}
-                                        data-testid="admin-search-input"
-                                    />
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                        onClick={toggleAllUsers}
+                                        disabled={deletable.length === 0 || userBulkBusy}
+                                        className="btn-ghost !py-1 !px-3 !text-xs flex items-center gap-2"
+                                        data-testid="users-select-all-button"
+                                    >
+                                        {selectedUsers.size > 0 && selectedUsers.size >= deletable.length ? (
+                                            <CheckSquare size={12} strokeWidth={1.5} />
+                                        ) : (
+                                            <Square size={12} strokeWidth={1.5} />
+                                        )}
+                                        {selectedUsers.size >= deletable.length && deletable.length > 0
+                                            ? "Deselect all"
+                                            : "Select all"}
+                                    </button>
+                                    <button
+                                        onClick={deleteSelectedUsers}
+                                        disabled={selectedUsers.size === 0 || userBulkBusy}
+                                        className="btn-ghost !py-1 !px-3 !text-xs"
+                                        style={{ color: selectedUsers.size > 0 ? "hsl(var(--sell))" : undefined }}
+                                        data-testid="users-remove-selected-button"
+                                    >
+                                        {userBulkBusy ? (
+                                            <Loader2 size={12} className="animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Trash2 size={12} strokeWidth={1.5} className="inline mr-1" />
+                                                Remove selected ({selectedUsers.size})
+                                            </>
+                                        )}
+                                    </button>
+                                    <div className="relative">
+                                        <Search
+                                            size={14}
+                                            strokeWidth={1.5}
+                                            className="absolute left-3 top-1/2 -translate-y-1/2"
+                                            style={{ color: "hsl(var(--text-muted))" }}
+                                        />
+                                        <input
+                                            type="text"
+                                            value={query}
+                                            onChange={(e) => setQuery(e.target.value)}
+                                            placeholder="Search email or name"
+                                            className="input-base pl-9 font-mono"
+                                            style={{ width: 240 }}
+                                            data-testid="admin-search-input"
+                                        />
+                                    </div>
                                 </div>
+                            </div>
+
+                            <div
+                                className="px-5 md:px-6 py-3 text-xs flex items-start gap-2"
+                                style={{
+                                    background: "hsla(38, 45%, 45%, 0.05)",
+                                    borderBottom: "1px solid hsl(var(--border-divider))",
+                                    color: "hsl(var(--hold))",
+                                }}
+                                data-testid="users-paid-warning"
+                            >
+                                <AlertTriangle size={12} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+                                <span style={{ color: "hsl(var(--text-secondary))" }}>
+                                    Before removing, verify any <span style={{ color: "hsl(var(--hold))" }}>paid subscribers</span> have had their PayPal subscription cancelled and billing adjustments made. Bulk delete auto-cancels active PayPal subs, but always confirm in your PayPal dashboard. Admins cannot be removed.
+                                </span>
                             </div>
 
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
                                     <thead>
                                         <tr>
-                                            {["Email", "Plan", "Unlock", "Logins", "Last login", "Actions"].map(
-                                                (h) => (
+                                            {["", "Email", "Plan", "Unlock", "Logins", "Last login", "Actions"].map(
+                                                (h, idx) => (
                                                     <th
-                                                        key={h}
+                                                        key={h || `col-${idx}`}
                                                         className="text-left text-overline py-3 px-4"
                                                         style={{
                                                             background: "hsl(var(--surface-elevated))",
                                                             fontSize: "0.56rem",
+                                                            width: idx === 0 ? 40 : undefined,
                                                         }}
                                                     >
                                                         {h}
@@ -386,12 +480,31 @@ export default function AdminPage() {
                                     <tbody>
                                         {filtered.map((u) => {
                                             const unlocked = !!u.test_unlock_expires_at;
+                                            const checked = selectedUsers.has(u.id);
                                             return (
                                                 <tr
                                                     key={u.id}
-                                                    style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                                                    style={{
+                                                        borderTop: "1px solid hsl(var(--border-divider))",
+                                                        background: checked ? "hsla(38, 45%, 45%, 0.06)" : undefined,
+                                                    }}
                                                     data-testid={`user-row-${u.email}`}
                                                 >
+                                                    <td className="py-3 px-4">
+                                                        {!u.is_admin && (
+                                                            <button
+                                                                onClick={() => toggleUser(u.id)}
+                                                                className="inline-flex"
+                                                                data-testid={`user-checkbox-${u.email}`}
+                                                            >
+                                                                {checked ? (
+                                                                    <CheckSquare size={14} strokeWidth={1.5} style={{ color: "hsl(var(--hold))" }} />
+                                                                ) : (
+                                                                    <Square size={14} strokeWidth={1.5} style={{ color: "hsl(var(--text-muted))" }} />
+                                                                )}
+                                                            </button>
+                                                        )}
+                                                    </td>
                                                     <td className="py-3 px-4">
                                                         <div className="font-mono text-sm">{u.email}</div>
                                                         <div
@@ -520,7 +633,7 @@ export default function AdminPage() {
                                         })}
                                         {filtered.length === 0 && (
                                             <tr>
-                                                <td colSpan="6" className="py-10 text-center text-[hsl(var(--text-muted))]">
+                                                <td colSpan="7" className="py-10 text-center text-[hsl(var(--text-muted))]">
                                                     No users match "{query}"
                                                 </td>
                                             </tr>
