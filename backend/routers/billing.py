@@ -1,6 +1,7 @@
 """Billing routes: PayPal subscription lifecycle + webhook."""
 import logging
 import uuid
+from datetime import timedelta
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -127,23 +128,40 @@ async def cancel(user=Depends(get_current_user)):
     sid = user.get("paypal_subscription_id")
     if not sid:
         raise HTTPException(status_code=400, detail="No active subscription")
+    # Cancel with PayPal — subscription remains ACTIVE until end of current billing cycle per PayPal docs.
     try:
         await cancel_subscription(sid, reason="User requested cancellation")
     except PayPalError as e:
-        # Continue to downgrade locally even if PayPal errors (subscription may already be cancelled)
         logger.warning("PayPal cancel warning for %s: %s", sid, e)
+    # Fetch subscription to get actual period-end (next_billing_time)
+    period_end = None
+    try:
+        sub = await get_subscription(sid)
+        bi = sub.get("billing_info") or {}
+        period_end = bi.get("next_billing_time") or bi.get("final_payment_time")
+    except Exception:
+        pass
+    if not period_end:
+        # Fallback: 30 days monthly / 365 days yearly from now
+        days = 365 if user.get("paypal_cycle") == "yearly" else 30
+        period_end = iso(now_utc() + timedelta(days=days))
+    # Mark cancelled but keep the user on their plan until period_end.
     await db.users.update_one(
         {"id": user["id"]},
-        {
-            "$set": {"plan": "free", "subscription_status": "CANCELLED"},
-            "$unset": {"paypal_subscription_id": "", "paypal_plan": ""},
-        },
+        {"$set": {
+            "subscription_status": "CANCELLED",
+            "subscription_cancels_at": period_end,
+        }},
     )
     await db.subscriptions.update_one(
         {"subscription_id": sid},
-        {"$set": {"status": "CANCELLED", "updated_at": iso(now_utc())}},
+        {"$set": {"status": "CANCELLED", "cancels_at": period_end, "updated_at": iso(now_utc())}},
     )
-    return {"ok": True, "message": "Subscription cancelled. You are now on Free plan."}
+    return {
+        "ok": True,
+        "cancels_at": period_end,
+        "message": f"Subscription cancelled. You keep {user.get('paypal_plan', user['plan']).capitalize()} access until {period_end[:10]}, then revert to Free. No further charges.",
+    }
 
 
 @router.post("/webhook")

@@ -59,6 +59,28 @@ async def get_current_user(
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    # Auto-downgrade: if subscription is CANCELLED and grace period has ended, revert to free.
+    cancels_at = user.get("subscription_cancels_at")
+    if user.get("subscription_status") == "CANCELLED" and cancels_at:
+        try:
+            end = datetime.fromisoformat(cancels_at)
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=timezone.utc)
+            if end < now_utc():
+                await db.users.update_one(
+                    {"id": user_id},
+                    {
+                        "$set": {"plan": "free", "subscription_status": "EXPIRED"},
+                        "$unset": {"paypal_subscription_id": "", "paypal_plan": "",
+                                   "paypal_cycle": "", "subscription_cancels_at": ""},
+                    },
+                )
+                user["plan"] = "free"
+                user["subscription_status"] = "EXPIRED"
+                for k in ("paypal_subscription_id", "paypal_plan", "paypal_cycle", "subscription_cancels_at"):
+                    user.pop(k, None)
+        except Exception:
+            pass
     # Derived flags
     if not user.get("plan"):
         user["plan"] = "free"

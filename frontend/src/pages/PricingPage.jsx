@@ -36,6 +36,7 @@ export default function PricingPage() {
     const { user, refreshUser } = useAuth();
     const [plans, setPlans] = useState(null);
     const [billingConfig, setBillingConfig] = useState(null);
+    const [quota, setQuota] = useState(null);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [processing, setProcessing] = useState(null);
@@ -45,12 +46,14 @@ export default function PricingPage() {
     useEffect(() => {
         (async () => {
             try {
-                const [plansRes, cfgRes] = await Promise.all([
+                const [plansRes, cfgRes, quotaRes] = await Promise.all([
                     api.get("/plans"),
                     api.get("/billing/config"),
+                    api.get("/quota"),
                 ]);
                 setPlans(plansRes.data);
                 setBillingConfig(cfgRes.data);
+                setQuota(quotaRes.data);
             } catch (err) {
                 setError(err?.response?.data?.detail || "Failed to load pricing");
             }
@@ -70,13 +73,16 @@ export default function PricingPage() {
     };
 
     const cancelSubscription = async () => {
-        if (!window.confirm("Cancel your subscription and downgrade to Free?")) return;
+        if (!window.confirm("Cancel your PayPal subscription? You'll keep full access until the end of your current billing period, then revert to Free. No further charges.")) return;
         setCancelling(true); setError(""); setMessage("");
         try {
             const r = await api.post("/billing/cancel");
+            // Refresh quota to pick up subscription_status=CANCELLED + cancels_at
+            const quotaRes = await api.get("/quota");
+            setQuota(quotaRes.data);
             await refreshUser();
             setMessage(r.data.message);
-            setTimeout(() => setMessage(""), 5000);
+            setTimeout(() => setMessage(""), 8000);
         } catch (err) {
             setError(err?.response?.data?.detail || "Cancel failed");
         } finally { setCancelling(false); }
@@ -123,6 +129,70 @@ export default function PricingPage() {
                         data-testid="sandbox-banner">
                         <ShieldCheck size={12} className="inline mr-2" strokeWidth={1.5} />
                         SANDBOX MODE · Use a PayPal sandbox buyer account. No real charge.
+                    </div>
+                )}
+
+                {/* Test-unlock / Admin banner: shown when user has unlocked all features without paying */}
+                {(quota?.test_unlock_active || quota?.is_admin) && (
+                    <div
+                        className="mt-4 px-5 py-4"
+                        style={{
+                            border: "1px solid hsl(var(--hold))",
+                            background: "hsla(38, 45%, 45%, 0.08)",
+                            borderRadius: 2,
+                        }}
+                        data-testid="test-unlock-banner"
+                    >
+                        <div className="flex items-start gap-3">
+                            <Crown size={14} strokeWidth={1.5} style={{ color: "hsl(var(--hold))", marginTop: 2 }} />
+                            <div>
+                                <p className="text-overline mb-1" style={{ color: "hsl(var(--hold))" }}>
+                                    {quota.is_admin ? "Admin account · all features unlocked" : "Admin test-unlock active"}
+                                </p>
+                                <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
+                                    {quota.is_admin ? (
+                                        <>
+                                            You are signed in as an <strong>admin</strong>. Subscription payments are <strong>not active</strong> for your account — all features across <strong>Free, Pro, and Elite tiers are unlocked</strong>. Free tier behaves the same as Elite, and Pro behaves the same as Elite.
+                                        </>
+                                    ) : (
+                                        <>
+                                            Your account has an <strong>admin-granted test unlock</strong>. Subscription payments are <strong>not active</strong> — all features across <strong>Free, Pro, and Elite tiers are unlocked</strong>. Free tier behaves the same as Elite, and Pro behaves the same as Elite.
+                                            {quota.test_unlock_expires_at && quota.test_unlock_expires_at !== "forever" && (
+                                                <> Test unlock expires <span className="font-mono">{new Date(quota.test_unlock_expires_at).toLocaleString()}</span>.</>
+                                            )}
+                                            {quota.test_unlock_expires_at === "forever" && <> Test unlock has no expiry.</>}
+                                        </>
+                                    )}
+                                </p>
+                                <p className="text-xs mt-2 font-mono" style={{ color: "hsl(var(--text-muted))" }}>
+                                    Subscribe buttons below are informational only while unlocked.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Cancelled-at-period-end banner */}
+                {quota?.subscription_status === "CANCELLED" && quota?.subscription_cancels_at && (
+                    <div
+                        className="mt-4 px-5 py-4"
+                        style={{
+                            border: "1px solid hsl(var(--sell))",
+                            background: "hsla(0, 65%, 50%, 0.06)",
+                            borderRadius: 2,
+                        }}
+                        data-testid="subscription-cancelled-banner"
+                    >
+                        <p className="text-overline mb-1" style={{ color: "hsl(var(--sell))" }}>
+                            Subscription cancelled · access ending soon
+                        </p>
+                        <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
+                            Your {quota.plan_name} subscription is cancelled. You keep full access until{" "}
+                            <span className="font-mono" style={{ color: "hsl(var(--hold))" }}>
+                                {new Date(quota.subscription_cancels_at).toLocaleString()}
+                            </span>
+                            , then revert to Free. You will not be charged again. Re-subscribe anytime to keep your access.
+                        </p>
                     </div>
                 )}
 
@@ -177,7 +247,9 @@ export default function PricingPage() {
                         <section className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mt-10">
                             {ORDER.map((key) => {
                                 const p = plans[key];
-                                const isCurrent = (user?.plan || "free") === key;
+                                // CURRENT badge follows the user's actual base plan (not effective plan from admin/unlock).
+                                const basePlan = quota?.base_plan || user?.plan || "free";
+                                const isCurrent = basePlan === key;
                                 const price = priceFor(key, p);
                                 const icon =
                                     key === "elite" ? <Crown size={16} strokeWidth={1.5} /> :
@@ -257,67 +329,111 @@ export default function PricingPage() {
 
                                         {/* Uniform CTA slot — same min-height across all tiers for visual balance */}
                                         <div className="mt-8 flex flex-col justify-end" style={{ minHeight: 150 }}>
-                                            {key === "free" ? (
-                                                // Free tier: no button. Free is the default — users land here automatically.
-                                                isCurrent ? (
-                                                    <CTAButton variant="current" testid={`current-${key}-button`}>
-                                                        Your current plan
-                                                    </CTAButton>
-                                                ) : (
-                                                    <p
-                                                        className="text-overline text-center"
-                                                        style={{
-                                                            color: "hsl(var(--text-muted))",
-                                                            fontSize: "0.58rem",
-                                                            lineHeight: 1.6,
+                                            {(() => {
+                                                const hasPaid = quota?.has_paypal_subscription;
+                                                const onTestUnlock = quota?.test_unlock_active;
+                                                // For the Free card:
+                                                if (key === "free") {
+                                                    if (isCurrent && !hasPaid && !onTestUnlock) {
+                                                        return (
+                                                            <CTAButton variant="current" testid={`current-${key}-button`}>
+                                                                Your current plan
+                                                            </CTAButton>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <p
+                                                            className="text-overline text-center"
+                                                            style={{
+                                                                color: "hsl(var(--text-muted))",
+                                                                fontSize: "0.58rem",
+                                                                lineHeight: 1.6,
+                                                            }}
+                                                            data-testid="free-tier-info"
+                                                        >
+                                                            {onTestUnlock
+                                                                ? "All features currently unlocked via test unlock."
+                                                                : "Always free. Cancel a paid plan to revert to Free."}
+                                                        </p>
+                                                    );
+                                                }
+                                                // Pro & Elite cards:
+                                                // If paid subscriber on this tier: show Cancel (or "Cancels on" if already cancelled)
+                                                if (hasPaid && quota?.base_plan === key) {
+                                                    if (quota?.subscription_status === "CANCELLED") {
+                                                        return (
+                                                            <div
+                                                                className="w-full font-mono text-center"
+                                                                style={{
+                                                                    background: "hsl(var(--surface-elevated))",
+                                                                    border: "1px solid hsl(var(--sell))",
+                                                                    color: "hsl(var(--sell))",
+                                                                    height: 98,
+                                                                    borderRadius: 2,
+                                                                    letterSpacing: "0.04em",
+                                                                    textTransform: "uppercase",
+                                                                    fontSize: "0.7rem",
+                                                                    padding: "20px 12px",
+                                                                }}
+                                                                data-testid={`cancelled-${key}-notice`}
+                                                            >
+                                                                Cancelled
+                                                                <div className="mt-2 text-[0.6rem]" style={{ color: "hsl(var(--text-muted))", textTransform: "none" }}>
+                                                                    access until {new Date(quota.subscription_cancels_at).toLocaleDateString()}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <button
+                                                            onClick={cancelSubscription}
+                                                            disabled={cancelling}
+                                                            className="w-full font-mono text-sm transition-all"
+                                                            style={{
+                                                                background: "hsl(var(--surface-elevated))",
+                                                                border: "1px solid hsl(var(--sell))",
+                                                                color: "hsl(var(--sell))",
+                                                                height: 98,
+                                                                borderRadius: 2,
+                                                                letterSpacing: "0.04em",
+                                                                textTransform: "uppercase",
+                                                                fontSize: "0.75rem",
+                                                                fontWeight: 600,
+                                                            }}
+                                                            data-testid={`cancel-${key}-button`}
+                                                        >
+                                                            {cancelling ? (
+                                                                <Loader2 size={14} className="animate-spin mx-auto" />
+                                                            ) : (
+                                                                <>
+                                                                    Cancel Subscription
+                                                                    <div className="mt-1 text-[0.58rem]" style={{ color: "hsl(var(--text-muted))", textTransform: "none", letterSpacing: 0 }}>
+                                                                        access continues until end of billing period
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                }
+                                                // Otherwise: show PayPal subscribe block (Pro or Elite, for any user not paying on this tier)
+                                                return (
+                                                    <PayPalSubscribeButton
+                                                        planKey={key}
+                                                        cycle={cycle}
+                                                        planId={billingConfig.plan_ids[`${key}_${cycle}`]}
+                                                        planName={p.name}
+                                                        processing={processing === `${key}_${cycle}`}
+                                                        setProcessing={(v) => setProcessing(v ? `${key}_${cycle}` : null)}
+                                                        onSuccess={(msg) => {
+                                                            setMessage(msg);
+                                                            refreshUser();
+                                                            api.get("/quota").then((r) => setQuota(r.data));
+                                                            setTimeout(() => setMessage(""), 6000);
                                                         }}
-                                                        data-testid="free-tier-info"
-                                                    >
-                                                        Always free. Cancel a paid plan to revert to Free.
-                                                    </p>
-                                                )
-                                            ) : isCurrent ? (
-                                                // Pro/Elite when currently subscribed: prominent cancel button (sized like PayPal block for balance)
-                                                <button
-                                                    onClick={cancelSubscription}
-                                                    disabled={cancelling}
-                                                    className="w-full font-mono text-sm transition-all"
-                                                    style={{
-                                                        background: "hsl(var(--surface-elevated))",
-                                                        border: "1px solid hsl(var(--sell))",
-                                                        color: "hsl(var(--sell))",
-                                                        height: 98,
-                                                        borderRadius: 2,
-                                                        letterSpacing: "0.04em",
-                                                        textTransform: "uppercase",
-                                                        fontSize: "0.75rem",
-                                                        fontWeight: 600,
-                                                    }}
-                                                    data-testid={`cancel-${key}-button`}
-                                                >
-                                                    {cancelling ? (
-                                                        <Loader2 size={14} className="animate-spin mx-auto" />
-                                                    ) : (
-                                                        "Cancel Subscription"
-                                                    )}
-                                                </button>
-                                            ) : (
-                                                // Pro/Elite (not current): PayPal subscribe button
-                                                <PayPalSubscribeButton
-                                                    planKey={key}
-                                                    cycle={cycle}
-                                                    planId={billingConfig.plan_ids[`${key}_${cycle}`]}
-                                                    planName={p.name}
-                                                    processing={processing === `${key}_${cycle}`}
-                                                    setProcessing={(v) => setProcessing(v ? `${key}_${cycle}` : null)}
-                                                    onSuccess={(msg) => {
-                                                        setMessage(msg);
-                                                        refreshUser();
-                                                        setTimeout(() => setMessage(""), 6000);
-                                                    }}
-                                                    onError={(m) => setError(m)}
-                                                />
-                                            )}
+                                                        onError={(m) => setError(m)}
+                                                    />
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 );
