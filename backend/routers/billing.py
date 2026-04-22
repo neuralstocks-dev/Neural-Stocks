@@ -374,3 +374,33 @@ async def smoke_test_history(user=Depends(get_current_user)):
         .to_list(20)
     )
     return {"count": len(items), "results": items}
+
+
+@router.post("/smoke-test/cancel/{subscription_id}")
+async def smoke_test_cancel(subscription_id: str, user=Depends(get_current_user)):
+    """Cancel a smoke-test subscription via PayPal. Admin-only. Does NOT touch
+    user plans — smoke tests never upgraded anyone to begin with."""
+    _require_admin(user)
+    try:
+        await cancel_subscription(subscription_id, reason="Neulab smoke-test cancel")
+    except PayPalError as e:
+        # Confirm current status from PayPal so we can report an accurate outcome
+        try:
+            sub = await get_subscription(subscription_id)
+            current = (sub.get("status") or "").upper()
+        except PayPalError:
+            current = "UNKNOWN"
+        logger.warning("Smoke-test cancel failed for %s: %s (current=%s)", subscription_id, e, current)
+        if current == "CANCELLED":
+            await db.smoke_test_results.update_many(
+                {"subscription_id": subscription_id},
+                {"$set": {"paypal_status": "CANCELLED", "cancelled_at": iso(now_utc())}},
+            )
+            return {"ok": True, "already_cancelled": True, "status": current}
+        raise HTTPException(status_code=502, detail=f"PayPal cancel failed: {e}")
+    await db.smoke_test_results.update_many(
+        {"subscription_id": subscription_id},
+        {"$set": {"paypal_status": "CANCELLED", "cancelled_at": iso(now_utc())}},
+    )
+    logger.info("Smoke-test subscription cancelled: %s by %s", subscription_id, user.get("email"))
+    return {"ok": True, "status": "CANCELLED", "subscription_id": subscription_id}

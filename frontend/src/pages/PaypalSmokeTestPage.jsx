@@ -15,7 +15,7 @@ import { Link } from "react-router-dom";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import AppShell from "@/components/AppShell";
 import api from "@/lib/api";
-import { Loader2, AlertTriangle, CheckCircle2, ArrowLeft, Shield, Copy } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, ArrowLeft, Shield, Copy, XCircle } from "lucide-react";
 
 export default function PaypalSmokeTestPage() {
     const [config, setConfig] = useState(null);
@@ -24,6 +24,8 @@ export default function PaypalSmokeTestPage() {
     const [processing, setProcessing] = useState(false);
     const [result, setResult] = useState(null);
     const [history, setHistory] = useState([]);
+    const [cancellingId, setCancellingId] = useState("");
+    const [cancelMessage, setCancelMessage] = useState("");
 
     const load = async () => {
         setLoading(true);
@@ -59,6 +61,45 @@ export default function PaypalSmokeTestPage() {
             navigator.clipboard.writeText(JSON.stringify(obj, null, 2));
         } catch { /* noop */ }
     };
+
+    const handleCancel = async (subscriptionId) => {
+        if (!subscriptionId) return;
+        if (!window.confirm(`Cancel PayPal subscription ${subscriptionId}? This stops future $1 recurring charges. Irreversible.`)) return;
+        setCancellingId(subscriptionId);
+        setError("");
+        setCancelMessage("");
+        try {
+            const r = await api.post(`/billing/smoke-test/cancel/${subscriptionId}`);
+            const msg = r.data?.already_cancelled
+                ? `${subscriptionId} was already cancelled on PayPal — local record synced.`
+                : `${subscriptionId} cancelled. No further charges.`;
+            setCancelMessage(msg);
+            // If we just cancelled the sub currently shown in the result card, mirror the status
+            setResult((prev) =>
+                prev && prev.subscription_id === subscriptionId
+                    ? { ...prev, paypal_status: "CANCELLED" }
+                    : prev,
+            );
+            try {
+                const h = await api.get("/billing/smoke-test/history");
+                setHistory(h.data.results || []);
+            } catch { /* noop */ }
+        } catch (err) {
+            const status = err?.response?.status;
+            const body = err?.response?.data;
+            setError(
+                `Cancel failed (HTTP ${status || "?"}): ` +
+                (typeof body === "string" ? body : (body?.detail || JSON.stringify(body || err?.message || "unknown")))
+            );
+        } finally {
+            setCancellingId("");
+        }
+    };
+
+    // Most recent subscription that's still ACTIVE/APPROVED — prominent cancel card
+    const activeSubscription = history.find(
+        (h) => ["ACTIVE", "APPROVED", "APPROVAL_PENDING"].includes((h.paypal_status || "").toUpperCase()),
+    );
 
     return (
         <AppShell>
@@ -117,6 +158,52 @@ export default function PaypalSmokeTestPage() {
                             <p className="font-mono text-overline mb-1" style={{ color: "hsl(var(--sell))", fontSize: "0.6rem" }}>Error</p>
                             <p>{error}</p>
                         </div>
+                    </div>
+                )}
+
+                {cancelMessage && (
+                    <div
+                        className="mt-6 p-4 flex items-start gap-3 text-sm"
+                        style={{ border: "1px solid hsl(var(--buy))", background: "hsla(142,55%,45%,0.06)" }}
+                        data-testid="cancel-banner"
+                    >
+                        <CheckCircle2 size={16} strokeWidth={1.5} style={{ color: "hsl(var(--buy))", marginTop: 2 }} />
+                        <p>{cancelMessage}</p>
+                    </div>
+                )}
+
+                {activeSubscription && (
+                    <div
+                        className="mt-6 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+                        style={{
+                            border: "1px solid hsl(var(--hold))",
+                            background: "hsla(38,45%,45%,0.05)",
+                        }}
+                        data-testid="active-sub-banner"
+                    >
+                        <div>
+                            <p className="text-overline mb-1" style={{ color: "hsl(var(--hold))", fontSize: "0.58rem" }}>
+                                Active $1/mo subscription on this account
+                            </p>
+                            <p className="font-mono text-sm">{activeSubscription.subscription_id}</p>
+                            <p className="text-xs mt-1" style={{ color: "hsl(var(--text-muted))" }}>
+                                Started {(activeSubscription.created_at || "").slice(0, 19).replace("T", " ")} ·
+                                {" "}will auto-renew until cancelled
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => handleCancel(activeSubscription.subscription_id)}
+                            disabled={cancellingId === activeSubscription.subscription_id}
+                            className="btn-ghost flex items-center gap-2 text-sm"
+                            style={{ borderColor: "hsl(var(--sell))", color: "hsl(var(--sell))" }}
+                            data-testid="cancel-active-btn"
+                        >
+                            {cancellingId === activeSubscription.subscription_id ? (
+                                <><Loader2 size={14} className="animate-spin" /> Cancelling…</>
+                            ) : (
+                                <><XCircle size={14} strokeWidth={1.5} /> Cancel smoke test</>
+                            )}
+                        </button>
                     </div>
                 )}
 
@@ -255,21 +342,46 @@ export default function PaypalSmokeTestPage() {
                                         <th className="text-left py-2 px-4 text-overline" style={{ fontSize: "0.55rem" }}>Admin</th>
                                         <th className="text-left py-2 px-4 text-overline" style={{ fontSize: "0.55rem" }}>Sub ID</th>
                                         <th className="text-left py-2 px-4 text-overline" style={{ fontSize: "0.55rem" }}>Status</th>
+                                        <th className="text-right py-2 px-4 text-overline" style={{ fontSize: "0.55rem" }}>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {history.map((h) => (
-                                        <tr key={h.id} style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
-                                            <td className="py-2 px-4" style={{ color: "hsl(var(--text-muted))" }}>
-                                                {(h.created_at || "").slice(0, 19).replace("T", " ")}
-                                            </td>
-                                            <td className="py-2 px-4">{h.admin_email || "—"}</td>
-                                            <td className="py-2 px-4">{h.subscription_id}</td>
-                                            <td className="py-2 px-4" style={{ color: h.paypal_status === "ACTIVE" ? "hsl(var(--buy))" : "hsl(var(--hold))" }}>
-                                                {h.paypal_status || "—"}
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {history.map((h) => {
+                                        const st = (h.paypal_status || "").toUpperCase();
+                                        const isActive = ["ACTIVE", "APPROVED", "APPROVAL_PENDING"].includes(st);
+                                        const busy = cancellingId === h.subscription_id;
+                                        return (
+                                            <tr key={h.id} style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
+                                                <td className="py-2 px-4" style={{ color: "hsl(var(--text-muted))" }}>
+                                                    {(h.created_at || "").slice(0, 19).replace("T", " ")}
+                                                </td>
+                                                <td className="py-2 px-4">{h.admin_email || "—"}</td>
+                                                <td className="py-2 px-4">{h.subscription_id}</td>
+                                                <td className="py-2 px-4" style={{ color: isActive ? "hsl(var(--buy))" : "hsl(var(--text-muted))" }}>
+                                                    {st || "—"}
+                                                </td>
+                                                <td className="py-2 px-4 text-right">
+                                                    {isActive ? (
+                                                        <button
+                                                            onClick={() => handleCancel(h.subscription_id)}
+                                                            disabled={busy}
+                                                            className="text-[11px] font-mono inline-flex items-center gap-1 px-2 py-1"
+                                                            style={{
+                                                                border: "1px solid hsl(var(--sell))",
+                                                                color: "hsl(var(--sell))",
+                                                            }}
+                                                            data-testid={`cancel-row-${h.subscription_id}`}
+                                                        >
+                                                            {busy ? <Loader2 size={11} className="animate-spin" /> : <XCircle size={11} strokeWidth={1.5} />}
+                                                            Cancel
+                                                        </button>
+                                                    ) : (
+                                                        <span style={{ color: "hsl(var(--text-muted))" }}>—</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
