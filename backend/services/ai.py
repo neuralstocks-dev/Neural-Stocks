@@ -141,7 +141,7 @@ def _handle_llm_error(e: Exception):
 
 async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals: dict,
                           technicals: dict, candlestick_findings: dict | None = None,
-                          mode: str = "standard") -> dict:
+                          mode: str = "standard", market_context: dict | None = None) -> dict:
     """Run AI analysis. If candlestick_findings is provided AND mode == 'hybrid',
     the hybrid prompt is used. Otherwise the standard prompt is used."""
     payload = {
@@ -160,6 +160,24 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
     else:
         system_prompt = STANDARD_SYSTEM_PROMPT
         prefix = "analysis"
+
+    # Add market context (news headlines, analyst consensus, next earnings) if available
+    if market_context and isinstance(market_context, dict) and market_context.get("configured"):
+        mc_slim = {}
+        news = market_context.get("news") or {}
+        if news.get("articles"):
+            mc_slim["recent_headlines"] = [
+                {"headline": a.get("headline"), "sentiment": a.get("sentiment"), "source": a.get("source")}
+                for a in news.get("articles", [])[:5]
+            ]
+            mc_slim["news_sentiment_summary"] = news.get("summary_sentiment")
+            mc_slim["news_score"] = news.get("score")
+        if market_context.get("analyst_consensus"):
+            mc_slim["analyst_consensus"] = market_context["analyst_consensus"]
+        if market_context.get("earnings"):
+            mc_slim["next_earnings"] = market_context["earnings"]
+        if mc_slim:
+            payload["market_context"] = mc_slim
 
     try:
         raw = await _run_chat(system_prompt, f"{prefix}-{ticker}",

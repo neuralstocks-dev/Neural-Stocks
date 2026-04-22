@@ -9,6 +9,7 @@ from core.security import get_current_user, iso, now_utc
 from services.yfinance_svc import get_quote, _yf_history_sync, _yf_fundamentals_sync, compute_technicals
 from services.ai import run_ai_analysis, run_timeline_analysis, run_candlestick_analysis
 from services.candlestick import scan_daily_and_weekly
+from services.finnhub import get_market_context
 from services.quota import enforce_analysis_quota, plan_for, resolved_plan_for
 from routers.disclaimer import require_accepted
 
@@ -80,17 +81,18 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     quote_task = get_quote(ticker)
     hist_task = asyncio.to_thread(_yf_history_sync, ticker, "6mo", "1d")
     fund_task = asyncio.to_thread(_yf_fundamentals_sync, ticker)
+    market_ctx_task = get_market_context(ticker)
     # For candlestick/hybrid we also need weekly candles
     weekly_task = None
     if mode in ("candlestick", "hybrid"):
         weekly_task = asyncio.to_thread(_yf_history_sync, ticker, "1y", "1wk")
 
-    gather_args = [quote_task, hist_task, fund_task]
+    gather_args = [quote_task, hist_task, fund_task, market_ctx_task]
     if weekly_task is not None:
         gather_args.append(weekly_task)
     results = await asyncio.gather(*gather_args)
-    quote, history, fundamentals = results[0], results[1], results[2]
-    weekly_history = results[3] if weekly_task is not None else []
+    quote, history, fundamentals, market_ctx = results[0], results[1], results[2], results[3]
+    weekly_history = results[4] if weekly_task is not None else []
 
     if quote.get("price") is None:
         raise HTTPException(status_code=404, detail=f"No data for ticker {ticker}")
@@ -108,9 +110,13 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
         analysis = await run_ai_analysis(
             ticker, quote, history, fundamentals, technicals,
             candlestick_findings=candlestick_findings, mode="hybrid",
+            market_context=market_ctx,
         )
     else:
-        analysis = await run_ai_analysis(ticker, quote, history, fundamentals, technicals)
+        analysis = await run_ai_analysis(
+            ticker, quote, history, fundamentals, technicals,
+            market_context=market_ctx,
+        )
 
     doc = {
         "id": str(uuid.uuid4()),
@@ -122,6 +128,7 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
         "technicals": technicals,
         "fundamentals": fundamentals,
         "mode": mode,
+        "market_context": market_ctx if isinstance(market_ctx, dict) and market_ctx.get("configured") else None,
         **analysis,
     }
     if candlestick_findings is not None:
@@ -537,6 +544,7 @@ def _public_view(analysis: dict) -> dict:
         "mode": analysis.get("mode") or "standard",
         "candlestick_summary": analysis.get("candlestick_summary"),
         "candlestick_findings": analysis.get("candlestick_findings"),
+        "market_context": analysis.get("market_context"),
         "technicals": {k: v for k, v in (analysis.get("technicals") or {}).items()
                        if k in ("rsi_14", "sma_20", "sma_50", "macd")},
         "fundamentals": {k: v for k, v in (analysis.get("fundamentals") or {}).items()

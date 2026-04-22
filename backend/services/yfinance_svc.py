@@ -75,7 +75,43 @@ def _yf_quote_sync(ticker: str) -> dict:
 
 
 async def get_quote(ticker: str) -> dict:
-    return await asyncio.to_thread(_yf_quote_sync, ticker)
+    """Returns a merged quote dict.
+
+    - Finnhub (if configured) provides fresher live price, prev_close, day high/low.
+    - yfinance provides metadata (name, exchange, currency, volume, fundamentals).
+
+    When both succeed, Finnhub fields override price-related values. If Finnhub
+    fails or isn't configured, yfinance-only data is returned (backward compatible).
+    """
+    from services.finnhub import get_quote as finnhub_quote, is_configured as fh_ready
+    yf_task = asyncio.to_thread(_yf_quote_sync, ticker)
+    if fh_ready():
+        fh_task = finnhub_quote(ticker)
+        yf_data, fh_data = await asyncio.gather(yf_task, fh_task, return_exceptions=True)
+    else:
+        yf_data = await yf_task
+        fh_data = None
+    if isinstance(yf_data, Exception) or not isinstance(yf_data, dict):
+        yf_data = {}
+    merged = dict(yf_data)
+    if isinstance(fh_data, dict) and fh_data.get("price") is not None:
+        # Prefer Finnhub for live market data
+        merged["price"] = fh_data["price"]
+        if fh_data.get("previous_close") is not None:
+            merged["previous_close"] = fh_data["previous_close"]
+        if fh_data.get("day_high") is not None:
+            merged["day_high"] = fh_data["day_high"]
+        if fh_data.get("day_low") is not None:
+            merged["day_low"] = fh_data["day_low"]
+        # Recompute change/change_pct
+        p, pc = merged.get("price"), merged.get("previous_close")
+        if p is not None and pc:
+            merged["change"] = round(p - pc, 4)
+            merged["change_percent"] = round(((p - pc) / pc) * 100, 4)
+        merged["quote_source"] = "finnhub+yfinance"
+    else:
+        merged["quote_source"] = "yfinance"
+    return merged
 
 
 def _yf_history_sync(ticker: str, period: str = "3mo", interval: str = "1d") -> list:
