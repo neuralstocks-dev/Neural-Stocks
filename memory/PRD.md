@@ -17,6 +17,16 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Apr 2026)
 
+- **Apr 22 — Promo discounts + Day Pass one-time tier**:
+  - **Promo discount engine** — admin can set independent % discounts on Pro-monthly and Elite-monthly (plus optional label like "Launch Week"). Stored in `db.settings.pricing`; live PayPal plans are auto-rotated to the discounted monthly price on save. Non-admin Pricing page shows a promo banner + per-card strikethrough + `SAVE X%` badge + label.
+  - **Day Pass (one-time $5)** — new 4th tier in `PLANS["daypass"]` with admin-editable price, duration (days), and quotas (analyses/day, analyses/week, watchlist, shares/day). Quick batch sweep intentionally disabled; Standard + Candlestick + Hybrid + Pattern Scan always on.
+  - Backend: `POST /api/billing/daypass/order` (creates PayPal Order v2 CAPTURE intent) + `POST /api/billing/daypass/capture` (captures + sets `user.plan="daypass"` + `daypass_expires_at`, auto-reverts to free on expiry via `quota.effective_plan_key`). Receipt email sent via Resend. Audit trail in `db.daypass_orders`.
+  - `services/paypal.py` extended with `create_order` / `capture_order` / `get_order`.
+  - `services/pricing.py` + `routers/admin.py` refactored to support promo fields (`promo_pro_discount_pct`, `promo_elite_discount_pct`, `promo_label`, `promo_ends_at`) and Day Pass config (`daypass_price`, `daypass_duration_days`).
+  - Frontend Pricing page — 3 PayPal button variants render for Day Pass (Buy Now / Pay Later / Debit or Credit Card). Banner shows when the user has an active pass (with expiry date).
+  - Admin console — new "Promo discount (monthly)" block (Pro % / Elite % / Label) and "Day Pass · one-time purchase" block (price / duration). Tier limits table now includes a fourth `Day Pass` row with an extra `Watchlist` column.
+  - Live validation: activated 20% Pro / 15% Elite promo + $5 / 7-day Day Pass → live PayPal plans rotated, Order v2 created with real order_id (`0A428550DT000811T`), Pricing page screenshots confirm strikethrough + SAVE badges + full Day Pass card render.
+
 - **Apr 22 — IDX (Indonesia Stock Exchange) support + Bahasa news**:
   - 20 IDX blue-chip tickers added to catalog (`routers/stocks.py`) under new `IDX` exchange bucket — BBCA.JK, BBRI.JK, BMRI.JK, BBNI.JK, TLKM.JK, ASII.JK, UNVR.JK, GOTO.JK, ICBP.JK, INDF.JK, KLBF.JK, SMGR.JK, ADRO.JK, PTBA.JK, ANTM.JK, GGRM.JK, HMSP.JK, EXCL.JK, JSMR.JK, BREN.JK.
   - `services/idx_news.py` — new RSS scraper for CNBC Indonesia Market + Detik Finance (10-min TTL cache, word-boundary ticker+alias matcher with Bahasa company-name aliases). Returns same shape as Finnhub's `get_company_news()` so UI/PDF don't need to branch.

@@ -22,6 +22,12 @@ class PricingReq(BaseModel):
     pro_price: float = Field(gt=0, le=9999)
     elite_price: float = Field(gt=0, le=9999)
     annual_discount_pct: float = Field(ge=0, le=90)
+    promo_pro_discount_pct: float = Field(default=0.0, ge=0, le=90)
+    promo_elite_discount_pct: float = Field(default=0.0, ge=0, le=90)
+    promo_label: Optional[str] = Field(default="", max_length=80)
+    promo_ends_at: Optional[str] = None
+    daypass_price: Optional[float] = Field(default=None, ge=0, le=9999)
+    daypass_duration_days: Optional[int] = Field(default=None, ge=1, le=365)
 
 
 class TierLimitBlock(BaseModel):
@@ -30,10 +36,18 @@ class TierLimitBlock(BaseModel):
     share_per_day: Optional[int] = Field(default=None, ge=0, le=100000)
 
 
+class DaypassLimitBlock(BaseModel):
+    analyses_per_day: Optional[int] = Field(default=None, ge=0, le=100000)
+    analyses_per_week: Optional[int] = Field(default=None, ge=0, le=1000000)
+    share_per_day: Optional[int] = Field(default=None, ge=0, le=100000)
+    watchlist_limit: Optional[int] = Field(default=None, ge=0, le=1000)
+
+
 class TierLimitsReq(BaseModel):
     free: TierLimitBlock
     pro: TierLimitBlock
     elite: TierLimitBlock
+    daypass: Optional[DaypassLimitBlock] = None
 
 
 class LoginDeleteReq(BaseModel):
@@ -260,17 +274,42 @@ async def get_admin_pricing(_admin=Depends(admin_required)):
 
 @router.put("/pricing")
 async def update_admin_pricing(req: PricingReq, _admin=Depends(admin_required)):
-    prices = await set_pricing(req.pro_price, req.elite_price, req.annual_discount_pct)
-    # Rotate PayPal plans so new checkouts charge the new price
+    prices = await set_pricing(
+        pro_price=req.pro_price,
+        elite_price=req.elite_price,
+        annual_discount_pct=req.annual_discount_pct,
+        promo_pro_discount_pct=req.promo_pro_discount_pct,
+        promo_elite_discount_pct=req.promo_elite_discount_pct,
+        promo_label=req.promo_label or "",
+        promo_ends_at=req.promo_ends_at,
+        daypass_price=req.daypass_price,
+        daypass_duration_days=req.daypass_duration_days,
+    )
+    # Rotate PayPal subscription plans so new recurring checkouts charge the
+    # (possibly promo-discounted) monthly/yearly prices. Day Pass uses Orders,
+    # not Plans, so nothing to rotate for it.
     try:
         plan_ids = await get_plan_ids(prices)
     except PayPalError as e:
         raise HTTPException(status_code=502, detail=f"Price saved but PayPal plan rotation failed: {e}")
+    promo_note = ""
+    if prices["promo_active"]:
+        parts = []
+        if prices["promo_pro_discount_pct"] > 0:
+            parts.append(f"Pro {prices['promo_pro_discount_pct']:.0f}% off")
+        if prices["promo_elite_discount_pct"] > 0:
+            parts.append(f"Elite {prices['promo_elite_discount_pct']:.0f}% off")
+        promo_note = f" · Promo active: {', '.join(parts)}" + (f" — {prices['promo_label']}" if prices["promo_label"] else "")
     return {
         "ok": True,
         "prices": prices,
         "plan_ids": plan_ids,
-        "message": f"Updated pricing: Pro ${prices['pro_monthly']:.2f}/mo (${prices['pro_yearly']:.2f}/yr) · Elite ${prices['elite_monthly']:.2f}/mo (${prices['elite_yearly']:.2f}/yr) · Annual discount {prices['annual_discount_pct']:.0f}%. New checkouts use the updated prices; existing subscribers continue at their current rate until they resubscribe.",
+        "message": (
+            f"Updated: Pro ${prices['pro_monthly']:.2f}/mo · Elite ${prices['elite_monthly']:.2f}/mo · "
+            f"Annual {prices['annual_discount_pct']:.0f}% off · Day Pass ${prices['daypass_price']:.2f} "
+            f"({prices['daypass_duration_days']}-day){promo_note}. "
+            "Existing subscribers continue at their current rate until they resubscribe."
+        ),
     }
 
 
@@ -288,6 +327,8 @@ async def update_admin_tier_limits(req: TierLimitsReq, _admin=Depends(admin_requ
         "pro": req.pro.model_dump(exclude_none=False),
         "elite": req.elite.model_dump(exclude_none=False),
     }
+    if req.daypass is not None:
+        tiers["daypass"] = req.daypass.model_dump(exclude_none=False)
     limits = await set_tier_limits(tiers)
     return {
         "ok": True,

@@ -17,6 +17,8 @@ from services.paypal import (
     verify_webhook_signature,
     _ensure_product,
     _create_plan,
+    create_order,
+    capture_order,
     PayPalError,
 )
 from services.email import send_receipt_email
@@ -34,6 +36,10 @@ def _require_admin(user: dict):
 
 class SmokeActivateReq(BaseModel):
     subscription_id: str
+
+
+class DaypassCaptureReq(BaseModel):
+    order_id: str
 
 
 class ActivateReq(BaseModel):
@@ -56,6 +62,106 @@ async def billing_config(user=Depends(get_current_user)):
         "env": PAYPAL_ENV,
         "plan_ids": plan_ids,
         "prices": prices,
+    }
+
+
+# =============================================================================
+# Day Pass — one-time payment (PayPal Orders v2 CAPTURE intent)
+# =============================================================================
+
+@router.post("/daypass/order")
+async def daypass_create_order(user=Depends(get_current_user)):
+    """Creates a PayPal Order for the current Day Pass price. Returns the
+    order_id so the frontend PayPalButtons widget can approve it."""
+    prices = await get_pricing()
+    price = float(prices["daypass_price"])
+    days = int(prices["daypass_duration_days"])
+    try:
+        order = await create_order(
+            amount=price,
+            description=f"Neulab Day Pass — {days}-day access",
+            custom_id=f"neulab:daypass:{user['id']}",
+        )
+    except PayPalError as e:
+        raise HTTPException(status_code=502, detail=f"PayPal create order failed: {e}")
+    return {"order_id": order["id"], "price": price, "duration_days": days}
+
+
+@router.post("/daypass/capture")
+async def daypass_capture_order(req: DaypassCaptureReq, user=Depends(get_current_user)):
+    """Captures an approved Day Pass order and grants the access window on the
+    user record. Idempotent: re-capturing an already-captured order is a no-op
+    beyond returning the existing expiry."""
+    prices = await get_pricing()
+    days = int(prices["daypass_duration_days"])
+
+    try:
+        capture = await capture_order(req.order_id)
+    except PayPalError as e:
+        if "ORDER_ALREADY_CAPTURED" in str(e):
+            logger.info("Day Pass order %s already captured — reading state", req.order_id)
+            capture = None
+        else:
+            raise HTTPException(status_code=502, detail=f"PayPal capture failed: {e}")
+
+    # Extract amount + capture_id (if we actually captured just now)
+    capture_id = None
+    amount_captured = None
+    if capture:
+        try:
+            cap0 = capture["purchase_units"][0]["payments"]["captures"][0]
+            capture_id = cap0.get("id")
+            amount_captured = float(cap0.get("amount", {}).get("value", 0))
+        except Exception:
+            pass
+
+    now = now_utc()
+    expires_at = now + timedelta(days=days)
+    update = {
+        "plan": "daypass",
+        "daypass_expires_at": iso(expires_at),
+        "daypass_granted_at": iso(now),
+        "daypass_order_id": req.order_id,
+    }
+    if capture_id:
+        update["daypass_capture_id"] = capture_id
+
+    await db.users.update_one({"id": user["id"]}, {"$set": update})
+
+    await db.daypass_orders.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "user_email": user.get("email"),
+        "order_id": req.order_id,
+        "capture_id": capture_id,
+        "amount": amount_captured,
+        "duration_days": days,
+        "granted_at": iso(now),
+        "expires_at": iso(expires_at),
+    })
+
+    try:
+        await send_receipt_email(
+            to_email=user.get("email") or "",
+            full_name=user.get("full_name") or "",
+            plan_name=f"Day Pass · {days}-day access",
+            amount=amount_captured or float(prices["daypass_price"]),
+            subscription_id=req.order_id,
+            next_billing=None,
+        )
+    except Exception as e:
+        logger.warning("Day Pass receipt email failed: %s", e)
+
+    logger.info(
+        "Day Pass granted: user=%s order=%s expires=%s",
+        user.get("email"), req.order_id, iso(expires_at),
+    )
+    return {
+        "ok": True,
+        "plan": "daypass",
+        "expires_at": iso(expires_at),
+        "duration_days": days,
+        "message": f"Day Pass activated · {days}-day access until {expires_at.strftime('%b %d, %Y')}",
     }
 
 

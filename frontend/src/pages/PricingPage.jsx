@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
-import { Check, Loader2, X, Sparkles, Crown, Zap, ShieldCheck } from "lucide-react";
+import { Check, Loader2, X, Sparkles, Crown, Zap, ShieldCheck, Clock } from "lucide-react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 const ORDER = ["free", "pro", "elite"];
@@ -120,6 +120,11 @@ export default function PricingPage() {
     };
 
     const discountPct = plans?.pro?.annual_discount_pct || 20;
+    const daypass = plans?.daypass;
+    const promoActive = plans?.pro?.promo_active || plans?.elite?.promo_active;
+    const promoLabel = plans?.pro?.promo_label || "";
+
+    const [daypassProcessing, setDaypassProcessing] = useState(false);
 
     return (
         <AppShell>
@@ -132,6 +137,32 @@ export default function PricingPage() {
                     Start free. Scale your watchlist, unlock quick batch sweeps, and shareable
                     verdicts as you grow. Billed via PayPal — cancel anytime.
                 </p>
+
+                {/* Promo banner */}
+                {promoActive && (
+                    <div
+                        className="mt-6 px-5 py-4 flex items-center gap-4"
+                        style={{
+                            border: "2px solid hsl(var(--buy))",
+                            background: "hsla(142,55%,45%,0.06)",
+                            borderRadius: 2,
+                        }}
+                        data-testid="promo-banner"
+                    >
+                        <Sparkles size={18} strokeWidth={1.5} style={{ color: "hsl(var(--buy))" }} />
+                        <div>
+                            <p className="text-overline" style={{ color: "hsl(var(--buy))", fontSize: "0.6rem" }}>
+                                Limited-time promotion
+                            </p>
+                            <p className="text-sm mt-1" style={{ color: "hsl(var(--text-primary))" }}>
+                                <strong>{promoLabel || "Promo active"}</strong>
+                                {plans?.pro?.promo_discount_pct > 0 && <> · Pro <strong style={{ color: "hsl(var(--buy))" }}>{Math.round(plans.pro.promo_discount_pct)}% off</strong></>}
+                                {plans?.elite?.promo_discount_pct > 0 && <> · Elite <strong style={{ color: "hsl(var(--buy))" }}>{Math.round(plans.elite.promo_discount_pct)}% off</strong></>}
+                                {" monthly · applied automatically at checkout."}
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {billingConfig?.env === "sandbox" && (
                     <div className="mt-6 px-4 py-3 font-mono text-xs"
@@ -301,14 +332,50 @@ export default function PricingPage() {
                                         <h3 className="font-serif mt-4" style={{ fontSize: "2.4rem", letterSpacing: "-0.02em" }}>
                                             {p.name}
                                         </h3>
-                                        <div className="mt-4 flex items-baseline gap-2">
+                                        <div className="mt-4 flex items-baseline gap-2 flex-wrap">
                                             <span className="font-mono hero-number" style={{ fontSize: "3rem" }}>
                                                 ${price.toFixed(2)}
                                             </span>
                                             <span className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
                                                 / {cycle === "yearly" ? "yr" : "mo"}
                                             </span>
+                                            {/* Promo strikethrough on monthly only (yearly already discounts on top) */}
+                                            {cycle === "monthly" && p.promo_discount_pct > 0 && p.price_usd_original > p.price_usd && (
+                                                <div className="flex items-baseline gap-2 ml-2" data-testid={`promo-strike-${key}`}>
+                                                    <span
+                                                        className="font-mono"
+                                                        style={{
+                                                            fontSize: "1.1rem",
+                                                            color: "hsl(var(--text-muted))",
+                                                            textDecoration: "line-through",
+                                                        }}
+                                                    >
+                                                        ${p.price_usd_original.toFixed(2)}
+                                                    </span>
+                                                    <span
+                                                        className="text-overline font-mono px-1.5 py-0.5"
+                                                        style={{
+                                                            background: "hsl(var(--buy))",
+                                                            color: "hsl(0 0% 8%)",
+                                                            fontSize: "0.6rem",
+                                                            fontWeight: 700,
+                                                            borderRadius: 2,
+                                                        }}
+                                                    >
+                                                        SAVE {Math.round(p.promo_discount_pct)}%
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
+                                        {cycle === "monthly" && p.promo_discount_pct > 0 && p.promo_label && (
+                                            <p
+                                                className="text-xs mt-1 font-mono italic"
+                                                style={{ color: "hsl(var(--buy))" }}
+                                                data-testid={`promo-label-${key}`}
+                                            >
+                                                ✨ {p.promo_label}
+                                            </p>
+                                        )}
                                         {cycle === "yearly" && key !== "free" && (
                                             <p className="text-xs mt-1 font-mono" style={{ color: "hsl(var(--buy))" }}>
                                                 Save ${(p.price_usd * 12 - p.price_yearly).toFixed(2)} vs monthly
@@ -456,6 +523,162 @@ export default function PricingPage() {
                                     </div>
                                 );
                             })}
+                        </section>
+                    </PayPalScriptProvider>
+                )}
+
+                {/* Day Pass — one-time purchase */}
+                {plans && billingConfig && daypass && paypalOptions && (
+                    <PayPalScriptProvider
+                        options={{
+                            "client-id": billingConfig.client_id,
+                            intent: "capture",
+                            currency: "USD",
+                            components: "buttons",
+                        }}
+                        deferLoading={false}
+                    >
+                        <section
+                            className="module mt-6 md:mt-10 p-6 md:p-10 grid grid-cols-12 gap-6 items-start"
+                            data-testid="daypass-card"
+                            style={{
+                                borderColor: "hsl(var(--hold))",
+                                borderWidth: 1,
+                                background: "hsla(38,45%,45%,0.04)",
+                            }}
+                        >
+                            <div className="col-span-12 md:col-span-7">
+                                <p className="text-overline flex items-center gap-2" style={{ color: "hsl(var(--hold))" }}>
+                                    <Clock size={14} strokeWidth={1.5} /> Day Pass · One-time payment
+                                </p>
+                                <h3 className="font-serif mt-3" style={{ fontSize: "2.2rem", letterSpacing: "-0.02em", lineHeight: 1.05 }}>
+                                    {daypass.duration_days}-day access.<br />
+                                    <em style={{ color: "hsl(var(--hold))" }}>No subscription, no auto-renew.</em>
+                                </h3>
+                                <p className="mt-4 text-sm leading-relaxed max-w-xl" style={{ color: "hsl(var(--text-secondary))" }}>
+                                    Pay once, unlock full analysis power for {daypass.duration_days} days. Ideal for testing the platform, evaluating
+                                    a specific trade thesis, or holding capacity when you need it.
+                                </p>
+
+                                <ul className="mt-6 space-y-3 max-w-lg">
+                                    <FeatureLi>
+                                        {daypass.analyses_per_day === null
+                                            ? "Unlimited analyses"
+                                            : `${daypass.analyses_per_day} analyses per day`}
+                                    </FeatureLi>
+                                    <FeatureLi>
+                                        {daypass.analyses_per_week === null
+                                            ? "No weekly cap"
+                                            : `${daypass.analyses_per_week} analyses per week`}
+                                    </FeatureLi>
+                                    <FeatureLi>{daypass.watchlist_limit} stock watchlist</FeatureLi>
+                                    <FeatureLi>Standard AI analysis mode</FeatureLi>
+                                    <FeatureLi>Candlestick &amp; Hybrid analysis modes</FeatureLi>
+                                    <FeatureLi>Watchlist pattern scan (15 patterns)</FeatureLi>
+                                    <FeatureLi>
+                                        {daypass.share_per_day === null
+                                            ? "Unlimited share verdicts"
+                                            : `${daypass.share_per_day} share verdicts / day`}
+                                    </FeatureLi>
+                                    <FeatureLi enabled={daypass.quick_actions}>
+                                        Quick batch sweep (Top / Bottom 3)
+                                    </FeatureLi>
+                                </ul>
+                            </div>
+
+                            <div className="col-span-12 md:col-span-5">
+                                <div
+                                    className="p-6 md:p-8"
+                                    style={{
+                                        background: "hsl(var(--surface))",
+                                        border: "1px solid hsl(var(--border-default))",
+                                    }}
+                                >
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="font-mono hero-number" style={{ fontSize: "3rem" }}>
+                                            ${Number(daypass.price_usd).toFixed(2)}
+                                        </span>
+                                        <span className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
+                                            one-time
+                                        </span>
+                                    </div>
+                                    <p className="text-xs mt-1 font-mono" style={{ color: "hsl(var(--text-muted))" }}>
+                                        ~ ${(Number(daypass.price_usd) / Math.max(daypass.duration_days, 1)).toFixed(2)} / day
+                                    </p>
+
+                                    {/* Active day-pass banner */}
+                                    {quota?.daypass_active && quota?.daypass_expires_at ? (
+                                        <div
+                                            className="mt-6 px-4 py-3 text-center"
+                                            style={{
+                                                border: "1px solid hsl(var(--buy))",
+                                                background: "hsla(142,55%,45%,0.08)",
+                                                borderRadius: 2,
+                                            }}
+                                            data-testid="daypass-active-indicator"
+                                        >
+                                            <p className="text-overline" style={{ color: "hsl(var(--buy))", fontSize: "0.6rem" }}>
+                                                Active · Day Pass
+                                            </p>
+                                            <p className="text-sm mt-1 font-mono">
+                                                Until {new Date(quota.daypass_expires_at).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="mt-6 relative" data-testid="daypass-paypal-wrap">
+                                            {daypassProcessing && (
+                                                <div
+                                                    className="absolute inset-0 grid place-items-center z-10 font-mono text-xs"
+                                                    style={{ background: "rgba(11,11,11,0.75)", color: "hsl(var(--hold))" }}
+                                                >
+                                                    <Loader2 size={16} className="animate-spin" />&nbsp; Activating…
+                                                </div>
+                                            )}
+                                            <PayPalButtons
+                                                style={{
+                                                    layout: "vertical",
+                                                    color: "silver",
+                                                    shape: "rect",
+                                                    label: "buynow",
+                                                    height: 42,
+                                                }}
+                                                fundingSource={undefined}
+                                                disabled={daypassProcessing}
+                                                forceReRender={[daypass.price_usd, daypass.duration_days]}
+                                                createOrder={async () => {
+                                                    setError("");
+                                                    try {
+                                                        const r = await api.post("/billing/daypass/order");
+                                                        return r.data.order_id;
+                                                    } catch (err) {
+                                                        setError(err?.response?.data?.detail || "Failed to create order");
+                                                        throw err;
+                                                    }
+                                                }}
+                                                onApprove={async (data) => {
+                                                    setDaypassProcessing(true);
+                                                    try {
+                                                        const r = await api.post("/billing/daypass/capture", {
+                                                            order_id: data.orderID,
+                                                        });
+                                                        setMessage(r.data.message || "Day Pass activated.");
+                                                        await refreshUser();
+                                                        const q = await api.get("/quota");
+                                                        setQuota(q.data);
+                                                        setTimeout(() => setMessage(""), 8000);
+                                                    } catch (err) {
+                                                        setError(err?.response?.data?.detail || "Day Pass activation failed");
+                                                    } finally {
+                                                        setDaypassProcessing(false);
+                                                    }
+                                                }}
+                                                onError={(err) => setError(err?.message || "PayPal error")}
+                                                onCancel={() => setError("Checkout cancelled")}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </section>
                     </PayPalScriptProvider>
                 )}

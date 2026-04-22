@@ -45,6 +45,11 @@ export default function AdminPage() {
     const [proForm, setProForm] = useState("");
     const [eliteForm, setEliteForm] = useState("");
     const [discountForm, setDiscountForm] = useState("");
+    const [promoProForm, setPromoProForm] = useState("");
+    const [promoEliteForm, setPromoEliteForm] = useState("");
+    const [promoLabelForm, setPromoLabelForm] = useState("");
+    const [daypassPriceForm, setDaypassPriceForm] = useState("");
+    const [daypassDurationForm, setDaypassDurationForm] = useState("");
     const [savingPrice, setSavingPrice] = useState(false);
     const [selectedLogins, setSelectedLogins] = useState(new Set());
     const [loginBusy, setLoginBusy] = useState(false);
@@ -66,9 +71,14 @@ export default function AdminPage() {
             setUsers(u.data || []);
             setLogins(l.data || []);
             setPricing(pr.data || null);
-            setProForm(String(pr.data?.pro_monthly ?? ""));
-            setEliteForm(String(pr.data?.elite_monthly ?? ""));
+            setProForm(String(pr.data?.pro_monthly_original ?? pr.data?.pro_monthly ?? ""));
+            setEliteForm(String(pr.data?.elite_monthly_original ?? pr.data?.elite_monthly ?? ""));
             setDiscountForm(String(pr.data?.annual_discount_pct ?? ""));
+            setPromoProForm(String(pr.data?.promo_pro_discount_pct || ""));
+            setPromoEliteForm(String(pr.data?.promo_elite_discount_pct || ""));
+            setPromoLabelForm(String(pr.data?.promo_label || ""));
+            setDaypassPriceForm(String(pr.data?.daypass_price ?? ""));
+            setDaypassDurationForm(String(pr.data?.daypass_duration_days ?? ""));
             setSelectedLogins(new Set());
             setSelectedUsers(new Set());
             setTierLimits(tl.data || null);
@@ -90,6 +100,12 @@ export default function AdminPage() {
                         analyses_per_day: toStr(tl.data.elite.analyses_per_day),
                         analyses_per_week: toStr(tl.data.elite.analyses_per_week),
                         share_per_day: toStr(tl.data.elite.share_per_day),
+                    },
+                    daypass: {
+                        analyses_per_day: toStr(tl.data.daypass?.analyses_per_day),
+                        analyses_per_week: toStr(tl.data.daypass?.analyses_per_week),
+                        share_per_day: toStr(tl.data.daypass?.share_per_day),
+                        watchlist_limit: toStr(tl.data.daypass?.watchlist_limit),
                     },
                 });
             }
@@ -182,11 +198,17 @@ export default function AdminPage() {
         setMessage("");
         setSavingLimits(true);
         try {
-            const payload = { free: {}, pro: {}, elite: {} };
-            for (const tier of ["free", "pro", "elite"]) {
-                for (const k of ["analyses_per_day", "analyses_per_week", "share_per_day"]) {
+            const payload = { free: {}, pro: {}, elite: {}, daypass: {} };
+            const KEYS = {
+                free: ["analyses_per_day", "analyses_per_week", "share_per_day"],
+                pro: ["analyses_per_day", "analyses_per_week", "share_per_day"],
+                elite: ["analyses_per_day", "analyses_per_week", "share_per_day"],
+                daypass: ["analyses_per_day", "analyses_per_week", "share_per_day", "watchlist_limit"],
+            };
+            for (const tier of ["free", "pro", "elite", "daypass"]) {
+                for (const k of KEYS[tier]) {
                     const raw = tierLimitsForm[tier][k];
-                    if (raw === "" || raw === null) {
+                    if (raw === "" || raw === null || raw === undefined) {
                         payload[tier][k] = null; // unlimited
                     } else {
                         const n = parseInt(raw, 10);
@@ -222,6 +244,10 @@ export default function AdminPage() {
         const pro = parseFloat(proForm);
         const elite = parseFloat(eliteForm);
         const discount = parseFloat(discountForm);
+        const promoPro = parseFloat(promoProForm) || 0;
+        const promoElite = parseFloat(promoEliteForm) || 0;
+        const daypassP = parseFloat(daypassPriceForm);
+        const daypassD = parseInt(daypassDurationForm, 10);
         if (!(pro > 0) || !(elite > 0)) {
             setError("Prices must be positive numbers");
             return;
@@ -230,12 +256,29 @@ export default function AdminPage() {
             setError("Annual discount must be between 0 and 90");
             return;
         }
+        if (promoPro < 0 || promoPro > 90 || promoElite < 0 || promoElite > 90) {
+            setError("Promo discount must be between 0 and 90");
+            return;
+        }
+        if (!(daypassP >= 0) || daypassP > 9999) {
+            setError("Day Pass price must be a non-negative number ≤ 9999");
+            return;
+        }
+        if (!Number.isInteger(daypassD) || daypassD < 1 || daypassD > 365) {
+            setError("Day Pass duration must be between 1 and 365 days");
+            return;
+        }
         setSavingPrice(true);
         try {
             const r = await api.put("/admin/pricing", {
                 pro_price: pro,
                 elite_price: elite,
                 annual_discount_pct: discount,
+                promo_pro_discount_pct: promoPro,
+                promo_elite_discount_pct: promoElite,
+                promo_label: promoLabelForm || "",
+                daypass_price: daypassP,
+                daypass_duration_days: daypassD,
             });
             setMessage(r.data.message);
             setPricing(r.data.prices);
@@ -443,12 +486,120 @@ export default function AdminPage() {
                                     {savingPrice ? <Loader2 size={14} className="animate-spin" /> : "Save pricing"}
                                 </button>
                             </div>
+
+                            {/* Promo discount (highlighted on user pricing page) */}
+                            <div
+                                className="px-5 md:px-6 pb-5 pt-3"
+                                style={{ borderTop: "1px dashed hsl(var(--border-divider))" }}
+                            >
+                                <p className="text-overline mb-3" style={{ color: "hsl(var(--buy))" }}>
+                                    <Sparkles size={11} className="inline mr-1" strokeWidth={1.5} /> Promo discount (monthly)
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <label className="flex flex-col gap-2">
+                                        <span className="text-overline" style={{ fontSize: "0.58rem" }}>Pro promo %</span>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="90"
+                                                step="1"
+                                                value={promoProForm}
+                                                onChange={(e) => setPromoProForm(e.target.value)}
+                                                placeholder="0"
+                                                className="input-base font-mono"
+                                                data-testid="admin-promo-pro-input"
+                                            />
+                                            <span className="font-mono" style={{ color: "hsl(var(--text-muted))" }}>%</span>
+                                        </div>
+                                    </label>
+                                    <label className="flex flex-col gap-2">
+                                        <span className="text-overline" style={{ fontSize: "0.58rem" }}>Elite promo %</span>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="90"
+                                                step="1"
+                                                value={promoEliteForm}
+                                                onChange={(e) => setPromoEliteForm(e.target.value)}
+                                                placeholder="0"
+                                                className="input-base font-mono"
+                                                data-testid="admin-promo-elite-input"
+                                            />
+                                            <span className="font-mono" style={{ color: "hsl(var(--text-muted))" }}>%</span>
+                                        </div>
+                                    </label>
+                                    <label className="flex flex-col gap-2">
+                                        <span className="text-overline" style={{ fontSize: "0.58rem" }}>Label (optional)</span>
+                                        <input
+                                            type="text"
+                                            maxLength={80}
+                                            value={promoLabelForm}
+                                            onChange={(e) => setPromoLabelForm(e.target.value)}
+                                            placeholder="Launch Week"
+                                            className="input-base"
+                                            data-testid="admin-promo-label-input"
+                                        />
+                                    </label>
+                                </div>
+                                <p className="text-xs mt-2 font-mono" style={{ color: "hsl(var(--text-muted))" }}>
+                                    Set 0% to disable. Active promos show a strikethrough + badge on the user Pricing page and rotate PayPal plans to the discounted monthly price.
+                                </p>
+                            </div>
+
+                            {/* Day Pass (one-time) */}
+                            <div
+                                className="px-5 md:px-6 pb-5 pt-3"
+                                style={{ borderTop: "1px dashed hsl(var(--border-divider))" }}
+                            >
+                                <p className="text-overline mb-3" style={{ color: "hsl(var(--hold))" }}>
+                                    <Clock size={11} className="inline mr-1" strokeWidth={1.5} /> Day Pass · one-time purchase
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <label className="flex flex-col gap-2">
+                                        <span className="text-overline" style={{ fontSize: "0.58rem" }}>Price (USD)</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono" style={{ color: "hsl(var(--text-muted))" }}>$</span>
+                                            <input
+                                                type="number"
+                                                min="0.01"
+                                                max="9999"
+                                                step="0.01"
+                                                value={daypassPriceForm}
+                                                onChange={(e) => setDaypassPriceForm(e.target.value)}
+                                                placeholder="5.00"
+                                                className="input-base font-mono"
+                                                data-testid="admin-daypass-price-input"
+                                            />
+                                        </div>
+                                    </label>
+                                    <label className="flex flex-col gap-2">
+                                        <span className="text-overline" style={{ fontSize: "0.58rem" }}>Access duration (days)</span>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="365"
+                                            step="1"
+                                            value={daypassDurationForm}
+                                            onChange={(e) => setDaypassDurationForm(e.target.value)}
+                                            placeholder="7"
+                                            className="input-base font-mono"
+                                            data-testid="admin-daypass-duration-input"
+                                        />
+                                    </label>
+                                </div>
+                                <p className="text-xs mt-2 font-mono" style={{ color: "hsl(var(--text-muted))" }}>
+                                    Quotas (analyses/day, analyses/week, shares/day, watchlist size) are edited in the Tier limits table below.
+                                    Features: Standard/Candlestick/Hybrid AI + 15-pattern scan are always enabled. Quick batch sweep is disabled.
+                                </p>
+                            </div>
                             {pricing && (
                                 <div
                                     className="px-5 md:px-6 pb-5 font-mono text-xs"
                                     style={{ color: "hsl(var(--text-muted))" }}
                                 >
-                                    Live: Pro ${pricing.pro_monthly.toFixed(2)}/mo (${pricing.pro_yearly.toFixed(2)}/yr) · Elite ${pricing.elite_monthly.toFixed(2)}/mo (${pricing.elite_yearly.toFixed(2)}/yr) · Annual discount {Math.round(pricing.annual_discount_pct)}%
+                                    Live: Pro ${pricing.pro_monthly.toFixed(2)}/mo{pricing.promo_active && pricing.promo_pro_discount_pct > 0 && <> <span style={{color:"hsl(var(--buy))"}}>(was ${pricing.pro_monthly_original.toFixed(2)}, {Math.round(pricing.promo_pro_discount_pct)}% off)</span></>} · Elite ${pricing.elite_monthly.toFixed(2)}/mo{pricing.promo_active && pricing.promo_elite_discount_pct > 0 && <> <span style={{color:"hsl(var(--buy))"}}>(was ${pricing.elite_monthly_original.toFixed(2)}, {Math.round(pricing.promo_elite_discount_pct)}% off)</span></>} · Annual {Math.round(pricing.annual_discount_pct)}% · Day Pass ${Number(pricing.daypass_price).toFixed(2)} / {pricing.daypass_duration_days}d
                                 </div>
                             )}
                         </section>
@@ -467,7 +618,7 @@ export default function AdminPage() {
                                         Per-tier quotas
                                     </h2>
                                     <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
-                                        Adjust the daily &amp; weekly analysis caps plus daily share-verdict caps for Free, Pro, and Elite.
+                                        Adjust the daily &amp; weekly analysis caps plus daily share-verdict caps for Free, Pro, Elite, and the one-time Day Pass (includes watchlist size).
                                         Leave a field empty to mark that limit as <span style={{ color: "hsl(var(--hold))" }}>Unlimited</span>.
                                     </p>
                                 </div>
@@ -484,7 +635,7 @@ export default function AdminPage() {
                                                 >
                                                     Tier
                                                 </th>
-                                                {["Analyses / day", "Analyses / week", "Shares / day"].map((h) => (
+                                                {["Analyses / day", "Analyses / week", "Shares / day", "Watchlist"].map((h) => (
                                                     <th
                                                         key={h}
                                                         className="text-left text-overline py-3 px-4"
@@ -499,13 +650,18 @@ export default function AdminPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {["free", "pro", "elite"].map((tier) => {
+                                            {["free", "pro", "elite", "daypass"].map((tier) => {
                                                 const tierColor =
                                                     tier === "elite"
                                                         ? "hsl(var(--hold))"
                                                         : tier === "pro"
                                                         ? "hsl(var(--buy))"
+                                                        : tier === "daypass"
+                                                        ? "hsl(var(--hold))"
                                                         : "hsl(var(--text-secondary))";
+                                                const KEYS = tier === "daypass"
+                                                    ? ["analyses_per_day", "analyses_per_week", "share_per_day", "watchlist_limit"]
+                                                    : ["analyses_per_day", "analyses_per_week", "share_per_day"];
                                                 return (
                                                     <tr
                                                         key={tier}
@@ -517,28 +673,29 @@ export default function AdminPage() {
                                                                 className="font-serif text-base capitalize"
                                                                 style={{ color: tierColor }}
                                                             >
-                                                                {tier}
+                                                                {tier === "daypass" ? "Day Pass" : tier}
                                                             </span>
                                                         </td>
-                                                        {[
-                                                            "analyses_per_day",
-                                                            "analyses_per_week",
-                                                            "share_per_day",
-                                                        ].map((k) => (
-                                                            <td key={k} className="py-3 px-4">
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    step="1"
-                                                                    value={tierLimitsForm[tier][k]}
-                                                                    onChange={(e) => updateTierLimit(tier, k, e.target.value)}
-                                                                    placeholder="Unlimited"
-                                                                    className="input-base font-mono"
-                                                                    style={{ width: 140 }}
-                                                                    data-testid={`tier-limit-${tier}-${k}`}
-                                                                />
-                                                            </td>
-                                                        ))}
+                                                        {["analyses_per_day", "analyses_per_week", "share_per_day", "watchlist_limit"].map((k) => {
+                                                            if (!KEYS.includes(k)) {
+                                                                return <td key={k} className="py-3 px-4" style={{ color: "hsl(var(--text-muted))" }}>—</td>;
+                                                            }
+                                                            return (
+                                                                <td key={k} className="py-3 px-4">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        step="1"
+                                                                        value={tierLimitsForm[tier][k] ?? ""}
+                                                                        onChange={(e) => updateTierLimit(tier, k, e.target.value)}
+                                                                        placeholder={k === "watchlist_limit" ? "e.g. 5" : "Unlimited"}
+                                                                        className="input-base font-mono"
+                                                                        style={{ width: 140 }}
+                                                                        data-testid={`tier-limit-${tier}-${k}`}
+                                                                    />
+                                                                </td>
+                                                            );
+                                                        })}
                                                     </tr>
                                                 );
                                             })}

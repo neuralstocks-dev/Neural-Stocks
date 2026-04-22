@@ -49,6 +49,8 @@ FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
 DEFAULT_PRO_PRICE = 9.0
 DEFAULT_ELITE_PRICE = 29.0
 DEFAULT_ANNUAL_DISCOUNT_PCT = 20.0  # yearly price = monthly * 12 * (1 - pct/100)
+DEFAULT_DAYPASS_PRICE = 5.0
+DEFAULT_DAYPASS_DURATION_DAYS = 7
 
 PLANS = {
     "free": {
@@ -86,6 +88,23 @@ PLANS = {
         "analysis_history_days": 3650,
         "tag": "Institutional",
         "share_per_day": None,
+    },
+    # One-time "Day Pass" — admin-configurable duration + quotas. NOT a
+    # recurring subscription. Paid via PayPal Orders (capture), not Billing.
+    # When user pays, backend sets user.plan="daypass" + daypass_expires_at.
+    # Auto-reverts to free when the window closes.
+    "daypass": {
+        "name": "Day Pass",
+        "price_usd": DEFAULT_DAYPASS_PRICE,
+        "watchlist_limit": 5,
+        "analyses_per_day": 5,
+        "analyses_per_week": 20,
+        "quick_actions": False,
+        "share_verdicts": True,
+        "analysis_history_days": 30,
+        "tag": "One-time",
+        "share_per_day": 10,
+        "duration_days": DEFAULT_DAYPASS_DURATION_DAYS,
     },
 }
 

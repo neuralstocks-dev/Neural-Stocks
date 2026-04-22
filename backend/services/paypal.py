@@ -242,3 +242,64 @@ async def verify_webhook_signature(headers: dict, raw_body: bytes) -> bool:
     except Exception as e:
         logger.warning("Webhook verify failed: %s", e)
     return False
+
+
+
+# =============================================================================
+# Orders (one-time payments) — used for Day Pass
+# =============================================================================
+
+async def create_order(amount: float, description: str, custom_id: str = "") -> dict:
+    """Creates a PayPal Order with intent=CAPTURE (one-time charge). Returns
+    the parsed order response. Raises PayPalError on non-2xx."""
+    payload = {
+        "intent": "CAPTURE",
+        "purchase_units": [
+            {
+                "amount": {"currency_code": "USD", "value": f"{float(amount):.2f}"},
+                "description": description[:127],
+                "custom_id": (custom_id or "")[:127],
+            }
+        ],
+        "application_context": {
+            "brand_name": "Neulab",
+            "shipping_preference": "NO_SHIPPING",
+            "user_action": "PAY_NOW",
+        },
+    }
+    async with httpx.AsyncClient(timeout=20.0) as hc:
+        r = await hc.post(
+            f"{PAYPAL_API_BASE}/v2/checkout/orders",
+            headers=await _auth_headers(),
+            json=payload,
+        )
+    if r.status_code not in (200, 201):
+        raise PayPalError(f"Create order failed: {r.status_code} {r.text}")
+    return r.json()
+
+
+async def capture_order(order_id: str) -> dict:
+    """Captures an approved order. Returns the parsed response. Raises on
+    non-2xx or when capture status != COMPLETED."""
+    async with httpx.AsyncClient(timeout=20.0) as hc:
+        r = await hc.post(
+            f"{PAYPAL_API_BASE}/v2/checkout/orders/{order_id}/capture",
+            headers=await _auth_headers(),
+        )
+    if r.status_code not in (200, 201):
+        raise PayPalError(f"Capture failed: {r.status_code} {r.text}")
+    data = r.json()
+    if data.get("status") != "COMPLETED":
+        raise PayPalError(f"Capture not completed: status={data.get('status')}")
+    return data
+
+
+async def get_order(order_id: str) -> dict:
+    async with httpx.AsyncClient(timeout=20.0) as hc:
+        r = await hc.get(
+            f"{PAYPAL_API_BASE}/v2/checkout/orders/{order_id}",
+            headers=await _auth_headers(),
+        )
+    if r.status_code != 200:
+        raise PayPalError(f"Get order failed: {r.status_code} {r.text}")
+    return r.json()

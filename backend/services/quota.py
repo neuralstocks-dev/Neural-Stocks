@@ -36,9 +36,24 @@ def test_unlock_active(user: dict) -> bool:
     return False
 
 
+def daypass_active(user: dict) -> bool:
+    """Is user currently in the paid Day Pass window?"""
+    if (user.get("plan") or "") != "daypass":
+        return False
+    parsed = _parse_unlock(user.get("daypass_expires_at"))
+    if isinstance(parsed, datetime) and parsed > now_utc():
+        return True
+    return False
+
+
 def effective_plan_key(user: dict) -> str:
     if test_unlock_active(user) or user.get("is_admin"):
         return "elite"
+    if daypass_active(user):
+        return "daypass"
+    # Auto-revert expired daypass to free for display (DB clean-up is lazy)
+    if (user.get("plan") or "") == "daypass" and not daypass_active(user):
+        return "free"
     return user.get("plan") or "free"
 
 
@@ -80,6 +95,8 @@ async def quota_snapshot(user: dict) -> dict:
         "is_admin": bool(user.get("is_admin")),
         "test_unlock_active": test_unlock_active(user),
         "test_unlock_expires_at": user.get("test_unlock_expires_at"),
+        "daypass_active": daypass_active(user),
+        "daypass_expires_at": user.get("daypass_expires_at"),
         "subscription_status": user.get("subscription_status"),
         "subscription_cancels_at": user.get("subscription_cancels_at"),
         "paypal_cycle": user.get("paypal_cycle"),
