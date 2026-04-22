@@ -507,8 +507,32 @@ export default function AnalysisReportPage() {
                                     </ol>
                                 </section>
 
+                                {/* Data sources — understated footer */}
+                                <section
+                                    className="mt-6 md:mt-8 px-4 py-3"
+                                    style={{
+                                        borderTop: "1px solid hsl(var(--border-divider))",
+                                        borderBottom: "1px solid hsl(var(--border-divider))",
+                                        color: "hsl(var(--text-muted))",
+                                    }}
+                                    data-testid="data-sources-footer"
+                                >
+                                    <p
+                                        className="text-overline mb-1"
+                                        style={{ fontSize: "0.52rem" }}
+                                    >
+                                        Data sources
+                                    </p>
+                                    <p className="text-[11px] leading-relaxed font-mono">
+                                        Market quotes, OHLC history &amp; fundamentals: <strong>Yahoo Finance</strong> (via <code>yfinance</code>).
+                                        {" "}Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly).
+                                        {" "}AI reasoning &amp; verdict synthesis: <strong>Anthropic Claude Sonnet 4.5</strong>.
+                                        {" "}News / press / sentiment feeds: not currently integrated — verdicts are derived from price, technicals, and fundamentals only.
+                                    </p>
+                                </section>
+
                                 <p
-                                    className="text-overline mt-8 text-center"
+                                    className="text-overline mt-6 text-center"
                                     style={{ color: "hsl(var(--text-muted))", fontSize: "0.6rem" }}
                                 >
                                     This is not financial advice. For educational use only.
