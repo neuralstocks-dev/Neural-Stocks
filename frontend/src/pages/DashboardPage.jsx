@@ -162,20 +162,10 @@ export default function DashboardPage() {
     const watchlistLimit = quota?.watchlist_limit ?? (plan === "free" ? 3 : plan === "pro" ? 10 : 25);
     const watchlistFull = items.length >= watchlistLimit;
 
-    // Analyze-mode: picked here and passed into every analyze call. Default is
-    // computed synchronously from user.plan so the UI never flashes the wrong
-    // pill on first paint.
-    const [analyzeMode, setAnalyzeMode] = useState(() => (plan !== "free" ? "hybrid" : "standard"));
-
-    // If plan changes (e.g. admin test-unlock flips quota), align the default.
-    // Never downgrade a user's explicit choice silently — only adjust if the
-    // current mode becomes locked.
-    useEffect(() => {
-        if (!canQuickActions && analyzeMode !== "standard") {
-            setAnalyzeMode("standard");
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [canQuickActions]);
+    // Analyze-mode is picked here and passed into every analyze call.
+    // Candlestick & Hybrid are available to ALL tiers (Feb 2026 change) —
+    // Hybrid is the default across the board since it produces the best verdicts.
+    const [analyzeMode, setAnalyzeMode] = useState("hybrid");
 
     const fetchWatchlist = useCallback(async () => {
         const r = await api.get("/watchlist/live");
@@ -482,7 +472,7 @@ export default function DashboardPage() {
                     <AnalysisModeSelector
                         value={analyzeMode}
                         onChange={setAnalyzeMode}
-                        canPro={canQuickActions}
+                        canPro={true}
                         testIdPrefix="dashboard-mode"
                     />
                 </section>

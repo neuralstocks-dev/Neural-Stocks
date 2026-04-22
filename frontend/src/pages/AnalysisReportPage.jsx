@@ -48,25 +48,13 @@ export default function AnalysisReportPage() {
     const [loading, setLoading] = useState(true);
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState("");
-    // Pro+ gate — matches backend `effective_plan_key` (admin + active test-unlock = elite).
-    const isUnlocked = (() => {
-        const exp = user?.test_unlock_expires_at;
-        if (!exp) return false;
-        if (exp === "forever") return true;
-        try {
-            return new Date(exp) > new Date();
-        } catch {
-            return false;
-        }
-    })();
-    const canPro = Boolean(
-        user?.is_admin || isUnlocked || (user?.plan && user.plan !== "free")
-    );
-    const [mode, setMode] = useState(canPro ? "hybrid" : "standard");
+    // All 3 analysis modes are available to all tiers (Feb 2026).
+    const canPro = true;
+    const [mode, setMode] = useState("hybrid");
 
     useEffect(() => {
-        setMode(canPro ? "hybrid" : "standard");
-    }, [canPro]);
+        setMode("hybrid");
+    }, []);
 
     // When viewing an existing verdict, the selector is read-only and locked
     // to the mode the verdict was generated with.

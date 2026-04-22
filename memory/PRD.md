@@ -17,6 +17,8 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Feb 2026)
 
+- **Candlestick modes now FREE for all tiers (Feb 22)**: Removed the Pro/Elite gate on `mode=candlestick|hybrid` in `/api/analysis/{ticker}`. Pricing matrix + feature bullets updated — all 3 modes available to Free users. Pattern scan (bulk watchlist) remains a Pro/Elite perk.
+- **Pattern Reference Guide (Feb 22)**: New `PatternGuideDialog` component (accessible via "Learn about patterns" button inside the Candlestick Findings section of any verdict). Displays all 15 supported patterns with Shape / What it means / How to read it / Best when. Searchable + bias-filterable. Patterns detected in the current verdict are highlighted and surface first.
 - **Phase 2 — Portfolio, PDF, Telegram (Feb 22)**:
   - **Portfolio P&L** (`/portfolio`): New DB collection `portfolio`. Full CRUD at `/api/portfolio`. Computes live cost basis, market value, unrealized P&L (+ %), day change (+ %), allocation % per position using yfinance quotes. Add/Edit/Delete inline. Ticker deep-links to Analysis Report. Date picker uses shadcn Calendar + Popover.
   - **PDF Export**: `GET /api/analysis/{analysis_id}/pdf` returns a branded PDF via `reportlab`. Includes verdict, reasoning, candlestick findings (Daily/Weekly tables + Primary/Confirmation/Rejected summary), risks, and disclaimer. Owner-scoped (404 for cross-user). "Export PDF" button on AnalysisReportPage.

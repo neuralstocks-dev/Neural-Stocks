@@ -1,5 +1,6 @@
-import React from "react";
-import { TrendingUp, TrendingDown, Minus, Zap } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { TrendingUp, TrendingDown, Minus, Zap, BookOpen } from "lucide-react";
+import PatternGuideDialog from "@/components/PatternGuideDialog";
 
 function BiasBadge({ bias }) {
     const map = {
@@ -109,6 +110,17 @@ function TimeframeColumn({ label, data }) {
 }
 
 export default function CandlestickFindings({ findings, summary, mode }) {
+    const [guideOpen, setGuideOpen] = useState(false);
+    const detectedNames = useMemo(() => {
+        if (!findings) return [];
+        const names = [];
+        for (const tf of ["daily", "weekly"]) {
+            const pats = findings[tf]?.patterns || [];
+            for (const p of pats) if (p.pattern) names.push(p.pattern);
+        }
+        return names;
+    }, [findings]);
+
     if (!findings) return null;
     const daily = findings.daily || {};
     const weekly = findings.weekly || {};
@@ -219,6 +231,29 @@ export default function CandlestickFindings({ findings, summary, mode }) {
                     )}
                 </div>
             )}
+
+            {/* Learn more */}
+            <div className="mt-6 flex items-center justify-between flex-wrap gap-3">
+                <p className="text-xs" style={{ color: "hsl(var(--text-secondary))", maxWidth: "52ch" }}>
+                    Not sure what a pattern means? Open the reference guide for shape diagrams, meaning, and how
+                    to read each of the 15 patterns Neulab detects.
+                </p>
+                <button
+                    type="button"
+                    onClick={() => setGuideOpen(true)}
+                    className="btn-quick inline-flex items-center gap-2"
+                    data-testid="open-pattern-guide-button"
+                >
+                    <BookOpen size={14} strokeWidth={1.5} />
+                    Learn about patterns
+                </button>
+            </div>
+
+            <PatternGuideDialog
+                open={guideOpen}
+                onOpenChange={setGuideOpen}
+                highlightNames={detectedNames}
+            />
         </section>
     );
 }

@@ -15,14 +15,14 @@ const MODES = [
         label: "Candlestick",
         icon: Binary,
         description: "Pure candlestick pattern strategy. Detects Doji, Hammer, Engulfing, Morning/Evening Star, Three Soldiers/Crows and 10+ more. Best for timing entries and reversals.",
-        pro: true,
+        pro: false,
     },
     {
         value: "hybrid",
         label: "Hybrid",
         icon: Layers,
         description: "AI + Candlestick combined. Claude weighs fundamentals & technicals, then uses candlestick patterns for confirmation and timing. Recommended.",
-        pro: true,
+        pro: false,
         recommended: true,
     },
 ];

@@ -61,15 +61,8 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     if mode not in ANALYSIS_MODES:
         raise HTTPException(status_code=400, detail=f"Invalid mode. Must be one of: {sorted(ANALYSIS_MODES)}")
 
-    # Gate candlestick and hybrid modes behind Pro/Elite (same gate as other pro features)
-    if mode in ("candlestick", "hybrid"):
-        p = plan_for(user)
-        if not p["quick_actions"]:
-            raise HTTPException(
-                status_code=402,
-                detail=f"Candlestick & Hybrid analysis modes are Pro/Elite features. Upgrade from {p['name']} to unlock pattern-based verdicts.",
-            )
-
+    # All analysis modes (standard, candlestick, hybrid) are available to all tiers.
+    # Free tier still has lower per-day quotas enforced below.
     await enforce_analysis_quota(user)
     quote_task = get_quote(ticker)
     hist_task = asyncio.to_thread(_yf_history_sync, ticker, "6mo", "1d")
