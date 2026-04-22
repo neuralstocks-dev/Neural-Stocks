@@ -17,7 +17,15 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Feb 2026)
 
-- **Pattern Alerts (NEW)**: `POST /api/patterns/scan` — one-click watchlist-wide candlestick scanner (Pro/Elite). Runs pure-Python detector on daily + weekly candles for every watchlist stock. Creates alerts for patterns with strength ≥ 70 (bullish/bearish only). Idempotent: dedupes on (ticker, pattern, candle_date, timeframe). No LLM calls — fast and free. New "Scan Patterns" button in Dashboard quick actions grid (⚡ Zap icon). Signal Feed now renders pattern alerts with a BULLISH/BEARISH badge (green/red) plus pattern name, timeframe, and strength.
+- **UI polish (Feb 22)**:
+  - Analysis Report page: mode selector is now **disabled when viewing an existing verdict** — all three pills are locked, the active pill reflects `analysis.mode`, cursor is `not-allowed`, and the label changes from "Mode" to "Mode used" with a description stating the verdict's mode. Re-analyze preserves the same mode. To run a different mode, user returns to Dashboard and picks it there.
+  - Why Us page: removed 4 coming-soon modules (Catalyst Radar, Risk Guard, Market Pulse, Screener Studio). Added new **Candlestick Strategy** module that mentions the 3 analyzer modes (Standard AI / Candlestick / Hybrid) with a link to pattern detectors, timeframes, and Claude reasoning.
+  - Pricing page: added 3 new bullet points per tier — "Standard AI analysis mode" (always on), "Candlestick & Hybrid analysis modes" (Pro/Elite), "Watchlist pattern scan (15 patterns)" (Pro/Elite). Matrix shows strike-through on Free, check on Pro/Elite.
+  - Admin users table: added **Analyses / day** column showing `used / limit`. Admin users and active test-unlock users render as `used / ∞` (amber) to reflect effective Elite tier.
+  - Analysis Report `canPro` gate now respects `user.is_admin` and `user.test_unlock_expires_at` so admin/unlock accounts see candlestick modes as unlocked.
+  - Backend `GET /admin/users` now returns `analyses_today`, `analyses_day_limit`, `effective_plan`, `test_unlock_active` per row.
+  - AuthCallback: improved error copy + idempotency guard (skips exchange if JWT already present) to prevent double-consumption of the single-use Google session_id under React StrictMode.
+- **Pattern Alerts**: `POST /api/patterns/scan` — one-click watchlist-wide candlestick scanner (Pro/Elite). Scans daily + weekly candles across every watchlist stock. Creates alerts for patterns with strength ≥ 70. Idempotent. No LLM calls. New "Scan Patterns" button in Dashboard quick actions.
 - **Analysis Modes**: The Analyze Now engine now supports three modes selectable from the Dashboard and the Analysis Report page:
   - **Standard** (Mode A) — existing AI analysis using technicals, fundamentals, momentum. Available to all users (default for Free).
   - **Candlestick** (Mode B) — AI verdict driven primarily by detected candlestick patterns. *Pro/Elite only.*

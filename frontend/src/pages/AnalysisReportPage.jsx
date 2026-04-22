@@ -48,13 +48,30 @@ export default function AnalysisReportPage() {
     const [loading, setLoading] = useState(true);
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState("");
-    // Pro+ gate — same as Dashboard's canQuickActions
-    const canPro = (user?.plan && user.plan !== "free") || false;
+    // Pro+ gate — matches backend `effective_plan_key` (admin + active test-unlock = elite).
+    const isUnlocked = (() => {
+        const exp = user?.test_unlock_expires_at;
+        if (!exp) return false;
+        if (exp === "forever") return true;
+        try {
+            return new Date(exp) > new Date();
+        } catch {
+            return false;
+        }
+    })();
+    const canPro = Boolean(
+        user?.is_admin || isUnlocked || (user?.plan && user.plan !== "free")
+    );
     const [mode, setMode] = useState(canPro ? "hybrid" : "standard");
 
     useEffect(() => {
         setMode(canPro ? "hybrid" : "standard");
     }, [canPro]);
+
+    // When viewing an existing verdict, the selector is read-only and locked
+    // to the mode the verdict was generated with.
+    const displayMode = analysis?.mode || mode;
+    const selectorDisabled = Boolean(analysis);
 
     const load = async () => {
         setLoading(true);
@@ -89,7 +106,9 @@ export default function AnalysisReportPage() {
             setAnalyzing(true);
             setError("");
             try {
-                const r = await api.post(`/analysis/${t}?mode=${mode}`);
+                // Re-analysis preserves the mode of the existing verdict (if any).
+                const effectiveMode = analysis?.mode || mode;
+                const r = await api.post(`/analysis/${t}?mode=${effectiveMode}`);
                 setAnalysis(r.data);
             } catch (err) {
                 if (disclaimer.promptFromError(err)) return;
@@ -226,11 +245,12 @@ export default function AnalysisReportPage() {
                             {/* Mode selector */}
                             <div className="px-5 md:px-8 pb-5" data-testid="report-mode-row">
                                 <AnalysisModeSelector
-                                    value={mode}
+                                    value={displayMode}
                                     onChange={setMode}
                                     canPro={canPro}
                                     size="sm"
                                     testIdPrefix="report-mode"
+                                    disabled={selectorDisabled}
                                 />
                             </div>
 

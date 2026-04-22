@@ -11,6 +11,9 @@ const FEATURE_MATRIX = [
     { label: "Watchlist size", key: "watchlist_limit" },
     { label: "Analyses / day", key: "analyses_per_day" },
     { label: "Analyses / week", key: "analyses_per_week" },
+    { label: "Standard AI analysis", key: "__always", type: "bool" },
+    { label: "Candlestick & Hybrid (AI + Candlestick) modes", key: "quick_actions", type: "bool" },
+    { label: "Watchlist pattern scan (15 candlestick patterns)", key: "quick_actions", type: "bool" },
     { label: "Quick batch sweep (Top / Bottom 3)", key: "quick_actions", type: "bool" },
     { label: "Public share verdicts", key: "share_verdicts", type: "bool" },
     { label: "Shares / day", key: "share_per_day" },
@@ -18,6 +21,14 @@ const FEATURE_MATRIX = [
 ];
 
 function renderValue(plan, feat) {
+    // Synthetic "always on" rows (standard AI is available to everyone)
+    if (feat.key === "__always") {
+        return (
+            <div className="flex justify-end">
+                <Check size={16} strokeWidth={1.5} style={{ color: "hsl(var(--buy))" }} />
+            </div>
+        );
+    }
     const v = plan[feat.key];
     if (feat.type === "bool") {
         return (
@@ -316,6 +327,13 @@ export default function PricingPage() {
                                                     : `${p.analyses_per_week} analyses per week`}
                                             </FeatureLi>
                                             <FeatureLi>{p.watchlist_limit} stock watchlist</FeatureLi>
+                                            <FeatureLi>Standard AI analysis mode</FeatureLi>
+                                            <FeatureLi enabled={p.quick_actions}>
+                                                Candlestick & Hybrid analysis modes
+                                            </FeatureLi>
+                                            <FeatureLi enabled={p.quick_actions}>
+                                                Watchlist pattern scan (15 patterns)
+                                            </FeatureLi>
                                             <FeatureLi enabled={p.quick_actions}>
                                                 Quick batch sweep (Top / Bottom 3)
                                             </FeatureLi>

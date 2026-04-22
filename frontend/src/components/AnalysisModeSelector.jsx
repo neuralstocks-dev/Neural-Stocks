@@ -43,6 +43,7 @@ export default function AnalysisModeSelector({
     size = "md",
     testIdPrefix = "mode",
     hideDescription = false,
+    disabled = false,
 }) {
     const active = MODES.find((m) => m.value === value) || MODES[0];
     const pad = size === "sm" ? "px-3 py-1.5" : "px-4 py-2";
@@ -55,7 +56,7 @@ export default function AnalysisModeSelector({
                     className="text-overline"
                     style={{ color: "hsl(var(--text-muted))", fontSize: "0.56rem" }}
                 >
-                    Mode
+                    {disabled ? "Mode used" : "Mode"}
                 </span>
                 <div
                     className="inline-flex"
@@ -63,37 +64,45 @@ export default function AnalysisModeSelector({
                         border: "1px solid hsl(var(--border-default))",
                         borderRadius: 2,
                         overflow: "hidden",
+                        opacity: disabled ? 0.85 : 1,
                     }}
                 >
                     {MODES.map((m, i) => {
                         const isActive = value === m.value;
-                        const locked = m.pro && !canPro;
+                        const locked = !disabled && m.pro && !canPro;
+                        const clickDisabled = disabled || locked;
                         const Icon = m.icon;
                         return (
                             <button
                                 key={m.value}
                                 type="button"
                                 onClick={() => {
-                                    if (locked) return;
+                                    if (clickDisabled) return;
                                     onChange(m.value);
                                 }}
-                                disabled={locked}
-                                title={locked ? `${m.label} mode requires Pro/Elite` : m.description}
+                                disabled={clickDisabled}
+                                title={
+                                    disabled
+                                        ? "This verdict was generated with the highlighted mode. Return to Dashboard to run a different mode."
+                                        : locked
+                                        ? `${m.label} mode requires Pro/Elite`
+                                        : m.description
+                                }
                                 data-testid={`${testIdPrefix}-${m.value}`}
                                 className={`${fontSize} font-mono ${pad} inline-flex items-center gap-2 transition-colors`}
                                 style={{
                                     background: isActive ? "hsl(var(--hold))" : "hsl(var(--surface))",
                                     color: isActive
                                         ? "hsl(var(--surface))"
-                                        : locked
+                                        : (locked || disabled)
                                         ? "hsl(var(--text-muted))"
                                         : "hsl(var(--text-primary))",
                                     borderLeft:
                                         i === 0 ? "none" : "1px solid hsl(var(--border-default))",
                                     letterSpacing: "0.08em",
                                     fontWeight: isActive ? 600 : 400,
-                                    cursor: locked ? "not-allowed" : "pointer",
-                                    opacity: locked ? 0.55 : 1,
+                                    cursor: clickDisabled ? "not-allowed" : "pointer",
+                                    opacity: (!isActive && (locked || disabled)) ? 0.5 : 1,
                                 }}
                             >
                                 {locked ? (
@@ -102,7 +111,7 @@ export default function AnalysisModeSelector({
                                     <Icon size={12} strokeWidth={1.8} />
                                 )}
                                 <span>{m.label}</span>
-                                {m.recommended && !locked && (
+                                {m.recommended && !locked && !disabled && (
                                     <span
                                         className="text-[0.5rem]"
                                         style={{
@@ -119,7 +128,7 @@ export default function AnalysisModeSelector({
                         );
                     })}
                 </div>
-                {!canPro && (
+                {!disabled && !canPro && (
                     <Link
                         to="/pricing"
                         className="text-overline"
@@ -140,7 +149,9 @@ export default function AnalysisModeSelector({
                     style={{ color: "hsl(var(--text-secondary))", maxWidth: "68ch" }}
                     data-testid={`${testIdPrefix}-description`}
                 >
-                    {active.description}
+                    {disabled
+                        ? `This verdict was generated with ${active.label} mode. ${active.description}`
+                        : active.description}
                 </p>
             )}
         </div>

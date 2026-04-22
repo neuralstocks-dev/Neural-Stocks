@@ -11,6 +11,7 @@ from core.models import UnlockReq
 from core.security import admin_required, iso, now_utc, is_admin_email
 from services.pricing import get_pricing, set_pricing, get_tier_limits, set_tier_limits
 from services.paypal import get_plan_ids, PayPalError
+from services.quota import resolved_plan_for, test_unlock_active, count_analyses, effective_plan_key
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,26 @@ async def list_users(limit: int = 200, _admin=Depends(admin_required)):
         .sort("created_at", -1)
         .to_list(max(1, min(limit, 500)))
     )
-    return [_sanitize_user(u) for u in users]
+    now = now_utc()
+    day_ago = now - timedelta(days=1)
+    rows = []
+    for u in users:
+        base = _sanitize_user(u)
+        # Effective daily limit & today's usage. Admin and active test-unlock
+        # resolve to Elite (effective), so their daily limit is unlimited.
+        try:
+            p = await resolved_plan_for(u)
+            base["effective_plan"] = effective_plan_key(u)
+            base["analyses_day_limit"] = p.get("analyses_per_day")  # None == unlimited
+            base["analyses_today"] = await count_analyses(u["id"], day_ago)
+            base["test_unlock_active"] = test_unlock_active(u)
+        except Exception:
+            base["effective_plan"] = base.get("plan")
+            base["analyses_day_limit"] = None
+            base["analyses_today"] = 0
+            base["test_unlock_active"] = False
+        rows.append(base)
+    return rows
 
 
 @router.get("/logins")

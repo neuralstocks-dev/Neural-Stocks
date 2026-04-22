@@ -4,10 +4,7 @@ import AppShell from "@/components/AppShell";
 import {
     Activity,
     Binary,
-    Radar,
-    ShieldAlert,
-    BarChart3,
-    Filter,
+    Layers,
     MessageSquareText,
     BellRing,
     Crown,
@@ -36,28 +33,10 @@ const MODULES = [
         body: "Composite confidence score showing relative opportunity strength with transparent factor breakdowns across technicals and fundamentals.",
     },
     {
-        icon: Radar,
-        title: "Catalyst Radar",
-        status: "coming",
-        body: "Identifies abnormal volume, scheduled earnings, corporate events, and momentum regime shifts — so you see moves before they're obvious.",
-    },
-    {
-        icon: ShieldAlert,
-        title: "Risk Guard",
+        icon: Layers,
+        title: "Candlestick Strategy",
         status: "available",
-        body: "Surfaces concrete risk factors per position — valuation stretch, technical exhaustion, leverage, and sector-specific pressure points.",
-    },
-    {
-        icon: BarChart3,
-        title: "Market Pulse",
-        status: "coming",
-        body: "High-level snapshot of market breadth, sector rotation, and sentiment regime — context for individual signals.",
-    },
-    {
-        icon: Filter,
-        title: "Screener Studio",
-        status: "coming",
-        body: "Custom stock screening across technical, fundamental, and behavioral factors. Build your own hypothesis, test it against the market.",
+        body: "Three analyzer modes to match your edge — Standard AI (fundamentals + technicals), Candlestick (15 pattern detectors on daily + weekly timeframes), and Hybrid (AI + Candlestick combined). Claude weighs patterns as primary, confirmation, or rejection signals and explains every verdict.",
     },
     {
         icon: MessageSquareText,

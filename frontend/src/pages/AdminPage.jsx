@@ -641,7 +641,7 @@ export default function AdminPage() {
                                 <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
                                     <thead>
                                         <tr>
-                                            {["", "Email", "Plan", "Unlock", "Logins", "Last login", "Actions"].map(
+                                            {["", "Email", "Plan", "Analyses / day", "Unlock", "Logins", "Last login", "Actions"].map(
                                                 (h, idx) => (
                                                     <th
                                                         key={h || `col-${idx}`}
@@ -729,6 +729,31 @@ export default function AdminPage() {
                                                             {(u.plan || "free").toUpperCase()}
                                                         </span>
                                                     </td>
+                                                    <td className="py-3 px-4 font-mono text-xs" data-testid={`user-analyses-${u.email}`}>
+                                                        {(() => {
+                                                            // Admin or active test-unlock → effectively Elite → treat as unlimited
+                                                            const effUnlimited =
+                                                                u.is_admin ||
+                                                                u.test_unlock_active ||
+                                                                u.analyses_day_limit === null ||
+                                                                u.analyses_day_limit === undefined;
+                                                            const used = typeof u.analyses_today === "number" ? u.analyses_today : 0;
+                                                            if (effUnlimited) {
+                                                                return (
+                                                                    <span style={{ color: "hsl(var(--hold))" }}>
+                                                                        {used} / ∞
+                                                                    </span>
+                                                                );
+                                                            }
+                                                            const limit = u.analyses_day_limit;
+                                                            const atCap = used >= limit;
+                                                            return (
+                                                                <span style={{ color: atCap ? "hsl(var(--sell))" : "hsl(var(--text-secondary))" }}>
+                                                                    {used} / {limit}
+                                                                </span>
+                                                            );
+                                                        })()}
+                                                    </td>
                                                     <td className="py-3 px-4 font-mono text-xs">
                                                         {unlocked ? (
                                                             <span style={{ color: "hsl(var(--hold))" }}>
@@ -814,7 +839,7 @@ export default function AdminPage() {
                                         })}
                                         {filtered.length === 0 && (
                                             <tr>
-                                                <td colSpan="7" className="py-10 text-center text-[hsl(var(--text-muted))]">
+                                                <td colSpan="8" className="py-10 text-center text-[hsl(var(--text-muted))]">
                                                     No users match "{query}"
                                                 </td>
                                             </tr>

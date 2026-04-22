@@ -19,24 +19,33 @@ export default function AuthCallback() {
             navigate("/login", { replace: true });
             return;
         }
+        // If we already have a JWT (e.g. double-invoked effect in StrictMode, or
+        // tab reopened), skip the exchange to avoid consuming the one-time
+        // session_id twice.
+        if (localStorage.getItem("sai_token")) {
+            window.history.replaceState({}, document.title, "/dashboard");
+            navigate("/dashboard", { replace: true });
+            return;
+        }
         const session_id = match[1];
 
         (async () => {
             try {
                 await exchangeGoogleSession(session_id);
-                // Clear fragment from URL
                 window.history.replaceState({}, document.title, "/dashboard");
                 navigate("/dashboard", { replace: true });
             } catch (err) {
-                setError(err?.response?.data?.detail || "Google sign-in failed");
-                setTimeout(() => navigate("/login", { replace: true }), 2500);
+                const detail = err?.response?.data?.detail;
+                setError(detail || "Google sign-in failed. Please try signing in again.");
+                // Auto-redirect after giving user time to read
+                setTimeout(() => navigate("/login", { replace: true }), 3500);
             }
         })();
     }, [exchangeGoogleSession, navigate]);
 
     return (
         <div className="min-h-screen grid place-items-center bg-background text-foreground p-8" data-testid="auth-callback">
-            <div className="text-center">
+            <div className="text-center max-w-md">
                 {error ? (
                     <>
                         <p className="text-overline mb-2" style={{ color: "hsl(var(--sell))" }}>
@@ -45,7 +54,11 @@ export default function AuthCallback() {
                         <p className="font-serif text-2xl" style={{ letterSpacing: "-0.01em" }}>
                             {error}
                         </p>
-                        <p className="text-overline mt-4">Redirecting back to login…</p>
+                        <p className="text-xs mt-4" style={{ color: "hsl(var(--text-secondary))" }}>
+                            This usually means the Google session expired or was already used.
+                            Please return to login and click <strong>Sign in with Google</strong> again.
+                        </p>
+                        <p className="text-overline mt-6">Redirecting back to login…</p>
                     </>
                 ) : (
                     <>
