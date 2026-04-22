@@ -18,7 +18,7 @@ import {
     ResponsiveContainer,
     CartesianGrid,
 } from "recharts";
-import { ArrowLeft, Sparkles, Loader2, AlertTriangle, Target, Shield } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, AlertTriangle, Target, Shield, FileDown } from "lucide-react";
 import { formatPrice, formatPct, formatCompact, timeAgo } from "@/lib/format";
 import { errMessage } from "@/lib/errors";
 
@@ -221,7 +221,35 @@ export default function AnalysisReportPage() {
                                 </div>
                                 <div className="col-span-12 md:col-span-4 flex justify-start md:justify-end items-center gap-2">
                                     {analysis && (
-                                        <ShareVerdictButton analysisId={analysis.id} />
+                                        <>
+                                            <ShareVerdictButton analysisId={analysis.id} />
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        const { data } = await api.get(
+                                                            `/analysis/${analysis.id}/pdf`,
+                                                            { responseType: "blob" }
+                                                        );
+                                                        const url = window.URL.createObjectURL(new Blob([data], { type: "application/pdf" }));
+                                                        const a = document.createElement("a");
+                                                        a.href = url;
+                                                        a.download = `neulab-${t.toLowerCase()}-${analysis.id.slice(0, 8)}.pdf`;
+                                                        document.body.appendChild(a);
+                                                        a.click();
+                                                        a.remove();
+                                                        window.URL.revokeObjectURL(url);
+                                                    } catch (err) {
+                                                        setError(errMessage(err?.response?.data?.detail, "PDF download failed"));
+                                                    }
+                                                }}
+                                                className="btn-quick inline-flex items-center gap-2"
+                                                data-testid="download-pdf-button"
+                                                title="Download this verdict as PDF"
+                                            >
+                                                <FileDown size={14} strokeWidth={1.5} />
+                                                <span className="hidden md:inline">Export PDF</span>
+                                            </button>
+                                        </>
                                     )}
                                     <button
                                         onClick={runAnalysis}

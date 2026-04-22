@@ -68,6 +68,15 @@ export default function AppShell({ children }) {
                             Dashboard
                         </Link>
                         <Link
+                            to="/portfolio"
+                            className={`text-sm font-medium link-underline ${
+                                loc.pathname.startsWith("/portfolio") ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"
+                            }`}
+                            data-testid="nav-portfolio"
+                        >
+                            Portfolio
+                        </Link>
+                        <Link
                             to="/scorecard"
                             className={`text-sm font-medium link-underline ${
                                 loc.pathname.startsWith("/scorecard") ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"
@@ -105,6 +114,15 @@ export default function AppShell({ children }) {
                                 Admin
                             </Link>
                         )}
+                        <Link
+                            to="/settings"
+                            className={`text-sm font-medium link-underline ${
+                                loc.pathname.startsWith("/settings") ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"
+                            }`}
+                            data-testid="nav-settings"
+                        >
+                            Settings
+                        </Link>
                     </nav>
 
                     <div className="flex items-center gap-2">

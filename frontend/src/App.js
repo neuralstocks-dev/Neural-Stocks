@@ -14,6 +14,8 @@ import AuthCallback from "@/pages/AuthCallback";
 import AdminPage from "@/pages/AdminPage";
 import ScorecardPage from "@/pages/ScorecardPage";
 import WhyUsPage from "@/pages/WhyUsPage";
+import PortfolioPage from "@/pages/PortfolioPage";
+import SettingsPage from "@/pages/SettingsPage";
 import { Loader2 } from "lucide-react";
 
 function Protected({ children }) {
@@ -98,6 +100,22 @@ function AppRoutes() {
                 element={
                     <Protected>
                         <AdminPage />
+                    </Protected>
+                }
+            />
+            <Route
+                path="/portfolio"
+                element={
+                    <Protected>
+                        <PortfolioPage />
+                    </Protected>
+                }
+            />
+            <Route
+                path="/settings"
+                element={
+                    <Protected>
+                        <SettingsPage />
                     </Protected>
                 }
             />

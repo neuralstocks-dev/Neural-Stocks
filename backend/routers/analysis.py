@@ -138,6 +138,27 @@ async def latest_analysis(ticker: str, user=Depends(get_current_user)):
     return doc
 
 
+@router.get("/analysis/{analysis_id}/pdf")
+async def analysis_pdf(analysis_id: str, user=Depends(get_current_user)):
+    """Download an analysis verdict as a branded PDF. Owner-only access."""
+    from fastapi.responses import StreamingResponse
+    from services.pdf import generate_analysis_pdf
+    import io
+    doc = await db.analyses.find_one(
+        {"id": analysis_id, "user_id": user["id"]},
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    pdf_bytes = generate_analysis_pdf(doc)
+    filename = f"neulab-{doc.get('ticker', 'analysis').lower()}-{analysis_id[:8]}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/analysis/{ticker}/history")
 async def analysis_history(ticker: str, user=Depends(get_current_user)):
     return (
@@ -452,6 +473,16 @@ async def scan_watchlist_patterns(user=Depends(get_current_user)):
             "created_at": now_iso,
         })
         alerts_created += 1
+        # Fire-and-forget Telegram push (if user is linked)
+        try:
+            from services.telegram import send_alert_to_user
+            asyncio.create_task(send_alert_to_user(
+                user["id"],
+                f"{best['pattern']} · {ticker}",
+                f"{best['bias'].upper()} on {best['timeframe']} · strength {best['strength']}\n\n{best.get('explanation', '')}",
+            ))
+        except Exception:
+            pass
 
     return {
         "scanned": len(tickers),

@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 10 (Phase 2: Portfolio P&L + PDF Export + Telegram) — backend + frontend tested. Backend pytest: 12/12 PASS in 5.87s. Frontend Playwright: all critical flows pass — /portfolio renders add-position-form + 4 metric cards + positions table with live yfinance prices (AAPL $266.17, MSFT $424.16); add-position submit succeeds end-to-end; /settings renders settings-page + telegram-module + telegram-not-configured banner correctly; /analysis/TSLA renders download-pdf-button which initiates a real PDF blob download (suggested filename neulab-tsla-49238ee6.pdf). Cross-user PDF access correctly returns 404 (owner-only enforced). Telegram /link returns 503 'not configured' as expected when TELEGRAM_BOT_TOKEN empty. AVOIDED: /api/billing/* (PAYPAL_ENV=live) and any LLM analysis endpoints.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "PortfolioPage · Add Position form",
+        "issues": [
+          "Purchase-date field uses the browser's native HTML5 date input (mm/dd/yyyy placeholder visible) instead of the shadcn Calendar/Popover component used elsewhere in the app. This breaks design consistency, locks date format to user-locale (US-only mm/dd/yyyy), and isn't theme-able (renders a default OS picker on click). Recommend swapping to <Popover><Calendar/></Popover> for visual + interaction parity."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration10_phase2.py",
+    "/app/test_reports/pytest/iteration10_phase2.xml"
+  ],
+  "action_items": [
+    "(LOW · design) Replace native HTML5 date input on PortfolioPage AddPosition form with shadcn Calendar inside a Popover, matching app design system."
+  ],
+  "critical_code_review_comments": [
+    "routers/portfolio.py — Clean CRUD. Validates ticker via live get_quote() before insert (correctly returns 404 for unknown symbols). Pydantic Field(gt=0) on shares/avg_cost gives proper 422s. user_id scoping is applied on all reads/updates/deletes, and _id is excluded from projections. Good.",
+    "routers/portfolio.py:114 — total_day_change_pct math: prev_total = total_market_value - total_day_change. This correctly back-computes yesterday's portfolio MV but only includes positions where BOTH price AND prev_close were available. If some positions are missing prev_close (e.g. fresh IPO), they are silently dropped from day_change but still counted in total_market_value — could yield a misleading prev_total. Worth a comment or guard.",
+    "routers/portfolio.py:172-176 — purchase_date validation in update_position is reachable AFTER `if not updates: return` only if purchase_date present; ordering is fine but slightly confusing. Consider moving validation before the dict comprehension.",
+    "routers/analysis.py:141-159 — PDF endpoint is owner-scoped via {id, user_id}; cross-user access correctly returns 404 (verified). StreamingResponse with explicit Content-Disposition attachment + filename is correct. PDF byte size in test was ~13KB (>5KB threshold met).",
+    "services/pdf.py — Well-structured reportlab usage. Brand colors centralized as constants. Handles missing fields gracefully (uses '—' placeholder). Disclaimer footer present. PageBreak before candlestick section avoids cramped pages. Good.",
+    "services/telegram.py — is_configured() correctly gates ALL bot calls (link, poll, sendMessage). poll_and_link uses a persistent updates_offset cursor in db.settings — survives restarts and avoids duplicate processing. send_alert_to_user is fire-and-forget compatible (no exceptions thrown for unlinked users — returns False). Auto-linking by 6-digit code in '/start <code>' or bare '<code>' is a great UX. Good.",
+    "routers/telegram.py — /link returns 503 (Service Unavailable) when not configured — this is semantically correct (the upstream Telegram bot service isn't ready). Some teams prefer 501 (Not Implemented) for 'feature disabled', but 503 is fine. /unlink intentionally always 200s with {unlinked:bool} — allows idempotent client UX.",
+    "Backward-compat: GET /api/portfolio on a never-touched user correctly returns the zeroed shape with empty positions[], matching the spec.",
+    "Frontend integration: download-pdf-button uses fetch() with Bearer token + Blob URL approach (since native <a download> can't send auth headers cross-origin). Verified live: file downloads as 'neulab-tsla-49238ee6.pdf'."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration10_phase2.py (NEW — 12 tests, all pass)"
+  ],
+  "success_rate": {
+    "backend": "12/12 (100%)",
+    "frontend": "100% (all 4 critical flows verified: portfolio render+CRUD, settings telegram banner, analysis report PDF download, navigation links present)"
+  },
+  "test_credentials": "Pro: tiers@demo.io/pass1234 (has AAPL+MSFT positions, TSLA hybrid analysis) · Free: demo@stockai.io/demo1234 · Admin: jolor69@gmail.com/admin1234",
+  "seed_data_creation": "One TEST_iter10 AAPL position was created and deleted within test_create_update_delete_position — clean. UI smoke also added 1× AAPL 0.5 shares position then attempted delete (delete confirm dialog auto-accepted). User may want to verify tiers@demo.io still has only the original 2 positions (AAPL+MSFT) — re-seed if any orphan TEST positions remain.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: `python -m pytest backend/tests/test_iteration10_phase2.py -v` (~6s, no LLM calls). data-testid map for Phase 2: add-position-form, add-position-ticker/shares/cost/submit, positions-table, position-row-{ticker}, delete-position-{id}, settings-page, telegram-module, telegram-not-configured, download-pdf-button. PDF endpoint is /api/analysis/{analysis_id}/pdf (NOT {ticker}/pdf) — uses analysis UUID, not ticker. Coexists fine with /api/analysis/{ticker}/latest because 'latest' and 'pdf' are distinct path literals. AVOID PayPal/billing tests (PAYPAL_ENV=live).",
+  "rca of the issue": "No bugs found. Only one design-consistency note: the purchase_date field on PortfolioPage AddPosition uses <input type='date'> (native browser picker) instead of the shadcn Calendar+Popover pattern used elsewhere — easy fix, low priority, not blocking."
+}
