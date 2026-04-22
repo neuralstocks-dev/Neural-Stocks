@@ -17,6 +17,21 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Apr 2026)
 
+- **Apr 22 — IDX (Indonesia Stock Exchange) support + Bahasa news**:
+  - 20 IDX blue-chip tickers added to catalog (`routers/stocks.py`) under new `IDX` exchange bucket — BBCA.JK, BBRI.JK, BMRI.JK, BBNI.JK, TLKM.JK, ASII.JK, UNVR.JK, GOTO.JK, ICBP.JK, INDF.JK, KLBF.JK, SMGR.JK, ADRO.JK, PTBA.JK, ANTM.JK, GGRM.JK, HMSP.JK, EXCL.JK, JSMR.JK, BREN.JK.
+  - `services/idx_news.py` — new RSS scraper for CNBC Indonesia Market + Detik Finance (10-min TTL cache, word-boundary ticker+alias matcher with Bahasa company-name aliases). Returns same shape as Finnhub's `get_company_news()` so UI/PDF don't need to branch.
+  - `services/sentiment.py` — shared Neulab keyword classifier extended with ~80 Bahasa Indonesia words (melonjak/anjlok/cuan/laba/rugi/dilaporkan/digugat etc.). Finnhub service now delegates to this shared module.
+  - `routers/analysis.py` — `.JK` tickers route through `get_market_context_idx()` instead of Finnhub. Non-IDX tickers unchanged.
+  - IDR currency formatting: `formatPrice` (frontend) uses `id-ID` locale (`Rp 6.450`), `_fmt_price` (PDF) uses `Rp ` with zero-decimal precision. Also covers JPY/KRW/VND edge cases.
+  - Verdict-page header already shows `{exchange} · {currency}` ⇒ IDX stocks render as `JKT · IDR` with no extra code.
+  - Live validation: `POST /api/analysis/BBCA.JK?mode=hybrid` → HOLD @ 62% conf, price Rp 6,450, target Rp 7,100, stop Rp 6,200; yfinance quotes/fundamentals, IDX news source populated (0 articles for BBCA this window is expected — graceful empty state).
+  - Limitations: Finnhub's paid-only IDX quotes/consensus/earnings are intentionally skipped on free tier. News coverage depends on feed freshness and whether the ticker/company is mentioned by headline in the last ~100 items per source.
+
+- **Apr 22 — PayPal smoke test + cancel endpoint (admin diagnostic)**:
+  - `/admin/paypal-smoke-test` page + `GET /api/billing/smoke-test/plan` / `POST /api/billing/smoke-test/activate` / `GET /api/billing/smoke-test/history` / `POST /api/billing/smoke-test/cancel/{sub_id}`.
+  - $1/mo Live PayPal plan (`P-4G394907YL6715359NHUNGJY`) created lazily and cached. End-to-end proven with a real Wise card purchase (`I-BG1V3KRJVK5U`, ACTIVE → CANCELLED after verification).
+  - Prominent "Cancel smoke test" banner + per-row Cancel button in Recent diagnostics table.
+
 - **Apr 22 — Sentiment transparency + roadmap on Why Us + CI**:
   - **Finnhub sentiment now transparent**: every headline carries `sentiment_triggers` (positive/negative keyword lists), and the payload includes a `daily_sentiment` 8-point sparkline (today + 7 prior days) built from the full article window.
   - **"Why this sentiment?" tooltip** on each headline — hover the sentiment badge to see matched trigger words (POS/NEG chips) with the "Neulab keyword heuristic" footer.

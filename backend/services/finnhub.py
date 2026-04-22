@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 
 from core.config import FINNHUB_API_KEY
+from services.sentiment import classify_sentiment_detailed
 
 logger = logging.getLogger(__name__)
 BASE = "https://finnhub.io/api/v1"
@@ -84,32 +85,14 @@ async def get_quote(symbol: str) -> dict | None:
     }
 
 
-# ----- Sentiment heuristic (we don't have /news-sentiment on free tier) ----
-_POS_WORDS = {"beat", "beats", "surge", "surged", "soar", "soars", "soared", "rally", "rallies", "gain", "gains", "jump", "jumped", "record", "strong", "upgrade", "upgraded", "raises", "raised", "bullish", "outperform", "top", "breakthrough", "wins", "win", "profit", "profits", "boom", "boosts", "boost", "expand", "positive", "growth", "increase", "increased", "exceeds", "exceeded"}
-_NEG_WORDS = {"miss", "misses", "missed", "plunge", "plunged", "drop", "drops", "dropped", "fall", "falls", "fell", "tumble", "tumbled", "crash", "crashed", "decline", "declined", "declines", "weak", "downgrade", "downgraded", "cuts", "cut", "bearish", "underperform", "loss", "losses", "lawsuit", "probe", "investigate", "investigation", "concerns", "warning", "delay", "fraud", "fine", "fined", "negative", "slump", "slumped", "layoff", "layoffs", "bankruptcy", "scandal"}
-
-
+# ----- Sentiment heuristic — delegated to services/sentiment ---------------
+# Backwards-compat aliases so existing tests that import these still work.
 def _classify_sentiment(headline: str) -> str:
-    """Backward-compat: returns just the label."""
-    return _classify_sentiment_detailed(headline)["sentiment"]
+    return classify_sentiment_detailed(headline)["sentiment"]
 
 
 def _classify_sentiment_detailed(headline: str) -> dict:
-    """Returns {sentiment, triggers: {positive: [...], negative: [...]}}.
-    Triggers expose the *actual* keyword matches so the UI can render a
-    transparent "Why this sentiment?" tooltip per article."""
-    if not headline:
-        return {"sentiment": "neutral", "triggers": {"positive": [], "negative": []}}
-    words = {w.strip(".,!?;:'\"()[]").lower() for w in headline.split()}
-    pos_hits = sorted(words & _POS_WORDS)
-    neg_hits = sorted(words & _NEG_WORDS)
-    if len(pos_hits) > len(neg_hits):
-        s = "positive"
-    elif len(neg_hits) > len(pos_hits):
-        s = "negative"
-    else:
-        s = "neutral"
-    return {"sentiment": s, "triggers": {"positive": pos_hits, "negative": neg_hits}}
+    return classify_sentiment_detailed(headline)
 
 
 async def get_company_news(symbol: str, limit: int = 6) -> list[dict]:

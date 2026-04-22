@@ -134,6 +134,28 @@ CATALOG = [
     {"ticker": "RY.TO", "name": "Royal Bank of Canada (TSX)", "exchange": "TSX", "category": "finance"},
     {"ticker": "TD.TO", "name": "Toronto-Dominion Bank (TSX)", "exchange": "TSX", "category": "finance"},
     {"ticker": "ENB.TO", "name": "Enbridge Inc. (TSX)", "exchange": "TSX", "category": "commodities"},
+
+    # ---------- IDX (Jakarta / Indonesia Stock Exchange) ----------
+    {"ticker": "BBCA.JK", "name": "Bank Central Asia (IDX)", "exchange": "IDX", "category": "finance"},
+    {"ticker": "BBRI.JK", "name": "Bank Rakyat Indonesia (IDX)", "exchange": "IDX", "category": "finance"},
+    {"ticker": "BMRI.JK", "name": "Bank Mandiri (IDX)", "exchange": "IDX", "category": "finance"},
+    {"ticker": "BBNI.JK", "name": "Bank Negara Indonesia (IDX)", "exchange": "IDX", "category": "finance"},
+    {"ticker": "TLKM.JK", "name": "Telkom Indonesia (IDX)", "exchange": "IDX", "category": "other"},
+    {"ticker": "ASII.JK", "name": "Astra International (IDX)", "exchange": "IDX", "category": "consumer"},
+    {"ticker": "UNVR.JK", "name": "Unilever Indonesia (IDX)", "exchange": "IDX", "category": "consumer"},
+    {"ticker": "GOTO.JK", "name": "GoTo Gojek Tokopedia (IDX)", "exchange": "IDX", "category": "tech"},
+    {"ticker": "ICBP.JK", "name": "Indofood CBP (IDX)", "exchange": "IDX", "category": "consumer"},
+    {"ticker": "INDF.JK", "name": "Indofood Sukses Makmur (IDX)", "exchange": "IDX", "category": "consumer"},
+    {"ticker": "KLBF.JK", "name": "Kalbe Farma (IDX)", "exchange": "IDX", "category": "healthcare"},
+    {"ticker": "SMGR.JK", "name": "Semen Indonesia (IDX)", "exchange": "IDX", "category": "commodities"},
+    {"ticker": "ADRO.JK", "name": "Adaro Energy (IDX)", "exchange": "IDX", "category": "commodities"},
+    {"ticker": "PTBA.JK", "name": "Bukit Asam (IDX)", "exchange": "IDX", "category": "commodities"},
+    {"ticker": "ANTM.JK", "name": "Aneka Tambang / Antam (IDX)", "exchange": "IDX", "category": "commodities"},
+    {"ticker": "GGRM.JK", "name": "Gudang Garam (IDX)", "exchange": "IDX", "category": "consumer"},
+    {"ticker": "HMSP.JK", "name": "HM Sampoerna (IDX)", "exchange": "IDX", "category": "consumer"},
+    {"ticker": "EXCL.JK", "name": "XL Axiata (IDX)", "exchange": "IDX", "category": "other"},
+    {"ticker": "JSMR.JK", "name": "Jasa Marga (IDX)", "exchange": "IDX", "category": "other"},
+    {"ticker": "BREN.JK", "name": "Barito Renewables Energy (IDX)", "exchange": "IDX", "category": "commodities"},
 ]
 
 # Alias for legacy callers (POPULAR used to be exported)

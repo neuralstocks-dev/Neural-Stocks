@@ -1,11 +1,15 @@
 export function formatPrice(v, currency = "USD") {
     if (v === null || v === undefined || Number.isNaN(v)) return "—";
+    // IDR (Indonesian Rupiah) has no fractional cents and conventionally shows
+    // thousand-separator dots. Intl 'IDR' renders "Rp 6.450" which is correct.
+    const ccy = (currency || "USD").toUpperCase();
+    const isZeroDecimal = ccy === "IDR" || ccy === "JPY" || ccy === "KRW" || ccy === "VND";
     try {
-        return new Intl.NumberFormat("en-US", {
+        return new Intl.NumberFormat(ccy === "IDR" ? "id-ID" : "en-US", {
             style: "currency",
-            currency: currency || "USD",
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
+            currency: ccy,
+            minimumFractionDigits: isZeroDecimal ? 0 : 2,
+            maximumFractionDigits: isZeroDecimal ? 0 : 2,
         }).format(v);
     } catch {
         return `$${Number(v).toFixed(2)}`;

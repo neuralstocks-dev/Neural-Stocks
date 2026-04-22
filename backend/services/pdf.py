@@ -65,8 +65,13 @@ def _kv_row(label: str, value: str, style):
 def _fmt_price(v, currency="USD"):
     if v is None:
         return "—"
-    sym = {"USD": "$", "SGD": "S$", "HKD": "HK$", "GBP": "£", "EUR": "€", "JPY": "¥"}.get(currency, "")
-    return f"{sym}{v:,.2f}" if isinstance(v, (int, float)) else str(v)
+    sym = {"USD": "$", "SGD": "S$", "HKD": "HK$", "GBP": "£", "EUR": "€", "JPY": "¥", "IDR": "Rp "}.get(currency, "")
+    if not isinstance(v, (int, float)):
+        return str(v)
+    # IDR has no fractional cents; use thousand-separator with 0 decimals
+    if currency in ("IDR", "JPY", "KRW", "VND"):
+        return f"{sym}{v:,.0f}"
+    return f"{sym}{v:,.2f}"
 
 
 def _risk_para(risks: list, style):

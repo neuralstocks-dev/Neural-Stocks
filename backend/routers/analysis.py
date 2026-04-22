@@ -10,6 +10,7 @@ from services.yfinance_svc import get_quote, _yf_history_sync, _yf_fundamentals_
 from services.ai import run_ai_analysis, run_timeline_analysis, run_candlestick_analysis
 from services.candlestick import scan_daily_and_weekly
 from services.finnhub import get_market_context
+from services.idx_news import get_market_context_idx, is_idx_ticker
 from services.quota import enforce_analysis_quota, plan_for, resolved_plan_for
 from routers.disclaimer import require_accepted
 
@@ -81,7 +82,7 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     quote_task = get_quote(ticker)
     hist_task = asyncio.to_thread(_yf_history_sync, ticker, "6mo", "1d")
     fund_task = asyncio.to_thread(_yf_fundamentals_sync, ticker)
-    market_ctx_task = get_market_context(ticker)
+    market_ctx_task = get_market_context_idx(ticker) if is_idx_ticker(ticker) else get_market_context(ticker)
     # For candlestick/hybrid we also need weekly candles
     weekly_task = None
     if mode in ("candlestick", "hybrid"):
