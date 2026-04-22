@@ -36,7 +36,7 @@ const MODULES = [
         icon: Layers,
         title: "Candlestick Strategy",
         status: "available",
-        body: "Three analyzer modes to match your edge — Standard AI (fundamentals + technicals), Candlestick (15 pattern detectors on daily + weekly timeframes), and Hybrid (AI + Candlestick combined). Claude weighs patterns as primary, confirmation, or rejection signals and explains every verdict.",
+        body: "Three analyzer modes on every tier — Standard AI (fundamentals + technicals), Candlestick (15 pattern detectors on daily + weekly timeframes), and Hybrid (AI + Candlestick). Claude weighs patterns as primary, confirmation, or rejection signals and explains every verdict. Even the free tier gets all three modes.",
     },
     {
         icon: MessageSquareText,
@@ -65,14 +65,21 @@ const COMPETITORS = [
 
 const FEATURES = [
     { label: "Explainable AI reasoning (not just signals)", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
+    { label: "Three analyzer modes — Standard AI · Candlestick · Hybrid", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
+    { label: "15 candlestick patterns with plain-English explanations", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "none" } },
+    { label: "Daily + weekly pattern scan on your entire watchlist", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
     { label: "Short / Medium / Long-term horizon fit", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "partial", tradeideas: "partial", dbsvickers: "none" } },
+    { label: "Portfolio P&L with live pricing", values: { nsi: "full", moomoo: "full", tiger: "full", tradingview: "partial", stashaway: "full", tradeideas: "none", dbsvickers: "full" } },
     { label: "Top / Bottom batch sweep across watchlist", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
+    { label: "Export verdict as branded PDF", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "partial" } },
     { label: "Broker-agnostic (no lock-in)", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "full", stashaway: "none", tradeideas: "full", dbsvickers: "none" } },
     { label: "Beginner-friendly narrative insight", values: { nsi: "full", moomoo: "partial", tiger: "none", tradingview: "none", stashaway: "full", tradeideas: "none", dbsvickers: "none" } },
     { label: "Public AI Accuracy Scorecard", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "none", tradeideas: "none", dbsvickers: "none" } },
     { label: "Shareable verdict links", values: { nsi: "full", moomoo: "partial", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "none" } },
+    { label: "Telegram push alerts (no phone number required)", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
     { label: "Signal-grade alerts, no promotions", values: { nsi: "full", moomoo: "partial", tiger: "partial", tradingview: "full", stashaway: "none", tradeideas: "full", dbsvickers: "none" } },
     { label: "Web-first · runs anywhere · no install", values: { nsi: "full", moomoo: "partial", tiger: "partial", tradingview: "full", stashaway: "full", tradeideas: "partial", dbsvickers: "partial" } },
+    { label: "Candlestick & Hybrid analysis on the free tier", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "none" } },
     { label: "Starts at $0 · Pro $9/mo", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "partial" } },
 ];
 

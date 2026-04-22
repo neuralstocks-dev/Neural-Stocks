@@ -9,6 +9,7 @@ import SignalBadge from "@/components/SignalBadge";
 import TestUnlockBanner from "@/components/TestUnlockBanner";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import AnalysisModeSelector from "@/components/AnalysisModeSelector";
+import LiveDeskGuide from "@/components/LiveDeskGuide";
 import { useAuth } from "@/hooks/useAuth";
 import { formatPrice, formatPct, timeAgo } from "@/lib/format";
 import { errMessage } from "@/lib/errors";
@@ -477,6 +478,9 @@ export default function DashboardPage() {
                     />
                 </section>
 
+                {/* Live Desk — how-to-use guide */}
+                <LiveDeskGuide />
+
                 {/* Quick Actions */}
                 <section className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-8">
                     <button
@@ -518,16 +522,14 @@ export default function DashboardPage() {
                     <button
                         onClick={scanPatterns}
                         className="btn-quick flex items-center justify-between"
-                        disabled={!!quickBusy || !canQuickActions}
-                        title={!canQuickActions ? "Pro/Elite feature" : "Scan watchlist for candlestick reversal patterns — no LLM calls"}
+                        disabled={!!quickBusy}
+                        title="Scan watchlist for candlestick reversal patterns — no LLM calls"
                         data-testid="scan-patterns-button"
                     >
                         <span>
-                            {!canQuickActions ? "Patterns · Pro" : quickBusy === "patterns" ? "Scanning…" : "Scan Patterns"}
+                            {quickBusy === "patterns" ? "Scanning…" : "Scan Patterns"}
                         </span>
-                        {!canQuickActions ? (
-                            <Lock size={14} strokeWidth={1.5} />
-                        ) : quickBusy === "patterns" ? (
+                        {quickBusy === "patterns" ? (
                             <Loader2 size={14} className="animate-spin" />
                         ) : (
                             <Zap size={14} strokeWidth={1.5} />

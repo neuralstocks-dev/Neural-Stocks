@@ -394,15 +394,9 @@ PATTERN_ALERT_MIN_STRENGTH = 70
 @router.post("/patterns/scan")
 async def scan_watchlist_patterns(user=Depends(get_current_user)):
     """Scan every watchlist stock for high-strength candlestick patterns
-    (daily + weekly). Creates alerts for each qualifying pattern. Pro/Elite only.
-    Runs the pure-Python detector — no LLM calls, fast and free."""
+    (daily + weekly). Creates alerts for each qualifying pattern. Available
+    on all tiers — the detector is deterministic Python, no LLM calls."""
     await require_accepted(user)
-    p = plan_for(user)
-    if not p["quick_actions"]:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Pattern Scan is a Pro/Elite feature. Upgrade from {p['name']} to unlock watchlist-wide candlestick alerts.",
-        )
     items = await db.watchlist.find(
         {"user_id": user["id"]}, {"_id": 0, "user_id": 0}
     ).to_list(50)

@@ -17,7 +17,12 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Feb 2026)
 
-- **Telegram LIVE (Feb 22)**: `neulab_bot` is operational. `TELEGRAM_BOT_TOKEN` + `TELEGRAM_BOT_USERNAME=neulab_bot` in `.env`. End-to-end verified: user can link account via Settings → 6-digit code → bot, and receive test + pattern alerts. Pattern scan now auto-pushes every detected high-strength pattern to linked chats via fire-and-forget helper.
+- **Feb 22 — Live Desk guide + full free-tier candlestick**:
+  - **Live Desk Guide** (`LiveDeskGuide.jsx`): New dismissable 4-step onboarding banner on Dashboard — (01) Pick a mode → (02) Click Analyze → (03) Read the verdict → (04) Export or share. Persists dismissal in localStorage.
+  - **Watchlist Pattern Scan is now FREE** for all tiers (deterministic detector, no LLM). Removed the Pro gate on `/api/patterns/scan` + Dashboard's Scan Patterns button no longer shows the Pro lock.
+  - **Pricing page**: Updated Free tier card to show checkmarks on Candlestick/Hybrid modes AND Watchlist pattern scan. Quick batch sweep (Top/Bottom 3) remains Pro (LLM-gated).
+  - **Why Us page**: Refreshed competitive matrix — 17 rows now including Three analyzer modes, 15 candlestick patterns, Daily+weekly scan, Portfolio P&L, PDF export, Telegram push alerts, and "Candlestick & Hybrid on free tier" — with competitor comparison updated accordingly.
+- **Telegram LIVE (Feb 22)**: `neulab_bot` is operational. Pattern alerts + high-conviction verdict alerts (BUY/SELL with conf ≥75) auto-push to linked chats.
 - **Candlestick modes now FREE for all tiers (Feb 22)**: Removed the Pro/Elite gate on `mode=candlestick|hybrid` in `/api/analysis/{ticker}`. Pricing matrix + feature bullets updated — all 3 modes available to Free users. Pattern scan (bulk watchlist) remains a Pro/Elite perk.
 - **Pattern Reference Guide (Feb 22)**: New `PatternGuideDialog` component (accessible via "Learn about patterns" button inside the Candlestick Findings section of any verdict). Displays all 15 supported patterns with Shape / What it means / How to read it / Best when. Searchable + bias-filterable. Patterns detected in the current verdict are highlighted and surface first.
 - **Phase 2 — Portfolio, PDF, Telegram (Feb 22)**:

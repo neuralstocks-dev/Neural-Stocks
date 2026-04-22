@@ -329,9 +329,7 @@ export default function PricingPage() {
                                             <FeatureLi>{p.watchlist_limit} stock watchlist</FeatureLi>
                                             <FeatureLi>Standard AI analysis mode</FeatureLi>
                                             <FeatureLi>Candlestick & Hybrid analysis modes</FeatureLi>
-                                            <FeatureLi enabled={p.quick_actions}>
-                                                Watchlist pattern scan (15 patterns)
-                                            </FeatureLi>
+                                            <FeatureLi>Watchlist pattern scan (15 patterns)</FeatureLi>
                                             <FeatureLi enabled={p.quick_actions}>
                                                 Quick batch sweep (Top / Bottom 3)
                                             </FeatureLi>
