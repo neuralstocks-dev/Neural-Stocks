@@ -15,6 +15,9 @@ import {
     ChevronRight,
     Zap,
     Telescope,
+    Bot,
+    Smartphone,
+    CalendarRange,
 } from "lucide-react";
 
 // ---------- Product modules ----------
@@ -48,7 +51,25 @@ const MODULES = [
         icon: BellRing,
         title: "Watchlists & Alerts",
         status: "available",
-        body: "Rule-based notifications for score changes, breakouts, and risk events — across your tracked positions, with horizon-fit recommendations.",
+        body: "Track up to 25 tickers, run one-click Analyze or full Pattern Scan across the list, and get push notifications the moment a high-conviction BUY/SELL verdict or candlestick reversal triggers — delivered straight to our Telegram bot (@neulab_bot). No phone number, no SMS fees.",
+    },
+    {
+        icon: Bot,
+        title: "Autonomous AI Trading",
+        status: "coming",
+        body: "Let the Signal Engine execute for you. Rule-based autopilot that turns your watchlist verdicts into live orders through your connected broker — with hard risk caps, position sizing, and human-in-the-loop override on every trade.",
+    },
+    {
+        icon: Smartphone,
+        title: "Native Mobile Apps",
+        status: "coming",
+        body: "Neulab on iOS and Android — full dashboard, one-tap Analyze, Touch ID / Face ID login, and native push alerts. Background refresh keeps your watchlist scoring even when the app is closed.",
+    },
+    {
+        icon: CalendarRange,
+        title: "SMS · CSV · Backtesting",
+        status: "coming",
+        body: "Three power-user workflows in one drop — SMS alerts for regions where Telegram isn't practical, CSV import/export so you can move your entire watchlist in a single click, and a Backtesting lab that replays any verdict against the last 12 months of price action.",
     },
 ];
 

@@ -17,6 +17,18 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Apr 2026)
 
+- **Apr 22 — Sentiment transparency + roadmap on Why Us + CI**:
+  - **Finnhub sentiment now transparent**: every headline carries `sentiment_triggers` (positive/negative keyword lists), and the payload includes a `daily_sentiment` 8-point sparkline (today + 7 prior days) built from the full article window.
+  - **"Why this sentiment?" tooltip** on each headline — hover the sentiment badge to see matched trigger words (POS/NEG chips) with the "Neulab keyword heuristic" footer.
+  - **7-day sentiment sparkline** rendered in the Headlines module header next to the overall score — SVG line + colored dots (green/red/amber) with native-tooltip hover detail per day.
+  - **Why Us — roadmap modules added**: `WhyUsPage.jsx` grid expanded from 5 → 8 cards:
+    - Watchlists & Alerts copy rewritten to explicitly mention @neulab_bot Telegram push alerts.
+    - 3 new "Coming soon" blocks: **Autonomous AI Trading** (broker-connected autopilot), **Native Mobile Apps** (iOS + Android with Touch/Face ID), **SMS · CSV · Backtesting** (SMS alerts, watchlist CSV import/export, 12-month backtesting lab).
+  - **CI: Finnhub Contract GitHub Action** (`.github/workflows/finnhub-contract.yml`):
+    - `unit` job — PR blocker, runs the 6 offline sentiment/is_configured tests.
+    - `integration` job — nightly (02:15 UTC) + on push to main, runs full 16-test contract against the preview backend via `PREVIEW_BACKEND_URL` secret.
+  - **Pytest regression locked in** (`backend/tests/test_finnhub_contract.py`): 16 tests — 6 offline + 10 integration incl. trigger-word shape, 8-point sparkline bounds, PDF download contract. 1 LLM call per run via module-scoped fixture.
+
 - **Apr 22 — Finnhub market context surfaced in UI + PDF**:
   - `MarketContextModules.jsx` renders 3 new modules on every Analysis Report between Candlestick Findings and Technical/Fundamental/Peer:
     - **Recent Headlines** — top 5 news items (last 7 days) with source, timeAgo, per-article sentiment chip (pos/neg/neutral), and click-out link; aggregate sentiment summary + score (-1..+1) in the header.

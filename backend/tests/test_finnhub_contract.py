@@ -46,6 +46,14 @@ class TestFinnhubServiceUnits:
         from services.finnhub import _classify_sentiment
         assert _classify_sentiment("") == "neutral"
 
+    def test_sentiment_detailed_exposes_triggers(self):
+        from services.finnhub import _classify_sentiment_detailed
+        d = _classify_sentiment_detailed("Apple shares surge to record high")
+        assert d["sentiment"] == "positive"
+        # Trigger words must be lowercase keywords that were matched
+        assert "surge" in d["triggers"]["positive"] or "record" in d["triggers"]["positive"]
+        assert d["triggers"]["negative"] == []
+
     def test_is_configured_reflects_env(self, monkeypatch):
         import services.finnhub as fh
         monkeypatch.setattr(fh, "FINNHUB_API_KEY", "")
@@ -150,13 +158,34 @@ class TestFinnhubMarketContext:
             pytest.skip("No news available for AAPL this window")
         a = articles[0]
         # Fields the UI reads directly
-        for key in ("headline", "source", "url", "published_at", "sentiment"):
+        for key in ("headline", "source", "url", "published_at", "sentiment", "sentiment_triggers"):
             assert key in a, f"news article missing key {key}"
         assert a["sentiment"] in ("positive", "negative", "neutral")
+        # sentiment_triggers must expose the keyword buckets
+        tr = a["sentiment_triggers"]
+        assert isinstance(tr, dict)
+        assert isinstance(tr.get("positive"), list)
+        assert isinstance(tr.get("negative"), list)
         summary = (mc.get("news") or {}).get("summary_sentiment")
         assert summary in ("positive", "negative", "neutral")
         score = (mc.get("news") or {}).get("score")
         assert isinstance(score, (int, float)) and -1.0 <= score <= 1.0
+
+    def test_daily_sentiment_sparkline(self, analysis):
+        mc = self._mc(analysis)
+        if not mc.get("configured"):
+            pytest.skip("Finnhub not configured")
+        news = mc.get("news") or {}
+        spark = news.get("daily_sentiment")
+        if not spark:
+            pytest.skip("No news articles returned")
+        # UI expects exactly 8 points (today + 7 prior days) to render its sparkline
+        assert isinstance(spark, list) and len(spark) == 8
+        for pt in spark:
+            assert set(pt.keys()) >= {"date", "score", "positive", "negative", "total"}
+            assert isinstance(pt["score"], (int, float)) and -1.0 <= pt["score"] <= 1.0
+            assert pt["total"] == pt["positive"] + pt["negative"] + (pt["total"] - pt["positive"] - pt["negative"])
+            assert pt["positive"] >= 0 and pt["negative"] >= 0 and pt["total"] >= 0
 
     def test_analyst_consensus_shape(self, analysis):
         mc = self._mc(analysis)

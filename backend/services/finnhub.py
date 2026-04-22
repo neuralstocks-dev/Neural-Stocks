@@ -90,20 +90,32 @@ _NEG_WORDS = {"miss", "misses", "missed", "plunge", "plunged", "drop", "drops", 
 
 
 def _classify_sentiment(headline: str) -> str:
+    """Backward-compat: returns just the label."""
+    return _classify_sentiment_detailed(headline)["sentiment"]
+
+
+def _classify_sentiment_detailed(headline: str) -> dict:
+    """Returns {sentiment, triggers: {positive: [...], negative: [...]}}.
+    Triggers expose the *actual* keyword matches so the UI can render a
+    transparent "Why this sentiment?" tooltip per article."""
     if not headline:
-        return "neutral"
+        return {"sentiment": "neutral", "triggers": {"positive": [], "negative": []}}
     words = {w.strip(".,!?;:'\"()[]").lower() for w in headline.split()}
-    pos = len(words & _POS_WORDS)
-    neg = len(words & _NEG_WORDS)
-    if pos > neg:
-        return "positive"
-    if neg > pos:
-        return "negative"
-    return "neutral"
+    pos_hits = sorted(words & _POS_WORDS)
+    neg_hits = sorted(words & _NEG_WORDS)
+    if len(pos_hits) > len(neg_hits):
+        s = "positive"
+    elif len(neg_hits) > len(pos_hits):
+        s = "negative"
+    else:
+        s = "neutral"
+    return {"sentiment": s, "triggers": {"positive": pos_hits, "negative": neg_hits}}
 
 
 async def get_company_news(symbol: str, limit: int = 6) -> list[dict]:
-    """Returns latest {limit} news items with heuristic sentiment."""
+    """Returns latest {limit} news items with heuristic sentiment + a 7-day
+    daily sentiment sparkline computed from the full window (not just the
+    headline preview)."""
     today = datetime.now(timezone.utc).date()
     start = today - timedelta(days=7)
     data = await _get(
@@ -116,11 +128,47 @@ async def get_company_news(symbol: str, limit: int = 6) -> list[dict]:
         return []
     # Finnhub returns newest-first already, but sort defensively
     data = sorted(data, key=lambda x: x.get("datetime", 0), reverse=True)
+
+    # --- Build 7-day sparkline from ALL articles (not just preview) ------
+    day_buckets: dict[str, dict] = {}
+    for item in data:
+        ts = item.get("datetime")
+        if not ts:
+            continue
+        try:
+            day = datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat()
+        except Exception:
+            continue
+        s = _classify_sentiment_detailed(item.get("headline") or "")["sentiment"]
+        bucket = day_buckets.setdefault(day, {"pos": 0, "neg": 0, "total": 0})
+        if s == "positive":
+            bucket["pos"] += 1
+        elif s == "negative":
+            bucket["neg"] += 1
+        bucket["total"] += 1
+    # Emit exactly 7 consecutive days (oldest → newest), filling gaps with 0
+    sparkline = []
+    for i in range(7, -1, -1):
+        day = (today - timedelta(days=i)).isoformat()
+        b = day_buckets.get(day, {"pos": 0, "neg": 0, "total": 0})
+        score = 0.0
+        if b["total"] > 0:
+            score = round((b["pos"] - b["neg"]) / b["total"], 2)
+        sparkline.append({
+            "date": day,
+            "score": score,
+            "positive": b["pos"],
+            "negative": b["neg"],
+            "total": b["total"],
+        })
+
+    # --- Top-N preview articles with per-article triggers ----------------
     out = []
     pos = neg = total = 0
     for item in data[:limit]:
         headline = (item.get("headline") or "").strip()
-        senti = _classify_sentiment(headline)
+        detail = _classify_sentiment_detailed(headline)
+        senti = detail["sentiment"]
         if senti == "positive":
             pos += 1
         elif senti == "negative":
@@ -134,8 +182,9 @@ async def get_company_news(symbol: str, limit: int = 6) -> list[dict]:
             "url": item.get("url"),
             "published_at": datetime.fromtimestamp(ts, tz=timezone.utc).isoformat() if ts else None,
             "sentiment": senti,
+            "sentiment_triggers": detail["triggers"],
         })
-    # Compute aggregate buzz score (-1..+1)
+    # Compute aggregate buzz score (-1..+1) across the *preview set*
     score = 0.0
     if total > 0:
         score = round((pos - neg) / total, 2)
@@ -145,6 +194,7 @@ async def get_company_news(symbol: str, limit: int = 6) -> list[dict]:
         "summary_sentiment": "positive" if score > 0.1 else "negative" if score < -0.1 else "neutral",
         "score": score,
         "sentiment_method": "neulab_keyword_heuristic",
+        "daily_sentiment": sparkline,
     }
 
 

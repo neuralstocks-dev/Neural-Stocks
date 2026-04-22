@@ -47,23 +47,27 @@ function HeadlinesModule({ news }) {
     const overall = news.summary_sentiment || "neutral";
     const score = news.score ?? 0;
     const { color: overallColor } = SENTIMENT_STYLES[overall] || SENTIMENT_STYLES.neutral;
+    const sparkline = Array.isArray(news.daily_sentiment) ? news.daily_sentiment : [];
 
     return (
         <article
             className="module p-6 md:p-8 col-span-12 md:col-span-6"
             data-testid="market-headlines-module"
         >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between gap-4 mb-4">
                 <p className="text-overline flex items-center gap-2">
                     <Newspaper size={12} strokeWidth={1.5} /> Recent Headlines
                 </p>
-                <span
-                    className="font-mono text-[10px] uppercase tracking-wider"
-                    style={{ color: overallColor }}
-                    data-testid="headlines-sentiment-summary"
-                >
-                    {overall} · {score > 0 ? "+" : ""}{score}
-                </span>
+                <div className="flex items-center gap-3">
+                    {sparkline.length > 0 && <SentimentSparkline points={sparkline} />}
+                    <span
+                        className="font-mono text-[10px] uppercase tracking-wider"
+                        style={{ color: overallColor }}
+                        data-testid="headlines-sentiment-summary"
+                    >
+                        {overall} · {score > 0 ? "+" : ""}{score}
+                    </span>
+                </div>
             </div>
             <h3 className="font-serif text-2xl mb-5" style={{ letterSpacing: "-0.01em" }}>
                 Last 7 days on the tape.
@@ -79,15 +83,14 @@ function HeadlinesModule({ news }) {
                             style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
                             data-testid={`headline-item-${i}`}
                         >
-                            <div className="flex flex-col items-center gap-1 pt-1" style={{ minWidth: "2.5rem" }}>
-                                <Icon size={14} strokeWidth={1.5} style={{ color: s.color }} />
-                                <span
-                                    className="font-mono text-[9px]"
-                                    style={{ color: s.color, letterSpacing: "0.1em" }}
-                                >
-                                    {s.label}
-                                </span>
-                            </div>
+                            <SentimentBadge
+                                sentiment={a.sentiment}
+                                triggers={a.sentiment_triggers}
+                                Icon={Icon}
+                                label={s.label}
+                                color={s.color}
+                                idx={i}
+                            />
                             <div className="flex-1 min-w-0">
                                 <a
                                     href={a.url}
@@ -111,6 +114,177 @@ function HeadlinesModule({ news }) {
                 })}
             </ol>
         </article>
+    );
+}
+
+/* Sentiment trigger badge — hover to see matched keywords */
+function SentimentBadge({ sentiment, triggers, Icon, label, color, idx }) {
+    const pos = triggers?.positive || [];
+    const neg = triggers?.negative || [];
+    const hasTriggers = pos.length > 0 || neg.length > 0;
+    return (
+        <div
+            className="relative group flex flex-col items-center gap-1 pt-1"
+            style={{ minWidth: "2.5rem" }}
+            data-testid={`headline-sentiment-badge-${idx}`}
+        >
+            <Icon size={14} strokeWidth={1.5} style={{ color }} />
+            <span
+                className="font-mono text-[9px]"
+                style={{ color, letterSpacing: "0.1em" }}
+            >
+                {label}
+            </span>
+            {/* Tooltip */}
+            <div
+                className="pointer-events-none absolute left-8 top-0 z-20 w-64 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                style={{
+                    background: "hsl(var(--surface-elevated))",
+                    border: "1px solid hsl(var(--border-default))",
+                    borderRadius: 3,
+                    padding: "10px 12px",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                }}
+                data-testid={`headline-sentiment-tooltip-${idx}`}
+            >
+                <p
+                    className="text-overline mb-2"
+                    style={{ fontSize: "0.52rem", letterSpacing: "0.14em" }}
+                >
+                    Why {sentiment}?
+                </p>
+                {!hasTriggers ? (
+                    <p className="text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>
+                        No keyword triggers — defaulted to neutral.
+                    </p>
+                ) : (
+                    <>
+                        {pos.length > 0 && (
+                            <div className="mb-1.5">
+                                <p className="text-[9px] font-mono mb-1" style={{ color: "hsl(var(--buy))" }}>
+                                    POSITIVE ({pos.length})
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                    {pos.map((w) => (
+                                        <span
+                                            key={`p-${w}`}
+                                            className="font-mono text-[10px] px-1.5 py-0.5"
+                                            style={{
+                                                background: "hsla(142, 55%, 45%, 0.12)",
+                                                color: "hsl(var(--buy))",
+                                                borderRadius: 2,
+                                            }}
+                                        >
+                                            {w}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {neg.length > 0 && (
+                            <div>
+                                <p className="text-[9px] font-mono mb-1" style={{ color: "hsl(var(--sell))" }}>
+                                    NEGATIVE ({neg.length})
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                    {neg.map((w) => (
+                                        <span
+                                            key={`n-${w}`}
+                                            className="font-mono text-[10px] px-1.5 py-0.5"
+                                            style={{
+                                                background: "hsla(0, 55%, 55%, 0.12)",
+                                                color: "hsl(var(--sell))",
+                                                borderRadius: 2,
+                                            }}
+                                        >
+                                            {w}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+                <p
+                    className="text-[9px] font-mono mt-2 pt-2"
+                    style={{
+                        color: "hsl(var(--text-muted))",
+                        borderTop: "1px solid hsl(var(--border-divider))",
+                    }}
+                >
+                    Neulab keyword heuristic
+                </p>
+            </div>
+        </div>
+    );
+}
+
+/* 8-day (7 past + today) sentiment sparkline — compact visual */
+function SentimentSparkline({ points }) {
+    if (!points?.length) return null;
+    const W = 72;
+    const H = 22;
+    const n = points.length;
+    const step = W / Math.max(n - 1, 1);
+    // y = 0 → score +1 at top; y = H → score -1 at bottom; y = H/2 → score 0
+    const toY = (s) => H / 2 - (Math.max(-1, Math.min(1, s)) * (H / 2 - 2));
+    const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${(i * step).toFixed(1)},${toY(p.score).toFixed(1)}`).join(" ");
+    const tooltipTitle = points
+        .map((p) => `${p.date}: ${p.score >= 0 ? "+" : ""}${p.score} (${p.total} articles)`)
+        .join("\n");
+    return (
+        <div
+            className="flex items-center gap-1.5"
+            title={tooltipTitle}
+            data-testid="sentiment-sparkline"
+        >
+            <span
+                className="font-mono text-[9px]"
+                style={{ color: "hsl(var(--text-muted))", letterSpacing: "0.08em" }}
+            >
+                7D
+            </span>
+            <svg width={W} height={H} style={{ display: "block" }} aria-label="7-day sentiment trend">
+                {/* Zero line */}
+                <line
+                    x1={0}
+                    x2={W}
+                    y1={H / 2}
+                    y2={H / 2}
+                    stroke="hsl(var(--border-divider))"
+                    strokeDasharray="2,2"
+                    strokeWidth="0.5"
+                />
+                {/* Line */}
+                <path
+                    d={path}
+                    fill="none"
+                    stroke="hsl(var(--hold))"
+                    strokeWidth="1.3"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                />
+                {/* Dots colored by polarity */}
+                {points.map((p, i) => (
+                    <circle
+                        key={`spark-${p.date}`}
+                        cx={i * step}
+                        cy={toY(p.score)}
+                        r={p.total > 0 ? 1.6 : 1}
+                        fill={
+                            p.total === 0
+                                ? "hsl(var(--text-muted))"
+                                : p.score > 0.1
+                                    ? "hsl(var(--buy))"
+                                    : p.score < -0.1
+                                        ? "hsl(var(--sell))"
+                                        : "hsl(var(--hold))"
+                        }
+                        opacity={p.total === 0 ? 0.3 : 1}
+                    />
+                ))}
+            </svg>
+        </div>
     );
 }
 

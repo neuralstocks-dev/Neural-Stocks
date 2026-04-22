@@ -1,0 +1,89 @@
+name: Finnhub Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/services/finnhub.py"
+      - "backend/services/ai.py"
+      - "backend/services/yfinance_svc.py"
+      - "backend/routers/analysis.py"
+      - "backend/services/pdf.py"
+      - "backend/tests/test_finnhub_contract.py"
+      - ".github/workflows/finnhub-contract.yml"
+  push:
+    branches: [main]
+  schedule:
+    # Nightly 02:15 UTC — catches drift in the live Finnhub feed
+    - cron: "15 2 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Fast, offline — runs on every PR. No secrets required. Must pass to merge.
+  # ---------------------------------------------------------------------------
+  unit:
+    name: Unit tests (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest
+
+      - name: Run Finnhub unit tests (no network, no LLM)
+        working-directory: backend
+        env:
+          FINNHUB_API_KEY: ""
+          MONGO_URL: "mongodb://127.0.0.1:27017"
+          DB_NAME: "ci_dummy"
+        run: |
+          python -m pytest tests/test_finnhub_contract.py::TestFinnhubServiceUnits -v --tb=short
+
+  # ---------------------------------------------------------------------------
+  # Full integration — one real Claude + Finnhub call. Runs nightly and on
+  # push to main. Skipped on forked PRs (no access to secrets).
+  # ---------------------------------------------------------------------------
+  integration:
+    name: Integration contract (live)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: unit
+    if: github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest
+
+      - name: Guard — required secret present
+        run: |
+          if [ -z "${{ secrets.PREVIEW_BACKEND_URL }}" ]; then
+            echo "::warning::PREVIEW_BACKEND_URL secret not set — skipping integration run."
+            echo "SKIP_INTEGRATION=1" >> $GITHUB_ENV
+          fi
+
+      - name: Run integration + PDF contract
+        if: env.SKIP_INTEGRATION != '1'
+        working-directory: backend
+        env:
+          REACT_APP_BACKEND_URL: ${{ secrets.PREVIEW_BACKEND_URL }}
+        run: |
+          python -m pytest tests/test_finnhub_contract.py -v --tb=short
