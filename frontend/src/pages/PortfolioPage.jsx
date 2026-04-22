@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
     PieChart,
     Plus,
@@ -14,6 +16,7 @@ import {
     ArrowUpRight,
     Loader2,
     Save,
+    CalendarIcon,
 } from "lucide-react";
 
 function fmtMoney(v, currency = "USD") {
@@ -103,15 +106,42 @@ function AddPositionForm({ onAdd, busy }) {
                     style={inputStyle}
                     data-testid="position-cost-input"
                 />
-                <input
-                    type="date"
-                    placeholder="Purchase date"
-                    value={form.purchase_date}
-                    onChange={(e) => setForm({ ...form, purchase_date: e.target.value })}
-                    className="px-3 py-2 font-mono text-sm"
-                    style={inputStyle}
-                    data-testid="position-date-input"
-                />
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <button
+                            type="button"
+                            className="px-3 py-2 font-mono text-sm inline-flex items-center justify-between"
+                            style={inputStyle}
+                            data-testid="position-date-input"
+                        >
+                            <span style={{ color: form.purchase_date ? "hsl(var(--text-primary))" : "hsl(var(--text-muted))" }}>
+                                {form.purchase_date || "Purchase date"}
+                            </span>
+                            <CalendarIcon size={14} strokeWidth={1.5} style={{ color: "hsl(var(--text-muted))" }} />
+                        </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                        className="w-auto p-0"
+                        align="start"
+                        style={{
+                            background: "hsl(var(--surface))",
+                            border: "1px solid hsl(var(--border-default))",
+                            borderRadius: 2,
+                        }}
+                    >
+                        <Calendar
+                            mode="single"
+                            selected={form.purchase_date ? new Date(form.purchase_date) : undefined}
+                            onSelect={(d) => {
+                                if (!d) return;
+                                const iso = d.toISOString().slice(0, 10);
+                                setForm((prev) => ({ ...prev, purchase_date: iso }));
+                            }}
+                            disabled={(d) => d > new Date()}
+                            data-testid="position-date-calendar"
+                        />
+                    </PopoverContent>
+                </Popover>
                 <button
                     type="submit"
                     disabled={busy}

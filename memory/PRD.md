@@ -17,7 +17,14 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Feb 2026)
 
-- **UI polish (Feb 22)**:
+- **Phase 2 — Portfolio, PDF, Telegram (Feb 22)**:
+  - **Portfolio P&L** (`/portfolio`): New DB collection `portfolio`. Full CRUD at `/api/portfolio`. Computes live cost basis, market value, unrealized P&L (+ %), day change (+ %), allocation % per position using yfinance quotes. Add/Edit/Delete inline. Ticker deep-links to Analysis Report. Date picker uses shadcn Calendar + Popover.
+  - **PDF Export**: `GET /api/analysis/{analysis_id}/pdf` returns a branded PDF via `reportlab`. Includes verdict, reasoning, candlestick findings (Daily/Weekly tables + Primary/Confirmation/Rejected summary), risks, and disclaimer. Owner-scoped (404 for cross-user). "Export PDF" button on AnalysisReportPage.
+  - **Telegram Alerts**: New `TELEGRAM_BOT_TOKEN` + `TELEGRAM_BOT_USERNAME` env vars. Routes: `/api/telegram/status|link|poll|unlink|test`. User generates a 6-digit code in Settings, sends to the bot, frontend polls `/telegram/poll` which runs `getUpdates` and auto-links any matching code. Pattern alerts now push to linked chats via fire-and-forget `send_alert_to_user()`. Works out-of-the-box once admin provides bot token — currently shows "Bot not configured" banner gracefully.
+  - Nav: added **Portfolio** and **Settings** to main AppShell menu.
+  - Dependencies: added `reportlab==4.4.10` for PDF generation.
+- **UI polish (earlier Feb 22)**: Analysis Report mode selector disabled on existing verdicts. Why Us cleanup. Pricing updated. Admin list shows analyses/day + ∞ for admins/unlock.
+- **Pattern Alerts**: `POST /api/patterns/scan`
   - Analysis Report page: mode selector is now **disabled when viewing an existing verdict** — all three pills are locked, the active pill reflects `analysis.mode`, cursor is `not-allowed`, and the label changes from "Mode" to "Mode used" with a description stating the verdict's mode. Re-analyze preserves the same mode. To run a different mode, user returns to Dashboard and picks it there.
   - Why Us page: removed 4 coming-soon modules (Catalyst Radar, Risk Guard, Market Pulse, Screener Studio). Added new **Candlestick Strategy** module that mentions the 3 analyzer modes (Standard AI / Candlestick / Hybrid) with a link to pattern detectors, timeframes, and Claude reasoning.
   - Pricing page: added 3 new bullet points per tier — "Standard AI analysis mode" (always on), "Candlestick & Hybrid analysis modes" (Pro/Elite), "Watchlist pattern scan (15 patterns)" (Pro/Elite). Matrix shows strike-through on Free, check on Pro/Elite.
