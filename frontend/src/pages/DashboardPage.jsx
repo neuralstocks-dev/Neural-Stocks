@@ -155,21 +155,21 @@ export default function DashboardPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [timelineTicker, setTimelineTicker] = useState(null);
     const [actionError, setActionError] = useState("");
-    // Analyze-mode is chosen here and passed into every analyze call.
-    // Default to 'hybrid' for Pro+, 'standard' for Free. `canQuickActions`
-    // doubles as our Pro+ gate (same as Top/Bottom 3 and Timeline).
-    const [analyzeMode, setAnalyzeMode] = useState("standard");
 
     const plan = user?.plan || "free";
     const canQuickActions = quota?.quick_actions ?? (plan !== "free");
     const watchlistLimit = quota?.watchlist_limit ?? (plan === "free" ? 3 : plan === "pro" ? 10 : 25);
     const watchlistFull = items.length >= watchlistLimit;
 
-    // Once we know if user is Pro+, promote default to 'hybrid'.
+    // Analyze-mode: picked here and passed into every analyze call. Default is
+    // computed synchronously from user.plan so the UI never flashes the wrong
+    // pill on first paint.
+    const [analyzeMode, setAnalyzeMode] = useState(() => (plan !== "free" ? "hybrid" : "standard"));
+
+    // If plan changes (e.g. admin test-unlock flips quota), align the default.
+    // Never downgrade a user's explicit choice silently — only adjust if the
+    // current mode becomes locked.
     useEffect(() => {
-        if (canQuickActions && analyzeMode === "standard") {
-            setAnalyzeMode("hybrid");
-        }
         if (!canQuickActions && analyzeMode !== "standard") {
             setAnalyzeMode("standard");
         }

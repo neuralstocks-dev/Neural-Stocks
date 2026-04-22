@@ -17,10 +17,18 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Feb 2026)
 
+- **Analysis Modes**: The Analyze Now engine now supports three modes selectable from the Dashboard and the Analysis Report page:
+  - **Standard** (Mode A) — existing AI analysis using technicals, fundamentals, momentum. Available to all users (default for Free).
+  - **Candlestick** (Mode B) — AI verdict driven primarily by detected candlestick patterns. *Pro/Elite only.*
+  - **Hybrid** (Mode C, ★ default for Pro+) — AI fuses fundamentals + technicals + candlestick patterns, using patterns as timing/confirmation signals. *Pro/Elite only.*
+  - Backend: `POST /api/analysis/{ticker}?mode=standard|candlestick|hybrid`. Pure-Python detector `services/candlestick.py` scans 15 common patterns (Doji, Hammer, Inverted Hammer, Shooting Star, Hanging Man, Bullish/Bearish Engulfing, Morning/Evening Star, Harami, Three White Soldiers / Black Crows, Piercing Line, Dark Cloud Cover, Tweezer Top/Bottom) on both **daily and weekly** timeframes and returns bias, strength, explanation per pattern + combined bias score.
+  - UI: New `AnalysisModeSelector` component (3-pill group, Pro-gated) + new `CandlestickFindings` section on Analysis Report showing Daily/Weekly pattern columns + Primary/Confirmation/Rejected pattern summary from the AI.
+  - Tests: `backend/tests/test_candlestick.py` (11/11 passing).
 - Scorecard **timeframe filter** (7 days / 1 month / 3 months). Backend `/api/scorecard/me` and `/api/scorecard/global` accept `?timeframe=7|30|90` overriding `min_age_days`.
 - WhyUs module rename: **"Alpha Score" → "Score Card"** (clickable — routes to `/scorecard`).
 - WhyUs module rename: **"Explain Panel" → "AI Explain Panels"** with new description referencing confidence % + short/medium/long-term fit.
 - WhyUs "How it works" step 02 updated: "composite Score Card ratings".
+- **PayPal LIVE webhook** registered and verified reachable: `PAYPAL_WEBHOOK_ID=8LP24872BC452025J`. Simulator events fail signature (known quirk); real events will verify correctly.
 
 ## 2. Tech Stack
 
@@ -155,6 +163,7 @@ Pro/Elite · Claude scores short/medium/long-term horizons · 24h cache · Modal
 | 7 | 14/14 backend + 12/12 frontend | 100% |
 | 8 | Manual smoke tested · pending full regression on prod | Ready to deploy |
 | 9 | Manual smoke (Feb 2026) — scorecard timeframe filter + Why Us module rename verified | ✅ |
+| 10 | 6/6 backend + 11/12 frontend — Analysis Modes (standard / candlestick / hybrid) end-to-end | ✅ zero critical issues |
 
 ## 10. Known Non-Blockers
 
