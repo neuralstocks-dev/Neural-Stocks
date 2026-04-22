@@ -158,7 +158,7 @@ export default function PricingPage() {
                                 <strong>{promoLabel || "Promo active"}</strong>
                                 {plans?.pro?.promo_discount_pct > 0 && <> · Pro <strong style={{ color: "hsl(var(--buy))" }}>{Math.round(plans.pro.promo_discount_pct)}% off</strong></>}
                                 {plans?.elite?.promo_discount_pct > 0 && <> · Elite <strong style={{ color: "hsl(var(--buy))" }}>{Math.round(plans.elite.promo_discount_pct)}% off</strong></>}
-                                {" monthly · applied automatically at checkout."}
+                                {" first month, then regular price applies. Cancel anytime."}
                             </p>
                         </div>
                     </div>
@@ -374,6 +374,16 @@ export default function PricingPage() {
                                                 data-testid={`promo-label-${key}`}
                                             >
                                                 ✨ {p.promo_label}
+                                            </p>
+                                        )}
+                                        {cycle === "monthly" && p.promo_discount_pct > 0 && (
+                                            <p
+                                                className="text-[11px] mt-1.5 font-mono leading-snug"
+                                                style={{ color: "hsl(var(--text-muted))" }}
+                                                data-testid={`promo-disclaimer-${key}`}
+                                            >
+                                                First month <span style={{color:"hsl(var(--buy))"}}>${Number(p.price_usd).toFixed(2)}</span>,
+                                                then <span style={{color:"hsl(var(--text-primary))"}}>${Number(p.price_usd_original).toFixed(2)}/mo</span>. Cancel anytime.
                                             </p>
                                         )}
                                         {cycle === "yearly" && key !== "free" && (

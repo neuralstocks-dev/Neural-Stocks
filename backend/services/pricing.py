@@ -64,12 +64,14 @@ async def get_pricing() -> dict:
     elite_effective = _apply_promo(elite, promo_elite) if promo_active and promo_elite > 0 else elite
 
     return {
-        # Effective (promo-applied) prices used everywhere in checkout + display
+        # Display prices. For monthly with promo, pro_monthly is the FIRST-MONTH price.
+        # Subsequent months charge pro_monthly_original (handled by PayPal trial/regular cycles).
         "pro_monthly": pro_effective,
         "elite_monthly": elite_effective,
-        "pro_yearly": _yearly_from_monthly(pro_effective, discount),
-        "elite_yearly": _yearly_from_monthly(elite_effective, discount),
-        # Originals for strikethrough UI
+        # Yearly is unaffected by the monthly promo — promo applies only to the first month.
+        "pro_yearly": _yearly_from_monthly(pro, discount),
+        "elite_yearly": _yearly_from_monthly(elite, discount),
+        # Originals for strikethrough UI + PayPal regular-cycle price
         "pro_monthly_original": pro,
         "elite_monthly_original": elite,
         # Promo metadata

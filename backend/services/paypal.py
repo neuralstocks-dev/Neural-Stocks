@@ -93,23 +93,38 @@ async def _ensure_product() -> str:
 
 
 async def _create_plan(product_id: str, name: str, price_usd: float,
-                       interval_unit: str = "MONTH", interval_count: int = 1) -> str:
+                       interval_unit: str = "MONTH", interval_count: int = 1,
+                       trial_price_usd: float | None = None,
+                       trial_cycles: int = 0) -> str:
+    """Create a PayPal billing plan. If trial_price_usd is provided and
+    trial_cycles > 0, the plan has a TRIAL cycle (discounted) followed by the
+    REGULAR cycle (full price) — used for first-month promo pricing."""
+    billing_cycles = []
+    if trial_price_usd is not None and trial_cycles > 0:
+        billing_cycles.append({
+            "frequency": {"interval_unit": interval_unit, "interval_count": interval_count},
+            "tenure_type": "TRIAL",
+            "sequence": 1,
+            "total_cycles": int(trial_cycles),
+            "pricing_scheme": {
+                "fixed_price": {"value": f"{trial_price_usd:.2f}", "currency_code": "USD"},
+            },
+        })
+    billing_cycles.append({
+        "frequency": {"interval_unit": interval_unit, "interval_count": interval_count},
+        "tenure_type": "REGULAR",
+        "sequence": len(billing_cycles) + 1,
+        "total_cycles": 0,  # infinite
+        "pricing_scheme": {
+            "fixed_price": {"value": f"{price_usd:.2f}", "currency_code": "USD"},
+        },
+    })
     body = {
         "product_id": product_id,
         "name": name,
         "description": name,
         "status": "ACTIVE",
-        "billing_cycles": [
-            {
-                "frequency": {"interval_unit": interval_unit, "interval_count": interval_count},
-                "tenure_type": "REGULAR",
-                "sequence": 1,
-                "total_cycles": 0,  # infinite
-                "pricing_scheme": {
-                    "fixed_price": {"value": f"{price_usd:.2f}", "currency_code": "USD"}
-                },
-            }
-        ],
+        "billing_cycles": billing_cycles,
         "payment_preferences": {
             "auto_bill_outstanding": True,
             "setup_fee": {"value": "0", "currency_code": "USD"},
@@ -151,7 +166,9 @@ _PLAN_VARIANTS = [
 
 async def get_plan_ids(prices: dict) -> dict:
     """Ensure PayPal plans exist for current prices (monthly + yearly for both tiers).
-    Creates / rotates as needed. Returns {pro_monthly, pro_yearly, elite_monthly, elite_yearly}."""
+    Monthly plans may include a TRIAL cycle (first-month promo) followed by the
+    REGULAR cycle at the original monthly price. Creates / rotates as needed.
+    Returns {pro_monthly, pro_yearly, elite_monthly, elite_yearly}."""
     doc = await db.settings.find_one({"id": PLAN_IDS_SETTINGS_ID}, {"_id": 0}) or {
         "id": PLAN_IDS_SETTINGS_ID
     }
@@ -160,21 +177,56 @@ async def get_plan_ids(prices: dict) -> dict:
     product_id = await _ensure_product()
     changed = False
 
+    # Derive trial vs regular price per monthly variant
+    promo_active = bool(prices.get("promo_active"))
+    monthly_specs = {
+        "pro_monthly": {
+            "regular": float(prices["pro_monthly_original"]),
+            "trial": float(prices["pro_monthly"]) if promo_active and prices.get("promo_pro_discount_pct", 0) > 0 else None,
+        },
+        "elite_monthly": {
+            "regular": float(prices["elite_monthly_original"]),
+            "trial": float(prices["elite_monthly"]) if promo_active and prices.get("promo_elite_discount_pct", 0) > 0 else None,
+        },
+    }
+
     for key, tier, cycle, price_field, name_suffix, interval_unit in _PLAN_VARIANTS:
-        want_price = float(prices[price_field])
+        if cycle == "monthly":
+            spec = monthly_specs[key]
+            want_regular = spec["regular"]
+            want_trial = spec["trial"]  # None when no promo, else discounted first-month price
+        else:
+            want_regular = float(prices[price_field])
+            want_trial = None
+
+        # Only tier up when any of (regular_price, trial_price) changed. Trial
+        # is considered None when equal to regular (no promo).
         current = bucket.get(key) or {}
-        if current.get("price") == want_price and current.get("plan_id"):
+        if (
+            current.get("price") == want_regular
+            and current.get("trial_price") == want_trial
+            and current.get("plan_id")
+        ):
             continue
+
         new_plan_id = await _create_plan(
             product_id,
             f"Neural {name_suffix}",
-            want_price,
+            want_regular,
             interval_unit=interval_unit,
             interval_count=1,
+            trial_price_usd=want_trial,
+            trial_cycles=1 if want_trial is not None else 0,
         )
         if current.get("plan_id"):
             await _deactivate_plan(current["plan_id"])
-        bucket[key] = {"plan_id": new_plan_id, "price": want_price, "cycle": cycle, "tier": tier}
+        bucket[key] = {
+            "plan_id": new_plan_id,
+            "price": want_regular,
+            "trial_price": want_trial,
+            "cycle": cycle,
+            "tier": tier,
+        }
         changed = True
 
     if changed:

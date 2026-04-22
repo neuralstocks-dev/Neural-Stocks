@@ -544,7 +544,7 @@ export default function AdminPage() {
                                     </label>
                                 </div>
                                 <p className="text-xs mt-2 font-mono" style={{ color: "hsl(var(--text-muted))" }}>
-                                    Set 0% to disable. Active promos show a strikethrough + badge on the user Pricing page and rotate PayPal plans to the discounted monthly price.
+                                    Applies to the <strong>first month only</strong> of new monthly subscriptions (PayPal trial cycle) — subsequent months charge the regular price automatically. Set 0% to disable. Yearly plans unaffected.
                                 </p>
                             </div>
 
