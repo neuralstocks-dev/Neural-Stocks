@@ -16,6 +16,7 @@ import ScorecardPage from "@/pages/ScorecardPage";
 import WhyUsPage from "@/pages/WhyUsPage";
 import PortfolioPage from "@/pages/PortfolioPage";
 import SettingsPage from "@/pages/SettingsPage";
+import PaypalSmokeTestPage from "@/pages/PaypalSmokeTestPage";
 import { Loader2 } from "lucide-react";
 
 function Protected({ children }) {
@@ -116,6 +117,14 @@ function AppRoutes() {
                 element={
                     <Protected>
                         <SettingsPage />
+                    </Protected>
+                }
+            />
+            <Route
+                path="/admin/paypal-smoke-test"
+                element={
+                    <Protected>
+                        <PaypalSmokeTestPage />
                     </Protected>
                 }
             />

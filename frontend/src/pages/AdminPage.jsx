@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { Loader2, ShieldCheck, Clock, RotateCcw, Search, Trash2, BellOff, DollarSign, CheckSquare, Square, AlertTriangle, Sparkles } from "lucide-react";
 import { timeAgo } from "@/lib/format";
 
@@ -342,6 +342,17 @@ export default function AdminPage() {
                     Grant any user a timed <em className="italic" style={{ color: "hsl(var(--hold))" }}>Elite test-unlock</em>.
                     Reset any user back to Free. Users must log out and log back in to see the change.
                 </p>
+
+                <div className="mt-5 flex flex-wrap gap-3" data-testid="admin-quick-links">
+                    <Link
+                        to="/admin/paypal-smoke-test"
+                        className="btn-ghost text-sm"
+                        style={{ borderColor: "hsl(var(--hold))" }}
+                        data-testid="link-paypal-smoke-test"
+                    >
+                        PayPal smoke test ($1 diagnostic) →
+                    </Link>
+                </div>
 
                 {message && (
                     <div className="signal-buy px-4 py-3 mt-6 font-mono text-sm" data-testid="admin-message">

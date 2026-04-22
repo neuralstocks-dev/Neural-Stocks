@@ -6,7 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from core.config import PAYPAL_CLIENT_ID, PAYPAL_ENV
+from core.config import PAYPAL_CLIENT_ID, PAYPAL_ENV, ADMIN_EMAILS
 from core.db import db
 from core.security import get_current_user, iso, now_utc
 from services.pricing import get_pricing
@@ -15,12 +15,25 @@ from services.paypal import (
     get_subscription,
     cancel_subscription,
     verify_webhook_signature,
+    _ensure_product,
+    _create_plan,
     PayPalError,
 )
 from services.email import send_receipt_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billing", tags=["billing"])
+
+SMOKE_TEST_SETTINGS_ID = "paypal_smoke_test_plan"
+
+
+def _require_admin(user: dict):
+    if (user.get("email") or "").lower() not in ADMIN_EMAILS and not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin only")
+
+
+class SmokeActivateReq(BaseModel):
+    subscription_id: str
 
 
 class ActivateReq(BaseModel):
@@ -254,3 +267,110 @@ async def paypal_webhook(request: Request):
             )
 
     return {"received": True, "verified": True, "event": event_type}
+
+
+
+# =============================================================================
+# Smoke test — admin-only PayPal end-to-end diagnostic ($1/mo plan)
+# =============================================================================
+# Purpose: prove the full PayPal Live round-trip (button → approve → server-side
+# subscription lookup → receipt) with a real card + real cheap price. Does NOT
+# touch the caller's plan — the user stays on their original tier. Intended for
+# admin diagnostics only. The $1 subscription should be cancelled from the
+# buyer's PayPal account after the test to avoid recurring billing.
+
+@router.get("/smoke-test/plan")
+async def smoke_test_plan(user=Depends(get_current_user)):
+    """Returns ($1/mo PayPal Live) plan_id + client_id. Creates the plan once
+    and caches in db.settings. Admin-only."""
+    _require_admin(user)
+    doc = await db.settings.find_one({"id": SMOKE_TEST_SETTINGS_ID}, {"_id": 0}) or {}
+    env_key = f"plan_id_{PAYPAL_ENV}"
+    if doc.get(env_key):
+        return {
+            "client_id": PAYPAL_CLIENT_ID,
+            "env": PAYPAL_ENV,
+            "plan_id": doc[env_key],
+            "price": 1.0,
+            "cached": True,
+        }
+    # Create the $1/mo plan under the shared Neural product
+    try:
+        product_id = await _ensure_product()
+        plan_id = await _create_plan(
+            product_id,
+            "Neural Smoke Test $1/mo",
+            1.0,
+            interval_unit="MONTH",
+            interval_count=1,
+        )
+    except PayPalError as e:
+        raise HTTPException(status_code=502, detail=f"PayPal plan create failed: {e}")
+    await db.settings.update_one(
+        {"id": SMOKE_TEST_SETTINGS_ID},
+        {"$set": {"id": SMOKE_TEST_SETTINGS_ID, env_key: plan_id, "created_at": iso(now_utc())}},
+        upsert=True,
+    )
+    logger.info("Smoke-test plan created: %s (env=%s)", plan_id, PAYPAL_ENV)
+    return {
+        "client_id": PAYPAL_CLIENT_ID,
+        "env": PAYPAL_ENV,
+        "plan_id": plan_id,
+        "price": 1.0,
+        "cached": False,
+    }
+
+
+@router.post("/smoke-test/activate")
+async def smoke_test_activate(req: SmokeActivateReq, user=Depends(get_current_user)):
+    """Looks up the subscription with our PayPal Live creds and returns the
+    full PayPal response. Intentionally does NOT mutate user.plan — this is a
+    diagnostic, not an upgrade. Admin-only."""
+    _require_admin(user)
+    try:
+        sub = await get_subscription(req.subscription_id)
+    except PayPalError as e:
+        logger.warning("Smoke-test lookup FAILED for %s: %s", req.subscription_id, e)
+        raise HTTPException(status_code=502, detail=f"PayPal lookup failed: {e}")
+
+    # Record the diagnostic so we can inspect later
+    diagnostic = {
+        "id": str(uuid.uuid4()),
+        "subscription_id": req.subscription_id,
+        "admin_user_id": user["id"],
+        "admin_email": user.get("email"),
+        "paypal_status": (sub.get("status") or "").upper(),
+        "plan_id": sub.get("plan_id"),
+        "start_time": sub.get("start_time"),
+        "raw": sub,
+        "created_at": iso(now_utc()),
+    }
+    await db.smoke_test_results.insert_one(diagnostic)
+    diagnostic.pop("_id", None)
+    logger.info(
+        "Smoke-test activation OK: sub=%s status=%s plan=%s",
+        req.subscription_id, diagnostic["paypal_status"], diagnostic["plan_id"],
+    )
+    return {
+        "ok": True,
+        "subscription_id": req.subscription_id,
+        "paypal_status": diagnostic["paypal_status"],
+        "plan_id": diagnostic["plan_id"],
+        "start_time": diagnostic["start_time"],
+        "raw": sub,  # full PayPal response surfaced to the UI for inspection
+        "note": "This was a diagnostic only. Your Neulab plan was NOT changed. "
+                "Cancel the $1 recurring subscription in your PayPal account "
+                "(Activity → Manage Subscriptions → Cancel) to avoid next month's charge.",
+    }
+
+
+@router.get("/smoke-test/history")
+async def smoke_test_history(user=Depends(get_current_user)):
+    """Recent smoke-test diagnostics for this admin."""
+    _require_admin(user)
+    items = (
+        await db.smoke_test_results.find({}, {"_id": 0, "raw": 0})
+        .sort("created_at", -1)
+        .to_list(20)
+    )
+    return {"count": len(items), "results": items}
