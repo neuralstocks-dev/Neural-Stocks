@@ -43,6 +43,19 @@ async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
             "read": False,
             "created_at": iso(now_utc()),
         })
+        # Fire-and-forget Telegram push (if linked)
+        try:
+            from services.telegram import send_alert_to_user
+            target = analysis.get("price_target")
+            target_line = f"\nTarget: ${target}" if target else ""
+            mode = (analysis.get("mode") or "standard").capitalize()
+            asyncio.create_task(send_alert_to_user(
+                user_id,
+                f"{rec} · {ticker} · {conf}%",
+                f"{analysis.get('executive_summary', '')}{target_line}\n\nMode: {mode}",
+            ))
+        except Exception:
+            pass
 
 
 @router.post("/analysis/{ticker}")
