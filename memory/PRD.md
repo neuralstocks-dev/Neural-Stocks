@@ -17,6 +17,7 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Feb 2026)
 
+- **Telegram LIVE (Feb 22)**: `neulab_bot` is operational. `TELEGRAM_BOT_TOKEN` + `TELEGRAM_BOT_USERNAME=neulab_bot` in `.env`. End-to-end verified: user can link account via Settings → 6-digit code → bot, and receive test + pattern alerts. Pattern scan now auto-pushes every detected high-strength pattern to linked chats via fire-and-forget helper.
 - **Candlestick modes now FREE for all tiers (Feb 22)**: Removed the Pro/Elite gate on `mode=candlestick|hybrid` in `/api/analysis/{ticker}`. Pricing matrix + feature bullets updated — all 3 modes available to Free users. Pattern scan (bulk watchlist) remains a Pro/Elite perk.
 - **Pattern Reference Guide (Feb 22)**: New `PatternGuideDialog` component (accessible via "Learn about patterns" button inside the Candlestick Findings section of any verdict). Displays all 15 supported patterns with Shape / What it means / How to read it / Best when. Searchable + bias-filterable. Patterns detected in the current verdict are highlighted and surface first.
 - **Phase 2 — Portfolio, PDF, Telegram (Feb 22)**:
