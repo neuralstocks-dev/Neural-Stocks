@@ -24,6 +24,7 @@ import {
     Loader2,
     Lock,
     Clock,
+    Zap,
 } from "lucide-react";
 
 function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyzing, canTimeline }) {
@@ -312,6 +313,40 @@ export default function DashboardPage() {
         setAlerts((prev) => prev.map((a) => ({ ...a, read: true })));
     };
 
+    const scanPatterns = async () => {
+        if (items.length === 0) {
+            setActionError("Add stocks to your watchlist first");
+            return;
+        }
+        disclaimer.ensureAccepted(async () => {
+            setActionError("");
+            setQuickBusy("patterns");
+            try {
+                const r = await api.post("/patterns/scan");
+                const { scanned, detected, alerts_created } = r.data;
+                await fetchAlerts();
+                if (detected === 0) {
+                    setActionError(
+                        `Pattern scan complete · ${scanned} watchlist stocks scanned · no high-strength reversal patterns detected.`
+                    );
+                } else if (alerts_created === 0) {
+                    setActionError(
+                        `Pattern scan complete · ${detected} pattern(s) detected but already alerted (no duplicates created).`
+                    );
+                } else {
+                    setActionError(
+                        `Pattern scan complete · ${alerts_created} new alert(s) for ${detected} detected pattern(s) across ${scanned} stocks. Check Signal Feed →`
+                    );
+                }
+            } catch (err) {
+                if (disclaimer.promptFromError(err)) return;
+                setActionError(errMessage(err?.response?.data?.detail, "Pattern scan failed"));
+            } finally {
+                setQuickBusy(null);
+            }
+        });
+    };
+
     // Performance summary derivations
     const perf = useMemo(() => {
         const changes = items.map((i) => i.quote?.change_pct).filter((v) => v != null);
@@ -453,7 +488,7 @@ export default function DashboardPage() {
                 </section>
 
                 {/* Quick Actions */}
-                <section className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-8">
+                <section className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-8">
                     <button
                         onClick={() => quickAnalyze("top")}
                         className="btn-quick flex items-center justify-between"
@@ -488,6 +523,24 @@ export default function DashboardPage() {
                             <Loader2 size={14} className="animate-spin" />
                         ) : (
                             <TrendingDown size={14} strokeWidth={1.5} />
+                        )}
+                    </button>
+                    <button
+                        onClick={scanPatterns}
+                        className="btn-quick flex items-center justify-between"
+                        disabled={!!quickBusy || !canQuickActions}
+                        title={!canQuickActions ? "Pro/Elite feature" : "Scan watchlist for candlestick reversal patterns — no LLM calls"}
+                        data-testid="scan-patterns-button"
+                    >
+                        <span>
+                            {!canQuickActions ? "Patterns · Pro" : quickBusy === "patterns" ? "Scanning…" : "Scan Patterns"}
+                        </span>
+                        {!canQuickActions ? (
+                            <Lock size={14} strokeWidth={1.5} />
+                        ) : quickBusy === "patterns" ? (
+                            <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                            <Zap size={14} strokeWidth={1.5} />
                         )}
                     </button>
                     <button
@@ -623,12 +676,20 @@ export default function DashboardPage() {
                                 </div>
                             ) : (
                                 alerts.map((a) => {
-                                    const signalColor =
-                                        a.signal === "BUY"
+                                    const isPattern = a.type === "pattern";
+                                    const bias = a.bias; // pattern alerts only
+                                    const signal = a.signal; // signal alerts only
+                                    const accentColor = isPattern
+                                        ? bias === "bullish"
                                             ? "hsl(var(--buy))"
-                                            : a.signal === "SELL"
+                                            : bias === "bearish"
                                             ? "hsl(var(--sell))"
-                                            : "hsl(var(--hold))";
+                                            : "hsl(var(--hold))"
+                                        : signal === "BUY"
+                                        ? "hsl(var(--buy))"
+                                        : signal === "SELL"
+                                        ? "hsl(var(--sell))"
+                                        : "hsl(var(--hold))";
                                     return (
                                         <Link
                                             to={`/analysis/${a.ticker}`}
@@ -636,7 +697,7 @@ export default function DashboardPage() {
                                             className="block px-4 py-4 hover:bg-[hsl(var(--surface-elevated))] transition-colors"
                                             style={{
                                                 borderBottom: "1px solid hsl(var(--border-divider))",
-                                                borderLeft: `2px solid ${signalColor}`,
+                                                borderLeft: `2px solid ${accentColor}`,
                                                 opacity: a.read ? 0.55 : 1,
                                             }}
                                             data-testid={`alert-${a.id}`}
@@ -644,7 +705,24 @@ export default function DashboardPage() {
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono text-sm font-medium">{a.ticker}</span>
-                                                    <SignalBadge signal={a.signal} />
+                                                    {isPattern ? (
+                                                        <span
+                                                            className="font-mono px-2 py-0.5"
+                                                            style={{
+                                                                fontSize: "0.56rem",
+                                                                letterSpacing: "0.12em",
+                                                                color: accentColor,
+                                                                border: `1px solid ${accentColor}`,
+                                                                borderRadius: 2,
+                                                                textTransform: "uppercase",
+                                                            }}
+                                                            data-testid={`pattern-badge-${a.id}`}
+                                                        >
+                                                            {bias || "neutral"}
+                                                        </span>
+                                                    ) : (
+                                                        <SignalBadge signal={signal} />
+                                                    )}
                                                 </div>
                                                 <span className="text-overline" style={{ fontSize: "0.56rem" }}>
                                                     {timeAgo(a.created_at)}
@@ -657,7 +735,9 @@ export default function DashboardPage() {
                                                 {a.message}
                                             </p>
                                             <p className="text-overline mt-1" style={{ fontSize: "0.56rem" }}>
-                                                {a.confidence_score}% conviction
+                                                {isPattern
+                                                    ? `${a.pattern} · ${a.timeframe} · strength ${a.strength}`
+                                                    : `${a.confidence_score}% conviction`}
                                             </p>
                                         </Link>
                                     );

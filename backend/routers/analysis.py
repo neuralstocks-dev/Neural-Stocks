@@ -360,6 +360,109 @@ async def quick_job_status(job_id: str, user=Depends(get_current_user)):
 
 
 # ---------- Alerts ----------
+# Strength threshold for a candlestick pattern to trigger an alert
+PATTERN_ALERT_MIN_STRENGTH = 70
+
+
+@router.post("/patterns/scan")
+async def scan_watchlist_patterns(user=Depends(get_current_user)):
+    """Scan every watchlist stock for high-strength candlestick patterns
+    (daily + weekly). Creates alerts for each qualifying pattern. Pro/Elite only.
+    Runs the pure-Python detector — no LLM calls, fast and free."""
+    await require_accepted(user)
+    p = plan_for(user)
+    if not p["quick_actions"]:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Pattern Scan is a Pro/Elite feature. Upgrade from {p['name']} to unlock watchlist-wide candlestick alerts.",
+        )
+    items = await db.watchlist.find(
+        {"user_id": user["id"]}, {"_id": 0, "user_id": 0}
+    ).to_list(50)
+    if not items:
+        raise HTTPException(status_code=400, detail="Watchlist is empty. Add stocks before running Pattern Scan.")
+
+    tickers = [i["ticker"] for i in items]
+
+    async def _scan_one(ticker: str):
+        try:
+            daily = await asyncio.to_thread(_yf_history_sync, ticker, "3mo", "1d")
+            weekly = await asyncio.to_thread(_yf_history_sync, ticker, "1y", "1wk")
+            findings = scan_daily_and_weekly(daily, weekly)
+            return ticker, findings, None
+        except Exception as e:
+            return ticker, None, str(e)[:200]
+
+    results = await asyncio.gather(*[_scan_one(t) for t in tickers])
+
+    detected = []
+    alerts_created = 0
+    errored = []
+    now_iso = iso(now_utc())
+
+    for ticker, findings, err in results:
+        if err or not findings:
+            errored.append({"ticker": ticker, "error": err or "scan failed"})
+            continue
+        # Combine patterns from both timeframes, keep those above the threshold
+        candidates = []
+        for tf_key in ("daily", "weekly"):
+            tf = findings.get(tf_key) or {}
+            for pat in tf.get("patterns", []):
+                if pat.get("strength", 0) >= PATTERN_ALERT_MIN_STRENGTH and pat.get("bias") in ("bullish", "bearish"):
+                    candidates.append({**pat, "timeframe": tf_key})
+        # Keep the single strongest candidate per ticker to avoid noise
+        if not candidates:
+            continue
+        best = max(candidates, key=lambda c: c["strength"])
+        detected.append({
+            "ticker": ticker,
+            "pattern": best["pattern"],
+            "bias": best["bias"],
+            "strength": best["strength"],
+            "timeframe": best["timeframe"],
+            "candle_date": best.get("candle_date"),
+            "combined_bias": findings.get("combined_bias"),
+        })
+        # Dedupe: skip if an identical unread alert already exists for this
+        # ticker+pattern+candle_date (avoids duplicates across repeated scans).
+        dup = await db.alerts.find_one({
+            "user_id": user["id"],
+            "ticker": ticker,
+            "type": "pattern",
+            "pattern": best["pattern"],
+            "candle_date": best.get("candle_date"),
+            "timeframe": best["timeframe"],
+        })
+        if dup:
+            continue
+        await db.alerts.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": user["id"],
+            "ticker": ticker,
+            "type": "pattern",
+            "pattern": best["pattern"],
+            "bias": best["bias"],
+            "strength": best["strength"],
+            "timeframe": best["timeframe"],
+            "candle_date": best.get("candle_date"),
+            "title": f"{best['pattern']} · {ticker}",
+            "message": f"{best['bias'].upper()} {best['pattern']} detected on {best['timeframe']} timeframe (strength {best['strength']}). {best.get('explanation', '')}",
+            "read": False,
+            "created_at": now_iso,
+        })
+        alerts_created += 1
+
+    return {
+        "scanned": len(tickers),
+        "detected": len(detected),
+        "alerts_created": alerts_created,
+        "patterns": detected,
+        "errored": errored,
+        "threshold": PATTERN_ALERT_MIN_STRENGTH,
+    }
+
+
 @router.get("/alerts")
 async def list_alerts(user=Depends(get_current_user)):
     return (

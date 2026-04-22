@@ -17,6 +17,7 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Feb 2026)
 
+- **Pattern Alerts (NEW)**: `POST /api/patterns/scan` — one-click watchlist-wide candlestick scanner (Pro/Elite). Runs pure-Python detector on daily + weekly candles for every watchlist stock. Creates alerts for patterns with strength ≥ 70 (bullish/bearish only). Idempotent: dedupes on (ticker, pattern, candle_date, timeframe). No LLM calls — fast and free. New "Scan Patterns" button in Dashboard quick actions grid (⚡ Zap icon). Signal Feed now renders pattern alerts with a BULLISH/BEARISH badge (green/red) plus pattern name, timeframe, and strength.
 - **Analysis Modes**: The Analyze Now engine now supports three modes selectable from the Dashboard and the Analysis Report page:
   - **Standard** (Mode A) — existing AI analysis using technicals, fundamentals, momentum. Available to all users (default for Free).
   - **Candlestick** (Mode B) — AI verdict driven primarily by detected candlestick patterns. *Pro/Elite only.*
