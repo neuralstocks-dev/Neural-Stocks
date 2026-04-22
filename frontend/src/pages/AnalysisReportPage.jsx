@@ -6,6 +6,8 @@ import VerdictRing from "@/components/VerdictRing";
 import SignalBadge from "@/components/SignalBadge";
 import ShareVerdictButton from "@/components/ShareVerdictButton";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
+import AnalysisModeSelector from "@/components/AnalysisModeSelector";
+import CandlestickFindings from "@/components/CandlestickFindings";
 import { useAuth } from "@/hooks/useAuth";
 import {
     LineChart,
@@ -46,6 +48,13 @@ export default function AnalysisReportPage() {
     const [loading, setLoading] = useState(true);
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState("");
+    // Pro+ gate — same as Dashboard's canQuickActions
+    const canPro = (user?.plan && user.plan !== "free") || false;
+    const [mode, setMode] = useState(canPro ? "hybrid" : "standard");
+
+    useEffect(() => {
+        setMode(canPro ? "hybrid" : "standard");
+    }, [canPro]);
 
     const load = async () => {
         setLoading(true);
@@ -80,7 +89,7 @@ export default function AnalysisReportPage() {
             setAnalyzing(true);
             setError("");
             try {
-                const r = await api.post(`/analysis/${t}`);
+                const r = await api.post(`/analysis/${t}?mode=${mode}`);
                 setAnalysis(r.data);
             } catch (err) {
                 if (disclaimer.promptFromError(err)) return;
@@ -212,6 +221,17 @@ export default function AnalysisReportPage() {
                                         )}
                                     </button>
                                 </div>
+                            </div>
+
+                            {/* Mode selector */}
+                            <div className="px-5 md:px-8 pb-5" data-testid="report-mode-row">
+                                <AnalysisModeSelector
+                                    value={mode}
+                                    onChange={setMode}
+                                    canPro={canPro}
+                                    size="sm"
+                                    testIdPrefix="report-mode"
+                                />
                             </div>
 
                             {/* Chart */}
@@ -385,6 +405,15 @@ export default function AnalysisReportPage() {
                                         {analysis.reasoning}
                                     </div>
                                 </section>
+
+                                {/* Candlestick Findings (only when present) */}
+                                {analysis.candlestick_findings && (
+                                    <CandlestickFindings
+                                        findings={analysis.candlestick_findings}
+                                        summary={analysis.candlestick_summary}
+                                        mode={analysis.mode}
+                                    />
+                                )}
 
                                 {/* Technical / Fundamental / Peer */}
                                 <section className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mb-1 md:mb-4">

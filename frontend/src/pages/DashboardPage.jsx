@@ -8,6 +8,7 @@ import Sparkline from "@/components/Sparkline";
 import SignalBadge from "@/components/SignalBadge";
 import TestUnlockBanner from "@/components/TestUnlockBanner";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
+import AnalysisModeSelector from "@/components/AnalysisModeSelector";
 import { useAuth } from "@/hooks/useAuth";
 import { formatPrice, formatPct, timeAgo } from "@/lib/format";
 import { errMessage } from "@/lib/errors";
@@ -154,11 +155,26 @@ export default function DashboardPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [timelineTicker, setTimelineTicker] = useState(null);
     const [actionError, setActionError] = useState("");
+    // Analyze-mode is chosen here and passed into every analyze call.
+    // Default to 'hybrid' for Pro+, 'standard' for Free. `canQuickActions`
+    // doubles as our Pro+ gate (same as Top/Bottom 3 and Timeline).
+    const [analyzeMode, setAnalyzeMode] = useState("standard");
 
     const plan = user?.plan || "free";
     const canQuickActions = quota?.quick_actions ?? (plan !== "free");
     const watchlistLimit = quota?.watchlist_limit ?? (plan === "free" ? 3 : plan === "pro" ? 10 : 25);
     const watchlistFull = items.length >= watchlistLimit;
+
+    // Once we know if user is Pro+, promote default to 'hybrid'.
+    useEffect(() => {
+        if (canQuickActions && analyzeMode === "standard") {
+            setAnalyzeMode("hybrid");
+        }
+        if (!canQuickActions && analyzeMode !== "standard") {
+            setAnalyzeMode("standard");
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canQuickActions]);
 
     const fetchWatchlist = useCallback(async () => {
         const r = await api.get("/watchlist/live");
@@ -232,7 +248,7 @@ export default function DashboardPage() {
             setActionError("");
             setAnalyzingTicker(ticker);
             try {
-                await api.post(`/analysis/${ticker}`);
+                await api.post(`/analysis/${ticker}?mode=${analyzeMode}`);
                 await fetchWatchlist();
                 await fetchAlerts();
                 await fetchQuota();
@@ -425,6 +441,16 @@ export default function DashboardPage() {
                         {actionError}
                     </div>
                 )}
+
+                {/* Analysis mode selector — applies to per-row Analyze */}
+                <section className="module px-5 py-4 mb-4" data-testid="analyze-mode-section">
+                    <AnalysisModeSelector
+                        value={analyzeMode}
+                        onChange={setAnalyzeMode}
+                        canPro={canQuickActions}
+                        testIdPrefix="dashboard-mode"
+                    />
+                </section>
 
                 {/* Quick Actions */}
                 <section className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-8">

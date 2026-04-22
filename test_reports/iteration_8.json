@@ -1,0 +1,56 @@
+{
+  "summary": "Iteration 8 (Analysis Modes: standard / candlestick / hybrid) — backend + frontend tested. Backend: 6/6 pytest tests pass (2 skipped due to no cached TSLA hybrid for admin). Verified mode=bogus -> 400, free user -> 402 on hybrid+candlestick with Pro/Elite upgrade message, free user can hit standard (gate not regressed), legacy standard analyses lack candlestick_findings, ONE live MSFT hybrid call (~30s) returned valid {mode:'hybrid', candlestick_findings:{daily,weekly,combined_bias}, recommendation:BUY}. Frontend: Dashboard analyze-mode-section renders 3 pills with correct data-testids (dashboard-mode-standard/candlestick/hybrid). Free user (demo@stockai.io) — Standard enabled, Candlestick+Hybrid disabled with Lock icon + 'UNLOCK CANDLESTICK & HYBRID →' link visible. Pro user (tiers@demo.io) — all 3 pills enabled, Hybrid is default highlighted with ★, no upgrade link. Re-clicked Candlestick → switches state. AnalysisReportPage renders report-mode-selector at top with same 3 pills (report-mode-standard/candlestick/hybrid). MSFT hybrid analysis renders candlestick-findings-module with both candlestick-daily-column and candlestick-weekly-column. Legacy AAPL standard analysis correctly does NOT render the candlestick section (only the mode selector). Did NOT touch billing/subscription flows (PAYPAL_ENV=live).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AnalysisModeSelector (DashboardPage)",
+        "issue": "On Pro user dashboard, the Standard pill background renders amber (rgb(245,159,10)) at the same time as the Hybrid pill background (rgb(238,154,11)) — both look 'active' visually, even though Hybrid is the actual selected mode. Likely cause: initial render flash where state defaults to 'standard' before user-plan resolves and flips it to 'hybrid', OR a CSS hover/focus state lingering. Functionally Hybrid IS the value (verified mode-hybrid star marker present and click actions use hybrid), but the dual-amber appearance is misleading and the visual 'active state' should be exclusive to one pill.",
+        "selector": "[data-testid='dashboard-mode-standard']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Dashboard Analyze button → POST /api/analysis/{ticker}?mode=<selected>",
+        "issue": "Could not verify POST URL contains ?mode=hybrid because the Pro user's watchlist took >2s to load and no Analyze button was visible in time during the test run. tiers@demo.io has AAPL+MSFT in watchlist per test_credentials, so the request integration likely works (main agent confirmed via curl + screenshot), but I did not confirm end-to-end UI→API via Playwright for the watchlist-row Analyze trigger.",
+        "affected_selectors": ["button:has-text('Analyze')"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration9_modes.py",
+    "/app/test_reports/pytest/iteration9_modes.xml"
+  ],
+  "action_items": [
+    "(LOW) Investigate dual-amber appearance of Standard + Hybrid pills on Pro user dashboard. Check if AnalysisModeSelector renders before user-plan/canPro resolves, causing initial active=standard then re-render to active=hybrid without clearing the prior styling. May need to gate the selector render on user load, or add a transition guard.",
+    "(LOW) Add a Playwright test that explicitly waits for watchlist rows then clicks Analyze and asserts the POST URL includes ?mode=hybrid for Pro user.",
+    "Carryover: PayPal webhook ID still unset (by design — PAYPAL_ENV=live)."
+  ],
+  "critical_code_review_comments": [
+    "routers/analysis.py — mode validation, plan gating, and dispatch are clean. Gate (lines 65-71) correctly short-circuits BEFORE quota enforcement and any yfinance/LLM calls — important because it means free-user 402s don't waste API budget. Good.",
+    "routers/analysis.py line 122: doc['candlestick_findings'] = candlestick_findings is set AFTER {**analysis} spread, so even if the AI accidentally returned a candlestick_findings key in its JSON, it would be overwritten by the canonical scanner output — desirable.",
+    "services/candlestick.py — pure-Python scanner is well-structured, deterministic, and has no external deps. Already covered by 11/11 tests in test_candlestick.py per main agent. The scan_daily_and_weekly weighted combined_bias (60% daily / 40% weekly) is a reasonable default but is a magic number — consider extracting to a constant for tunability.",
+    "AnalysisModeSelector.jsx — locked Pro pills have disabled=true AND cursor:not-allowed AND title='requires Pro/Elite'. Triple-coverage is good for accessibility. Lock icon + reduced opacity make it visually obvious. ★ marker on Hybrid for the recommended badge is a nice touch.",
+    "CandlestickFindings.jsx — gracefully handles findings=null (returns null), zero-pattern case (renders 'No qualifying patterns' note), and missing summary (omits How-AI-used block). data-testid coverage is excellent (candlestick-findings-module, candlestick-daily-column, candlestick-weekly-column, candlestick-summary-block, pattern-row-{name}). Good.",
+    "Backward compatibility verified: GET /api/analysis/AAPL/latest returns the legacy doc with no 'mode' key and no 'candlestick_findings' — and the UI correctly does NOT render the section, instead just shows the mode selector. Excellent backward-compat handling.",
+    "_public_view (line 387) correctly forwards mode/candlestick_summary/candlestick_findings to public share endpoint, so shared verdicts will render the candlestick UI for hybrid analyses. Good."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration9_modes.py (NEW — 8 tests, 6 pass + 2 skip)"
+  ],
+  "success_rate": {
+    "backend": "6/6 active tests pass (100%); 2 skipped due to environment (no cached TSLA hybrid for admin user)",
+    "frontend": "11/12 assertions pass (all selector presence, all gating, all icons, all colors, hybrid CandlestickFindings render, legacy AAPL exclusion). 1 visual quirk noted: Standard pill bg also amber for Pro user."
+  },
+  "test_credentials": "Admin (elite): jolor69@gmail.com/admin1234 · Pro: tiers@demo.io/pass1234 (watchlist: AAPL+MSFT, now also has hybrid MSFT cached) · Free: demo@stockai.io/demo1234",
+  "seed_data_creation": "ONE live hybrid analysis triggered on MSFT for tiers@demo.io (Pro user), now cached in db.analyses with mode=hybrid + candlestick_findings. Future test runs will skip the live LLM call thanks to the 'check-existing' guard in test_pro_user_can_invoke_hybrid_if_needed. Total LLM call cost across this iteration: 1 hybrid call (~30s).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: `REACT_APP_BACKEND_URL=https://p1-builder.preview.emergentagent.com python -m pytest backend/tests/test_iteration9_modes.py -v` (~5s if MSFT hybrid cache hits, ~60s for cold run). data-testid map for analysis modes: analyze-mode-section (dashboard wrapper), report-mode-selector (report page wrapper), dashboard-mode-{standard|candlestick|hybrid} (dashboard pills), report-mode-{standard|candlestick|hybrid} (report pills), dashboard-mode-upgrade-link (free-user CTA), candlestick-findings-module (whole section), candlestick-daily-column / candlestick-weekly-column, candlestick-summary-block, candlestick-primary-patterns / -confirmation-patterns / -rejected-patterns, pattern-row-{name-kebab}. Pro user tiers@demo.io now has hybrid MSFT cached for instant UI tests. AAPL latest is still legacy standard (no mode field, no candlestick_findings) — perfect for backward-compat tests. AVOID any /api/billing/* tests (PAYPAL_ENV=live).",
+  "rca of the issue": "Dual-amber pill issue: AnalysisModeSelector on DashboardPage receives `value` and `canPro` from parent state. On first paint, DashboardPage's analyzeMode state likely defaults to 'standard' (synchronous initialState), then once the user's plan loads asynchronously and resolves canPro=true, the parent flips analyzeMode to 'hybrid'. During the brief render-flush, both pills may share the active background, OR the screenshot capture happened mid-transition. Reproduction via test confirmed both pills had near-identical amber rgb (245,159,10) and (238,154,11) — slightly different rgbs suggest these may actually be different css vars (--hold vs --warning?) rather than a flash. Suggest: in DashboardPage, gate the AnalysisModeSelector mount on `userLoaded && canPro!==undefined` (e.g., {user && <AnalysisModeSelector ...>}) to prevent the initial 'standard' flash; or compute initial analyzeMode synchronously from userPlan rather than via useEffect."
+}

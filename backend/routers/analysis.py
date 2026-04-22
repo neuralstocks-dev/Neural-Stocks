@@ -2,12 +2,13 @@
 import asyncio
 import uuid
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from core.db import db
 from core.security import get_current_user, iso, now_utc
 from services.yfinance_svc import get_quote, _yf_history_sync, _yf_fundamentals_sync, compute_technicals
-from services.ai import run_ai_analysis, run_timeline_analysis
+from services.ai import run_ai_analysis, run_timeline_analysis, run_candlestick_analysis
+from services.candlestick import scan_daily_and_weekly
 from services.quota import enforce_analysis_quota, plan_for, resolved_plan_for
 from routers.disclaimer import require_accepted
 
@@ -17,10 +18,13 @@ router = APIRouter(tags=["analysis"])
 # now run in the background (fire-and-forget), this no longer competes with
 # the ingress 60s budget. We run tickers sequentially inside the job to
 # avoid saturating the single-worker event loop with concurrent LLM calls.
-QUICK_PER_TASK_TIMEOUT = 90.0
+QUICK_PER_TASK_TIMEOUT = 120.0
 QUICK_BATCH_SIZE = 3
 # Strong references to outstanding bg tasks so the GC doesn't drop them
 _BG_TASKS: set = set()
+
+# Supported analysis modes
+ANALYSIS_MODES = {"standard", "candlestick", "hybrid"}
 
 
 async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
@@ -42,18 +46,66 @@ async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
 
 
 @router.post("/analysis/{ticker}")
-async def create_analysis(ticker: str, user=Depends(get_current_user)):
+async def create_analysis(
+    ticker: str,
+    mode: str = Query("standard", description="Analysis mode: standard | candlestick | hybrid"),
+    user=Depends(get_current_user),
+):
+    return await _create_analysis_impl(ticker, mode, user)
+
+
+async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     ticker = ticker.upper().strip()
     await require_accepted(user)
+    mode = (mode or "standard").lower()
+    if mode not in ANALYSIS_MODES:
+        raise HTTPException(status_code=400, detail=f"Invalid mode. Must be one of: {sorted(ANALYSIS_MODES)}")
+
+    # Gate candlestick and hybrid modes behind Pro/Elite (same gate as other pro features)
+    if mode in ("candlestick", "hybrid"):
+        p = plan_for(user)
+        if not p["quick_actions"]:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Candlestick & Hybrid analysis modes are Pro/Elite features. Upgrade from {p['name']} to unlock pattern-based verdicts.",
+            )
+
     await enforce_analysis_quota(user)
     quote_task = get_quote(ticker)
     hist_task = asyncio.to_thread(_yf_history_sync, ticker, "6mo", "1d")
     fund_task = asyncio.to_thread(_yf_fundamentals_sync, ticker)
-    quote, history, fundamentals = await asyncio.gather(quote_task, hist_task, fund_task)
+    # For candlestick/hybrid we also need weekly candles
+    weekly_task = None
+    if mode in ("candlestick", "hybrid"):
+        weekly_task = asyncio.to_thread(_yf_history_sync, ticker, "1y", "1wk")
+
+    gather_args = [quote_task, hist_task, fund_task]
+    if weekly_task is not None:
+        gather_args.append(weekly_task)
+    results = await asyncio.gather(*gather_args)
+    quote, history, fundamentals = results[0], results[1], results[2]
+    weekly_history = results[3] if weekly_task is not None else []
+
     if quote.get("price") is None:
         raise HTTPException(status_code=404, detail=f"No data for ticker {ticker}")
     technicals = compute_technicals(history)
-    analysis = await run_ai_analysis(ticker, quote, history, fundamentals, technicals)
+
+    candlestick_findings = None
+    if mode in ("candlestick", "hybrid"):
+        candlestick_findings = scan_daily_and_weekly(history, weekly_history)
+
+    if mode == "candlestick":
+        analysis = await run_candlestick_analysis(
+            ticker, quote, history, fundamentals, technicals, candlestick_findings
+        )
+    elif mode == "hybrid":
+        analysis = await run_ai_analysis(
+            ticker, quote, history, fundamentals, technicals,
+            candlestick_findings=candlestick_findings, mode="hybrid",
+        )
+    else:
+        analysis = await run_ai_analysis(ticker, quote, history, fundamentals, technicals)
+
     doc = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
@@ -63,8 +115,11 @@ async def create_analysis(ticker: str, user=Depends(get_current_user)):
         "quote_snapshot": quote,
         "technicals": technicals,
         "fundamentals": fundamentals,
+        "mode": mode,
         **analysis,
     }
+    if candlestick_findings is not None:
+        doc["candlestick_findings"] = candlestick_findings
     await db.analyses.insert_one(doc)
     doc.pop("_id", None)
     await _maybe_create_alert(user["id"], ticker, analysis)
@@ -233,7 +288,7 @@ async def _run_quick_job(job_id: str, user: dict, kind: str):
         for tk in selected:
             try:
                 r = await asyncio.wait_for(
-                    create_analysis(tk, user=user),
+                    _create_analysis_impl(tk, "standard", user),
                     timeout=QUICK_PER_TASK_TIMEOUT,
                 )
                 results.append({
@@ -345,6 +400,9 @@ def _public_view(analysis: dict) -> dict:
         "peer_comparison": analysis.get("peer_comparison"),
         "risk_factors": analysis.get("risk_factors") or [],
         "time_horizon_weeks": analysis.get("time_horizon_weeks"),
+        "mode": analysis.get("mode") or "standard",
+        "candlestick_summary": analysis.get("candlestick_summary"),
+        "candlestick_findings": analysis.get("candlestick_findings"),
         "technicals": {k: v for k, v in (analysis.get("technicals") or {}).items()
                        if k in ("rsi_14", "sma_20", "sma_50", "macd")},
         "fundamentals": {k: v for k, v in (analysis.get("fundamentals") or {}).items()
