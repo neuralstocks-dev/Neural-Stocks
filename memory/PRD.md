@@ -1,7 +1,7 @@
 # Neural Stock Intelligence™ — PRD
 
 Owner: Emergent Labs Inc. · Product: Neural Stock Intelligence™
-Last updated: Feb 2026
+Last updated: Apr 2026
 
 ---
 
@@ -15,7 +15,17 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 - Admin console for user management + pricing control
 - PayPal subscriptions + Resend email receipts
 
-## 1a. Recent Changes (Feb 2026)
+## 1a. Recent Changes (Apr 2026)
+
+- **Apr 22 — Finnhub market context surfaced in UI + PDF**:
+  - `MarketContextModules.jsx` renders 3 new modules on every Analysis Report between Candlestick Findings and Technical/Fundamental/Peer:
+    - **Recent Headlines** — top 5 news items (last 7 days) with source, timeAgo, per-article sentiment chip (pos/neg/neutral), and click-out link; aggregate sentiment summary + score (-1..+1) in the header.
+    - **Wall Street Consensus** — stacked bar of Strong Buy / Buy / Hold / Sell / Strong Sell, total analyst count, weighted score, and label (BUY / OVERWEIGHT / HOLD / UNDERWEIGHT / SELL). Graceful empty state when no coverage.
+    - **Next Earnings** — date, days-until countdown (amber if ≤7 days), BMO/AMC/DMH label, quarter/year, EPS estimate, revenue estimate.
+  - **PDF export** extended (`services/pdf.py`) — same 3 sections appear in the branded PDF under a "Market Context" header (headlines table, consensus row table, earnings summary line).
+  - **Data Sources footer** (web + PDF) rewritten: live quotes & market context via Finnhub.io; fundamentals/history via yfinance; news sentiment via Neulab keyword heuristic; AI reasoning via Claude Sonnet 4.5.
+
+## 1b. Recent Changes (Feb 2026)
 
 - **Feb 22 — Live Desk guide + full free-tier candlestick**:
   - **Live Desk Guide** (`LiveDeskGuide.jsx`): New dismissable 4-step onboarding banner on Dashboard — (01) Pick a mode → (02) Click Analyze → (03) Read the verdict → (04) Export or share. Persists dismissal in localStorage.

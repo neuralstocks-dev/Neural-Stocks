@@ -8,6 +8,7 @@ import ShareVerdictButton from "@/components/ShareVerdictButton";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import AnalysisModeSelector from "@/components/AnalysisModeSelector";
 import CandlestickFindings from "@/components/CandlestickFindings";
+import MarketContextModules from "@/components/MarketContextModules";
 import { useAuth } from "@/hooks/useAuth";
 import {
     LineChart,
@@ -451,6 +452,9 @@ export default function AnalysisReportPage() {
                                     />
                                 )}
 
+                                {/* Market context — Finnhub: headlines, analyst consensus, earnings */}
+                                <MarketContextModules marketContext={analysis.market_context} />
+
                                 {/* Technical / Fundamental / Peer */}
                                 <section className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mb-1 md:mb-4">
                                     <article className="module p-6" data-testid="technical-module">
@@ -524,10 +528,11 @@ export default function AnalysisReportPage() {
                                         Data sources
                                     </p>
                                     <p className="text-[11px] leading-relaxed font-mono">
-                                        Market quotes, OHLC history &amp; fundamentals: <strong>Yahoo Finance</strong> (via <code>yfinance</code>).
+                                        Market quotes &amp; OHLC history: <strong>Finnhub.io</strong> (live) + <strong>Yahoo Finance</strong> (fundamentals &amp; history, via <code>yfinance</code>).
+                                        {" "}Company news, analyst consensus &amp; earnings calendar: <strong>Finnhub.io</strong>.
+                                        {" "}News sentiment: Neulab keyword heuristic over headlines.
                                         {" "}Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly).
                                         {" "}AI reasoning &amp; verdict synthesis: <strong>Anthropic Claude Sonnet 4.5</strong>.
-                                        {" "}News / press / sentiment feeds: not currently integrated — verdicts are derived from price, technicals, and fundamentals only.
                                     </p>
                                 </section>
 

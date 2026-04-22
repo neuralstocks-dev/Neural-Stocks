@@ -206,14 +206,145 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
         story.append(Paragraph("Risks", s["h2"]))
         story.append(_risk_para(risks, s))
 
+    # Market context (Finnhub) — headlines + analyst consensus + earnings
+    mc = analysis.get("market_context") or {}
+    if mc.get("configured"):
+        news = mc.get("news") or {}
+        consensus = mc.get("analyst_consensus") or {}
+        earnings = mc.get("earnings") or {}
+        # Only break to a new page if there's something to show
+        if news.get("articles") or consensus or earnings:
+            story.append(Spacer(1, 12))
+            story.append(Paragraph("MARKET CONTEXT", s["overline"]))
+            story.append(Paragraph("Live feed snapshot.", s["h2"]))
+
+            # Headlines
+            articles = news.get("articles") or []
+            if articles:
+                overall = (news.get("summary_sentiment") or "neutral").upper()
+                score = news.get("score")
+                score_str = f" (score {score:+.2f})" if isinstance(score, (int, float)) else ""
+                story.append(Paragraph(
+                    f"RECENT HEADLINES · overall {overall}{score_str}",
+                    s["overline"],
+                ))
+                rows = [["", "Headline", "Source", "Bias"]]
+                for idx, a in enumerate(articles[:5], 1):
+                    senti = (a.get("sentiment") or "neutral").upper()
+                    headline = (a.get("headline") or "").strip()
+                    # Truncate defensively so Table wraps cleanly
+                    if len(headline) > 140:
+                        headline = headline[:137] + "…"
+                    rows.append([
+                        str(idx),
+                        Paragraph(headline, s["body"]),
+                        Paragraph((a.get("source") or "—"), s["muted"]),
+                        senti,
+                    ])
+                tbl = Table(rows, colWidths=[0.3 * inch, 4.2 * inch, 1.1 * inch, 0.6 * inch])
+                tbl.setStyle(TableStyle([
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), BRAND_INK),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.5, RULE_GREY),
+                    ("LINEBELOW", (0, 1), (-1, -1), 0.25, RULE_GREY),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]))
+                story.append(tbl)
+                story.append(Spacer(1, 10))
+
+            # Analyst consensus
+            if consensus and consensus.get("total"):
+                label = consensus.get("recommendation_label") or "—"
+                total = consensus.get("total", 0)
+                c_score = consensus.get("score")
+                c_score_str = f"{c_score:+.2f}" if isinstance(c_score, (int, float)) else "—"
+                story.append(Paragraph("WALL STREET CONSENSUS", s["overline"]))
+                story.append(Paragraph(
+                    f"<b>{label}</b> · {total} analysts · score {c_score_str}"
+                    + (f" · period {consensus.get('period')}" if consensus.get("period") else ""),
+                    s["body"],
+                ))
+                rows = [[
+                    "Strong Buy", "Buy", "Hold", "Sell", "Strong Sell",
+                ], [
+                    str(consensus.get("strong_buy", 0)),
+                    str(consensus.get("buy", 0)),
+                    str(consensus.get("hold", 0)),
+                    str(consensus.get("sell", 0)),
+                    str(consensus.get("strong_sell", 0)),
+                ]]
+                tbl = Table(rows, colWidths=[1.2 * inch] * 5)
+                tbl.setStyle(TableStyle([
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.5, RULE_GREY),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]))
+                story.append(tbl)
+                story.append(Spacer(1, 10))
+
+            # Next earnings
+            if earnings and earnings.get("date"):
+                hour_map = {"bmo": "Before market open", "amc": "After market close", "dmh": "During market hours"}
+                hour_lbl = hour_map.get((earnings.get("hour") or "").lower(), "")
+                days_until = earnings.get("days_until")
+                when = ""
+                if isinstance(days_until, int):
+                    when = (
+                        f" (in {days_until} days)" if days_until > 0
+                        else " (today)" if days_until == 0
+                        else f" ({abs(days_until)}d ago)"
+                    )
+                qy = ""
+                if earnings.get("quarter") and earnings.get("year"):
+                    qy = f" · Q{earnings['quarter']} {earnings['year']}"
+                eps = earnings.get("eps_estimate")
+                eps_str = f"${eps:.2f}" if isinstance(eps, (int, float)) else "—"
+                rev = earnings.get("revenue_estimate")
+                if isinstance(rev, (int, float)):
+                    abs_rev = abs(rev)
+                    if abs_rev >= 1e9:
+                        rev_str = f"${rev / 1e9:.2f}B"
+                    elif abs_rev >= 1e6:
+                        rev_str = f"${rev / 1e6:.1f}M"
+                    else:
+                        rev_str = f"${rev:,.0f}"
+                else:
+                    rev_str = "—"
+                story.append(Paragraph("NEXT EARNINGS", s["overline"]))
+                story.append(Paragraph(
+                    f"<b>{earnings.get('date')}</b>{when}{qy}"
+                    + (f" · {hour_lbl}" if hour_lbl else "")
+                    + f" · EPS est. {eps_str} · Revenue est. {rev_str}",
+                    s["body"],
+                ))
+
     # Footer — data sources + disclaimer
     story.append(Spacer(1, 20))
-    story.append(Paragraph(
-        "<b>DATA SOURCES</b> · Market quotes, OHLC history &amp; fundamentals: Yahoo Finance (via yfinance). "
-        "Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly). "
-        "AI reasoning: Anthropic Claude Sonnet 4.5. News / press / sentiment feeds: not currently integrated.",
-        s["muted"],
-    ))
+    finnhub_on = bool(mc.get("configured"))
+    if finnhub_on:
+        data_sources_line = (
+            "<b>DATA SOURCES</b> · Live quotes &amp; market context: Finnhub.io. "
+            "OHLC history &amp; fundamentals: Yahoo Finance (via yfinance). "
+            "Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly). "
+            "News sentiment: Neulab keyword heuristic. AI reasoning: Anthropic Claude Sonnet 4.5."
+        )
+    else:
+        data_sources_line = (
+            "<b>DATA SOURCES</b> · Market quotes, OHLC history &amp; fundamentals: Yahoo Finance (via yfinance). "
+            "Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly). "
+            "AI reasoning: Anthropic Claude Sonnet 4.5."
+        )
+    story.append(Paragraph(data_sources_line, s["muted"]))
     story.append(Spacer(1, 10))
     story.append(Paragraph(
         "This report is generated by Neural Stock Intelligence™ (Neulab) using AI models and publicly available market data. "
