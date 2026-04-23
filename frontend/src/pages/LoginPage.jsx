@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { LineChart, Lock, Mail } from "lucide-react";
+import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 
 const BG_IMAGE =
     "https://static.prod-images.emergentagent.com/jobs/449d5842-eb76-413d-bd7e-07775c2311fa/images/da6e03e36e932405f471d2bb00616910cb10e5c8d593c7714da3cd482bc97e88.png";
@@ -105,6 +106,10 @@ export default function LoginPage() {
                             alerts — all powered by Claude. Built for investors who demand the
                             'why' behind every call.
                         </p>
+
+                        <div className="mt-8 max-w-xl">
+                            <PublicTrendingTicker variant="muted" windowDays={7} limit={8} ctaHref="/signup" ctaLabel="Sign up & run one →" />
+                        </div>
                     </div>
 
                     <div

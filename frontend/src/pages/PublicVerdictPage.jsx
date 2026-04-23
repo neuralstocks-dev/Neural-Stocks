@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import VerdictRing from "@/components/VerdictRing";
 import SignalBadge from "@/components/SignalBadge";
+import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 import { Loader2, LineChart, AlertTriangle, Target, Shield, ArrowUpRight } from "lucide-react";
 import { formatPrice, formatPct, timeAgo, formatCompact } from "@/lib/format";
 
@@ -249,6 +250,16 @@ export default function PublicVerdictPage() {
                             >
                                 Track up to 5 stocks free on <em className="italic" style={{ color: signalColor }}>Neural</em>.
                             </h3>
+
+                            <div className="mt-5 max-w-2xl mx-auto">
+                                <PublicTrendingTicker
+                                    windowDays={7}
+                                    limit={8}
+                                    idxOnly={(a.ticker || "").toUpperCase().endsWith(".JK")}
+                                    ctaHref={null}
+                                />
+                            </div>
+
                             <Link to="/signup" className="btn-primary mt-5 inline-flex">
                                 Create your account →
                             </Link>

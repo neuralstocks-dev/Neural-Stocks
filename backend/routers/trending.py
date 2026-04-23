@@ -2,15 +2,14 @@
 about right now" from the `analyses` collection. Zero external API calls;
 pure MongoDB $group pipeline over the last N days.
 
-Surfaces on the Dashboard as a social-proof acquisition loop: "47 Neulab
-investors analysed BBCA.JK this week" — each row deep-links to an autorun
-verdict so discovery is one click away from action.
+Surfaces on the Dashboard (authed) AND the public marketing touchpoints
+(login / signup / shared-verdict pages) as a social-proof acquisition loop.
 """
 from datetime import timedelta
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 
 from core.db import db
-from core.security import get_current_user, iso, now_utc
+from core.security import iso, now_utc
 
 router = APIRouter(prefix="/trending", tags=["trending"])
 
@@ -20,12 +19,11 @@ async def trending_on_neulab(
     window_days: int = Query(7, ge=1, le=90),
     limit: int = Query(8, ge=1, le=50),
     idx_only: bool = Query(False),
-    _user=Depends(get_current_user),
 ):
     """Returns tickers ordered by how many unique Neulab users analysed them
-    in the last `window_days`. Each entry carries the most-recent verdict
-    for a decision-ready preview (recommendation + confidence). IDX filter
-    is optional for the dedicated IDX panel.
+    in the last `window_days`. PUBLIC endpoint — no auth — because the
+    data is already aggregated (no user identities leak) and it drives
+    social-proof on the marketing pages.
     """
     cutoff = iso(now_utc() - timedelta(days=window_days))
     match: dict = {"created_at": {"$gte": cutoff}}
