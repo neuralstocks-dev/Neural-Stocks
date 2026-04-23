@@ -105,6 +105,14 @@ export default function PublicVerdictPage() {
                             >
                                 {a.quote_snapshot?.name || ""}
                             </span>
+                            <Link
+                                to={`/analysis/${encodeURIComponent(a.ticker)}?autorun=1`}
+                                className="btn-ghost !text-xs inline-flex items-center gap-1 ml-auto"
+                                data-testid="public-run-your-own"
+                                title={`Log in or sign up, then we'll run your own AI analysis on ${a.ticker} immediately`}
+                            >
+                                Run your own on {a.ticker} <ArrowUpRight size={12} strokeWidth={1.5} />
+                            </Link>
                         </div>
 
                         <section className="grid grid-cols-12 gap-1 md:gap-4 mt-8">

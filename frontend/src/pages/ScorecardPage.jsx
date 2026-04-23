@@ -141,6 +141,100 @@ export default function ScorecardPage() {
 
                 {!loading && s && (
                     <>
+                        {/* "Why is this empty?" explainer — rendered when all verdicts are
+                            still pending OR when we have zero verdicts. The common case after
+                            a user's first week: they've run 5 analyses but none are ≥7 days
+                            old yet, so everything is pending and `overall === null`. */}
+                        {(s.total === 0 || s.pending === s.total) && (
+                            <section
+                                className="module mt-8 p-6 md:p-8"
+                                style={{
+                                    background: "hsla(38,75%,55%,0.05)",
+                                    border: "1px solid hsl(var(--hold))",
+                                    borderRadius: 2,
+                                }}
+                                data-testid="scorecard-empty-explainer"
+                            >
+                                <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
+                                    Why you see no hits/misses yet
+                                </p>
+                                <h2 className="font-serif text-2xl md:text-3xl mt-2" style={{ letterSpacing: "-0.01em" }}>
+                                    {s.total === 0
+                                        ? "Run at least one analysis — then come back after a week."
+                                        : `You have ${s.pending} verdict${s.pending !== 1 ? "s" : ""} cooking. None are ${me?.summary?.min_age_days || 7} days old yet.`}
+                                </h2>
+                                <p className="mt-3 text-sm max-w-3xl" style={{ color: "hsl(var(--text-secondary))" }}>
+                                    <strong>This page only scores verdicts after they've had time to play out.</strong>{" "}
+                                    We wait <strong>{me?.summary?.min_age_days || 7} days</strong> in the 7-day view,{" "}
+                                    <strong>30 days</strong> in the 30-day view, and <strong>90 days</strong> in the
+                                    90-day view. Anything younger shows up as <em>pending</em> and doesn't count
+                                    toward accuracy. It's the most honest way to measure the AI — anything shorter and
+                                    you'd just be grading on intraday noise.
+                                </p>
+
+                                <div
+                                    className="mt-5 grid grid-cols-1 md:grid-cols-4 gap-0"
+                                    style={{ border: "1px solid hsl(var(--border-default))" }}
+                                >
+                                    <div className="p-4" style={{ borderRight: "1px solid hsl(var(--border-default))" }}>
+                                        <p className="text-overline" style={{ fontSize: "0.58rem" }}>Min age</p>
+                                        <p className="mt-1.5 font-mono text-sm">
+                                            {me?.summary?.min_age_days || 7} days
+                                        </p>
+                                    </div>
+                                    <div className="p-4" style={{ borderRight: "1px solid hsl(var(--border-default))" }}>
+                                        <p className="text-overline" style={{ fontSize: "0.58rem" }}>Hit threshold</p>
+                                        <p className="mt-1.5 font-mono text-sm">
+                                            ±{me?.summary?.threshold_pct || 5}%
+                                        </p>
+                                    </div>
+                                    <div className="p-4" style={{ borderRight: "1px solid hsl(var(--border-default))" }}>
+                                        <p className="text-overline" style={{ fontSize: "0.58rem" }}>You have</p>
+                                        <p className="mt-1.5 font-mono text-sm" style={{ color: "hsl(var(--text-primary))" }}>
+                                            {s.total} verdict{s.total !== 1 ? "s" : ""}
+                                        </p>
+                                    </div>
+                                    <div className="p-4">
+                                        <p className="text-overline" style={{ fontSize: "0.58rem" }}>Still cooking</p>
+                                        <p className="mt-1.5 font-mono text-sm" style={{ color: "hsl(var(--hold))" }}>
+                                            {s.pending} pending
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <p className="text-overline mt-6" style={{ fontSize: "0.58rem" }}>
+                                    What you need to do
+                                </p>
+                                <ol className="mt-2 space-y-1.5 text-sm list-decimal list-inside" style={{ color: "hsl(var(--text-secondary))" }}>
+                                    <li>
+                                        <strong>Keep running analyses</strong> — every new verdict enters the pipeline
+                                        and becomes eligible for scoring ~{me?.summary?.min_age_days || 7} days later.
+                                    </li>
+                                    <li>
+                                        <strong>Come back after a week</strong>. The 7-day scorecard is the fastest view
+                                        to populate — once your oldest verdict crosses the threshold, you'll see your
+                                        first hit/miss appear here.
+                                    </li>
+                                    <li>
+                                        <strong>Nothing else</strong>. There's no manual rating, no feedback button. The
+                                        market resolves the verdicts automatically using closing prices — we just
+                                        compare what the AI said on day T to where the price is on day T + {me?.summary?.min_age_days || 7}.
+                                    </li>
+                                </ol>
+
+                                <p className="mt-5 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>
+                                    Also check the <strong>30-day</strong> and <strong>90-day</strong> filters above —
+                                    once you have verdicts old enough, they'll populate those views too.
+                                </p>
+
+                                {s.total === 0 ? (
+                                    <Link to="/dashboard" className="btn-primary mt-6 inline-flex">
+                                        Run your first analysis →
+                                    </Link>
+                                ) : null}
+                            </section>
+                        )}
+
                         {/* Hero stats */}
                         <section className="grid grid-cols-12 gap-1 md:gap-4 mt-10">
                             <div className="col-span-12 md:col-span-5 module p-6 md:p-8 flex flex-col md:flex-row items-center gap-6" data-testid="scorecard-hero">

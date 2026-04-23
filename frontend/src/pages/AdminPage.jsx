@@ -5,7 +5,7 @@ import RFRetrainCard from "@/components/RFRetrainCard";
 import IdxBudgetCard from "@/components/IdxBudgetCard";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, Link } from "react-router-dom";
-import { Loader2, ShieldCheck, Clock, RotateCcw, Search, Trash2, BellOff, DollarSign, CheckSquare, Square, AlertTriangle, Sparkles } from "lucide-react";
+import { Loader2, ShieldCheck, Clock, RotateCcw, Timer, Search, Trash2, BellOff, DollarSign, CheckSquare, Square, AlertTriangle, Sparkles } from "lucide-react";
 import { timeAgo } from "@/lib/format";
 
 const DURATIONS = [
@@ -158,6 +158,22 @@ export default function AdminPage() {
             await loadAll();
         } catch (err) {
             setError(err?.response?.data?.detail || "Reset failed");
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    const resetQuota = async (uid, email) => {
+        if (!window.confirm(`Reset the daily + weekly analysis-quota window for ${email}? Past analyses stay on the user (for the scorecard) but won't count toward the current window.`)) return;
+        setError("");
+        setMessage("");
+        setBusy(uid);
+        try {
+            const r = await api.post(`/admin/users/${uid}/reset-quota`);
+            setMessage(`Quota window reset for ${email} at ${new Date(r.data.quota_reset_at).toLocaleString()}`);
+            await loadAll();
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Quota reset failed");
         } finally {
             setBusy(null);
         }
@@ -987,6 +1003,15 @@ export default function AdminPage() {
                                                                 data-testid={`reset-${u.email}-button`}
                                                             >
                                                                 <RotateCcw size={12} strokeWidth={1.5} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => resetQuota(u.id, u.email)}
+                                                                className="btn-ghost !py-1 !px-2 !text-xs"
+                                                                disabled={busy === u.id}
+                                                                title="Reset daily + weekly analysis-quota window"
+                                                                data-testid={`reset-quota-${u.email}-button`}
+                                                            >
+                                                                <Timer size={12} strokeWidth={1.5} />
                                                             </button>
                                                             <button
                                                                 onClick={() => clearAlerts(u.id, u.email)}

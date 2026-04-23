@@ -16,6 +16,7 @@ Zero webhook setup required — we use long-poll getUpdates with a server-side
 cursor (`settings._telegram_updates_offset`).
 """
 import logging
+import os
 import secrets
 from typing import Optional
 
@@ -153,13 +154,27 @@ async def _send_message(chat_id, text: str) -> bool:
         return False
 
 
-async def send_alert_to_user(user_id: str, title: str, body: str) -> bool:
-    """Public helper: push an alert to the user's linked Telegram chat."""
+_PUBLIC_APP_URL = os.environ.get("PUBLIC_APP_URL", "").rstrip("/")
+
+
+async def send_alert_to_user(user_id: str, title: str, body: str, ticker: str | None = None) -> bool:
+    """Public helper: push an alert to the user's linked Telegram chat.
+
+    When `ticker` is provided and `PUBLIC_APP_URL` is configured, append a
+    deep-link like "Open in app: https://.../analysis/AAPL?autorun=1" so
+    tapping it lands directly on the verdict page with the analysis auto-
+    triggered. Falls through cleanly when either value is missing."""
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "telegram_chat_id": 1})
     chat_id = (user or {}).get("telegram_chat_id")
     if not chat_id:
         return False
     formatted = f"<b>{title}</b>\n\n{body}"
+    if ticker and _PUBLIC_APP_URL:
+        safe = ticker.strip().upper()
+        formatted += (
+            f"\n\n<a href=\"{_PUBLIC_APP_URL}/analysis/{safe}?autorun=1\">"
+            f"Open {safe} in app →</a>"
+        )
     return await _send_message(chat_id, formatted)
 
 

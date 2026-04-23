@@ -124,9 +124,9 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                     )}
                 </button>
                 <Link
-                    to={`/analysis/${item.ticker}`}
+                    to={`/analysis/${item.ticker}?autorun=1`}
                     className="btn-ghost !py-1.5 !px-2 !text-xs"
-                    title="View details"
+                    title="View details · auto-runs analysis if none yet"
                     data-testid={`view-${item.ticker}-button`}
                 >
                     <ArrowUpRight size={12} strokeWidth={1.5} />

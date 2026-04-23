@@ -85,8 +85,23 @@ async def quota_snapshot(user: dict) -> dict:
     p = await resolved_plan_for(user)
     eff = effective_plan_key(user)
     now = now_utc()
-    used_day = await count_analyses(user["id"], now - timedelta(days=1))
-    used_week = await count_analyses(user["id"], now - timedelta(days=7))
+    since_day = now - timedelta(days=1)
+    since_week = now - timedelta(days=7)
+    # Honour admin-initiated quota resets — analyses before quota_reset_at
+    # don't count toward current window limits.
+    reset_at = user.get("quota_reset_at")
+    if reset_at:
+        try:
+            from datetime import datetime as _dt
+            reset_dt = _dt.fromisoformat(str(reset_at).replace("Z", "+00:00"))
+            if reset_dt > since_day:
+                since_day = reset_dt
+            if reset_dt > since_week:
+                since_week = reset_dt
+        except Exception:
+            pass
+    used_day = await count_analyses(user["id"], since_day)
+    used_week = await count_analyses(user["id"], since_week)
     watchlist_used = await db.watchlist.count_documents({"user_id": user["id"]})
     return {
         "plan": eff,
@@ -115,15 +130,30 @@ async def quota_snapshot(user: dict) -> dict:
 async def enforce_analysis_quota(user: dict):
     p = await resolved_plan_for(user)
     now = now_utc()
+    # Honour `quota_reset_at` floor if an admin recently reset this user
+    reset_at = user.get("quota_reset_at")
+    reset_dt = None
+    if reset_at:
+        try:
+            from datetime import datetime as _dt
+            reset_dt = _dt.fromisoformat(str(reset_at).replace("Z", "+00:00"))
+        except Exception:
+            reset_dt = None
     if p["analyses_per_day"] is not None:
-        used_day = await count_analyses(user["id"], now - timedelta(days=1))
+        since_day = now - timedelta(days=1)
+        if reset_dt and reset_dt > since_day:
+            since_day = reset_dt
+        used_day = await count_analyses(user["id"], since_day)
         if used_day >= p["analyses_per_day"]:
             raise HTTPException(
                 status_code=402,
                 detail=f"Daily analysis limit reached ({p['analyses_per_day']}/day on {p['name']} plan). Upgrade to unlock more.",
             )
     if p["analyses_per_week"] is not None:
-        used_week = await count_analyses(user["id"], now - timedelta(days=7))
+        since_week = now - timedelta(days=7)
+        if reset_dt and reset_dt > since_week:
+            since_week = reset_dt
+        used_week = await count_analyses(user["id"], since_week)
         if used_week >= p["analyses_per_week"]:
             raise HTTPException(
                 status_code=402,
@@ -152,6 +182,15 @@ async def enforce_idx_analysis_quota(user: dict):
         return  # admin / test-unlock accounts — no IDX-specific cap
     # Count this user's IDX (.JK) analyses in the last 24h
     since = now_utc() - timedelta(days=1)
+    reset_at = user.get("quota_reset_at")
+    if reset_at:
+        try:
+            from datetime import datetime as _dt
+            reset_dt = _dt.fromisoformat(str(reset_at).replace("Z", "+00:00"))
+            if reset_dt > since:
+                since = reset_dt
+        except Exception:
+            pass
     from core.security import iso as _iso
     used = await db.analyses.count_documents({
         "user_id": user["id"],

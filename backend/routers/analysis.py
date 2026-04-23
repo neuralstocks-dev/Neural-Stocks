@@ -185,6 +185,7 @@ async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
                 user_id,
                 f"{rec} · {ticker} · {conf}%",
                 f"{analysis.get('executive_summary', '')}{target_line}\n\nMode: {mode}",
+                ticker=ticker,
             ))
         except Exception:
             pass
@@ -766,6 +767,7 @@ async def scan_watchlist_patterns(user=Depends(get_current_user)):
                 user["id"],
                 f"{best['pattern']} · {ticker}",
                 f"{best['bias'].upper()} on {best['timeframe']} · strength {best['strength']}\n\n{best.get('explanation', '')}",
+                ticker=ticker,
             ))
         except Exception:
             pass

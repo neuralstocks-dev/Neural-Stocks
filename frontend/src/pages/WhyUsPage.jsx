@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import AppShell from "@/components/AppShell";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
     Activity,
     Binary,
@@ -13,6 +14,7 @@ import {
     ArrowRight,
     Sparkles,
     ChevronRight,
+    Info,
     Zap,
     Telescope,
     Bot,
@@ -85,6 +87,22 @@ const COMPETITORS = [
 ];
 
 const FEATURES = [
+    // IDX-exclusive differentiators (Apr 2026 — keep these at the top)
+    {
+        label: "Live director-level accumulation signals (Bandarmology) — IDX",
+        info: "bandarmology",
+        values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "none", tradeideas: "none", dbsvickers: "none" },
+    },
+    {
+        label: "Candlestick × smart-money confluence chip — IDX",
+        info: "confluence",
+        values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "none", tradeideas: "none", dbsvickers: "none" },
+    },
+    {
+        label: "Top IDX picks ranked by multi-factor score — refreshed every 30 min",
+        info: "toppicks",
+        values: { nsi: "full", moomoo: "partial", tiger: "partial", tradingview: "none", stashaway: "none", tradeideas: "none", dbsvickers: "none" },
+    },
     { label: "Explainable AI reasoning (not just signals)", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
     { label: "Three analyzer modes — Standard AI · Candlestick · Hybrid", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
     { label: "15 candlestick patterns with plain-English explanations", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "none" } },
@@ -103,6 +121,108 @@ const FEATURES = [
     { label: "Candlestick & Hybrid analysis on the free tier", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "none" } },
     { label: "Starts at $0 · Pro $9/mo", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "partial" } },
 ];
+
+// Deep explainer content for the info-button popovers on comparison rows.
+// Keyed by feature.info string.
+const INFO_CONTENT = {
+    bandarmology: {
+        title: "Bandarmology — what it actually is",
+        body: (
+            <>
+                <p className="mb-3">
+                    <strong>Bandarmology</strong> is Indonesian market slang for "tracking what
+                    the market-makers (bandars) are doing". We surface it for every{" "}
+                    <code>.JK</code> ticker by parsing the{" "}
+                    <strong>official IDX &amp; KSEI insider-filing feed</strong> — every disclosed
+                    movement of shares by directors, commissioners, and major shareholders.
+                </p>
+                <p className="mb-3">
+                    On the verdict page you see:
+                </p>
+                <ul className="list-disc list-inside space-y-1 mb-3">
+                    <li>
+                        <strong>Accumulation ratio</strong> — of all insider-moved shares, what % were buys
+                    </li>
+                    <li>
+                        <strong>Smart-money %</strong> — same ratio, filtered to directors / commissioners / president directors / major shareholders only (people with material non-public context by law)
+                    </li>
+                    <li>
+                        <strong>Foreign net flow</strong> — how many shares changed hands between domestic and foreign holders
+                    </li>
+                    <li>
+                        <strong>Recent filings list</strong> — the 5 most recent disclosures with names, share counts, prices, and "SMART MONEY" / "FOREIGN" badges
+                    </li>
+                </ul>
+                <p className="mb-3 text-sm" style={{ color: "hsl(var(--text-muted))" }}>
+                    Honest caveats: insiders can be wrong, filings lag 3–10 business days, and sub-threshold
+                    holders never appear. It's <em>evidence</em>, not a forecast — but it's evidence no
+                    other retail IDX platform exposes right now.
+                </p>
+                <p>
+                    <Link to="/technical#bandarmology" className="underline decoration-dotted underline-offset-4">
+                        See the full methodology + formulas →
+                    </Link>
+                </p>
+            </>
+        ),
+    },
+    confluence: {
+        title: "Candlestick × Bandarmology confluence",
+        body: (
+            <>
+                <p className="mb-3">
+                    When two completely independent signals point the same direction, that's more
+                    meaningful than either alone. On every IDX verdict page we cross-reference:
+                </p>
+                <ul className="list-disc list-inside space-y-1 mb-3">
+                    <li>What our <strong>candlestick pattern scanner</strong> detected (Hammer, Engulfing, Harami, 12 more)</li>
+                    <li>What the <strong>Bandarmology regime</strong> reports (accumulation, distribution, balanced)</li>
+                </ul>
+                <p className="mb-3">
+                    If we see a <strong>bullish reversal pattern AND smart-money accumulation</strong>,
+                    a green "BULLISH CONFLUENCE" banner appears above the verdict. If they
+                    pull opposite directions, you get a yellow "SIGNAL DIVERGENCE" chip instead —
+                    a signal to wait for one to resolve before sizing up.
+                </p>
+                <p className="text-sm" style={{ color: "hsl(var(--text-muted))" }}>
+                    It's still not a guarantee, but it's a higher-conviction setup. You can see
+                    this fire on <code>BBCA.JK</code> right now if you run a Hybrid analysis.
+                </p>
+            </>
+        ),
+    },
+    toppicks: {
+        title: "Top IDX Picks — how the ranking works",
+        body: (
+            <>
+                <p className="mb-3">
+                    Open the <strong>IDX Top Picks</strong> quick action on your Dashboard to see the
+                    top 10 trending Indonesian equities, refreshed every 30 minutes.
+                </p>
+                <p className="mb-3">
+                    Score formula (transparent, no black box):
+                </p>
+                <div
+                    className="p-3 font-mono text-[11.5px] mb-3"
+                    style={{
+                        background: "hsl(var(--bg))",
+                        border: "1px solid hsl(var(--border-divider))",
+                    }}
+                >
+                    score = 0.6 × capped_daily_pct_change + 0.4 × price_quality
+                </div>
+                <p className="mb-3">
+                    Daily-% contribution is capped at ±10% so a single-day spike can't dominate the
+                    ranking. <code>price_quality</code> penalises sub-Rp 100 penny stocks (they're
+                    illiquid and prone to manipulation). Rupiah prices ≥ Rp 1,000 get full marks.
+                </p>
+                <p className="text-sm" style={{ color: "hsl(var(--text-muted))" }}>
+                    Tap any pick and the full AI verdict runs automatically — no extra clicks.
+                </p>
+            </>
+        ),
+    },
+};
 
 function Cell({ v }) {
     if (v === "full") {
@@ -189,6 +309,8 @@ function ModuleCard({ mod }) {
 }
 
 export default function WhyUsPage() {
+    const [infoKey, setInfoKey] = useState(null);
+    const info = infoKey ? INFO_CONTENT[infoKey] : null;
     return (
         <AppShell>
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="why-us-page">
@@ -378,7 +500,28 @@ export default function WhyUsPage() {
                                                 zIndex: 5,
                                             }}
                                         >
-                                            {feat.label}
+                                            <span className="inline-flex items-center gap-2">
+                                                {feat.label}
+                                                {feat.info ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setInfoKey(feat.info)}
+                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 font-mono hover:opacity-75"
+                                                        style={{
+                                                            fontSize: "0.58rem",
+                                                            border: "1px solid hsl(var(--hold))",
+                                                            color: "hsl(var(--hold))",
+                                                            borderRadius: 2,
+                                                            letterSpacing: "0.08em",
+                                                        }}
+                                                        title="What's this?"
+                                                        data-testid={`whyus-info-${feat.info}`}
+                                                    >
+                                                        <Info size={9} strokeWidth={2} />
+                                                        EXPLAIN
+                                                    </button>
+                                                ) : null}
+                                            </span>
                                         </td>
                                         {COMPETITORS.map((c) => (
                                             <td
@@ -547,6 +690,33 @@ export default function WhyUsPage() {
                     </p>
                 </footer>
             </div>
+
+            {/* Feature-explainer dialog triggered by the EXPLAIN buttons */}
+            <Dialog open={!!info} onOpenChange={(o) => !o && setInfoKey(null)}>
+                <DialogContent
+                    className="max-w-lg max-h-[90vh] overflow-y-auto"
+                    data-testid="whyus-info-dialog"
+                >
+                    {info ? (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle className="font-serif text-2xl">
+                                    {info.title}
+                                </DialogTitle>
+                                <DialogDescription className="text-[11.5px]">
+                                    Short explainer so you know what's under the hood.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div
+                                className="mt-2 text-sm leading-relaxed"
+                                style={{ color: "hsl(var(--text-primary))" }}
+                            >
+                                {info.body}
+                            </div>
+                        </>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
         </AppShell>
     );
 }

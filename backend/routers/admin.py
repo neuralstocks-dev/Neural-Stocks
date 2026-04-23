@@ -71,6 +71,7 @@ def _sanitize_user(u: dict) -> dict:
         "test_unlock_granted_by": u.get("test_unlock_granted_by"),
         "login_count": u.get("login_count") or 0,
         "last_login_at": u.get("last_login_at"),
+        "quota_reset_at": u.get("quota_reset_at"),
         "created_at": u.get("created_at"),
     }
 
@@ -388,7 +389,21 @@ async def rf_reload(_admin=Depends(admin_required)):
 @router.get("/rapidapi/usage")
 async def rapidapi_usage(_admin=Depends(admin_required)):
     """Current-month request count vs monthly soft budget for the IDX
-    provider. The soft budget is set ≈5% below RapidAPI's hard 1,000-req
-    BASIC quota so we never incur $0.01/req overage charges."""
+    provider."""
     from services import idx_rapidapi
     return await idx_rapidapi.usage_snapshot()
+
+
+@router.post("/users/{user_id}/reset-quota")
+async def reset_user_quota(user_id: str, _admin=Depends(admin_required)):
+    """Reset a user's daily + weekly analysis-quota window by stamping
+    `quota_reset_at = now`. Historical analyses stay on the user for the
+    scorecard — they just don't count toward the current window."""
+    now = now_utc()
+    res = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"quota_reset_at": iso(now)}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True, "quota_reset_at": iso(now)}
