@@ -130,6 +130,9 @@ def predict_from_features(feature_row: dict | None) -> dict | None:
                 "baseline_accuracy": meta.get("baseline_accuracy"),
                 "universe_size": meta.get("universe_size"),
                 "cutoff_date": meta.get("cutoff_date"),
+                "training_start_date": meta.get("training_start_date"),
+                "training_end_date": meta.get("training_end_date"),
+                "horizon_days": int(meta.get("horizon_days", 5)),
             },
         }
     except Exception as e:

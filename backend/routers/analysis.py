@@ -215,6 +215,8 @@ async def rf_model_meta():
         "train_rows": meta.get("train_rows"),
         "test_rows": meta.get("test_rows"),
         "cutoff_date": meta.get("cutoff_date"),
+        "training_start_date": meta.get("training_start_date"),
+        "training_end_date": meta.get("training_end_date"),
         "holdout_accuracy": meta.get("holdout_accuracy"),
         "holdout_auc": meta.get("holdout_auc"),
         "oob_score": meta.get("oob_score"),

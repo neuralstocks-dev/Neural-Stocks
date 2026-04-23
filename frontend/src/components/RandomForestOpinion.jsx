@@ -26,6 +26,16 @@ export default function RandomForestOpinion({ opinion }) {
     const isStrong = edge === "strong";
     const isBullish = direction === "up";
 
+    // Provenance banner — honest disclosure of what this model was trained on
+    const trainStartYr = model_info?.training_start_date?.slice(0, 4);
+    const trainEndYr = model_info?.training_end_date?.slice(0, 4);
+    const trainRange = trainStartYr && trainEndYr
+        ? (trainStartYr === trainEndYr ? trainStartYr : `${trainStartYr}–${trainEndYr}`)
+        : null;
+    const provenanceText = trainRange
+        ? `Predicted by a Random Forest trained on ${model_info.universe_size} tickers · ${trainRange} · ${horizon_days}-day forward horizon`
+        : `Predicted by a Random Forest trained on ${model_info?.universe_size ?? "?"} tickers · ${horizon_days}-day forward horizon`;
+
     // Title + accent
     const accent = isNoEdge
         ? "hsl(var(--text-muted))"
@@ -81,6 +91,25 @@ export default function RandomForestOpinion({ opinion }) {
             data-testid="rf-opinion-module"
             style={{ background: "hsl(var(--surface))" }}
         >
+            {/* Provenance banner — regulatory-hygiene disclosure on every verdict */}
+            <div
+                className="flex items-start gap-2 px-3 py-2 mb-5 font-mono text-[10.5px] leading-snug"
+                style={{
+                    background: "hsl(var(--bg) / 0.6)",
+                    border: "1px dashed hsl(var(--border-divider))",
+                    color: "hsl(var(--text-muted))",
+                    borderRadius: 2,
+                }}
+                data-testid="rf-provenance-banner"
+            >
+                <Trees size={12} strokeWidth={1.5} className="mt-[1px] shrink-0" style={{ color: "hsl(var(--hold))" }} />
+                <span>
+                    {provenanceText}. Past behaviour is{" "}
+                    <strong style={{ color: "hsl(var(--text-primary))" }}>not indicative</strong> of
+                    future results — this is a probabilistic opinion, not a price forecast.
+                </span>
+            </div>
+
             <div className="flex items-start justify-between flex-wrap gap-4">
                 <div>
                     <p className="text-overline flex items-center gap-2">
@@ -171,7 +200,9 @@ export default function RandomForestOpinion({ opinion }) {
                 </strong>{" "}· ROC-AUC{" "}
                 <strong style={{ color: "hsl(var(--text-primary))" }}>
                     {(model_info?.holdout_auc ?? 0).toFixed(3)}
-                </strong>{" "}(trained on {model_info?.universe_size} tickers, walk-forward cutoff {model_info?.cutoff_date}).
+                </strong>{" "}(trained on {model_info?.universe_size} tickers,
+                {" "}{model_info?.training_start_date || "?"} → {model_info?.training_end_date || "?"},
+                {" "}walk-forward cutoff {model_info?.cutoff_date}).
                 Variables it relied on are correlations, not causes. See{" "}
                 <Link to="/technical#random-forest" className="underline decoration-dotted underline-offset-4">
                     methodology

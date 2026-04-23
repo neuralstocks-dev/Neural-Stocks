@@ -377,7 +377,8 @@ histogram  = MACD_line − signal`}
                 <div id="random-forest" className="mt-8 module p-6 md:p-10 scroll-mt-24" data-testid="tech-random-forest">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
                         Every verdict passes through a trained <strong>scikit-learn RandomForestClassifier</strong>{" "}
-                        that produces an independent probability of a positive 5-day forward return. It is the
+                        that produces an independent probability of a positive {rfMeta?.horizon_days ?? 20}-day
+                        forward return. It is the
                         <em> only</em> trained ML component in the stack. We added it for three reasons:
                         (1) catch cases where the LLM's narrative reasoning disagrees with what the
                         historical data actually says, (2) expose feature importances so users see
@@ -390,8 +391,9 @@ histogram  = MACD_line − signal`}
                     </h4>
                     <ul className="space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
                         <TLi>
-                            <strong>Universe</strong>: top-liquidity S&amp;P 500 large caps across Tech, Finance,
-                            Healthcare, Consumer, Industrials, Energy, Utilities &amp; Comms (~165 tickers).
+                            <strong>Universe</strong>: top-liquidity S&amp;P 500 large caps across all 11 GICS sectors —
+                            Tech, Finance, Healthcare, Consumer, Industrials, Energy, Materials, Utilities,
+                            REITs &amp; Comms (~{rfMeta?.universe_size ?? 344} tickers).
                         </TLi>
                         <TLi>
                             <strong>Input features</strong>: 21 numeric features derived from OHLCV alone —
@@ -399,9 +401,11 @@ histogram  = MACD_line − signal`}
                             No look-ahead. No news. No analyst consensus. Pure price-action statistics.
                         </TLi>
                         <TLi>
-                            <strong>Label</strong>: binary — did the closing price rise over the next 5 trading days?
+                            <strong>Label</strong>: binary — did the closing price rise over the next{" "}
+                            {rfMeta?.horizon_days ?? 20} trading days (≈1 calendar month)?
                             The 0.5% deadband around flat was kept in the dataset (treated as "not up") to
-                            avoid artificially cleaning out ambiguous cases.
+                            avoid artificially cleaning out ambiguous cases. A longer horizon smooths
+                            single-day noise and lets the model lean on regime-level features.
                         </TLi>
                         <TLi>
                             <strong>Split</strong>: strict walk-forward by calendar date, 80/20.
@@ -421,6 +425,16 @@ histogram  = MACD_line − signal`}
                             <p className="text-sm mb-4" style={{ color: "hsl(var(--text-muted))" }}>
                                 These are the numbers the <em>currently deployed</em> model produced on the
                                 unseen hold-out period. They update automatically whenever the model is retrained.
+                                Training window:{" "}
+                                <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                    {rfMeta.training_start_date || "?"} → {rfMeta.training_end_date || "?"}
+                                </strong>{" "}· horizon{" "}
+                                <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                    {rfMeta.horizon_days} trading days
+                                </strong>{" "}· walk-forward cutoff{" "}
+                                <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                    {rfMeta.cutoff_date}
+                                </strong>.
                             </p>
                             <div
                                 className="grid grid-cols-2 md:grid-cols-4 gap-0"
