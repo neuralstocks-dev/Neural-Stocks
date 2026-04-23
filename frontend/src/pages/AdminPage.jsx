@@ -3,6 +3,7 @@ import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import RFRetrainCard from "@/components/RFRetrainCard";
 import IdxBudgetCard from "@/components/IdxBudgetCard";
+import IdxCatalogCard from "@/components/IdxCatalogCard";
 import PayPalWebhookCard from "@/components/PayPalWebhookCard";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, Link } from "react-router-dom";
@@ -750,6 +751,9 @@ export default function AdminPage() {
 
                         {/* IDX · RapidAPI budget */}
                         <IdxBudgetCard />
+
+                        {/* IDX · Local catalog seed */}
+                        <IdxCatalogCard />
 
                         {/* PayPal webhook health */}
                         <PayPalWebhookCard />

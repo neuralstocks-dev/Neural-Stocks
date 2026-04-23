@@ -93,6 +93,241 @@ async def budget_remaining() -> int:
     return snap["remaining"] if snap["configured"] else 0
 
 
+# ------------------ IDX catalog (local MongoDB index) ----------------------
+# We seed a `idx_catalog` collection organically from every successful
+# RapidAPI call plus via a one-click admin bootstrap. Search then reads
+# from the local catalog first, falling back to the trending cache, then
+# the static 20-blue-chip catalog — zero extra RapidAPI calls per search.
+async def upsert_catalog_entry(
+    symbol: str,
+    name: str | None = None,
+    sector: str | None = None,
+    source: str = "rapidapi",
+) -> None:
+    """Upserts an IDX ticker into the local catalog. Called from every
+    successful quote / bandarmology / trending fetch so the catalog grows
+    organically with whatever tickers users actually touch."""
+    if not symbol:
+        return
+    symbol = symbol.upper()
+    if not symbol.endswith(".JK"):
+        symbol = f"{symbol}.JK"
+    update = {
+        "$set": {"symbol": symbol, "last_seen_at": datetime.now(timezone.utc).isoformat()},
+        "$setOnInsert": {"first_seen_at": datetime.now(timezone.utc).isoformat(), "source": source},
+    }
+    if name:
+        update["$set"]["name"] = name
+    if sector:
+        update["$set"]["sector"] = sector
+    try:
+        await db.idx_catalog.update_one({"symbol": symbol}, update, upsert=True)
+    except Exception:
+        pass  # Never let catalog bookkeeping break the hot path
+
+
+async def search_catalog(q: str = "", limit: int = 50) -> list[dict]:
+    """Searches the local idx_catalog by symbol OR name (case-insensitive).
+    When q is empty, returns the most-recently-seen tickers first."""
+    import re
+    query: dict = {}
+    if q:
+        pattern = re.escape(q)
+        query = {"$or": [
+            {"symbol": {"$regex": pattern, "$options": "i"}},
+            {"name": {"$regex": pattern, "$options": "i"}},
+        ]}
+    cursor = (
+        db.idx_catalog
+        .find(query, {"_id": 0})
+        .sort("last_seen_at", -1)
+        .limit(limit)
+    )
+    return await cursor.to_list(length=limit)
+
+
+async def catalog_stats() -> dict:
+    """Return total count + distribution by source for the admin panel."""
+    total = await db.idx_catalog.count_documents({})
+    pipeline = [{"$group": {"_id": "$source", "n": {"$sum": 1}}}]
+    cursor = db.idx_catalog.aggregate(pipeline)
+    by_source = {doc["_id"] or "unknown": doc["n"] async for doc in cursor}
+    return {"total": total, "by_source": by_source}
+
+
+# Candidate PRO-plan endpoints for bulk seeding. The BASIC plan returns
+# 404 on these — we iterate and surface which worked in the admin response.
+# Each tuple: (path, response-parser). Parser takes the JSON and returns
+# [{symbol, name, sector?}] or [] on shape mismatch.
+def _parse_generic_list(payload) -> list[dict]:
+    """Best-effort parser — hunts for a list of {symbol, name} regardless
+    of nesting depth. Handles common wrappers like {data: {data: [...]}} or
+    {results: [...]}. Returns a list (possibly empty)."""
+    if not isinstance(payload, dict):
+        return []
+
+    def _extract_list(obj):
+        if isinstance(obj, list):
+            return obj
+        if isinstance(obj, dict):
+            for k in ("data", "results", "items", "companies", "emiten", "list"):
+                sub = obj.get(k)
+                if isinstance(sub, list):
+                    return sub
+                if isinstance(sub, dict):
+                    nested = _extract_list(sub)
+                    if nested:
+                        return nested
+        return []
+
+    rows = _extract_list(payload)
+    out = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        sym = r.get("symbol") or r.get("code") or r.get("ticker")
+        if not sym:
+            continue
+        out.append({
+            "symbol": str(sym).upper(),
+            "name": r.get("name") or r.get("company_name") or r.get("longName"),
+            "sector": r.get("sector") or r.get("sector_name") or r.get("industry"),
+        })
+    return out
+
+
+# PRO-plan bulk-seed candidate paths. We only try these on explicit admin
+# trigger — never automatically — because a typo'd plan would waste budget
+# hitting 404s. Each sector id from /api/sectors is plugged in where marked.
+_BULK_SEED_PATHS = [
+    # Direct list endpoints (some IDX APIs expose them on higher tiers)
+    "/api/emiten",
+    "/api/emiten/list",
+    "/api/emiten/all",
+    "/api/main/list",
+    "/api/stocks/list",
+    "/api/saham",
+    # Sector-scoped enumerations (expanded at runtime per sector id)
+    "/api/sectors/{sector_id}/companies",
+    "/api/sectors/{sector_id}",
+    "/api/sector/{sector_id}/emiten",
+    "/api/sector/companies/{sector_alias}",
+    "/api/emiten/sector/{sector_alias}",
+]
+
+
+async def fetch_sectors() -> list[dict]:
+    """Returns the 22 IDX sectors from /api/sectors (free on BASIC). Used to
+    expand {sector_id}/{sector_alias} path templates in bulk-seed."""
+    raw = await _call("/api/sectors", ticker="SECTORS")
+    if not raw:
+        return []
+    data = raw.get("data") or {}
+    secs = data.get("data") if isinstance(data, dict) else None
+    return secs if isinstance(secs, list) else []
+
+
+async def bootstrap_catalog(
+    include_trending: bool = True,
+    try_bulk_endpoints: bool = True,
+) -> dict:
+    """Admin-triggered one-shot seed. Returns a clear report of which paths
+    worked, which failed, and the catalog delta. Safe to re-run (idempotent
+    via upsert). Always seeds trending first since that's free on BASIC."""
+    import httpx as _httpx  # local alias — service already imports httpx
+    report: dict = {
+        "seeded_from_trending": 0,
+        "attempts": [],
+        "sectors_seen": 0,
+        "count_before": 0,
+        "count_after": 0,
+        "requires_pro_plan": True,
+    }
+    report["count_before"] = await db.idx_catalog.count_documents({})
+
+    # Always seed from trending first (BASIC plan, reuses cache)
+    if include_trending:
+        try:
+            items = await get_trending() or []
+            seeded = 0
+            for it in items:
+                if (it.get("type") or "").lower() != "saham":
+                    continue
+                sym = it.get("symbol")
+                if not sym:
+                    continue
+                await upsert_catalog_entry(
+                    symbol=sym,
+                    name=it.get("name"),
+                    source="trending",
+                )
+                seeded += 1
+            report["seeded_from_trending"] = seeded
+        except Exception as e:
+            report["trending_error"] = str(e)
+
+    if try_bulk_endpoints:
+        # Get sectors first so we can expand templated paths
+        sectors = await fetch_sectors()
+        report["sectors_seen"] = len(sectors)
+
+        # Flatten candidate paths — expand templates per sector
+        paths_to_try: list[str] = []
+        for p in _BULK_SEED_PATHS:
+            if "{sector_id}" in p or "{sector_alias}" in p:
+                for s in sectors:
+                    sid = str(s.get("id") or "")
+                    alias = s.get("alias1") or s.get("name") or ""
+                    paths_to_try.append(
+                        p.replace("{sector_id}", sid).replace("{sector_alias}", alias)
+                    )
+            else:
+                paths_to_try.append(p)
+
+        client = await _get_client()
+        for path in paths_to_try:
+            # Guard: don't probe if budget is tight (keep 20-req safety margin)
+            if not await _budget_allows():
+                report["attempts"].append({"path": path, "status": "skipped", "reason": "budget"})
+                break
+            await _rate_limited_sleep()
+            try:
+                r = await client.get(f"https://{_HOST}{path}")
+                if r.status_code == 200:
+                    parsed = _parse_generic_list(r.json())
+                    if parsed:
+                        upserted = 0
+                        for row in parsed:
+                            await upsert_catalog_entry(
+                                symbol=row["symbol"],
+                                name=row.get("name"),
+                                sector=row.get("sector"),
+                                source="bulk_seed",
+                            )
+                            upserted += 1
+                        report["attempts"].append({
+                            "path": path, "status": "ok", "rows": upserted,
+                        })
+                        report["requires_pro_plan"] = False
+                    else:
+                        report["attempts"].append({
+                            "path": path, "status": "ok_but_empty", "preview": str(r.text)[:120],
+                        })
+                else:
+                    report["attempts"].append({
+                        "path": path, "status": f"http_{r.status_code}",
+                    })
+                await _increment_usage(ticker=path)
+            except Exception as e:
+                report["attempts"].append({"path": path, "status": "error", "error": str(e)[:120]})
+
+    report["count_after"] = await db.idx_catalog.count_documents({})
+    report["delta"] = report["count_after"] - report["count_before"]
+    return report
+
+
+
+
 async def _increment_usage(ticker: str, error: str | None = None) -> None:
     """Atomic month-counter update."""
     update = {
@@ -215,6 +450,13 @@ async def get_quote(ticker: str) -> dict | None:
         "source": "rapidapi.idx",
     }
     _quote_cache[symbol] = (time.time(), normalised)
+    # Organic catalog growth — remembers this ticker for future searches.
+    await upsert_catalog_entry(
+        symbol=symbol,
+        name=data.get("name"),
+        sector=data.get("sector"),
+        source="quote",
+    )
     return normalised
 
 
@@ -469,6 +711,13 @@ async def get_trending() -> list[dict] | None:
     if not isinstance(items, list):
         return None
     _trending_cache["trending"] = (time.time(), items)
+    # Organic catalog growth — capture every saham we see trending.
+    for it in items:
+        if (it.get("type") or "").lower() != "saham":
+            continue
+        sym = it.get("symbol")
+        if sym:
+            await upsert_catalog_entry(symbol=sym, name=it.get("name"), source="trending")
     return items
 
 
@@ -531,8 +780,18 @@ async def get_top_picks(limit: int = 10) -> list[dict] | None:
 # 20 hard-coded blue-chips when they filter by IDX.
 async def get_directory_tickers() -> list[dict]:
     """Returns [{symbol: 'KOTA.JK', name: 'DMS Propertindo Tbk.', source: 'rapidapi'}].
-    Uses the cached trending list. Safe to call on every search — at most
-    1 RapidAPI call per 30-min window (same cache the Top Picks dialog uses)."""
+    Prefers the local `idx_catalog` collection (grows organically from every
+    successful RapidAPI call + bulk-seed bootstrap). Falls back to the cached
+    trending feed when the local catalog is empty. Zero RapidAPI calls in
+    steady state — pure MongoDB read."""
+    local = await search_catalog(q="", limit=200)
+    if local:
+        return [{
+            "symbol": row["symbol"],
+            "name": row.get("name") or row["symbol"],
+            "source": "rapidapi",
+        } for row in local]
+    # First-run fallback — trending feed seeds the catalog on first call
     items = await get_trending()
     if not items:
         return []

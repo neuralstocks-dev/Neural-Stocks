@@ -517,3 +517,33 @@ async def subscribe_webhook_events(req: WebhookEventsPatchReq, _admin=Depends(ad
         raise HTTPException(status_code=502, detail=f"PayPal update failed: {e}")
     return {"ok": True, "applied_events": events, "applied_count": len(events), "paypal_response": updated}
 
+
+
+# ---------- IDX catalog bootstrap ----------------------------------------
+@router.get("/idx/catalog-stats")
+async def idx_catalog_stats(_admin=Depends(admin_required)):
+    """Total count + distribution by source (quote / trending / bulk_seed /
+    verified). Used by the admin UI card."""
+    from services import idx_rapidapi
+    return await idx_rapidapi.catalog_stats()
+
+
+@router.post("/idx/bootstrap-catalog")
+async def idx_bootstrap_catalog(
+    include_trending: bool = True,
+    try_bulk_endpoints: bool = True,
+    _admin=Depends(admin_required),
+):
+    """One-shot seed of the local idx_catalog collection. Always safe to
+    re-run (idempotent upserts). Returns a full report of which paths
+    worked, which failed, and the delta. If try_bulk_endpoints=True and
+    the current plan is BASIC, most paths will 404 — that's expected and
+    documented in the response so the UI can hint the user about upgrading."""
+    from services import idx_rapidapi
+    if not idx_rapidapi.is_configured():
+        raise HTTPException(status_code=503, detail="IDX provider not configured")
+    return await idx_rapidapi.bootstrap_catalog(
+        include_trending=include_trending,
+        try_bulk_endpoints=try_bulk_endpoints,
+    )
+

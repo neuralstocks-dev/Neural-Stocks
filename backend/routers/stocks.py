@@ -208,22 +208,35 @@ async def search_stocks(
 
     # Pull the live IDX directory (cached, zero API calls most of the time)
     # whenever the user's context suggests they're hunting for an IDX ticker.
+    # Prefers the local idx_catalog collection — grows organically over time.
     idx_live: list[dict] = []
     wants_idx = exchange == "IDX" or q.upper().endswith(".JK")
     if wants_idx or (q and len(q) <= 5 and q.replace(".", "").isalpha()):
         try:
             from services import idx_rapidapi
             if idx_rapidapi.is_configured():
-                directory = await idx_rapidapi.get_directory_tickers()
-                # Normalise to the same shape as CATALOG for merging
-                for d in directory:
-                    idx_live.append({
-                        "ticker": d["symbol"],
-                        "name": d["name"],
-                        "exchange": "IDX",
-                        "category": "other",
-                        "source": "rapidapi",
-                    })
+                # Query the local catalog first — O(ms) MongoDB read
+                local = await idx_rapidapi.search_catalog(q=q, limit=100)
+                if local:
+                    for d in local:
+                        idx_live.append({
+                            "ticker": d["symbol"],
+                            "name": d.get("name") or d["symbol"],
+                            "exchange": "IDX",
+                            "category": "other",
+                            "source": "rapidapi",
+                        })
+                else:
+                    # Cold catalog fallback — pull trending (cached 30 min)
+                    directory = await idx_rapidapi.get_directory_tickers()
+                    for d in directory:
+                        idx_live.append({
+                            "ticker": d["symbol"],
+                            "name": d["name"],
+                            "exchange": "IDX",
+                            "category": "other",
+                            "source": "rapidapi",
+                        })
         except Exception:
             pass  # Search must never fail because the 3rd-party API is down
 
