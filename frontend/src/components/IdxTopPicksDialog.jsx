@@ -100,7 +100,7 @@ export default function IdxTopPicksDialog({ canUse = true }) {
                             return (
                                 <Link
                                     key={p.symbol}
-                                    to={`/analysis/${encodeURIComponent(p.symbol)}`}
+                                    to={`/analysis/${encodeURIComponent(p.symbol)}?autorun=1`}
                                     onClick={() => setOpen(false)}
                                     className="flex items-center gap-4 p-3 hover:bg-[hsl(var(--bg))]"
                                     style={{ borderBottom: i < picks.length - 1 ? "1px solid hsl(var(--border-divider))" : undefined }}

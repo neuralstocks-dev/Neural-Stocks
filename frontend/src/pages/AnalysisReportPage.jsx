@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import VerdictRing from "@/components/VerdictRing";
@@ -44,6 +44,7 @@ const TOOLTIP_LABEL_STYLE = { color: "hsl(var(--text-secondary))" };
 
 export default function AnalysisReportPage() {
     const { ticker } = useParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { user } = useAuth();
     const disclaimer = useDisclaimer();
     const t = (ticker || "").toUpperCase();
@@ -56,6 +57,8 @@ export default function AnalysisReportPage() {
     // All 3 analysis modes are available to all tiers (Feb 2026).
     const canPro = true;
     const [mode, setMode] = useState("hybrid");
+    // Latch so `?autorun=1` only fires once per mount, even if load() re-runs
+    const [autorunFired, setAutorunFired] = useState(false);
 
     useEffect(() => {
         setMode("hybrid");
@@ -93,6 +96,30 @@ export default function AnalysisReportPage() {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [t]);
+
+    // Auto-trigger analysis on arrival when the `?autorun=1` flag is set
+    // (used by the IDX Top Picks dialog so a pick → full verdict is one
+    // click, not two). Only runs once per mount and only when no verdict
+    // exists yet, so the reload button still works normally.
+    useEffect(() => {
+        if (autorunFired) return;
+        if (loading || analyzing) return;
+        if (searchParams.get("autorun") !== "1") return;
+        if (analysis) {
+            // Verdict already exists — strip the flag to clean up the URL
+            setAutorunFired(true);
+            searchParams.delete("autorun");
+            setSearchParams(searchParams, { replace: true });
+            return;
+        }
+        if (!quote) return;  // quote hasn't loaded yet; wait for next tick
+        setAutorunFired(true);
+        // Strip the flag immediately so refresh doesn't re-trigger.
+        searchParams.delete("autorun");
+        setSearchParams(searchParams, { replace: true });
+        runAnalysis();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading, analyzing, quote, analysis, autorunFired, searchParams]);
 
     const runAnalysis = async () => {
         disclaimer.ensureAccepted(async () => {
