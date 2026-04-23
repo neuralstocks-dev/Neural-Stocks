@@ -520,3 +520,49 @@ async def get_top_picks(limit: int = 10) -> list[dict] | None:
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored[:limit]
 
+
+
+# ---- Lightweight IDX directory for search ----------------------------
+# The free RapidAPI plan doesn't expose a master "list all emiten" endpoint,
+# but the trending feed already gives us 25 live names with company names.
+# We reuse its existing 30-min cache (no extra API calls) and expose a
+# simplified directory view for `/api/stocks/search` to merge into its
+# IDX results. This guarantees the user sees LIVE IDX tickers beyond the
+# 20 hard-coded blue-chips when they filter by IDX.
+async def get_directory_tickers() -> list[dict]:
+    """Returns [{symbol: 'KOTA.JK', name: 'DMS Propertindo Tbk.', source: 'rapidapi'}].
+    Uses the cached trending list. Safe to call on every search — at most
+    1 RapidAPI call per 30-min window (same cache the Top Picks dialog uses)."""
+    items = await get_trending()
+    if not items:
+        return []
+    out = []
+    for it in items:
+        if (it.get("type") or "").lower() != "saham":
+            continue
+        sym = it.get("symbol")
+        if not sym:
+            continue
+        out.append({
+            "symbol": f"{sym}.JK",
+            "name": it.get("name") or sym,
+            "source": "rapidapi",
+        })
+    return out
+
+
+async def verify_ticker(ticker: str) -> dict | None:
+    """Confirm that an arbitrary .JK ticker exists on the IDX by pulling its
+    quote snapshot. Used on-demand from the AddStockModal when a user types
+    a ticker we don't know about. Costs 1 RapidAPI call. Returns None if the
+    ticker isn't found or budget is exhausted."""
+    q = await get_quote(ticker)
+    if not q or q.get("price") is None:
+        return None
+    return {
+        "symbol": ticker.upper() if ticker.upper().endswith(".JK") else f"{_strip_jk(ticker).upper()}.JK",
+        "name": q.get("name") or ticker.upper(),
+        "price": q.get("price"),
+        "currency": q.get("currency") or "IDR",
+        "source": "rapidapi",
+    }

@@ -191,14 +191,53 @@ async def search_stocks(
 ):
     """Search catalog with optional category and/or exchange filters.
     When q is empty: returns top N (default 10) tickers ordered by curator rank.
-    Filters stack — combining category + exchange narrows results."""
+    Filters stack — combining category + exchange narrows results.
+
+    IDX augmentation (no extra API calls):
+      - When exchange filter is IDX OR the free-text query looks IDX-flavoured
+        (ends in .JK, or 3-5 bare uppercase letters that could be an IDX symbol),
+        we merge the live RapidAPI trending feed (25 most-active tickers, cached
+        30 min) into the response so users discover real IDX names — not just
+        the 20 hard-coded blue-chips. Each live entry is tagged with
+        source='rapidapi' so the UI can render an "IDX LIVE" chip next to it.
+    """
     q = (q or "").strip()
     category = (category or "").strip().lower()
     exchange = (exchange or "").strip().upper()
     limit = max(1, min(limit, 50))
 
-    # Free-text query: search the whole catalog (case-insensitive) and accept
-    # arbitrary tickers (user might type a ticker we don't know about).
+    # Pull the live IDX directory (cached, zero API calls most of the time)
+    # whenever the user's context suggests they're hunting for an IDX ticker.
+    idx_live: list[dict] = []
+    wants_idx = exchange == "IDX" or q.upper().endswith(".JK")
+    if wants_idx or (q and len(q) <= 5 and q.replace(".", "").isalpha()):
+        try:
+            from services import idx_rapidapi
+            if idx_rapidapi.is_configured():
+                directory = await idx_rapidapi.get_directory_tickers()
+                # Normalise to the same shape as CATALOG for merging
+                for d in directory:
+                    idx_live.append({
+                        "ticker": d["symbol"],
+                        "name": d["name"],
+                        "exchange": "IDX",
+                        "category": "other",
+                        "source": "rapidapi",
+                    })
+        except Exception:
+            pass  # Search must never fail because the 3rd-party API is down
+
+    # Helper: dedupe by ticker preserving order
+    def _dedupe(rows):
+        seen, out = set(), []
+        for r in rows:
+            t = r.get("ticker")
+            if t and t not in seen:
+                seen.add(t)
+                out.append(r)
+        return out
+
+    # Free-text query: search catalog + IDX live roster together
     if q:
         ql = q.lower()
         qu = q.upper()
@@ -206,17 +245,59 @@ async def search_stocks(
             s for s in CATALOG
             if qu in s["ticker"].upper() or ql in s["name"].lower()
         ]
-        if qu not in [s["ticker"] for s in results]:
-            results.insert(0, {"ticker": qu, "name": qu, "exchange": "?", "category": "other"})
-        return results[:15]
+        # Merge IDX live matches (prefer these over the static 20-blue-chip catalog)
+        idx_matches = [
+            s for s in idx_live
+            if qu in s["ticker"].upper() or ql in s["name"].lower()
+        ]
+        merged = _dedupe(idx_matches + results)
+
+        # If the user typed a 3-5 letter bare symbol that didn't match anything
+        # and the IDX directory isn't configured, normalise it to .JK and hint
+        # the UI that they should use the "Verify" action before adding.
+        if not merged and len(q) <= 5 and q.replace(".", "").isalpha():
+            candidate = qu if qu.endswith(".JK") else f"{qu}.JK"
+            merged = [{
+                "ticker": candidate, "name": candidate, "exchange": "IDX",
+                "category": "other", "source": "unverified",
+            }]
+        elif not merged:
+            merged = [{
+                "ticker": qu, "name": qu, "exchange": "?",
+                "category": "other", "source": "unverified",
+            }]
+        return merged[:15]
 
     # No query: apply filters. Ranking is catalog insertion order (curator rank).
+    if exchange == "IDX":
+        # Merge the 20 curated blue-chips with the 25 live trending — fresh
+        # names get surfaced first so users see real-time IDX activity.
+        catalog_idx = [s for s in CATALOG if s["exchange"] == "IDX"]
+        merged = _dedupe(idx_live + catalog_idx)
+        if category:
+            merged = [s for s in merged if s.get("category") == category or s.get("source") == "rapidapi"]
+        return merged[:limit]
+
     filtered = CATALOG
     if category:
         filtered = [s for s in filtered if s["category"] == category]
     if exchange:
         filtered = [s for s in filtered if s["exchange"] == exchange]
     return filtered[:limit]
+
+
+@router.get("/verify-idx/{ticker}")
+async def verify_idx_ticker(ticker: str, user=Depends(get_current_user)):
+    """Confirm an arbitrary IDX ticker exists + fetch its proper name + price.
+    Used on-demand by the AddStockModal when a user types an unknown .JK
+    ticker. Costs exactly 1 RapidAPI call. 404 when the ticker isn't found."""
+    from services import idx_rapidapi
+    if not idx_rapidapi.is_configured():
+        raise HTTPException(status_code=503, detail="IDX provider not configured")
+    info = await idx_rapidapi.verify_ticker(ticker)
+    if not info:
+        raise HTTPException(status_code=404, detail=f"IDX ticker {ticker.upper()} not found")
+    return info
 
 
 @router.get("/{ticker}/quote", response_model=Quote)

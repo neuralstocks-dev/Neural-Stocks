@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Search, X, Loader2, ChevronDown } from "lucide-react";
+import { Search, X, Loader2, ChevronDown, ShieldCheck, Zap } from "lucide-react";
 
 const CATEGORIES = [
     { v: "", label: "All" },
@@ -70,6 +70,25 @@ export default function AddStockModal({ open, onClose, onAdded }) {
             onClose?.();
         } catch (err) {
             setError(err?.response?.data?.detail || "Failed to add ticker");
+        } finally {
+            setAdding(null);
+        }
+    };
+
+    const verifyIdx = async (ticker) => {
+        setError("");
+        setAdding(`verify:${ticker}`);
+        try {
+            const res = await api.get(`/stocks/verify-idx/${encodeURIComponent(ticker)}`);
+            // Replace the unverified row with the verified info in the results list
+            setResults((prev) => prev.map((r) => r.ticker === ticker ? {
+                ...r,
+                name: res.data.name || r.name,
+                source: "verified",
+                exchange: "IDX",
+            } : r));
+        } catch (err) {
+            setError(err?.response?.data?.detail || `Could not verify ${ticker} on IDX`);
         } finally {
             setAdding(null);
         }
@@ -237,42 +256,102 @@ export default function AddStockModal({ open, onClose, onAdded }) {
                         {results.length === 0 && (
                             <p className="text-sm text-[hsl(var(--text-muted))] py-6 text-center">No results</p>
                         )}
-                        {results.map((s) => (
-                            <button
-                                key={s.ticker}
-                                onClick={() => addTicker(s.ticker, s.category)}
-                                disabled={!!adding}
-                                className="w-full flex items-center justify-between py-3 px-2 text-left hover:bg-[hsl(var(--surface-elevated))] transition-colors"
-                                style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
-                                data-testid={`search-result-${s.ticker}`}
-                            >
-                                <div>
-                                    <div className="font-mono text-sm font-medium">{s.ticker}</div>
-                                    <div className="text-xs text-[hsl(var(--text-secondary))] mt-0.5">{s.name}</div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    {s.category && s.category !== "other" && (
-                                        <span
-                                            className="text-overline"
-                                            style={{
-                                                fontSize: "0.52rem",
-                                                color: "hsl(var(--text-muted))",
-                                            }}
+                        {results.map((s) => {
+                            const isUnverified = s.source === "unverified";
+                            const isLive = s.source === "rapidapi" || s.source === "verified";
+                            return (
+                                <div
+                                    key={s.ticker}
+                                    className="w-full flex items-center justify-between py-3 px-2"
+                                    style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
+                                    data-testid={`search-result-${s.ticker}`}
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-mono text-sm font-medium flex items-center gap-2 flex-wrap">
+                                            {s.ticker}
+                                            {isLive && (
+                                                <span
+                                                    className="font-mono inline-flex items-center gap-1 px-1.5 py-0.5"
+                                                    style={{
+                                                        color: "hsl(var(--buy))",
+                                                        border: "1px solid hsl(var(--buy))",
+                                                        fontSize: "0.5rem",
+                                                        letterSpacing: "0.12em",
+                                                        borderRadius: 2,
+                                                    }}
+                                                    title="Live from RapidAPI IDX"
+                                                    data-testid={`idx-live-chip-${s.ticker}`}
+                                                >
+                                                    <Zap size={8} strokeWidth={2.5} /> IDX LIVE
+                                                </span>
+                                            )}
+                                            {isUnverified && (
+                                                <span
+                                                    className="font-mono inline-flex items-center gap-1 px-1.5 py-0.5"
+                                                    style={{
+                                                        color: "hsl(var(--hold))",
+                                                        border: "1px solid hsl(var(--hold))",
+                                                        fontSize: "0.5rem",
+                                                        letterSpacing: "0.12em",
+                                                        borderRadius: 2,
+                                                    }}
+                                                    title="Not in catalog — verify before adding"
+                                                    data-testid={`unverified-chip-${s.ticker}`}
+                                                >
+                                                    UNVERIFIED
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-[hsl(var(--text-secondary))] mt-0.5 truncate">{s.name}</div>
+                                    </div>
+                                    <div className="flex items-center gap-3 ml-3">
+                                        {s.category && s.category !== "other" && (
+                                            <span
+                                                className="text-overline"
+                                                style={{
+                                                    fontSize: "0.52rem",
+                                                    color: "hsl(var(--text-muted))",
+                                                }}
+                                            >
+                                                {s.category}
+                                            </span>
+                                        )}
+                                        <span className="text-overline">{s.exchange || "—"}</span>
+                                        {isUnverified && s.ticker.endsWith(".JK") && (
+                                            <button
+                                                type="button"
+                                                onClick={() => verifyIdx(s.ticker)}
+                                                disabled={!!adding}
+                                                className="btn-ghost !py-1 !px-2 !text-xs inline-flex items-center gap-1"
+                                                data-testid={`verify-idx-${s.ticker}`}
+                                                title="Make 1 RapidAPI call to confirm this IDX ticker exists"
+                                            >
+                                                {adding === `verify:${s.ticker}` ? (
+                                                    <Loader2 size={11} className="animate-spin" />
+                                                ) : (
+                                                    <ShieldCheck size={11} strokeWidth={2} />
+                                                )}
+                                                Verify
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => addTicker(s.ticker, s.category)}
+                                            disabled={!!adding}
+                                            className="text-overline hover:opacity-70 transition-opacity"
+                                            style={{ color: "hsl(var(--text-primary))" }}
+                                            data-testid={`add-ticker-${s.ticker}`}
                                         >
-                                            {s.category}
-                                        </span>
-                                    )}
-                                    <span className="text-overline">{s.exchange || "—"}</span>
-                                    {adding === s.ticker ? (
-                                        <Loader2 size={14} className="animate-spin" />
-                                    ) : (
-                                        <span className="text-overline" style={{ color: "hsl(var(--text-primary))" }}>
-                                            Add →
-                                        </span>
-                                    )}
+                                            {adding === s.ticker ? (
+                                                <Loader2 size={14} className="animate-spin" />
+                                            ) : (
+                                                <>Add →</>
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
-                            </button>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </div>
