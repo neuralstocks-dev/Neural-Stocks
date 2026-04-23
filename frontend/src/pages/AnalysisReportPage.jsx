@@ -600,11 +600,24 @@ export default function AnalysisReportPage() {
                                         Data sources
                                     </p>
                                     <p className="text-[11px] leading-relaxed font-mono">
-                                        Market quotes &amp; OHLC history: <strong>Finnhub.io</strong> (live) + <strong>Yahoo Finance</strong> (fundamentals &amp; history, via <code>yfinance</code>).
-                                        {" "}Company news, analyst consensus &amp; earnings calendar: <strong>Finnhub.io</strong>.
-                                        {" "}News sentiment: Neulab keyword heuristic over headlines.
-                                        {" "}Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly).
-                                        {" "}AI reasoning &amp; verdict synthesis: <strong>Anthropic Claude Sonnet 4.5</strong>.
+                                        {(analysis.ticker || "").toUpperCase().endsWith(".JK") ? (
+                                            <>
+                                                Market quotes &amp; key stats: <strong>RapidAPI · Indonesia Stock Exchange (IDX)</strong> (primary) + <strong>Yahoo Finance</strong> (<code>yfinance</code>, fallback &amp; OHLC history).
+                                                {" "}Insider / director filings &amp; <strong>Bandarmology</strong> smart-money signals: <strong>RapidAPI IDX</strong> (computed in-house from raw filings).
+                                                {" "}Company news: <strong>CNBC Indonesia</strong> + <strong>Detik Finance</strong> RSS (ticker &amp; Bahasa alias matched).
+                                                {" "}News sentiment: Neulab keyword heuristic (English + Bahasa Indonesia).
+                                                {" "}Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly).
+                                                {" "}AI reasoning &amp; verdict synthesis: <strong>Anthropic Claude Sonnet 4.5</strong>.
+                                            </>
+                                        ) : (
+                                            <>
+                                                Market quotes &amp; OHLC history: <strong>Finnhub.io</strong> (live) + <strong>Yahoo Finance</strong> (fundamentals &amp; history, via <code>yfinance</code>).
+                                                {" "}Company news, analyst consensus &amp; earnings calendar: <strong>Finnhub.io</strong>.
+                                                {" "}News sentiment: Neulab keyword heuristic over headlines.
+                                                {" "}Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly).
+                                                {" "}AI reasoning &amp; verdict synthesis: <strong>Anthropic Claude Sonnet 4.5</strong>.
+                                            </>
+                                        )}
                                     </p>
                                 </section>
 

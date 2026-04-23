@@ -84,8 +84,13 @@ async def get_quote(ticker: str) -> dict:
     fails or isn't configured, yfinance-only data is returned (backward compatible).
     """
     from services.finnhub import get_quote as finnhub_quote, is_configured as fh_ready
+    from services.idx_news import is_idx_ticker
     yf_task = asyncio.to_thread(_yf_quote_sync, ticker)
-    if fh_ready():
+    # Finnhub's free tier doesn't cover IDX (.JK) — skip the call to avoid
+    # log noise from 403 "You don't have access to this resource" responses.
+    # IDX quotes are sourced from RapidAPI (primary) + yfinance (fallback)
+    # via services/idx_rapidapi.py inside routers/analysis.py.
+    if fh_ready() and not is_idx_ticker(ticker):
         fh_task = finnhub_quote(ticker)
         yf_data, fh_data = await asyncio.gather(yf_task, fh_task, return_exceptions=True)
     else:

@@ -335,8 +335,22 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
 
     # Footer — data sources + disclaimer
     story.append(Spacer(1, 20))
+    ticker = (analysis.get("ticker") or "").upper()
+    is_idx_report = ticker.endswith(".JK")
     finnhub_on = bool(mc.get("configured"))
-    if finnhub_on:
+    if is_idx_report:
+        idx_source = analysis.get("idx_data_source") or "rapidapi"
+        primary = "RapidAPI · Indonesia Stock Exchange" if idx_source == "rapidapi" else "Yahoo Finance (yfinance)"
+        bandar_line = " Insider / director filings &amp; Bandarmology smart-money signals: RapidAPI IDX (computed in-house from raw filings)." if analysis.get("bandarmology") else ""
+        data_sources_line = (
+            f"<b>DATA SOURCES</b> · Live quotes &amp; key stats: {primary} (primary) + Yahoo Finance (fallback &amp; OHLC history)."
+            f"{bandar_line} "
+            "Company news: CNBC Indonesia &amp; Detik Finance RSS (ticker &amp; Bahasa alias matched). "
+            "News sentiment: Neulab keyword heuristic (English + Bahasa Indonesia). "
+            "Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly). "
+            "AI reasoning: Anthropic Claude Sonnet 4.5."
+        )
+    elif finnhub_on:
         data_sources_line = (
             "<b>DATA SOURCES</b> · Live quotes &amp; market context: Finnhub.io. "
             "OHLC history &amp; fundamentals: Yahoo Finance (via yfinance). "

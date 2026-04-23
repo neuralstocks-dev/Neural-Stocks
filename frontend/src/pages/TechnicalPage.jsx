@@ -152,7 +152,7 @@ export default function TechnicalPage() {
                     <StageRow
                         n="01"
                         title="Data acquisition"
-                        body="For US stocks: Finnhub.io live quote (primary) + yfinance OHLC history + fundamentals. For IDX (.JK) stocks: yfinance only. 6 months daily + 2 years weekly candles pulled every run. 10-second timeout with retry fallback. Finnhub results are cached 5 minutes, yfinance per-request."
+                        body="For US stocks: Finnhub.io live quote (primary) + yfinance OHLC history + fundamentals. For IDX (.JK) stocks: RapidAPI · indonesia-stock-exchange-idx (primary — live quote, key stats, and Bandarmology insider filings) with yfinance as fallback / OHLC history. 6 months daily + 2 years weekly candles pulled every run. 10-second timeout with retry fallback. Finnhub cached 5 minutes, RapidAPI quote 10-min / keystats 24h / bandarmology 1h, yfinance per-request."
                     />
                     <StageRow
                         n="02"
@@ -712,10 +712,14 @@ histogram  = MACD_line − signal`}
                             </tr>
                         </thead>
                         <tbody>
-                            <Tr s="Live quote" src="Finnhub.io" cov="US markets" cache="5-min cache" />
-                            <Tr s="Live quote (fallback)" src="Yahoo Finance (yfinance)" cov="Global, incl. IDX" cache="Per request" />
+                            <Tr s="Live quote (US)" src="Finnhub.io" cov="US markets" cache="5-min cache" />
+                            <Tr s="Live quote (IDX)" src="RapidAPI · IDX (indonesia-stock-exchange-idx)" cov="Indonesia · 1,000 req/mo free tier (950 soft cap)" cache="10-min cache" />
+                            <Tr s="Live quote (fallback)" src="Yahoo Finance (yfinance)" cov="Global, incl. IDX fallback" cache="Per request" />
                             <Tr s="OHLC history" src="Yahoo Finance" cov="Global, 2+ years" cache="Per request" />
-                            <Tr s="Fundamentals (P/E, margin, ROE)" src="Yahoo Finance" cov="Global" cache="Per request" />
+                            <Tr s="Fundamentals — US" src="Yahoo Finance" cov="Global baseline" cache="Per request" />
+                            <Tr s="Fundamentals — IDX (P/E, P/B, ROE, EPS)" src="RapidAPI · IDX keystats" cov="Indonesia · IDR denominated" cache="24-hr cache" />
+                            <Tr s="Bandarmology · insider filings" src="RapidAPI · IDX /emiten/{sym}/insider" cov="Indonesia · director + commissioner + major holder" cache="1-hr cache" />
+                            <Tr s="Top IDX Picks scanner" src="RapidAPI · IDX /main/trending" cov="Indonesia · ranked by multi-factor score" cache="30-min cache" />
                             <Tr s="Company news (US)" src="Finnhub.io" cov="US · 7-day window" cache="5-min cache" />
                             <Tr s="Company news (IDX)" src="CNBC Indonesia + Detik Finance RSS" cov="Indonesia · 7-day window" cache="10-min cache" />
                             <Tr s="Analyst consensus" src="Finnhub.io" cov="US only (free tier)" cache="1-hr cache" />
@@ -791,8 +795,11 @@ histogram  = MACD_line − signal`}
                         </LimitLi>
                         <LimitLi>
                             <strong>IDX has no analyst or earnings data.</strong> Finnhub's free tier doesn't
-                            cover Indonesia. IDX verdicts rely purely on yfinance fundamentals + technicals +
-                            local RSS news. The relevant panels on the report page hide gracefully.
+                            cover Indonesia, so the US analyst-consensus and earnings-calendar panels hide
+                            gracefully on .JK verdicts. In exchange, IDX tickers get two things US tickers
+                            don't: live <em>Bandarmology</em> insider-flow signals and a <em>Top IDX Picks</em>
+                            scanner — both sourced from the RapidAPI IDX provider with yfinance fundamentals
+                            + local RSS news as the baseline layer.
                         </LimitLi>
                         <LimitLi>
                             <strong>No intraday.</strong> Daily candles only. This is a swing / position tool,
@@ -828,8 +835,9 @@ Backend          FastAPI (Python 3.11) · Uvicorn · async httpx for outbound I/
 Database         MongoDB (Motor async driver)
 Auth             JWT (email/password) + Emergent Google OAuth
 LLM              Anthropic Claude Sonnet 4.5 via Emergent LLM key
-Market data      yfinance (public) + Finnhub.io (REST)
+Market data      yfinance (public) + Finnhub.io (REST, US) + RapidAPI IDX (Indonesia)
 IDX news         CNBC Indonesia + Detik Finance RSS scraper
+IDX smart-money  Bandarmology — insider filings parsed from RapidAPI IDX /emiten/{sym}/insider
 PDF              ReportLab (server-side, zero client dependencies)
 Payments         PayPal REST v1 (Subscriptions) + v2 (Orders for Day Pass)
 Email            Resend (receipts, password reset)

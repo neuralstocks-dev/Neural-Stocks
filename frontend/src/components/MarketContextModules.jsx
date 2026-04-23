@@ -3,10 +3,10 @@ import { Newspaper, Users, CalendarClock, ExternalLink, TrendingUp, TrendingDown
 import { timeAgo } from "@/lib/format";
 
 /**
- * Renders 3 Finnhub-sourced modules on the Analysis Report page:
- *  - Recent Headlines
- *  - Wall Street Consensus (analyst recommendation mix)
- *  - Next Earnings
+ * Renders 3 market-context modules on the Analysis Report page:
+ *  - Recent Headlines  (Finnhub for US · CNBC Indonesia + Detik Finance RSS for IDX)
+ *  - Wall Street Consensus (analyst recommendation mix — US only; hides on IDX)
+ *  - Next Earnings (US only; hides on IDX — Finnhub free tier doesn't cover IDX)
  *
  * Expects the `market_context` object from /api/analysis/{ticker}:
  *   { configured, news: {articles, summary_sentiment, score},
@@ -17,7 +17,7 @@ import { timeAgo } from "@/lib/format";
 export default function MarketContextModules({ marketContext }) {
     if (!marketContext || marketContext.configured !== true) return null;
     const { news, analyst_consensus: consensus, earnings } = marketContext;
-    // Render nothing if Finnhub returned nothing useful at all
+    // Render nothing if the provider returned nothing useful at all
     if (!news?.articles?.length && !consensus && !earnings) return null;
 
     return (
