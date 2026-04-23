@@ -103,6 +103,15 @@ export default function AppShell({ children }) {
                         >
                             Why us
                         </Link>
+                        <Link
+                            to="/technical"
+                            className={`text-sm font-medium link-underline ${
+                                loc.pathname.startsWith("/technical") ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"
+                            }`}
+                            data-testid="nav-technical"
+                        >
+                            Technical
+                        </Link>
                         {user?.is_admin && (
                             <Link
                                 to="/admin"

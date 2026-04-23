@@ -16,6 +16,7 @@ import ScorecardPage from "@/pages/ScorecardPage";
 import WhyUsPage from "@/pages/WhyUsPage";
 import PortfolioPage from "@/pages/PortfolioPage";
 import SettingsPage from "@/pages/SettingsPage";
+import TechnicalPage from "@/pages/TechnicalPage";
 import PaypalSmokeTestPage from "@/pages/PaypalSmokeTestPage";
 import { Loader2 } from "lucide-react";
 
@@ -93,6 +94,14 @@ function AppRoutes() {
                 element={
                     <Protected>
                         <WhyUsPage />
+                    </Protected>
+                }
+            />
+            <Route
+                path="/technical"
+                element={
+                    <Protected>
+                        <TechnicalPage />
                     </Protected>
                 }
             />

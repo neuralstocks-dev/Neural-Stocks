@@ -17,6 +17,8 @@ Build an AI Stock Analysis Platform (Phase 1 MVP):
 
 ## 1a. Recent Changes (Apr 2026)
 
+- **Apr 23 — `/technical` page (engineering transparency)**: new deep-dive that honestly documents what Neulab uses (Claude Sonnet 4.5 + deterministic indicators + rule-based pattern engine + keyword heuristic sentiment) and what it does NOT (SVM, Random Forest, CNN, LSTM, FinBERT, proprietary datasets). Eleven sections: hero, myth-buster, 7-stage pipeline, confidence-score mechanics (4 signal families × 5 confidence bands), indicator formulas (RSI / SMA / MACD / volume ratio) replicable in Excel, all 15 candlestick patterns with bias chips + rule summaries, 3 analysis modes, 10-row data-source attribution table, 6 feature specs, honest-limits disclosure, full stack footer. Linked in top nav as "Technical".
+
 - **Apr 22 — Promo discounts + Day Pass one-time tier**:
   - **Promo discount engine** — admin can set independent % discounts on Pro-monthly and Elite-monthly (plus optional label like "Launch Week"). Stored in `db.settings.pricing`; live PayPal plans are auto-rotated to the discounted monthly price on save. Non-admin Pricing page shows a promo banner + per-card strikethrough + `SAVE X%` badge + label.
   - **Day Pass (one-time $5)** — new 4th tier in `PLANS["daypass"]` with admin-editable price, duration (days), and quotas (analyses/day, analyses/week, watchlist, shares/day). Quick batch sweep intentionally disabled; Standard + Candlestick + Hybrid + Pattern Scan always on.
