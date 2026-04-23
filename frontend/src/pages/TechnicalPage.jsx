@@ -583,6 +583,116 @@ histogram  = MACD_line − signal`}
                     </ul>
                 </div>
 
+                {/* Bandarmology (IDX-only differentiator) */}
+                <div
+                    id="bandarmology"
+                    className="mt-8 module p-6 md:p-10 scroll-mt-24"
+                    data-testid="tech-bandarmology"
+                >
+                    <p className="text-overline" style={{ color: "hsl(var(--buy))" }}>
+                        IDX-only · Smart money flow
+                    </p>
+                    <h3 className="font-serif mt-2" style={{ fontSize: "1.6rem", letterSpacing: "-0.01em" }}>
+                        Bandarmology — the signal no other IDX platform exposes.
+                    </h3>
+                    <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
+                        <em>Bandarmology</em> is Indonesian market slang for "tracking what the market
+                        makers (bandars) are doing". We surface this for every `.JK` ticker by parsing
+                        the <strong>official IDX &amp; KSEI insider-filing feed</strong> (directors,
+                        commissioners, major shareholders). When the people who know the company best
+                        are quietly buying, you see the ratio on the verdict page. When they're
+                        quietly selling, you see that too. No guessing.
+                    </p>
+
+                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                        How the score is computed
+                    </h4>
+                    <p className="text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                        For every disclosed insider movement in the trailing window, we categorise the
+                        filing and aggregate:
+                    </p>
+                    <ul className="mt-3 space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                        <TLi>
+                            <strong>Action</strong> — BUY or SELL (as reported in the IDX filing).
+                        </TLi>
+                        <TLi>
+                            <strong>Shares changed</strong> — the absolute delta between the insider's
+                            previous and current position.
+                        </TLi>
+                        <TLi>
+                            <strong>Badge</strong> — director, commissioner, president director, or
+                            major shareholder. These four categories make up what we label as
+                            <em> "smart money"</em> because the filers have material non-public
+                            context by law.
+                        </TLi>
+                        <TLi>
+                            <strong>Nationality</strong> — local vs foreign, used to compute foreign
+                            net-flow separately.
+                        </TLi>
+                    </ul>
+
+                    <div
+                        className="mt-6 p-4 font-mono text-[11.5px] leading-relaxed"
+                        style={{
+                            background: "hsl(var(--bg))",
+                            border: "1px solid hsl(var(--border-divider))",
+                            color: "hsl(var(--text-secondary))",
+                        }}
+                    >
+                        accumulation_ratio = sum(BUY_shares) / (sum(BUY_shares) + sum(SELL_shares))<br />
+                        smart_money_ratio  = sum(BUY_shares where badge ∈ smart_set) / smart_total<br />
+                        foreign_net_shares = Σ (foreign BUY) − Σ (foreign SELL)
+                    </div>
+
+                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                        Regime labels
+                    </h4>
+                    <div className="mt-2 grid grid-cols-1 md:grid-cols-5 gap-0" style={{ border: "1px solid hsl(var(--border-default))" }}>
+                        {[
+                            { label: "Strong accumulation", range: "≥70%", color: "hsl(var(--buy))" },
+                            { label: "Mild accumulation", range: "55–70%", color: "hsl(var(--buy))" },
+                            { label: "Balanced", range: "45–55%", color: "hsl(var(--hold))" },
+                            { label: "Mild distribution", range: "30–45%", color: "hsl(var(--sell))" },
+                            { label: "Strong distribution", range: "≤30%", color: "hsl(var(--sell))" },
+                        ].map((r, i) => (
+                            <div key={r.label} className="p-3" style={{ borderRight: i < 4 ? "1px solid hsl(var(--border-default))" : undefined }}>
+                                <p className="text-overline" style={{ fontSize: "0.58rem", color: r.color }}>{r.range}</p>
+                                <p className="mt-1.5 text-xs" style={{ color: "hsl(var(--text-primary))" }}>{r.label}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                        Honest caveats
+                    </h4>
+                    <ul className="mt-2 space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                        <TLi>
+                            Insiders can be wrong. Strong accumulation is <em>not</em> a price forecast.
+                            It's a second, independent piece of evidence to weigh against technicals
+                            and fundamentals — not a green light by itself.
+                        </TLi>
+                        <TLi>
+                            The IDX filing window has a reporting lag (typically 3–10 business days).
+                            Very recent intraday moves may not yet be reflected.
+                        </TLi>
+                        <TLi>
+                            Small shareholders below disclosure thresholds never appear — the signal
+                            only captures the top of the ownership pyramid.
+                        </TLi>
+                        <TLi>
+                            Signal-× pattern <strong>confluence</strong> (bullish candlestick pattern
+                            AND smart-money accumulation) is rendered as a "Double-confirmation" chip
+                            on the verdict page. That's typically a higher-conviction setup — but still
+                            not a guarantee.
+                        </TLi>
+                    </ul>
+
+                    <p className="mt-6 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>
+                        Source: IDX / KSEI disclosures via the <code>indonesia-stock-exchange-idx</code>{" "}
+                        RapidAPI provider. Computed client-side from raw filings — our math is auditable.
+                    </p>
+                </div>
+
                 {/* Data sources */}
                 <SectionHeader
                     icon={Database}

@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
-import { Check, Loader2, X, Sparkles, Crown, Zap, ShieldCheck, Clock } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Check, Loader2, X, Sparkles, Crown, Zap, ShieldCheck, Clock, Building2 } from "lucide-react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 const ORDER = ["free", "pro", "elite"];
@@ -290,7 +291,42 @@ export default function PricingPage() {
 
                 {plans && billingConfig && paypalOptions && (
                     <PayPalScriptProvider options={paypalOptions}>
-                        <section className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mt-10">
+                        {/* IDX differentiator banner — unique-in-market callout */}
+                        <section
+                            className="mt-10 px-5 py-4 md:px-6 md:py-5 flex items-start gap-4"
+                            style={{
+                                border: "1px solid hsl(var(--buy))",
+                                background: "hsla(145,45%,55%,0.06)",
+                                borderRadius: 2,
+                            }}
+                            data-testid="idx-differentiator-banner"
+                        >
+                            <Building2 size={18} strokeWidth={1.5} style={{ color: "hsl(var(--buy))", flexShrink: 0 }} className="mt-1" />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-overline" style={{ color: "hsl(var(--buy))" }}>
+                                    New · For IDX investors
+                                </p>
+                                <h3 className="font-serif text-xl mt-1" style={{ letterSpacing: "-0.01em" }}>
+                                    The only platform showing live director-level accumulation signals for the IDX
+                                </h3>
+                                <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                                    Every Indonesian stock verdict now includes a <strong>Bandarmology panel</strong>{" "}
+                                    computed from the official IDX / KSEI insider-filing feed — directors,
+                                    commissioners, and major shareholders. Know who's actually buying before
+                                    you do. {" "}
+                                    <Link
+                                        to="/technical#bandarmology"
+                                        className="underline decoration-dotted underline-offset-4"
+                                        style={{ color: "hsl(var(--text-primary))" }}
+                                        data-testid="bandarmology-methodology-link"
+                                    >
+                                        See how we compute it →
+                                    </Link>
+                                </p>
+                            </div>
+                        </section>
+
+                        <section className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mt-6">
                             {ORDER.map((key) => {
                                 const p = plans[key];
                                 // CURRENT badge follows the user's actual base plan (not effective plan from admin/unlock).

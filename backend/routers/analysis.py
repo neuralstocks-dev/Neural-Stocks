@@ -32,6 +32,92 @@ _BG_TASKS: set = set()
 ANALYSIS_MODES = {"standard", "candlestick", "hybrid"}
 
 
+def _compute_confluence(candlestick_findings: dict, bandarmology: dict) -> dict | None:
+    """Return a confluence signal when the two independent sources agree.
+
+    Trigger rule (per user request — "flag when a bullish reversal pattern
+    appears AND smart-money is accumulating"):
+      * bullish confluence = ANY bullish pattern found + accumulation regime
+      * bearish confluence = ANY bearish pattern found + distribution regime
+      * divergence         = ANY pattern + opposite-direction regime
+      * None               = no patterns or bandarmology regime is balanced
+    """
+    # Extract every pattern name from both daily + weekly tiers
+    bullish_patterns: list[str] = []
+    bearish_patterns: list[str] = []
+    for tier in ("daily", "weekly"):
+        tier_obj = (candlestick_findings or {}).get(tier) or {}
+        for p in tier_obj.get("patterns") or []:
+            bias = (p.get("bias") or "").lower()
+            name = p.get("pattern") or "?"
+            if bias == "bullish":
+                bullish_patterns.append(name)
+            elif bias == "bearish":
+                bearish_patterns.append(name)
+
+    if not bullish_patterns and not bearish_patterns:
+        return None
+
+    # De-dupe while preserving order
+    def _dedupe(xs):
+        seen = set()
+        return [x for x in xs if not (x in seen or seen.add(x))]
+    bullish_patterns = _dedupe(bullish_patterns)
+    bearish_patterns = _dedupe(bearish_patterns)
+
+    regime = bandarmology.get("regime") or ""
+    bullish_regime = regime in ("strong_accumulation", "mild_accumulation")
+    bearish_regime = regime in ("strong_distribution", "mild_distribution")
+
+    # Bullish confluence — prefer this interpretation when signals mixed
+    if bullish_patterns and bullish_regime:
+        return {
+            "direction": "bullish",
+            "strength": "strong" if regime == "strong_accumulation" else "mild",
+            "pattern_count": len(bullish_patterns),
+            "patterns": bullish_patterns[:3],
+            "bandarmology_regime": regime,
+            "accumulation_ratio": bandarmology.get("accumulation_ratio"),
+            "label": (
+                "Double-confirmation: bullish reversal pattern + smart-money accumulation"
+            ),
+        }
+    if bearish_patterns and bearish_regime:
+        return {
+            "direction": "bearish",
+            "strength": "strong" if regime == "strong_distribution" else "mild",
+            "pattern_count": len(bearish_patterns),
+            "patterns": bearish_patterns[:3],
+            "bandarmology_regime": regime,
+            "accumulation_ratio": bandarmology.get("accumulation_ratio"),
+            "label": (
+                "Double-confirmation: bearish reversal pattern + smart-money distribution"
+            ),
+        }
+    # Divergence (pattern vs insider flow pull in opposite directions)
+    if bullish_patterns and bearish_regime:
+        return {
+            "direction": "divergence",
+            "strength": "neutral",
+            "pattern_count": len(bullish_patterns),
+            "patterns": bullish_patterns[:3],
+            "bandarmology_regime": regime,
+            "accumulation_ratio": bandarmology.get("accumulation_ratio"),
+            "label": "Signal divergence: bullish pattern vs smart-money distribution",
+        }
+    if bearish_patterns and bullish_regime:
+        return {
+            "direction": "divergence",
+            "strength": "neutral",
+            "pattern_count": len(bearish_patterns),
+            "patterns": bearish_patterns[:3],
+            "bandarmology_regime": regime,
+            "accumulation_ratio": bandarmology.get("accumulation_ratio"),
+            "label": "Signal divergence: bearish pattern vs smart-money accumulation",
+        }
+    return None
+
+
 # --- Shared SPY/VIX snapshot for RF regime features ---------------------
 # Small in-process cache so every verdict doesn't re-download the same
 # market-wide series. ~2y daily history for SPY + VIX; refresh every 10 min.
@@ -252,6 +338,13 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
         doc["bandarmology"] = idx_bandar
     if candlestick_findings is not None:
         doc["candlestick_findings"] = candlestick_findings
+
+    # Candlestick × Bandarmology confluence — flag when a reversal pattern
+    # agrees with insider flow direction. Only for IDX (needs bandarmology).
+    if is_idx and idx_bandar and candlestick_findings:
+        confluence = _compute_confluence(candlestick_findings, idx_bandar)
+        if confluence:
+            doc["confluence"] = confluence
 
     # Random Forest secondary opinion (independent of Claude). Uses ≥1y of
     # daily history. Only attaches when the model is loaded and features are

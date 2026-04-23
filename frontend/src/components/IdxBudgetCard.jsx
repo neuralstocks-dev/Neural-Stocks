@@ -151,7 +151,38 @@ export default function IdxBudgetCard() {
                         </li>
                     </ol>
                 </div>
-            ) : null}
+            ) : (
+                <div
+                    className="mt-4 p-3 text-[11.5px] leading-relaxed flex items-start gap-2"
+                    style={{
+                        background: "hsla(38,45%,45%,0.06)",
+                        border: "1px solid hsl(var(--hold))",
+                        color: "hsl(var(--text-secondary))",
+                    }}
+                    data-testid="idx-hard-limit-reminder"
+                >
+                    <AlertTriangle size={12} strokeWidth={1.5} style={{ color: "hsl(var(--hold))", flexShrink: 0, marginTop: 2 }} />
+                    <div>
+                        <p style={{ color: "hsl(var(--text-primary))" }}>
+                            <strong>Second-line defence:</strong> our 950/mo soft-cap is the primary
+                            budget guard, but RapidAPI also offers a <strong>hard monthly limit</strong>
+                            {" "}you can set on your developer dashboard. Enabling it means RapidAPI itself
+                            stops serving the key once the cap is hit — zero risk of ever being charged
+                            the $0.01/req overage.{" "}
+                            <a
+                                href="https://rapidapi.com/developer/dashboard"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline decoration-dotted"
+                                style={{ color: "hsl(var(--text-primary))" }}
+                            >
+                                Enable it here <ExternalLink size={10} className="inline" />
+                            </a>{" "}
+                            → My Apps → app settings → set a hard cap on the IDX subscription.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {snap?.last_call_at ? (
                 <p className="mt-4 font-mono text-[10.5px]" style={{ color: "hsl(var(--text-muted))" }}>
