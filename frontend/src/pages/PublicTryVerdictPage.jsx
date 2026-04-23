@@ -149,7 +149,14 @@ export default function PublicTryVerdictPage() {
                             <Sparkles size={14} strokeWidth={1.8} style={{ color: "hsl(var(--hold))" }} />
                             <p className="text-sm flex-1" style={{ color: "hsl(var(--text-primary))" }}>
                                 {isSharedView ? (
-                                    <><strong>Shared preview.</strong> Someone ran this verdict on Neulab's free try and shared the preview with you. Run your own for any ticker below.</>
+                                    <>
+                                        <strong>Shared preview.</strong> Someone ran this verdict on Neulab's free try and shared the preview with you. Run your own for any ticker below.
+                                        {a._shared?.was_refreshed && (
+                                            <span className="ml-2 text-xs italic" style={{ color: "hsl(var(--text-muted))" }}>
+                                                · Verdict auto-refreshed to current market data
+                                            </span>
+                                        )}
+                                    </>
                                 ) : rateLimited ? (
                                     <><strong>Free daily analysis used.</strong> This is your {rateLimited.previous_ticker} verdict from earlier today. Sign up to run unlimited analyses.</>
                                 ) : (
