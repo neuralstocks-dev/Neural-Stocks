@@ -11,6 +11,9 @@ from services.ai import run_ai_analysis, run_timeline_analysis, run_candlestick_
 from services.candlestick import scan_daily_and_weekly
 from services.finnhub import get_market_context
 from services.idx_news import get_market_context_idx, is_idx_ticker
+from services import rf_predictor
+from services.features import feature_row_for_today
+import pandas as pd
 from services.quota import enforce_analysis_quota, plan_for, resolved_plan_for
 from routers.disclaimer import require_accepted
 
@@ -87,13 +90,23 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     weekly_task = None
     if mode in ("candlestick", "hybrid"):
         weekly_task = asyncio.to_thread(_yf_history_sync, ticker, "1y", "1wk")
+    # RF secondary opinion needs ~1y of daily history for 52-week regime features
+    rf_hist_task = None
+    if rf_predictor.is_available():
+        rf_hist_task = asyncio.to_thread(_yf_history_sync, ticker, "2y", "1d")
 
     gather_args = [quote_task, hist_task, fund_task, market_ctx_task]
     if weekly_task is not None:
         gather_args.append(weekly_task)
+    if rf_hist_task is not None:
+        gather_args.append(rf_hist_task)
     results = await asyncio.gather(*gather_args)
     quote, history, fundamentals, market_ctx = results[0], results[1], results[2], results[3]
-    weekly_history = results[4] if weekly_task is not None else []
+    idx = 4
+    weekly_history = results[idx] if weekly_task is not None else []
+    if weekly_task is not None:
+        idx += 1
+    rf_history = results[idx] if rf_hist_task is not None else []
 
     if quote.get("price") is None:
         raise HTTPException(status_code=404, detail=f"No data for ticker {ticker}")
@@ -134,6 +147,37 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     }
     if candlestick_findings is not None:
         doc["candlestick_findings"] = candlestick_findings
+
+    # Random Forest secondary opinion (independent of Claude). Uses ≥1y of
+    # daily history. Only attaches when the model is loaded and features are
+    # computable (IDX tickers with short history will silently skip).
+    if rf_history:
+        try:
+            df = pd.DataFrame(rf_history)
+            df["date"] = pd.to_datetime(df["date"], utc=True)
+            df = df.set_index("date").rename(columns={
+                "open": "Open", "high": "High", "low": "Low",
+                "close": "Close", "volume": "Volume",
+            })
+            feat = feature_row_for_today(df)
+            if feat is not None:
+                opinion = rf_predictor.predict_from_features(feat)
+                if opinion is not None:
+                    # Flag agreement/disagreement with the LLM verdict
+                    llm_rec = (analysis.get("recommendation") or "").upper()
+                    llm_direction = "up" if llm_rec == "BUY" else "down" if llm_rec == "SELL" else "neutral"
+                    opinion["agrees_with_llm"] = (
+                        opinion["edge"] != "none"
+                        and llm_direction != "neutral"
+                        and opinion["direction"] == llm_direction
+                    )
+                    opinion["llm_direction"] = llm_direction
+                    doc["rf_opinion"] = opinion
+        except Exception as e:
+            # Never fail the whole analysis because of the RF layer
+            import logging
+            logging.getLogger(__name__).warning("RF opinion failed for %s: %s", ticker, e)
+
     await db.analyses.insert_one(doc)
     doc.pop("_id", None)
     await _maybe_create_alert(user["id"], ticker, analysis)
@@ -150,6 +194,34 @@ async def latest_analysis(ticker: str, user=Depends(get_current_user)):
     if not doc:
         raise HTTPException(status_code=404, detail="No analysis yet")
     return doc
+
+
+@router.get("/analysis/rf-model/meta")
+async def rf_model_meta():
+    """Public metadata about the Random Forest secondary-opinion model —
+    documented on /technical#random-forest. Returns null when no model is
+    loaded (e.g. fresh deploy before training)."""
+    meta = rf_predictor.get_meta()
+    if meta is None:
+        return {"available": False}
+    # Only expose the fields the UI needs (omit the full classification_report
+    # and the universe list is already covered by size).
+    return {
+        "available": True,
+        "trained_at": meta.get("trained_at"),
+        "universe_size": meta.get("universe_size"),
+        "years_of_history": meta.get("years_of_history"),
+        "horizon_days": meta.get("horizon_days"),
+        "train_rows": meta.get("train_rows"),
+        "test_rows": meta.get("test_rows"),
+        "cutoff_date": meta.get("cutoff_date"),
+        "holdout_accuracy": meta.get("holdout_accuracy"),
+        "holdout_auc": meta.get("holdout_auc"),
+        "oob_score": meta.get("oob_score"),
+        "baseline_accuracy": meta.get("baseline_accuracy"),
+        # Top-10 features with importance for the UI table
+        "feature_importance": (meta.get("feature_importance") or [])[:10],
+    }
 
 
 @router.get("/analysis/{analysis_id}/pdf")

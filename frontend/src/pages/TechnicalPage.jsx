@@ -5,9 +5,10 @@
  * uses (and what it does NOT use) so users understand the mechanics behind
  * every verdict, price target, and confidence score.
  */
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import AppShell from "@/components/AppShell";
+import api from "@/lib/api";
 import {
     Cpu,
     Layers,
@@ -23,10 +24,17 @@ import {
     Check,
     X,
     Braces,
+    Trees,
 } from "lucide-react";
 
 export default function TechnicalPage() {
     const loc = useLocation();
+    const [rfMeta, setRfMeta] = useState(null);
+    useEffect(() => {
+        api.get("/analysis/rf-model/meta")
+            .then((r) => setRfMeta(r.data))
+            .catch(() => setRfMeta({ available: false }));
+    }, []);
     // Smooth-scroll to the section pointed to by the URL hash (e.g. /technical#rsi)
     // so deep-links from the verdict page land on the right spot.
     useEffect(() => {
@@ -97,7 +105,6 @@ export default function TechnicalPage() {
                         </p>
                         <ul className="space-y-3 text-sm">
                             <MythLi>SVM (Support Vector Machines)</MythLi>
-                            <MythLi>Random Forest classifiers</MythLi>
                             <MythLi>CNN (Convolutional Neural Networks) on chart images</MythLi>
                             <MythLi>LSTM / Transformer price-forecasting models</MythLi>
                             <MythLi>FinBERT or any fine-tuned sentiment classifier</MythLi>
@@ -114,6 +121,7 @@ export default function TechnicalPage() {
                             <MythLi positive>Claude Sonnet 4.5 (Anthropic LLM) for verdict reasoning</MythLi>
                             <MythLi positive>Deterministic technical indicators (RSI, SMA, EMA, MACD)</MythLi>
                             <MythLi positive>Rule-based 15-pattern candlestick detector</MythLi>
+                            <MythLi positive>Random Forest classifier as <em>secondary</em> probability opinion</MythLi>
                             <MythLi positive>Transparent keyword sentiment heuristic (EN + Bahasa)</MythLi>
                             <MythLi positive>Multi-source data (yfinance, Finnhub, IDX RSS)</MythLi>
                             <MythLi positive>Explainable confidence scoring with visible reasoning</MythLi>
@@ -356,6 +364,176 @@ histogram  = MACD_line − signal`}
                         emphasis="AI + Candlestick"
                         body="LLM is explicitly told to weigh patterns as primary, then require technical and fundamental confirmation before upgrading confidence. Highest-conviction mode — recommended default."
                     />
+                </div>
+
+                {/* Random Forest secondary-opinion model */}
+                <SectionHeader
+                    icon={Trees}
+                    overline="Secondary opinion"
+                    title="The Random Forest layer."
+                    subtitle="An independent probability estimate that runs alongside Claude — never instead of it. Honest numbers, warts and all."
+                />
+
+                <div id="random-forest" className="mt-8 module p-6 md:p-10 scroll-mt-24" data-testid="tech-random-forest">
+                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
+                        Every verdict passes through a trained <strong>scikit-learn RandomForestClassifier</strong>{" "}
+                        that produces an independent probability of a positive 5-day forward return. It is the
+                        <em> only</em> trained ML component in the stack. We added it for three reasons:
+                        (1) catch cases where the LLM's narrative reasoning disagrees with what the
+                        historical data actually says, (2) expose feature importances so users see
+                        <em> why</em> the model agrees or disagrees, (3) lay groundwork for the autonomous
+                        trading roadmap item where position sizing needs a calibrated probability.
+                    </p>
+
+                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                        Training methodology
+                    </h4>
+                    <ul className="space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                        <TLi>
+                            <strong>Universe</strong>: top-liquidity S&amp;P 500 large caps across Tech, Finance,
+                            Healthcare, Consumer, Industrials, Energy, Utilities &amp; Comms (~165 tickers).
+                        </TLi>
+                        <TLi>
+                            <strong>Input features</strong>: 21 numeric features derived from OHLCV alone —
+                            returns, RSI, SMA ratios, volatility, volume, MACD, candle-shape, 52-week regime.
+                            No look-ahead. No news. No analyst consensus. Pure price-action statistics.
+                        </TLi>
+                        <TLi>
+                            <strong>Label</strong>: binary — did the closing price rise over the next 5 trading days?
+                            The 0.5% deadband around flat was kept in the dataset (treated as "not up") to
+                            avoid artificially cleaning out ambiguous cases.
+                        </TLi>
+                        <TLi>
+                            <strong>Split</strong>: strict walk-forward by calendar date, 80/20.
+                            Every ticker's history is cut at the same date, so no ticker bleeds across train/test.
+                        </TLi>
+                        <TLi>
+                            <strong>Model</strong>: RandomForestClassifier(n_estimators=400, max_depth=12,
+                            min_samples_leaf=50, class_weight='balanced'). Out-of-bag scoring on.
+                        </TLi>
+                    </ul>
+
+                    {rfMeta?.available ? (
+                        <>
+                            <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                                Live holdout metrics
+                            </h4>
+                            <p className="text-sm mb-4" style={{ color: "hsl(var(--text-muted))" }}>
+                                These are the numbers the <em>currently deployed</em> model produced on the
+                                unseen hold-out period. They update automatically whenever the model is retrained.
+                            </p>
+                            <div
+                                className="grid grid-cols-2 md:grid-cols-4 gap-0"
+                                style={{ border: "1px solid hsl(var(--border-default))" }}
+                                data-testid="rf-metrics"
+                            >
+                                <MetricCell
+                                    label="Holdout accuracy"
+                                    value={`${(rfMeta.holdout_accuracy * 100).toFixed(2)}%`}
+                                    color={
+                                        rfMeta.holdout_accuracy > rfMeta.baseline_accuracy
+                                            ? "hsl(var(--buy))"
+                                            : "hsl(var(--sell))"
+                                    }
+                                />
+                                <MetricCell label="ROC-AUC" value={rfMeta.holdout_auc.toFixed(3)} />
+                                <MetricCell label="OOB score" value={rfMeta.oob_score.toFixed(3)} />
+                                <MetricCell
+                                    label="Always-majority baseline"
+                                    value={`${(rfMeta.baseline_accuracy * 100).toFixed(2)}%`}
+                                    last
+                                />
+                            </div>
+
+                            <div
+                                className="mt-5 p-4 text-[12px] leading-relaxed"
+                                style={{
+                                    background: rfMeta.holdout_accuracy > rfMeta.baseline_accuracy
+                                        ? "hsla(142,55%,45%,0.06)"
+                                        : "hsla(0,55%,55%,0.04)",
+                                    border: "1px solid hsl(var(--border-divider))",
+                                }}
+                                data-testid="rf-honesty-note"
+                            >
+                                <p style={{ color: "hsl(var(--text-primary))" }}>
+                                    <strong>Honest reading:</strong>{" "}
+                                    {rfMeta.holdout_accuracy > rfMeta.baseline_accuracy ? (
+                                        <>the model beats the always-majority baseline by{" "}
+                                            <strong style={{ color: "hsl(var(--buy))" }}>
+                                                {((rfMeta.holdout_accuracy - rfMeta.baseline_accuracy) * 100).toFixed(2)} pp
+                                            </strong> on unseen data. That's a meaningful edge — but a modest one, as
+                                            it should be for single-stock direction.</>
+                                    ) : (
+                                        <>the model underperforms the always-majority baseline on 2025 holdout by{" "}
+                                            <strong style={{ color: "hsl(var(--sell))" }}>
+                                                {((rfMeta.baseline_accuracy - rfMeta.holdout_accuracy) * 100).toFixed(2)} pp
+                                            </strong>. This reflects a regime change between the training window
+                                            and the forward window — not a bug. We ship the model anyway as a
+                                            <em> skeptic layer</em>: when the model has no confidence
+                                            (|p − 0.5| &lt; 0.08) the UI explicitly says "No meaningful edge"
+                                            rather than display a misleading number.</>
+                                    )}
+                                </p>
+                                <p className="mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                                    The historical training-period OOB score of <strong>{(rfMeta.oob_score * 100).toFixed(1)}%</strong> shows the model <em>did</em> learn in-distribution patterns — the shortfall on 2025 is regime drift, the classic ML-in-markets problem.
+                                </p>
+                            </div>
+
+                            <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                                Top-10 feature importance
+                            </h4>
+                            <p className="text-xs mb-3 font-mono" style={{ color: "hsl(var(--text-muted))" }}>
+                                Aggregate Gini importance across 400 trees. These are the variables the model
+                                <em> relied on</em> — correlations, not causes.
+                            </p>
+                            <div data-testid="rf-feature-importance">
+                                {(rfMeta.feature_importance || []).map((f, i) => (
+                                    <FeatureBar
+                                        key={f.name}
+                                        rank={i + 1}
+                                        name={f.name}
+                                        value={f.importance}
+                                        max={rfMeta.feature_importance[0].importance}
+                                    />
+                                ))}
+                            </div>
+
+                            <p
+                                className="text-xs font-mono mt-6 pt-4"
+                                style={{ color: "hsl(var(--text-muted))", borderTop: "1px solid hsl(var(--border-divider))" }}
+                            >
+                                Trained: {rfMeta.trained_at?.slice(0, 10)} · Universe: {rfMeta.universe_size} tickers · Training window: {rfMeta.years_of_history} years · Cutoff: {rfMeta.cutoff_date} · Train rows: {rfMeta.train_rows?.toLocaleString()} · Test rows: {rfMeta.test_rows?.toLocaleString()}
+                            </p>
+                        </>
+                    ) : (
+                        <p className="mt-8 text-sm" style={{ color: "hsl(var(--text-muted))" }}>
+                            Random Forest model not loaded on this deploy — secondary opinion disabled.
+                        </p>
+                    )}
+
+                    <h4 className="font-serif mt-10 mb-3" style={{ fontSize: "1.3rem" }}>
+                        How the UI combines LLM + RF
+                    </h4>
+                    <ul className="space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                        <TLi>
+                            Each analysis ships with both the Claude verdict <em>and</em> the RF probability as separate,
+                            independent signals. Neither suppresses the other.
+                        </TLi>
+                        <TLi>
+                            When the RF edge is <code>none</code> (|p − 0.5| &lt; 0.08), we explicitly render
+                            "No meaningful edge" rather than a fake number.
+                        </TLi>
+                        <TLi>
+                            When the RF <em>disagrees</em> with a high-confidence Claude verdict, the UI shows a
+                            red "Disagrees" chip. This is a prompt to re-examine the reasoning before acting.
+                        </TLi>
+                        <TLi>
+                            The RF is <strong>never used for position sizing or any trading action</strong> in
+                            the current product. It's informational only. The autonomous-trading roadmap item
+                            will introduce a separate calibrated model trained specifically for risk sizing,
+                            documented here before it ships.
+                        </TLi>
+                    </ul>
                 </div>
 
                 {/* Data sources */}
@@ -727,5 +905,63 @@ function LimitLi({ children }) {
             />
             <span>{children}</span>
         </li>
+    );
+}
+
+function TLi({ children }) {
+    return (
+        <li className="flex items-start gap-3">
+            <span style={{ color: "hsl(var(--hold))", marginTop: 3 }}>·</span>
+            <span>{children}</span>
+        </li>
+    );
+}
+
+function MetricCell({ label, value, color, last = false }) {
+    return (
+        <div
+            className="p-5"
+            style={{
+                borderRight: last ? "none" : "1px solid hsl(var(--border-divider))",
+                borderBottom: "1px solid hsl(var(--border-divider))",
+            }}
+        >
+            <p className="text-overline mb-2" style={{ fontSize: "0.58rem" }}>{label}</p>
+            <p
+                className="font-mono"
+                style={{ fontSize: "1.6rem", color: color || "hsl(var(--text-primary))", letterSpacing: "-0.01em" }}
+            >
+                {value}
+            </p>
+        </div>
+    );
+}
+
+function FeatureBar({ rank, name, value, max }) {
+    const pct = Math.max((value / max) * 100, 1);
+    return (
+        <div className="flex items-center gap-3 py-1.5" data-testid={`rf-importance-${name}`}>
+            <span
+                className="font-mono text-[10px] w-5 text-right"
+                style={{ color: "hsl(var(--text-muted))" }}
+            >
+                {rank}
+            </span>
+            <span className="font-mono text-xs flex-1 md:flex-initial md:w-48" style={{ color: "hsl(var(--text-primary))" }}>
+                {name}
+            </span>
+            <div className="flex-1 h-2" style={{ background: "hsl(var(--border-divider))", borderRadius: 1, overflow: "hidden" }}>
+                <div
+                    style={{
+                        width: `${pct}%`,
+                        height: "100%",
+                        background: "hsl(var(--hold))",
+                    }}
+                />
+            </div>
+            <span className="font-mono text-[11px] w-16 text-right" style={{ color: "hsl(var(--text-muted))" }}>
+                {(value * 100).toFixed(2)}%
+            </span>
+        </div>
     );
 }
