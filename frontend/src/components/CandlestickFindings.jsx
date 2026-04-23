@@ -1,7 +1,32 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { TrendingUp, TrendingDown, Minus, Zap, BookOpen } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Zap, BookOpen, ArrowDown } from "lucide-react";
 import PatternGuideDialog from "@/components/PatternGuideDialog";
+
+// Pick the most relevant driver module to anchor to based on which lens
+// the bias_alignment sentence references. Order matters when multiple
+// are mentioned — fundamental > technical > peer (fundamentals tend to
+// be the deeper 'why', technicals the 'how', peers contextual).
+function pickDriverAnchor(sentence) {
+    const s = (sentence || "").toLowerCase();
+    const hits = [];
+    if (/fundamental|valuation|earnings|revenue|margin|balance sheet|roe|eps/.test(s)) hits.push({ id: "fundamental-analysis", label: "Fundamental Analysis" });
+    if (/technical|rsi|macd|moving average|\bsma\b|\bema\b|momentum|overbought|oversold|breakout|parabolic/.test(s)) hits.push({ id: "technical-analysis", label: "Technical Analysis" });
+    if (/peer|sector|industry|competitor/.test(s)) hits.push({ id: "peer-comparison", label: "Peer Comparison" });
+    return hits;
+}
+
+function smoothScrollTo(id) {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Briefly highlight to orient the eye
+    const prev = el.style.boxShadow;
+    el.style.transition = "box-shadow 400ms ease";
+    el.style.boxShadow = "0 0 0 2px hsl(var(--accent-primary))";
+    setTimeout(() => { el.style.boxShadow = prev || ""; }, 1400);
+}
 
 function BiasBadge({ bias }) {
     const map = {
@@ -229,12 +254,7 @@ export default function CandlestickFindings({ findings, summary, mode }) {
                         Timeframe used · {summary.timeframe_used || "—"}
                     </p>
                     {summary.bias_alignment && (
-                        <p
-                            className="mt-3 text-sm leading-relaxed"
-                            style={{ color: "hsl(var(--text-primary))" }}
-                        >
-                            {summary.bias_alignment}
-                        </p>
+                        <BiasAlignmentLine sentence={summary.bias_alignment} />
                     )}
                 </div>
             )}
@@ -295,6 +315,62 @@ function SummaryList({ label, items, color, testId, emptyFallback }) {
                     ))}
                 </ul>
             )}
+        </div>
+    );
+}
+
+
+function BiasAlignmentLine({ sentence }) {
+    const drivers = useMemo(() => pickDriverAnchor(sentence), [sentence]);
+    if (!drivers.length) {
+        return (
+            <p
+                className="mt-3 text-sm leading-relaxed"
+                style={{ color: "hsl(var(--text-primary))" }}
+                data-testid="bias-alignment-line"
+            >
+                {sentence}
+            </p>
+        );
+    }
+    return (
+        <div className="mt-3" data-testid="bias-alignment-line">
+            <p
+                className="text-sm leading-relaxed"
+                style={{ color: "hsl(var(--text-primary))" }}
+            >
+                {sentence}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span
+                    className="text-overline"
+                    style={{ color: "hsl(var(--text-muted))", fontSize: "0.52rem" }}
+                >
+                    Jump to driver
+                </span>
+                {drivers.map((d) => (
+                    <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => smoothScrollTo(d.id)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 font-mono transition-colors"
+                        style={{
+                            color: "hsl(var(--accent-primary))",
+                            background: "transparent",
+                            border: "1px solid hsl(var(--accent-primary))",
+                            fontSize: "0.65rem",
+                            letterSpacing: "0.08em",
+                            borderRadius: 2,
+                            cursor: "pointer",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "hsl(var(--accent-primary) / 0.1)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                        data-testid={`jump-to-${d.id}`}
+                    >
+                        <ArrowDown size={10} strokeWidth={2} /> {d.label}
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }

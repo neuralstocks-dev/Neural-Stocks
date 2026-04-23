@@ -528,22 +528,22 @@ export default function AnalysisReportPage() {
                                 <ConfluenceChip confluence={analysis.confluence} />
 
                                 {/* Technical / Fundamental / Peer */}
-                                <section className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mb-1 md:mb-4">
-                                    <article className="module p-6" data-testid="technical-module">
+                                <section id="verdict-drivers" className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mb-1 md:mb-4">
+                                    <article id="technical-analysis" className="module p-6 scroll-mt-24" data-testid="technical-module">
                                         <p className="text-overline">Technical Analysis</p>
                                         <h3 className="font-serif text-2xl mt-2 mb-4">Momentum</h3>
                                         <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                                             {analysis.technical_analysis}
                                         </p>
                                     </article>
-                                    <article className="module p-6" data-testid="fundamental-module">
+                                    <article id="fundamental-analysis" className="module p-6 scroll-mt-24" data-testid="fundamental-module">
                                         <p className="text-overline">Fundamental Analysis</p>
                                         <h3 className="font-serif text-2xl mt-2 mb-4">Quality</h3>
                                         <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                                             {analysis.fundamental_analysis}
                                         </p>
                                     </article>
-                                    <article className="module p-6" data-testid="peer-module">
+                                    <article id="peer-comparison" className="module p-6 scroll-mt-24" data-testid="peer-module">
                                         <p className="text-overline">Peer Comparison</p>
                                         <h3 className="font-serif text-2xl mt-2 mb-4">Relative</h3>
                                         <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
