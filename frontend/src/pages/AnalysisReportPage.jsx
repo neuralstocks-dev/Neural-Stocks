@@ -166,7 +166,7 @@ export default function AnalysisReportPage() {
                                 <div className="col-span-12 md:col-span-8">
                                     <p className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
                                         {quote.exchange || "—"} · {quote.currency || "USD"}
-                                        {analysis.idx_data_source === "rapidapi" ? (
+                                        {analysis?.idx_data_source === "rapidapi" ? (
                                             <span
                                                 className="ml-2 px-1.5 py-0.5 font-mono"
                                                 style={{
@@ -180,7 +180,7 @@ export default function AnalysisReportPage() {
                                             >
                                                 IDX LIVE
                                             </span>
-                                        ) : analysis.idx_data_source === "yfinance" ? (
+                                        ) : analysis?.idx_data_source === "yfinance" ? (
                                             <span
                                                 className="ml-2 px-1.5 py-0.5 font-mono"
                                                 style={{
