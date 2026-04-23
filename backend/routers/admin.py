@@ -348,3 +348,37 @@ async def delete_all_logins(_admin=Depends(admin_required)):
 async def delete_selected_logins(req: LoginDeleteReq, _admin=Depends(admin_required)):
     res = await db.login_events.delete_many({"id": {"$in": req.ids}})
     return {"ok": True, "removed": res.deleted_count, "message": f"Deleted {res.deleted_count} login events."}
+
+
+# ---------- Random Forest retrain ----------
+@router.get("/rf/status")
+async def rf_retrain_status(_admin=Depends(admin_required)):
+    from services import rf_retrain
+    return await rf_retrain.get_retrain_status()
+
+
+@router.post("/rf/retrain")
+async def rf_retrain_trigger(_admin=Depends(admin_required)):
+    """Kick off an out-of-process retrain. Idempotent — returns the
+    currently-running job if one is already in progress."""
+    from services import rf_retrain
+    job = await rf_retrain.trigger_retrain(triggered_by="admin")
+    return {"ok": True, "job": job}
+
+
+@router.post("/rf/reload")
+async def rf_reload(_admin=Depends(admin_required)):
+    """Re-read `rf_signal.joblib` from disk. Used after an out-of-band
+    deploy (e.g. the GitHub Actions workflow rsyncs a freshly-trained
+    model and we need to swap it in without a backend restart)."""
+    from services import rf_predictor
+    bundle = rf_predictor.reload()
+    if bundle is None:
+        raise HTTPException(status_code=500, detail="Model file missing or unreadable")
+    meta = bundle.get("meta", {})
+    return {
+        "ok": True,
+        "trained_at": meta.get("trained_at"),
+        "holdout_accuracy": meta.get("holdout_accuracy"),
+        "universe_size": meta.get("universe_size"),
+    }

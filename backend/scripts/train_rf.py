@@ -139,27 +139,50 @@ def _download_history(tickers: list[str], years: int) -> dict[str, pd.DataFrame]
 
 
 def _download_market_context(years: int) -> dict:
-    """Download SPY + ^VIX for the regime features. Returns {'spy': df, 'vix': df}."""
+    """Download SPY + ^VIX for the regime features. Returns {'spy': df, 'vix': df}.
+
+    yfinance is flaky on these specific tickers — about 1 in 10 calls returns
+    empty. Retry up to 3 times with a short sleep, and fall back to ^GSPC
+    if SPY proves unreachable (~99.9% correlation with SPY close, so the
+    feature semantics are preserved)."""
     end = datetime.now(timezone.utc).date()
     start = end.replace(year=end.year - years - 1)  # extra year for 252d rolling mean
     print(f"▸ downloading market context (SPY, ^VIX) {start}..{end}", flush=True)
     out: dict = {}
-    for key, ticker in (("spy", "SPY"), ("vix", "^VIX")):
-        df = yf.download(
-            ticker, start=str(start), end=str(end), interval="1d",
-            auto_adjust=True, progress=False, threads=False,
-        )
-        if df is None or df.empty:
-            print(f"  !! {ticker} empty", flush=True)
-            continue
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        df = df[[c for c in ("Open", "High", "Low", "Close", "Volume") if c in df.columns]]
-        df.index = pd.to_datetime(df.index)
-        if df.index.tz is not None:
-            df.index = df.index.tz_localize(None)
-        out[key] = df
-        print(f"  ok {ticker}: {len(df)} rows", flush=True)
+    specs = (
+        ("spy", ["SPY", "^GSPC"]),  # fall back to the underlying index if the ETF fails
+        ("vix", ["^VIX"]),
+    )
+    for key, tickers in specs:
+        for attempt in range(3):
+            df = None
+            for ticker in tickers:
+                try:
+                    df = yf.download(
+                        ticker, start=str(start), end=str(end), interval="1d",
+                        auto_adjust=True, progress=False, threads=False,
+                    )
+                except Exception as e:
+                    print(f"  !! {ticker} attempt {attempt+1}: {e}", flush=True)
+                    df = None
+                    continue
+                if df is not None and not df.empty:
+                    print(f"  ok {ticker}: {len(df)} rows (attempt {attempt+1})", flush=True)
+                    break
+                else:
+                    print(f"  !! {ticker} empty on attempt {attempt+1}", flush=True)
+            if df is not None and not df.empty:
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.get_level_values(0)
+                df = df[[c for c in ("Open", "High", "Low", "Close", "Volume") if c in df.columns]]
+                df.index = pd.to_datetime(df.index)
+                if df.index.tz is not None:
+                    df.index = df.index.tz_localize(None)
+                out[key] = df
+                break
+            time.sleep(2 * (attempt + 1))  # 2s, 4s backoff
+        if key not in out:
+            print(f"  !! exhausted retries for {key} ({tickers})", flush=True)
     return out
 
 
@@ -333,9 +356,14 @@ def main():
         "meta": meta,
         "feature_importances": base_model.feature_importances_.tolist(),
     }
-    joblib.dump(bundle, out_path)
-    # Write meta separately (human-readable)
-    (out_path.parent / "rf_signal.meta.json").write_text(json.dumps(meta, indent=2))
+    # Atomic swap: write to .tmp first, then os.replace so inference never
+    # sees a half-written file even while training is running.
+    tmp_path = out_path.with_suffix(".tmp.joblib")
+    tmp_meta_path = (out_path.parent / "rf_signal.meta.json").with_suffix(".meta.tmp.json")
+    joblib.dump(bundle, tmp_path)
+    tmp_meta_path.write_text(json.dumps(meta, indent=2))
+    os.replace(tmp_path, out_path)
+    os.replace(tmp_meta_path, out_path.parent / "rf_signal.meta.json")
     elapsed = time.time() - t0
     print(f"▸ saved {out_path}  ({os.path.getsize(out_path)/1e6:.2f} MB) · {elapsed:.1f}s")
 

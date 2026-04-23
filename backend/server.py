@@ -46,6 +46,22 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def start_background_tasks():
+    """Kick off long-running background coroutines that should run for the
+    lifetime of the app. Each task is kept alive in `_BG_TASKS` so the GC
+    doesn't drop it."""
+    import asyncio
+    from services.rf_retrain import weekly_retrain_loop
+    task = asyncio.create_task(weekly_retrain_loop())
+    _BG_TASKS.add(task)
+    task.add_done_callback(_BG_TASKS.discard)
+    logger.info("Started RF weekly retrain scheduler")
+
+
+_BG_TASKS: set = set()
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()

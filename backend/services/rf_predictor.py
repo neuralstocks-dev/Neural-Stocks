@@ -60,6 +60,16 @@ def is_available() -> bool:
     return _lazy_load() is not None
 
 
+def reload() -> dict | None:
+    """Force a re-read of the joblib from disk. Called after an on-host
+    retrain (via admin endpoint or the weekly scheduler) so new weights
+    are picked up without a backend restart."""
+    global _BUNDLE, _LOAD_ATTEMPTED
+    _BUNDLE = None
+    _LOAD_ATTEMPTED = False
+    return _lazy_load()
+
+
 def get_meta() -> dict | None:
     """Expose metadata (training date, holdout metrics, feature importance)
     for the /technical page."""
