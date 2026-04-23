@@ -11,6 +11,7 @@ import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import AnalysisModeSelector from "@/components/AnalysisModeSelector";
 import LiveDeskGuide from "@/components/LiveDeskGuide";
 import IdxTopPicksDialog from "@/components/IdxTopPicksDialog";
+import TrendingOnNeulabWidget from "@/components/TrendingOnNeulabWidget";
 import { useAuth } from "@/hooks/useAuth";
 import { formatPrice, formatPct, timeAgo } from "@/lib/format";
 import { errMessage } from "@/lib/errors";
@@ -481,6 +482,9 @@ export default function DashboardPage() {
 
                 {/* Live Desk — how-to-use guide */}
                 <LiveDeskGuide />
+
+                {/* Trending on Neulab — community social proof */}
+                <TrendingOnNeulabWidget />
 
                 {/* Quick Actions */}
                 <section className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-8">
