@@ -205,18 +205,21 @@ export default function CandlestickFindings({ findings, summary, mode }) {
                             items={summary.primary_patterns}
                             color="hsl(var(--buy))"
                             testId="primary-patterns"
+                            emptyFallback="No candlestick pattern served as a primary signal — the verdict is driven by technicals and fundamentals."
                         />
                         <SummaryList
                             label="Confirmation"
                             items={summary.confirmation_patterns}
                             color="hsl(var(--hold))"
                             testId="confirmation-patterns"
+                            emptyFallback="No detected pattern confirmed the verdict — see Rejected / Overridden for the ones that were considered."
                         />
                         <SummaryList
                             label="Rejected / overridden"
                             items={summary.rejected_patterns}
                             color="hsl(var(--text-muted))"
                             testId="rejected-patterns"
+                            emptyFallback="None — every detected pattern either drove or confirmed the verdict."
                         />
                     </div>
                     <p
@@ -262,7 +265,7 @@ export default function CandlestickFindings({ findings, summary, mode }) {
     );
 }
 
-function SummaryList({ label, items, color, testId }) {
+function SummaryList({ label, items, color, testId, emptyFallback }) {
     const list = Array.isArray(items) ? items : [];
     return (
         <div data-testid={`candlestick-${testId}`}>
@@ -274,10 +277,10 @@ function SummaryList({ label, items, color, testId }) {
             </p>
             {list.length === 0 ? (
                 <p
-                    className="mt-2 font-mono text-xs"
+                    className="mt-2 text-xs leading-relaxed italic"
                     style={{ color: "hsl(var(--text-muted))" }}
                 >
-                    —
+                    {emptyFallback || "—"}
                 </p>
             ) : (
                 <ul className="mt-2 space-y-1.5">

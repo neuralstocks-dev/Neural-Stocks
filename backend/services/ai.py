@@ -105,6 +105,10 @@ Hybrid rules:
 - Stop-loss can still be informed by candlestick invalidation levels when patterns are present.
 - Confidence >= 85 only when ALL THREE lenses align.
 - Be decisive. Avoid hedging.
+- candlestick_summary population rules:
+  * When patterns WERE detected, at least one of primary_patterns or confirmation_patterns must be non-empty — classify the strongest detected pattern in one of those buckets even if its bias disagrees (a bearish pattern is a "primary signal" for a SELL verdict; a bullish pattern detected during a SELL verdict is a "rejected" signal, not an empty primary).
+  * Only leave ALL THREE arrays empty if NO patterns at all were detected in the supplied candlestick_findings.
+  * Name each entry with the PATTERN NAME first (e.g., "Doji · indecision, no bullish confirmation after 34% surge"), not an opaque description.
 """
 
 
