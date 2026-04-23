@@ -93,10 +93,10 @@ export default function LoginPage() {
                             className="font-serif hero-number text-white"
                             style={{ fontSize: "clamp(2.6rem, 5vw, 4.2rem)" }}
                         >
-                            An analyst in
+                            An analyst
                             <br />
                             <em className="italic" style={{ color: "#F59E0B" }}>
-                                your pocket.
+                                who explains why.
                             </em>
                         </h1>
                         <p
