@@ -355,3 +355,69 @@ async def get_order(order_id: str) -> dict:
     if r.status_code != 200:
         raise PayPalError(f"Get order failed: {r.status_code} {r.text}")
     return r.json()
+
+
+
+# =============================================================================
+# Webhook registry inspection — used by the admin diagnostics panel to answer
+# "is my webhook ID actually registered?", "what URL is it pointed at?",
+# "which events is it subscribed to?". All read-only (GET-only PayPal calls).
+# =============================================================================
+
+async def get_webhook_details(webhook_id: Optional[str] = None) -> dict:
+    """Fetches the webhook configuration from PayPal (/v1/notifications/webhooks/{id}).
+    Returns the raw response plus a normalised shape. Raises PayPalError on
+    any non-2xx (typically 404 = wrong ID, 401 = env mismatch)."""
+    wid = webhook_id or PAYPAL_WEBHOOK_ID
+    if not wid:
+        raise PayPalError("PAYPAL_WEBHOOK_ID not configured")
+    async with httpx.AsyncClient(timeout=15.0) as hc:
+        r = await hc.get(
+            f"{PAYPAL_API_BASE}/v1/notifications/webhooks/{wid}",
+            headers=await _auth_headers(),
+        )
+    if r.status_code != 200:
+        raise PayPalError(f"Webhook lookup failed: {r.status_code} {r.text[:300]}")
+    data = r.json()
+    return {
+        "id": data.get("id"),
+        "url": data.get("url"),
+        "event_types": [e.get("name") for e in (data.get("event_types") or [])],
+        "raw": data,
+    }
+
+
+async def list_available_event_types() -> list[dict]:
+    """Lists every event type PayPal can publish for the current app. Used
+    to cross-check which events are missing from the configured webhook."""
+    async with httpx.AsyncClient(timeout=15.0) as hc:
+        r = await hc.get(
+            f"{PAYPAL_API_BASE}/v1/notifications/webhooks-event-types",
+            headers=await _auth_headers(),
+        )
+    if r.status_code != 200:
+        raise PayPalError(f"Event-types lookup failed: {r.status_code} {r.text[:300]}")
+    return r.json().get("event_types") or []
+
+
+async def update_webhook_events(webhook_id: str, event_types: list[str]) -> dict:
+    """PATCHes the webhook's event_types list to the provided set. Used by the
+    admin 'Subscribe to all events' button. Returns the updated webhook."""
+    if not webhook_id:
+        raise PayPalError("webhook_id required")
+    if not event_types:
+        raise PayPalError("event_types must be non-empty")
+    payload = [{
+        "op": "replace",
+        "path": "/event_types",
+        "value": [{"name": n} for n in event_types],
+    }]
+    async with httpx.AsyncClient(timeout=20.0) as hc:
+        r = await hc.patch(
+            f"{PAYPAL_API_BASE}/v1/notifications/webhooks/{webhook_id}",
+            headers=await _auth_headers(),
+            json=payload,
+        )
+    if r.status_code not in (200, 204):
+        raise PayPalError(f"Webhook update failed: {r.status_code} {r.text[:300]}")
+    return r.json() if r.status_code == 200 else {"updated": True}

@@ -3,6 +3,7 @@ import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import RFRetrainCard from "@/components/RFRetrainCard";
 import IdxBudgetCard from "@/components/IdxBudgetCard";
+import PayPalWebhookCard from "@/components/PayPalWebhookCard";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, Link } from "react-router-dom";
 import { Loader2, ShieldCheck, Clock, RotateCcw, Timer, Search, Trash2, BellOff, DollarSign, CheckSquare, Square, AlertTriangle, Sparkles } from "lucide-react";
@@ -749,6 +750,9 @@ export default function AdminPage() {
 
                         {/* IDX · RapidAPI budget */}
                         <IdxBudgetCard />
+
+                        {/* PayPal webhook health */}
+                        <PayPalWebhookCard />
 
 
                         {/* Users table */}

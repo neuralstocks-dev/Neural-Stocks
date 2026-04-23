@@ -407,3 +407,113 @@ async def reset_user_quota(user_id: str, _admin=Depends(admin_required)):
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"ok": True, "quota_reset_at": iso(now)}
+
+
+# ---------- PayPal Webhook diagnostics -----------------------------------
+# Read-only panel on /admin that surfaces: which webhook ID is configured,
+# what URL PayPal thinks it's pointed at, which events are subscribed, and
+# the last 20 received events with verified status — so the user can answer
+# "is my production webhook correctly wired?" without leaving the app.
+
+from core.config import PAYPAL_WEBHOOK_ID as _CFG_WEBHOOK_ID, PAYPAL_ENV as _CFG_PP_ENV  # noqa: E402
+
+DEFAULT_WEBHOOK_EVENTS = [
+    "BILLING.SUBSCRIPTION.ACTIVATED",
+    "BILLING.SUBSCRIPTION.CANCELLED",
+    "BILLING.SUBSCRIPTION.SUSPENDED",
+    "BILLING.SUBSCRIPTION.EXPIRED",
+    "BILLING.SUBSCRIPTION.PAYMENT.FAILED",
+    "PAYMENT.SALE.COMPLETED",
+    "CHECKOUT.ORDER.APPROVED",
+    "PAYMENT.CAPTURE.COMPLETED",
+]
+
+
+@router.get("/paypal/webhook-diagnostics")
+async def paypal_webhook_diagnostics(_admin=Depends(admin_required)):
+    """One-shot snapshot for the admin panel: env, webhook id, registered url,
+    subscribed events, all available events, and recent received events.
+    Every external call is individually try/except'd so a single PayPal API
+    hiccup doesn't blank the whole panel."""
+    from services import paypal as pp
+
+    out = {
+        "env": _CFG_PP_ENV,
+        "webhook_id_configured": bool(_CFG_WEBHOOK_ID),
+        "webhook_id": _CFG_WEBHOOK_ID or None,
+        "public_app_url": __import__("os").environ.get("PUBLIC_APP_URL"),
+        "registered": None,
+        "registered_error": None,
+        "available_event_types": [],
+        "available_event_types_error": None,
+        "recent_events": [],
+        "stats": {"total": 0, "verified": 0, "unverified": 0},
+    }
+
+    # Fetch the registered webhook config
+    if _CFG_WEBHOOK_ID:
+        try:
+            out["registered"] = await pp.get_webhook_details(_CFG_WEBHOOK_ID)
+        except Exception as e:
+            out["registered_error"] = str(e)
+
+    # Fetch full catalogue of event types so UI can diff subscribed vs available
+    try:
+        evs = await pp.list_available_event_types()
+        out["available_event_types"] = [
+            {"name": e.get("name"), "description": e.get("description"), "status": e.get("status")}
+            for e in evs
+        ]
+    except Exception as e:
+        out["available_event_types_error"] = str(e)
+
+    # Recent received events (last 20)
+    cursor = db.webhook_events.find({}, {"_id": 0}).sort("received_at", -1).limit(20)
+    recent = await cursor.to_list(length=20)
+    out["recent_events"] = recent
+
+    # Aggregate verify stats (all-time)
+    out["stats"]["total"] = await db.webhook_events.count_documents({})
+    out["stats"]["verified"] = await db.webhook_events.count_documents({"verified": True})
+    out["stats"]["unverified"] = out["stats"]["total"] - out["stats"]["verified"]
+
+    return out
+
+
+class WebhookEventsPatchReq(BaseModel):
+    event_types: Optional[list[str]] = None  # None = use default curated set
+    subscribe_all: bool = False
+
+
+@router.post("/paypal/webhook/subscribe-events")
+async def subscribe_webhook_events(req: WebhookEventsPatchReq, _admin=Depends(admin_required)):
+    """Push a new event_types list to the configured PayPal webhook.
+    Three modes:
+      - req.subscribe_all = true → fetch catalogue, send every ACTIVE event
+      - req.event_types provided → use literal list
+      - both empty → send the curated DEFAULT_WEBHOOK_EVENTS set"""
+    from services import paypal as pp
+
+    if not _CFG_WEBHOOK_ID:
+        raise HTTPException(status_code=400, detail="PAYPAL_WEBHOOK_ID not configured in backend .env")
+
+    if req.subscribe_all:
+        try:
+            catalogue = await pp.list_available_event_types()
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Could not fetch PayPal event catalogue: {e}")
+        events = [e.get("name") for e in catalogue if e.get("status") != "DEPRECATED" and e.get("name")]
+    elif req.event_types:
+        events = req.event_types
+    else:
+        events = list(DEFAULT_WEBHOOK_EVENTS)
+
+    if not events:
+        raise HTTPException(status_code=400, detail="Event-types list ended up empty")
+
+    try:
+        updated = await pp.update_webhook_events(_CFG_WEBHOOK_ID, events)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"PayPal update failed: {e}")
+    return {"ok": True, "applied_events": events, "applied_count": len(events), "paypal_response": updated}
+
