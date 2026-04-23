@@ -76,13 +76,33 @@ def _edge_rating(prob_up: float) -> str:
     return "modest"
 
 
-def _top_contributors(model, feature_names: list[str], x: np.ndarray, k: int = 3):
+def _feature_importances(bundle) -> np.ndarray | None:
+    """Read feature importances from the bundle. Handles both a plain
+    RandomForestClassifier and a CalibratedClassifierCV wrapping it."""
+    imp = bundle.get("feature_importances")
+    if imp is not None:
+        return np.asarray(imp, dtype=float)
+    model = bundle["model"]
+    if hasattr(model, "feature_importances_"):
+        return np.asarray(model.feature_importances_, dtype=float)
+    # CalibratedClassifierCV exposes calibrated_classifiers_ — average
+    # importances from the wrapped base estimators.
+    if hasattr(model, "calibrated_classifiers_"):
+        bases = []
+        for cc in model.calibrated_classifiers_:
+            b = getattr(cc, "estimator", None) or getattr(cc, "base_estimator", None)
+            if b is not None and hasattr(b, "feature_importances_"):
+                bases.append(np.asarray(b.feature_importances_, dtype=float))
+        if bases:
+            return np.mean(bases, axis=0)
+    return None
+
+
+def _top_contributors(bundle, feature_names: list[str], x: np.ndarray, k: int = 3):
     """Return the top-k features that most differ from the training mean in
     this sample (a cheap substitute for SHAP — good enough for a UI
     transparency chip, not for a research paper)."""
-    # Precompute training mean from feature_importances structure if available
-    # Fallback: use the row value * global importance as the contribution score.
-    importances = getattr(model, "feature_importances_", None)
+    importances = _feature_importances(bundle)
     if importances is None:
         return []
     scores = np.abs(x) * importances
@@ -122,7 +142,7 @@ def predict_from_features(feature_row: dict | None) -> dict | None:
             "edge": edge,  # "none" | "modest" | "strong"
             "horizon_days": int(meta.get("horizon_days", 5)),
             "direction": "up" if prob_up >= 0.5 else "down",
-            "top_features": _top_contributors(model, feature_names, x, k=3),
+            "top_features": _top_contributors(bundle, feature_names, x, k=3),
             "model_info": {
                 "trained_at": meta.get("trained_at"),
                 "holdout_accuracy": meta.get("holdout_accuracy"),
@@ -133,6 +153,9 @@ def predict_from_features(feature_row: dict | None) -> dict | None:
                 "training_start_date": meta.get("training_start_date"),
                 "training_end_date": meta.get("training_end_date"),
                 "horizon_days": int(meta.get("horizon_days", 5)),
+                "calibration_method": meta.get("calibration_method"),
+                "calibrated_brier": meta.get("calibrated_brier"),
+                "uncalibrated_brier": meta.get("uncalibrated_brier"),
             },
         }
     except Exception as e:

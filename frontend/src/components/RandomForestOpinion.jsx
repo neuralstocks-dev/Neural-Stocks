@@ -32,9 +32,10 @@ export default function RandomForestOpinion({ opinion }) {
     const trainRange = trainStartYr && trainEndYr
         ? (trainStartYr === trainEndYr ? trainStartYr : `${trainStartYr}–${trainEndYr}`)
         : null;
+    const calibratedChip = model_info?.calibration_method ? " · isotonic calibrated" : "";
     const provenanceText = trainRange
-        ? `Predicted by a Random Forest trained on ${model_info.universe_size} tickers · ${trainRange} · ${horizon_days}-day forward horizon`
-        : `Predicted by a Random Forest trained on ${model_info?.universe_size ?? "?"} tickers · ${horizon_days}-day forward horizon`;
+        ? `Predicted by a Random Forest trained on ${model_info.universe_size} tickers · ${trainRange} · ${horizon_days}-day forward horizon${calibratedChip}`
+        : `Predicted by a Random Forest trained on ${model_info?.universe_size ?? "?"} tickers · ${horizon_days}-day forward horizon${calibratedChip}`;
 
     // Title + accent
     const accent = isNoEdge
@@ -218,6 +219,7 @@ function _featureAnchor(name) {
     if (name.startsWith("close_over_sma") || name.startsWith("sma")) return "#sma";
     if (name.startsWith("macd")) return "#macd";
     if (name === "vol_ratio_20d" || name === "vol_trend_5d") return "#volume";
+    if (name === "spy_ret_20d" || name === "vix_level_rel") return "#random-forest";
     return "#random-forest";
 }
 
@@ -244,6 +246,8 @@ function _humanize(name) {
         dist_52w_high: "Dist from 52w high",
         dist_52w_low: "Dist from 52w low",
         range_pos_52w: "52w range position",
+        spy_ret_20d: "Market regime (SPY 20d)",
+        vix_level_rel: "VIX vs 252d avg",
     };
     return map[name] || name;
 }

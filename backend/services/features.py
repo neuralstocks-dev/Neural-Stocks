@@ -36,6 +36,13 @@ FEATURE_NAMES = [
     "overnight_gap", "candle_body_ratio", "upper_shadow_ratio", "lower_shadow_ratio",
     # Regime (distance to 52-week extremes, range position)
     "dist_52w_high", "dist_52w_low", "range_pos_52w",
+    # Market-regime context (added Apr 23 2026 — conditions the model on
+    # macro vs stock-specific context so it can learn different behaviour
+    # in risk-on vs risk-off regimes). Both features need a market_df to
+    # compute — NaN if market_df is omitted, which means the row is dropped
+    # during training and RF opinion is silently skipped at inference.
+    "spy_ret_20d",        # SPY 20-day trailing return = market momentum
+    "vix_level_rel",      # VIX today / VIX 252d mean − 1 = regime fear level
 ]
 
 MIN_HISTORY_ROWS = 260  # ~1y trading days; enforces the 52-week regime features
@@ -69,8 +76,50 @@ def _macd_hist(series: pd.Series) -> pd.Series:
     return macd - signal
 
 
-def compute_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
+def _market_regime_series(market_df: dict | None, index: pd.DatetimeIndex) -> pd.DataFrame:
+    """Build the SPY and VIX regime columns aligned to the ticker's date
+    index. `market_df` is an optional dict with 'spy' and/or 'vix' keys
+    (each a DataFrame with a 'Close' column, datetime index)."""
+    out = pd.DataFrame(index=index, columns=["spy_ret_20d", "vix_level_rel"], dtype=float)
+    if not isinstance(market_df, dict):
+        return out
+    try:
+        spy = market_df.get("spy")
+        if isinstance(spy, pd.DataFrame) and not spy.empty and "Close" in spy.columns:
+            spy_close = spy["Close"].astype(float)
+            # tz-normalise both to avoid reindex mismatches
+            if spy_close.index.tz is not None:
+                spy_close.index = spy_close.index.tz_localize(None)
+            spy_ret = spy_close.pct_change(20)
+            out["spy_ret_20d"] = spy_ret.reindex(
+                index.tz_localize(None) if index.tz is not None else index,
+                method="ffill",
+            ).values
+    except Exception:
+        pass
+    try:
+        vix = market_df.get("vix")
+        if isinstance(vix, pd.DataFrame) and not vix.empty and "Close" in vix.columns:
+            vix_close = vix["Close"].astype(float)
+            if vix_close.index.tz is not None:
+                vix_close.index = vix_close.index.tz_localize(None)
+            vix_mean_252 = vix_close.rolling(252, min_periods=120).mean()
+            vix_rel = (vix_close / vix_mean_252) - 1.0
+            out["vix_level_rel"] = vix_rel.reindex(
+                index.tz_localize(None) if index.tz is not None else index,
+                method="ffill",
+            ).values
+    except Exception:
+        pass
+    return out
+
+
+def compute_feature_frame(df: pd.DataFrame, market_df: dict | None = None) -> pd.DataFrame:
     """Compute the full feature matrix for a history DataFrame.
+
+    `market_df` is an optional dict with 'spy' and 'vix' DataFrames (each
+    daily OHLCV). When provided, the regime columns `spy_ret_20d` and
+    `vix_level_rel` are populated; otherwise they are NaN.
 
     Returns one row per input day that has enough trailing history
     (~260 trading days). NaNs in the result indicate those days should be
@@ -159,13 +208,21 @@ def compute_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
         "range_pos_52w": range_pos,
     }, index=d.index)
 
+    # Market-regime columns (SPY 20d return, VIX relative). NaN when
+    # market_df is omitted — those rows drop out in dataset.dropna() during
+    # training; inference returns None and the UI skips the RF module.
+    regime = _market_regime_series(market_df, d.index)
+    out["spy_ret_20d"] = regime["spy_ret_20d"].values
+    out["vix_level_rel"] = regime["vix_level_rel"].values
+
     return out[FEATURE_NAMES]
 
 
-def feature_row_for_today(df: pd.DataFrame) -> dict | None:
+def feature_row_for_today(df: pd.DataFrame, market_df: dict | None = None) -> dict | None:
     """Compute features for the MOST RECENT day. Returns None if not enough
-    history to produce valid (non-NaN) features."""
-    frame = compute_feature_frame(df)
+    history to produce valid (non-NaN) features. `market_df` is an optional
+    dict {'spy': DataFrame, 'vix': DataFrame} for the regime features."""
+    frame = compute_feature_frame(df, market_df=market_df)
     if frame.empty:
         return None
     last = frame.iloc[-1]

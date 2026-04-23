@@ -37,8 +37,12 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.frozen import FrozenEstimator
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score,
+    brier_score_loss,
     classification_report,
     roc_auc_score,
 )
@@ -134,12 +138,41 @@ def _download_history(tickers: list[str], years: int) -> dict[str, pd.DataFrame]
     return out
 
 
-def _build_training_set(histories: dict[str, pd.DataFrame], horizon_days: int = 5):
+def _download_market_context(years: int) -> dict:
+    """Download SPY + ^VIX for the regime features. Returns {'spy': df, 'vix': df}."""
+    end = datetime.now(timezone.utc).date()
+    start = end.replace(year=end.year - years - 1)  # extra year for 252d rolling mean
+    print(f"▸ downloading market context (SPY, ^VIX) {start}..{end}", flush=True)
+    out: dict = {}
+    for key, ticker in (("spy", "SPY"), ("vix", "^VIX")):
+        df = yf.download(
+            ticker, start=str(start), end=str(end), interval="1d",
+            auto_adjust=True, progress=False, threads=False,
+        )
+        if df is None or df.empty:
+            print(f"  !! {ticker} empty", flush=True)
+            continue
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        df = df[[c for c in ("Open", "High", "Low", "Close", "Volume") if c in df.columns]]
+        df.index = pd.to_datetime(df.index)
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+        out[key] = df
+        print(f"  ok {ticker}: {len(df)} rows", flush=True)
+    return out
+
+
+def _build_training_set(
+    histories: dict[str, pd.DataFrame],
+    horizon_days: int = 5,
+    market_df: dict | None = None,
+):
     """For every (ticker, date) with valid features, compute label = sign(close[t+h]/close[t] − 1)."""
     frames = []
     for ticker, df in histories.items():
-        features = compute_feature_frame(df)
-        # Label = 5-day forward return positive?
+        features = compute_feature_frame(df, market_df=market_df)
+        # Label = N-day forward return positive?
         fwd_ret = df["Close"].pct_change(horizon_days).shift(-horizon_days)
         label = (fwd_ret > 0).astype(int)
         combined = features.copy()
@@ -188,8 +221,13 @@ def main():
     if len(histories) < 20:
         raise RuntimeError(f"Too few tickers succeeded ({len(histories)}) — try again later")
 
+    market_df = _download_market_context(years=args.years)
+    if "spy" not in market_df or "vix" not in market_df:
+        print("  !! market context incomplete; regime features will be NaN and all rows will drop", flush=True)
+        raise RuntimeError("Need both SPY and ^VIX for regime features")
+
     print(f"▸ building feature set (horizon={args.horizon} trading days)…", flush=True)
-    dataset = _build_training_set(histories, horizon_days=args.horizon)
+    dataset = _build_training_set(histories, horizon_days=args.horizon, market_df=market_df)
     print(f"  rows: {len(dataset):,}  (positive class pct: {dataset['_label'].mean():.1%})", flush=True)
 
     train, test, cutoff = _walk_forward_split(dataset, train_frac=0.8)
@@ -201,7 +239,14 @@ def main():
     X_test = test[FEATURE_NAMES].values
     y_test = test["_label"].values
 
-    model = RandomForestClassifier(
+    # Hold out a calibration slice from the training window so we can fit
+    # an isotonic calibrator on data the base RF has never seen — while
+    # still keeping the chronological holdout sacred for evaluation.
+    X_fit, X_cal, y_fit, y_cal = train_test_split(
+        X_train, y_train, test_size=0.2, random_state=42, stratify=y_train,
+    )
+
+    base_model = RandomForestClassifier(
         n_estimators=400,
         max_depth=12,
         min_samples_leaf=50,
@@ -210,25 +255,39 @@ def main():
         n_jobs=-1,
         random_state=42,
     )
-    print("▸ training Random Forest…", flush=True)
-    model.fit(X_train, y_train)
+    print(f"▸ training base Random Forest on {len(X_fit):,} rows…", flush=True)
+    base_model.fit(X_fit, y_fit)
+
+    # Uncalibrated holdout metrics (for comparison)
+    y_pred_raw = base_model.predict(X_test)
+    y_proba_raw = base_model.predict_proba(X_test)[:, 1]
+    uncal_acc = accuracy_score(y_test, y_pred_raw)
+    uncal_auc = roc_auc_score(y_test, y_proba_raw)
+    uncal_brier = brier_score_loss(y_test, y_proba_raw)
+
+    print(f"▸ calibrating (isotonic, frozen-prefit) on {len(X_cal):,} held-out rows…", flush=True)
+    # sklearn ≥1.6 removed cv='prefit' — wrap with FrozenEstimator instead.
+    model = CalibratedClassifierCV(FrozenEstimator(base_model), method="isotonic")
+    model.fit(X_cal, y_cal)
 
     y_pred = model.predict(X_test)
     y_proba = model.predict_proba(X_test)[:, 1]
     holdout_acc = accuracy_score(y_test, y_pred)
     holdout_auc = roc_auc_score(y_test, y_proba)
+    holdout_brier = brier_score_loss(y_test, y_proba)
     report = classification_report(y_test, y_pred, target_names=["DOWN", "UP"], output_dict=True)
 
     importances = sorted(
-        zip(FEATURE_NAMES, model.feature_importances_),
+        zip(FEATURE_NAMES, base_model.feature_importances_),
         key=lambda kv: kv[1],
         reverse=True,
     )
 
-    print("▸ holdout metrics")
-    print(f"    accuracy    {holdout_acc:.4f}")
-    print(f"    ROC-AUC     {holdout_auc:.4f}")
-    print(f"    OOB score   {model.oob_score_:.4f}")
+    print("▸ holdout metrics (calibrated)")
+    print(f"    accuracy    {holdout_acc:.4f}  (uncal {uncal_acc:.4f})")
+    print(f"    ROC-AUC     {holdout_auc:.4f}  (uncal {uncal_auc:.4f})")
+    print(f"    Brier       {holdout_brier:.4f}  (uncal {uncal_brier:.4f}, lower is better)")
+    print(f"    OOB score   {base_model.oob_score_:.4f}")
     print(f"    baseline    {max(y_test.mean(), 1 - y_test.mean()):.4f}  (always-majority)")
     print("▸ top 10 features")
     for name, imp in importances[:10]:
@@ -252,15 +311,29 @@ def main():
         "training_end_date": training_end,
         "holdout_accuracy": round(float(holdout_acc), 4),
         "holdout_auc": round(float(holdout_auc), 4),
-        "oob_score": round(float(model.oob_score_), 4),
+        "oob_score": round(float(base_model.oob_score_), 4),
         "baseline_accuracy": round(float(max(y_test.mean(), 1 - y_test.mean())), 4),
+        "calibration_method": "isotonic_frozen",
+        "calibration_rows": int(len(X_cal)),
+        "calibrated_brier": round(float(holdout_brier), 4),
+        "uncalibrated_brier": round(float(uncal_brier), 4),
+        "uncalibrated_accuracy": round(float(uncal_acc), 4),
+        "uncalibrated_auc": round(float(uncal_auc), 4),
         "classification_report": report,
         "feature_importance": [
             {"name": n, "importance": round(float(v), 6)} for n, v in importances
         ],
     }
 
-    joblib.dump({"model": model, "meta": meta}, out_path)
+    # Persist feature_importances at the top level too — the calibrated
+    # wrapper doesn't expose this attribute so the runtime predictor
+    # reads it from here.
+    bundle = {
+        "model": model,
+        "meta": meta,
+        "feature_importances": base_model.feature_importances_.tolist(),
+    }
+    joblib.dump(bundle, out_path)
     # Write meta separately (human-readable)
     (out_path.parent / "rf_signal.meta.json").write_text(json.dumps(meta, indent=2))
     elapsed = time.time() - t0

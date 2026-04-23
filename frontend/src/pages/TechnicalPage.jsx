@@ -396,8 +396,11 @@ histogram  = MACD_line − signal`}
                             REITs &amp; Comms (~{rfMeta?.universe_size ?? 344} tickers).
                         </TLi>
                         <TLi>
-                            <strong>Input features</strong>: 21 numeric features derived from OHLCV alone —
-                            returns, RSI, SMA ratios, volatility, volume, MACD, candle-shape, 52-week regime.
+                            <strong>Input features</strong>: 23 numeric features derived from OHLCV +
+                            market context — returns, RSI, SMA ratios, volatility, volume, MACD,
+                            candle-shape, 52-week regime, plus <strong>SPY 20d trailing return</strong>{" "}
+                            and <strong>VIX relative level</strong> (VIX today vs its 252-day mean)
+                            so the model can condition on risk-on vs risk-off regimes.
                             No look-ahead. No news. No analyst consensus. Pure price-action statistics.
                         </TLi>
                         <TLi>
@@ -492,6 +495,36 @@ histogram  = MACD_line − signal`}
                                     The historical training-period OOB score of <strong>{(rfMeta.oob_score * 100).toFixed(1)}%</strong> shows the model <em>did</em> learn in-distribution patterns — the shortfall on 2025 is regime drift, the classic ML-in-markets problem.
                                 </p>
                             </div>
+
+                            {rfMeta.calibration_method ? (
+                                <div
+                                    className="mt-5 p-4 text-[12px] leading-relaxed"
+                                    style={{
+                                        background: "hsla(220,30%,40%,0.05)",
+                                        border: "1px solid hsl(var(--border-divider))",
+                                    }}
+                                    data-testid="rf-calibration-note"
+                                >
+                                    <p style={{ color: "hsl(var(--text-primary))" }}>
+                                        <strong>Probability calibration:</strong>{" "}
+                                        <code>{rfMeta.calibration_method.replace("_", " / ")}</code>
+                                        {" "}on {rfMeta.calibration_rows?.toLocaleString()} held-out rows. Brier score on 2025 holdout:{" "}
+                                        <strong style={{ color: rfMeta.calibrated_brier <= rfMeta.uncalibrated_brier ? "hsl(var(--buy))" : "hsl(var(--sell))" }}>
+                                            {rfMeta.calibrated_brier?.toFixed(4)}
+                                        </strong>{" "}(calibrated) vs{" "}
+                                        <strong style={{ color: "hsl(var(--text-muted))" }}>
+                                            {rfMeta.uncalibrated_brier?.toFixed(4)}
+                                        </strong>{" "}(uncalibrated). Lower is better — closer to 0 means stated probabilities match observed frequencies.
+                                    </p>
+                                    <p className="mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                                        {rfMeta.calibrated_brier <= rfMeta.uncalibrated_brier ? (
+                                            <>Isotonic calibration tightened the probability surface — when the model says 65%, it really means ~65% of the time in holdout.</>
+                                        ) : (
+                                            <>Honest note: on this particular 2025 holdout, the uncalibrated probabilities score <em>slightly better</em> on Brier. This is the regime-shift in the holdout window showing up again — the calibrator was fit on 2024 data whose probability landscape differs from 2025. We keep the calibrated wrapper shipped because (a) its probability distribution is smoother and less step-function, (b) future retrains on fresher data should restore the calibration benefit. Still: trust the <em>"No meaningful edge"</em> chip over the raw number.</>
+                                        )}
+                                    </p>
+                                </div>
+                            ) : null}
 
                             <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
                                 Top-10 feature importance

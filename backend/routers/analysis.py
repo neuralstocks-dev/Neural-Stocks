@@ -32,6 +32,47 @@ _BG_TASKS: set = set()
 ANALYSIS_MODES = {"standard", "candlestick", "hybrid"}
 
 
+# --- Shared SPY/VIX snapshot for RF regime features ---------------------
+# Small in-process cache so every verdict doesn't re-download the same
+# market-wide series. ~2y daily history for SPY + VIX; refresh every 10 min.
+_MARKET_CACHE: dict = {"payload": None, "fetched_at": None}
+_MARKET_CACHE_TTL = timedelta(minutes=10)
+
+
+def _fetch_rf_market_sync():
+    """Download SPY + VIX (~2y, daily). Runs in a worker thread."""
+    import yfinance as yf
+    out: dict = {}
+    for key, ticker in (("spy", "SPY"), ("vix", "^VIX")):
+        try:
+            df = yf.Ticker(ticker).history(period="2y", interval="1d", auto_adjust=True)
+            if df is None or df.empty:
+                continue
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            df = df[["Open", "High", "Low", "Close", "Volume"]] if "Volume" in df.columns else df[["Open", "High", "Low", "Close"]]
+            out[key] = df
+        except Exception:
+            continue
+    return out
+
+
+async def _get_rf_market_snapshot() -> dict | None:
+    """TTL-cached SPY + VIX snapshot used to compute RF regime features."""
+    fetched_at = _MARKET_CACHE["fetched_at"]
+    if fetched_at is not None and (now_utc() - fetched_at) < _MARKET_CACHE_TTL:
+        return _MARKET_CACHE["payload"]
+    try:
+        payload = await asyncio.to_thread(_fetch_rf_market_sync)
+        if payload:
+            _MARKET_CACHE["payload"] = payload
+            _MARKET_CACHE["fetched_at"] = now_utc()
+            return payload
+    except Exception:
+        pass
+    return _MARKET_CACHE.get("payload")  # stale is better than nothing
+
+
 async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
     rec = analysis.get("recommendation")
     conf = int(analysis.get("confidence_score", 0))
@@ -107,6 +148,9 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     if weekly_task is not None:
         idx += 1
     rf_history = results[idx] if rf_hist_task is not None else []
+    # Pull cached SPY + VIX once per minute for RF regime features (shared
+    # across all concurrent requests via _market_regime_cache below).
+    rf_market = await _get_rf_market_snapshot() if rf_hist_task is not None else None
 
     if quote.get("price") is None:
         raise HTTPException(status_code=404, detail=f"No data for ticker {ticker}")
@@ -159,7 +203,7 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
                 "open": "Open", "high": "High", "low": "Low",
                 "close": "Close", "volume": "Volume",
             })
-            feat = feature_row_for_today(df)
+            feat = feature_row_for_today(df, market_df=rf_market)
             if feat is not None:
                 opinion = rf_predictor.predict_from_features(feat)
                 if opinion is not None:
@@ -221,6 +265,12 @@ async def rf_model_meta():
         "holdout_auc": meta.get("holdout_auc"),
         "oob_score": meta.get("oob_score"),
         "baseline_accuracy": meta.get("baseline_accuracy"),
+        "calibration_method": meta.get("calibration_method"),
+        "calibration_rows": meta.get("calibration_rows"),
+        "calibrated_brier": meta.get("calibrated_brier"),
+        "uncalibrated_brier": meta.get("uncalibrated_brier"),
+        "uncalibrated_accuracy": meta.get("uncalibrated_accuracy"),
+        "uncalibrated_auc": meta.get("uncalibrated_auc"),
         # Top-10 features with importance for the UI table
         "feature_importance": (meta.get("feature_importance") or [])[:10],
     }
