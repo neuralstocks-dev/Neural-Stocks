@@ -9,8 +9,8 @@
  * and the shape of what's missing, producing the strongest possible
  * signup motivation.
  */
-import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useLocation, Link } from "react-router-dom";
 import axios from "axios";
 import {
     LineChart,
@@ -20,6 +20,9 @@ import {
     ArrowUpRight,
     Sparkles,
     ShieldAlert,
+    Share2,
+    Copy,
+    Check,
 } from "lucide-react";
 import VerdictRing from "@/components/VerdictRing";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
@@ -28,7 +31,12 @@ import { formatPrice, formatPct } from "@/lib/format";
 const API = process.env.REACT_APP_BACKEND_URL;
 
 export default function PublicTryVerdictPage() {
-    const { ticker } = useParams();
+    const params = useParams();
+    const location = useLocation();
+    // Two modes:
+    //  - /try/:ticker      → run a fresh anon analysis (POST)
+    //  - /ts/:shareId      → fetch a shared anon verdict (GET, no analysis run)
+    const isSharedView = location.pathname.startsWith("/ts/");
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
     const [error, setError] = useState("");
@@ -38,8 +46,13 @@ export default function PublicTryVerdictPage() {
         (async () => {
             setLoading(true);
             try {
-                const res = await axios.post(`${API}/api/try/analysis/${encodeURIComponent(ticker)}?mode=hybrid`);
-                if (!cancelled) setData(res.data);
+                if (isSharedView) {
+                    const res = await axios.get(`${API}/api/try/shared/${encodeURIComponent(params.shareId)}`);
+                    if (!cancelled) setData(res.data);
+                } else {
+                    const res = await axios.post(`${API}/api/try/analysis/${encodeURIComponent(params.ticker)}?mode=hybrid`);
+                    if (!cancelled) setData(res.data);
+                }
             } catch (e) {
                 if (!cancelled) {
                     setError(
@@ -53,7 +66,7 @@ export default function PublicTryVerdictPage() {
             }
         })();
         return () => { cancelled = true; };
-    }, [ticker]);
+    }, [params.ticker, params.shareId, isSharedView]);
 
     const a = data;
     const signal = (a?.recommendation || "HOLD").toUpperCase();
@@ -95,9 +108,15 @@ export default function PublicTryVerdictPage() {
                 {loading && (
                     <div className="py-24 text-center">
                         <Loader2 className="animate-spin mx-auto" size={22} />
-                        <p className="text-overline mt-4">Running your free verdict on {ticker?.toUpperCase()}…</p>
+                        <p className="text-overline mt-4">
+                            {isSharedView
+                                ? "Loading shared verdict…"
+                                : `Running your free verdict on ${(params.ticker || "").toUpperCase()}…`}
+                        </p>
                         <p className="text-xs mt-2" style={{ color: "hsl(var(--text-muted))" }}>
-                            This typically takes 20–40 seconds · full pipeline, not a preview
+                            {isSharedView
+                                ? "Preview mode · redacted by design"
+                                : "This typically takes 20–40 seconds · full pipeline, not a preview"}
                         </p>
                     </div>
                 )}
@@ -129,20 +148,33 @@ export default function PublicTryVerdictPage() {
                         >
                             <Sparkles size={14} strokeWidth={1.8} style={{ color: "hsl(var(--hold))" }} />
                             <p className="text-sm flex-1" style={{ color: "hsl(var(--text-primary))" }}>
-                                {rateLimited ? (
+                                {isSharedView ? (
+                                    <><strong>Shared preview.</strong> Someone ran this verdict on Neulab's free try and shared the preview with you. Run your own for any ticker below.</>
+                                ) : rateLimited ? (
                                     <><strong>Free daily analysis used.</strong> This is your {rateLimited.previous_ticker} verdict from earlier today. Sign up to run unlimited analyses.</>
                                 ) : (
                                     <><strong>Free preview.</strong> Core verdict shown. Pattern details, risk factors, and confidence breakdown are unlocked after signup.</>
                                 )}
                             </p>
-                            <Link
-                                to="/signup"
-                                className="text-overline inline-flex items-center gap-1"
-                                style={{ color: "hsl(var(--accent-primary))" }}
-                                data-testid="try-banner-cta"
-                            >
-                                Sign up free → <ArrowUpRight size={11} strokeWidth={1.8} />
-                            </Link>
+                            {isSharedView ? (
+                                <Link
+                                    to={`/try/${encodeURIComponent(a.ticker || "")}`}
+                                    className="text-overline inline-flex items-center gap-1"
+                                    style={{ color: "hsl(var(--accent-primary))" }}
+                                    data-testid="try-banner-cta-run-mine"
+                                >
+                                    Run my own on {a.ticker} → <ArrowUpRight size={11} strokeWidth={1.8} />
+                                </Link>
+                            ) : (
+                                <Link
+                                    to="/signup"
+                                    className="text-overline inline-flex items-center gap-1"
+                                    style={{ color: "hsl(var(--accent-primary))" }}
+                                    data-testid="try-banner-cta"
+                                >
+                                    Sign up free → <ArrowUpRight size={11} strokeWidth={1.8} />
+                                </Link>
+                            )}
                         </div>
 
                         {/* Ticker + company headline */}
@@ -160,6 +192,11 @@ export default function PublicTryVerdictPage() {
                             >
                                 {a.quote_snapshot?.name || a.ticker}
                             </span>
+                            {/* Share button — only when we ran a fresh analysis (not when
+                                already viewing a share) and the verdict was actually ours */}
+                            {!isSharedView && a.id && (
+                                <SharePreviewButton verdictId={a.id} />
+                            )}
                         </div>
 
                         {/* Core verdict */}
@@ -414,3 +451,116 @@ function LockedHint({ label }) {
         </div>
     );
 }
+
+
+function SharePreviewButton({ verdictId }) {
+    const [state, setState] = useState("idle"); // idle | loading | shared | error
+    const [url, setUrl] = useState("");
+    const [copied, setCopied] = useState(false);
+
+    const shareUrl = useMemo(() => {
+        if (!url) return "";
+        return typeof window !== "undefined" ? `${window.location.origin}${url}` : url;
+    }, [url]);
+
+    const doShare = async () => {
+        if (state === "loading") return;
+        setState("loading");
+        try {
+            const res = await axios.post(`${API}/api/try/share`, { verdict_id: verdictId });
+            setUrl(res.data.url_path);
+            setState("shared");
+            // Try the native share sheet on touch devices — falls back to copy
+            if (typeof navigator !== "undefined" && navigator.share) {
+                try {
+                    await navigator.share({
+                        title: "Neulab preview verdict",
+                        text: "Check out this free AI verdict I just ran on Neulab",
+                        url: `${window.location.origin}${res.data.url_path}`,
+                    });
+                    return;
+                } catch { /* user cancelled — fall through to copy affordance */ }
+            }
+        } catch (e) {
+            setState("error");
+        }
+    };
+
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch { /* noop */ }
+    };
+
+    if (state === "idle") {
+        return (
+            <button
+                type="button"
+                onClick={doShare}
+                className="inline-flex items-center gap-1.5 ml-2 px-2.5 py-1.5 font-mono transition-all"
+                style={{
+                    color: "hsl(var(--accent-primary))",
+                    border: "1px solid hsl(var(--accent-primary))",
+                    background: "transparent",
+                    fontSize: "0.6rem",
+                    letterSpacing: "0.12em",
+                    borderRadius: 2,
+                    cursor: "pointer",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "hsl(var(--accent-primary) / 0.1)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                data-testid="share-preview-button"
+            >
+                <Share2 size={11} strokeWidth={1.8} /> SHARE PREVIEW
+            </button>
+        );
+    }
+    if (state === "loading") {
+        return (
+            <span className="inline-flex items-center gap-1.5 ml-2 text-overline" style={{ color: "hsl(var(--text-muted))" }}>
+                <Loader2 size={11} className="animate-spin" /> Minting link…
+            </span>
+        );
+    }
+    if (state === "error") {
+        return (
+            <span className="inline-flex items-center gap-1.5 ml-2 text-overline" style={{ color: "hsl(var(--sell))" }}>
+                Couldn't create share link — try again in a moment
+            </span>
+        );
+    }
+    // state === "shared"
+    return (
+        <div
+            className="inline-flex items-center gap-2 ml-2 px-2 py-1"
+            style={{
+                background: "hsl(var(--surface-elevated))",
+                border: "1px solid hsl(var(--border-default))",
+                borderRadius: 2,
+            }}
+            data-testid="share-preview-result"
+        >
+            <code
+                className="font-mono text-xs"
+                style={{ color: "hsl(var(--text-secondary))", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            >
+                {shareUrl}
+            </code>
+            <button
+                type="button"
+                onClick={copy}
+                className="inline-flex items-center gap-1 text-overline px-1.5 py-0.5"
+                style={{
+                    color: copied ? "hsl(var(--buy))" : "hsl(var(--accent-primary))",
+                    fontSize: "0.56rem",
+                }}
+                data-testid="share-preview-copy"
+            >
+                {copied ? (<><Check size={10} strokeWidth={2} /> COPIED</>) : (<><Copy size={10} strokeWidth={1.8} /> COPY</>)}
+            </button>
+        </div>
+    );
+}
+

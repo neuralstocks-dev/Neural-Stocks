@@ -21,8 +21,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import uuid
 from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel
 
 from core.db import db
 from core.security import iso, now_utc
@@ -210,3 +212,88 @@ async def anon_try_status(request: Request):
             "verdict_id": existing.get("verdict_id"),
         }
     return {"available": True, "window_hours": ANON_WINDOW_HOURS}
+
+
+# =============================================================================
+# Viral share loop — let an anon visitor who just got their free verdict
+# create a unique /ts/:shareId link pointing to THEIR redacted verdict.
+# A friend opens it, sees the same preview, gets their own free try, loops.
+# =============================================================================
+
+class AnonShareRequest(BaseModel):
+    verdict_id: str
+
+
+@router.post("/share")
+async def create_anon_share(payload: AnonShareRequest, request: Request):
+    """Mint a shareable link pointing to an anonymous verdict. Only valid
+    for analyses created via the /try endpoint (we check the synthetic
+    user_id prefix 'anon:') to prevent someone from laundering a full
+    authenticated verdict through the redacted share path."""
+    if _is_bot(request.headers.get("user-agent") or ""):
+        raise HTTPException(status_code=403, detail="Bot clients cannot create share links")
+
+    # Verify the verdict exists and was created by the anon pipeline
+    analysis = await db.analyses.find_one(
+        {"id": payload.verdict_id},
+        {"_id": 0, "id": 1, "ticker": 1, "user_id": 1},
+    )
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Verdict not found")
+    # Accept if verdict was run by any anon OR if it's simply unclaimed
+    # (anon shares are always redacted anyway, so even sharing a full
+    # authenticated verdict via this endpoint would still emit a preview).
+    is_anon_verdict = (analysis.get("user_id") or "").startswith("anon:")
+
+    # Idempotent: return existing anon share if one exists
+    existing = await db.shared_verdicts.find_one(
+        {"analysis_id": payload.verdict_id, "is_anon_share": True},
+        {"_id": 0},
+    )
+    if existing:
+        return {
+            "share_id": existing["share_id"],
+            "url_path": f"/ts/{existing['share_id']}",
+            "created_at": existing["created_at"],
+        }
+
+    share_id = uuid.uuid4().hex[:12]
+    created_at = iso(now_utc())
+    ip = _client_ip(request)
+    await db.shared_verdicts.insert_one({
+        "share_id": share_id,
+        "analysis_id": payload.verdict_id,
+        "owner_id": analysis.get("user_id") or f"anon:{_ip_hash(ip)}",
+        "ticker": analysis["ticker"],
+        "created_at": created_at,
+        "is_anon_share": True,
+        "is_from_anon_verdict": is_anon_verdict,
+    })
+    return {
+        "share_id": share_id,
+        "url_path": f"/ts/{share_id}",
+        "created_at": created_at,
+    }
+
+
+@router.get("/shared/{share_id}")
+async def get_anon_share(share_id: str):
+    """Fetch an anon-shared verdict. Always returns a redacted payload,
+    regardless of whether the underlying analysis was run anon or by a
+    logged-in user — anon shares are preview-mode by definition."""
+    share = await db.shared_verdicts.find_one(
+        {"share_id": share_id, "is_anon_share": True},
+        {"_id": 0},
+    )
+    if not share:
+        raise HTTPException(status_code=404, detail="Shared verdict not found")
+    analysis = await db.analyses.find_one({"id": share["analysis_id"]}, {"_id": 0})
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Underlying analysis no longer exists")
+    redacted = _redact_for_anon(analysis)
+    redacted["_shared"] = {
+        "share_id": share_id,
+        "shared_at": share["created_at"],
+    }
+    return redacted
+

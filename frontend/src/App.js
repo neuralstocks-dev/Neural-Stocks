@@ -59,6 +59,7 @@ function AppRoutes() {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/v/:shareId" element={<PublicVerdictPage />} />
             <Route path="/try/:ticker" element={<PublicTryVerdictPage />} />
+            <Route path="/ts/:shareId" element={<PublicTryVerdictPage />} />
             <Route
                 path="/dashboard"
                 element={
