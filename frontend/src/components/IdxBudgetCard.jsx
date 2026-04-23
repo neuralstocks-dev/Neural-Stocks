@@ -164,22 +164,41 @@ export default function IdxBudgetCard() {
                     <AlertTriangle size={12} strokeWidth={1.5} style={{ color: "hsl(var(--hold))", flexShrink: 0, marginTop: 2 }} />
                     <div>
                         <p style={{ color: "hsl(var(--text-primary))" }}>
-                            <strong>Second-line defence:</strong> our 950/mo soft-cap is the primary
-                            budget guard, but RapidAPI also offers a <strong>hard monthly limit</strong>
-                            {" "}you can set on your developer dashboard. Enabling it means RapidAPI itself
-                            stops serving the key once the cap is hit — zero risk of ever being charged
-                            the $0.01/req overage.{" "}
-                            <a
-                                href="https://rapidapi.com/developer/dashboard"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="underline decoration-dotted"
-                                style={{ color: "hsl(var(--text-primary))" }}
-                            >
-                                Enable it here <ExternalLink size={10} className="inline" />
-                            </a>{" "}
-                            → My Apps → app settings → set a hard cap on the IDX subscription.
+                            <strong>Defence in depth — about RapidAPI's "hard limit".</strong>
                         </p>
+                        <p className="mt-1.5">
+                            Heads up: on RapidAPI, the <strong>hard limit is set by the API provider</strong>, not the
+                            consumer. For this IDX API the provider (yasimpratama88) configured the BASIC plan with a
+                            <em> soft limit</em> + <strong>$0.01/req overage</strong> — meaning there is no toggle
+                            on your developer dashboard that blocks requests beyond 1,000/month. Our{" "}
+                            <strong>950/mo backend soft-cap is therefore the primary safeguard</strong>.
+                        </p>
+                        <p className="mt-1.5">
+                            What you <em>can</em> do in the RapidAPI dashboard:
+                        </p>
+                        <ul className="mt-1 ml-4 list-disc space-y-1">
+                            <li>
+                                <a
+                                    href="https://rapidapi.com/developer/billing/subscriptions-and-usage"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline decoration-dotted"
+                                    style={{ color: "hsl(var(--text-primary))" }}
+                                >
+                                    Open Subscriptions &amp; Usage <ExternalLink size={10} className="inline" />
+                                </a>{" "}
+                                — RapidAPI emails you at 85% and 100% of the 1,000 monthly cap.
+                            </li>
+                            <li>
+                                To make overage <em>impossible</em>, remove the payment card from your account
+                                billing page — once the 1,000 cap is hit, requests will return 429 instead of
+                                incurring charges. (Caveat: you also lose the ability to upgrade without re-adding.)
+                            </li>
+                            <li>
+                                Our backend stops calling the provider at <strong>950 requests</strong> and silently
+                                falls back to yfinance — the counter on this panel is the authoritative view.
+                            </li>
+                        </ul>
                     </div>
                 </div>
             )}
