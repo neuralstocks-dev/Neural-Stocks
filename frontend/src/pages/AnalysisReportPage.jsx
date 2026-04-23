@@ -164,6 +164,35 @@ export default function AnalysisReportPage() {
                                 <div className="col-span-12 md:col-span-8">
                                     <p className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
                                         {quote.exchange || "—"} · {quote.currency || "USD"}
+                                        {analysis.idx_data_source === "rapidapi" ? (
+                                            <span
+                                                className="ml-2 px-1.5 py-0.5 font-mono"
+                                                style={{
+                                                    fontSize: "0.56rem",
+                                                    border: "1px solid hsl(var(--buy))",
+                                                    color: "hsl(var(--buy))",
+                                                    borderRadius: 2,
+                                                }}
+                                                title="IDX live quote & fundamentals sourced from the RapidAPI provider"
+                                                data-testid="idx-source-chip-rapidapi"
+                                            >
+                                                IDX LIVE
+                                            </span>
+                                        ) : analysis.idx_data_source === "yfinance" ? (
+                                            <span
+                                                className="ml-2 px-1.5 py-0.5 font-mono"
+                                                style={{
+                                                    fontSize: "0.56rem",
+                                                    border: "1px solid hsl(var(--border-divider))",
+                                                    color: "hsl(var(--text-muted))",
+                                                    borderRadius: 2,
+                                                }}
+                                                title="IDX primary source unavailable — using yfinance fallback"
+                                                data-testid="idx-source-chip-fallback"
+                                            >
+                                                YF FALLBACK
+                                            </span>
+                                        ) : null}
                                     </p>
                                     <div className="flex items-baseline gap-4 mt-2">
                                         <h1

@@ -123,10 +123,26 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     # All analysis modes (standard, candlestick, hybrid) are available to all tiers.
     # Free tier still has lower per-day quotas enforced below.
     await enforce_analysis_quota(user)
+    is_idx = is_idx_ticker(ticker)
+    if is_idx:
+        # IDX uses a shared monthly RapidAPI budget (1000 req/month free tier).
+        # Apply tighter per-tier daily caps to protect the shared resource.
+        from services.quota import enforce_idx_analysis_quota
+        await enforce_idx_analysis_quota(user)
+
     quote_task = get_quote(ticker)
     hist_task = asyncio.to_thread(_yf_history_sync, ticker, "6mo", "1d")
     fund_task = asyncio.to_thread(_yf_fundamentals_sync, ticker)
-    market_ctx_task = get_market_context_idx(ticker) if is_idx_ticker(ticker) else get_market_context(ticker)
+    market_ctx_task = get_market_context_idx(ticker) if is_idx else get_market_context(ticker)
+    # For IDX tickers, also pull richer quote + key stats from RapidAPI
+    # (augments yfinance; gracefully None on any failure → we stay on yf).
+    idx_quote_task = None
+    idx_keystats_task = None
+    if is_idx:
+        from services import idx_rapidapi
+        if idx_rapidapi.is_configured():
+            idx_quote_task = idx_rapidapi.get_quote(ticker)
+            idx_keystats_task = idx_rapidapi.get_key_stats(ticker)
     # For candlestick/hybrid we also need weekly candles
     weekly_task = None
     if mode in ("candlestick", "hybrid"):
@@ -137,6 +153,10 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
         rf_hist_task = asyncio.to_thread(_yf_history_sync, ticker, "2y", "1d")
 
     gather_args = [quote_task, hist_task, fund_task, market_ctx_task]
+    if idx_quote_task is not None:
+        gather_args.append(idx_quote_task)
+    if idx_keystats_task is not None:
+        gather_args.append(idx_keystats_task)
     if weekly_task is not None:
         gather_args.append(weekly_task)
     if rf_hist_task is not None:
@@ -144,6 +164,12 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     results = await asyncio.gather(*gather_args)
     quote, history, fundamentals, market_ctx = results[0], results[1], results[2], results[3]
     idx = 4
+    idx_quote = results[idx] if idx_quote_task is not None else None
+    if idx_quote_task is not None:
+        idx += 1
+    idx_keystats = results[idx] if idx_keystats_task is not None else None
+    if idx_keystats_task is not None:
+        idx += 1
     weekly_history = results[idx] if weekly_task is not None else []
     if weekly_task is not None:
         idx += 1
@@ -151,6 +177,30 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     # Pull cached SPY + VIX once per minute for RF regime features (shared
     # across all concurrent requests via _market_regime_cache below).
     rf_market = await _get_rf_market_snapshot() if rf_hist_task is not None else None
+
+    # Data-source provenance chip surfaced to the UI: "rapidapi" means the
+    # primary quote came from the paid source; "yfinance" means we fell
+    # back because RapidAPI was unconfigured / budget-exhausted / errored.
+    idx_data_source = None
+    if is_idx:
+        idx_data_source = "rapidapi" if (idx_quote and idx_quote.get("price") is not None) else "yfinance"
+        # If RapidAPI returned a fresh quote, use it to fill / override yfinance
+        # fields (yfinance sometimes lags on .JK by ~15 min or returns None).
+        if idx_quote and idx_quote.get("price") is not None:
+            quote["price"] = idx_quote.get("price") or quote.get("price")
+            quote["change"] = idx_quote.get("change") or quote.get("change")
+            quote["change_pct"] = idx_quote.get("change_pct") or quote.get("change_pct")
+            quote["volume"] = idx_quote.get("volume") or quote.get("volume")
+            quote["market_cap"] = idx_quote.get("market_cap") or quote.get("market_cap")
+            quote["open"] = idx_quote.get("open") or quote.get("open")
+            quote["high"] = idx_quote.get("high") or quote.get("high")
+            quote["low"] = idx_quote.get("low") or quote.get("low")
+            quote["prev_close"] = idx_quote.get("prev_close") or quote.get("prev_close")
+        # Similarly, overlay the richer fundamentals (P/E, P/B, ROE, etc.)
+        if idx_keystats:
+            for k in ("pe_ratio", "pb_ratio", "dividend_yield", "roe", "roa", "eps", "debt_equity", "revenue_growth", "profit_margin"):
+                if idx_keystats.get(k) is not None:
+                    fundamentals[k] = idx_keystats[k]
 
     if quote.get("price") is None:
         raise HTTPException(status_code=404, detail=f"No data for ticker {ticker}")
@@ -189,6 +239,8 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
         "market_context": market_ctx if isinstance(market_ctx, dict) and market_ctx.get("configured") else None,
         **analysis,
     }
+    if idx_data_source is not None:
+        doc["idx_data_source"] = idx_data_source  # "rapidapi" | "yfinance"
     if candlestick_findings is not None:
         doc["candlestick_findings"] = candlestick_findings
 

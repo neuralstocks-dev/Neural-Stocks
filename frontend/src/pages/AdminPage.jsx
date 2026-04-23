@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import RFRetrainCard from "@/components/RFRetrainCard";
+import IdxBudgetCard from "@/components/IdxBudgetCard";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, Link } from "react-router-dom";
 import { Loader2, ShieldCheck, Clock, RotateCcw, Search, Trash2, BellOff, DollarSign, CheckSquare, Square, AlertTriangle, Sparkles } from "lucide-react";
@@ -729,6 +730,9 @@ export default function AdminPage() {
 
                         {/* Random Forest retrain module */}
                         <RFRetrainCard />
+
+                        {/* IDX · RapidAPI budget */}
+                        <IdxBudgetCard />
 
 
                         {/* Users table */}

@@ -129,3 +129,40 @@ async def enforce_analysis_quota(user: dict):
                 status_code=402,
                 detail=f"Weekly analysis limit reached ({p['analyses_per_week']}/week on {p['name']} plan). Upgrade to unlock more.",
             )
+
+
+# Per-tier daily cap specifically for IDX (.JK) analyses. Rationale: the
+# RapidAPI IDX data source is on a 1,000 req/month BASIC free plan and each
+# IDX analysis consumes ~3 API calls. Tight per-user caps here protect the
+# shared monthly budget so one power user can't drain it.
+IDX_DAILY_LIMITS = {
+    "free": 3,
+    "pro": 10,
+    "elite": 30,
+    "daypass": 10,
+}
+
+
+async def enforce_idx_analysis_quota(user: dict):
+    """Called only when the requested ticker is an IDX (.JK) symbol. Applies
+    per-tier daily caps on top of the generic analysis quota."""
+    plan_key = effective_plan_key(user)
+    limit = IDX_DAILY_LIMITS.get(plan_key)
+    if limit is None:
+        return  # admin / test-unlock accounts — no IDX-specific cap
+    # Count this user's IDX (.JK) analyses in the last 24h
+    since = now_utc() - timedelta(days=1)
+    from core.security import iso as _iso
+    used = await db.analyses.count_documents({
+        "user_id": user["id"],
+        "ticker": {"$regex": r"\.JK$", "$options": "i"},
+        "created_at": {"$gte": _iso(since)},
+    })
+    if used >= limit:
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"Daily IDX analysis limit reached ({limit}/day on the {plan_key} plan). "
+                "IDX data is on a shared monthly budget — upgrade to unlock more."
+            ),
+        )

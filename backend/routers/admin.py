@@ -382,3 +382,13 @@ async def rf_reload(_admin=Depends(admin_required)):
         "holdout_accuracy": meta.get("holdout_accuracy"),
         "universe_size": meta.get("universe_size"),
     }
+
+
+# ---------- RapidAPI IDX budget tracking ----------
+@router.get("/rapidapi/usage")
+async def rapidapi_usage(_admin=Depends(admin_required)):
+    """Current-month request count vs monthly soft budget for the IDX
+    provider. The soft budget is set ≈5% below RapidAPI's hard 1,000-req
+    BASIC quota so we never incur $0.01/req overage charges."""
+    from services import idx_rapidapi
+    return await idx_rapidapi.usage_snapshot()
