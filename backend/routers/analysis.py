@@ -202,20 +202,28 @@ async def create_analysis(
 
 async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     ticker = ticker.upper().strip()
-    await require_accepted(user)
+    is_anon = bool(user.get("__anon__"))
+    if not is_anon:
+        await require_accepted(user)
     mode = (mode or "standard").lower()
     if mode not in ANALYSIS_MODES:
         raise HTTPException(status_code=400, detail=f"Invalid mode. Must be one of: {sorted(ANALYSIS_MODES)}")
 
-    # All analysis modes (standard, candlestick, hybrid) are available to all tiers.
-    # Free tier still has lower per-day quotas enforced below.
-    await enforce_analysis_quota(user)
-    is_idx = is_idx_ticker(ticker)
-    if is_idx:
-        # IDX uses a shared monthly RapidAPI budget (1000 req/month free tier).
-        # Apply tighter per-tier daily caps to protect the shared resource.
-        from services.quota import enforce_idx_analysis_quota
-        await enforce_idx_analysis_quota(user)
+    # Anonymous "Try one free" requests bypass per-user quotas because they
+    # have their own IP-based rate limit (1 per 24h per IP), enforced in
+    # routers/anon_try.py. They still run the full pipeline.
+    if not is_anon:
+        # All analysis modes (standard, candlestick, hybrid) are available to all tiers.
+        # Free tier still has lower per-day quotas enforced below.
+        await enforce_analysis_quota(user)
+        is_idx = is_idx_ticker(ticker)
+        if is_idx:
+            # IDX uses a shared monthly RapidAPI budget (1000 req/month free tier).
+            # Apply tighter per-tier daily caps to protect the shared resource.
+            from services.quota import enforce_idx_analysis_quota
+            await enforce_idx_analysis_quota(user)
+    else:
+        is_idx = is_idx_ticker(ticker)
 
     quote_task = get_quote(ticker)
     hist_task = asyncio.to_thread(_yf_history_sync, ticker, "6mo", "1d")
@@ -379,7 +387,8 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
 
     await db.analyses.insert_one(doc)
     doc.pop("_id", None)
-    await _maybe_create_alert(user["id"], ticker, analysis)
+    if not is_anon:
+        await _maybe_create_alert(user["id"], ticker, analysis)
     return doc
 
 

@@ -10,6 +10,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import AnalysisReportPage from "@/pages/AnalysisReportPage";
 import PricingPage from "@/pages/PricingPage";
 import PublicVerdictPage from "@/pages/PublicVerdictPage";
+import PublicTryVerdictPage from "@/pages/PublicTryVerdictPage";
 import AuthCallback from "@/pages/AuthCallback";
 import AdminPage from "@/pages/AdminPage";
 import ScorecardPage from "@/pages/ScorecardPage";
@@ -57,6 +58,7 @@ function AppRoutes() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/v/:shareId" element={<PublicVerdictPage />} />
+            <Route path="/try/:ticker" element={<PublicTryVerdictPage />} />
             <Route
                 path="/dashboard"
                 element={
