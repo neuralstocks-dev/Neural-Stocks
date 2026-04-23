@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useTaglineVariant } from "@/hooks/useTaglineVariant";
 import { LineChart, Lock, Mail } from "lucide-react";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 import TryNowBox from "@/components/TryNowBox";
@@ -17,6 +18,7 @@ function googleSignIn() {
 export default function LoginPage() {
     const { user, login, bootstrapping } = useAuth();
     const navigate = useNavigate();
+    const tagline = useTaglineVariant();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -92,11 +94,12 @@ export default function LoginPage() {
                         <h1
                             className="font-serif hero-number text-white"
                             style={{ fontSize: "clamp(2.6rem, 5vw, 4.2rem)" }}
+                            data-testid={`login-tagline-${tagline.key}`}
                         >
-                            An analyst
+                            {tagline.line1}
                             <br />
-                            <em className="italic" style={{ color: "#F59E0B" }}>
-                                who explains why.
+                            <em className="italic" style={{ color: tagline.color }}>
+                                {tagline.line2}
                             </em>
                         </h1>
                         <p

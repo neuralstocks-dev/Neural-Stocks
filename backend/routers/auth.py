@@ -66,6 +66,12 @@ async def register(req: SignupReq, request: Request):
     }
     await db.users.insert_one(doc)
     await _record_login(user_id, doc["email"], "email", request)
+    # Attribute tagline A/B — frontend sends the variant they were pinned to
+    try:
+        from routers.experiments import attribute_signup_if_any
+        await attribute_signup_if_any(user_id, request.headers.get("x-tagline-variant"))
+    except Exception:
+        pass
     return {"token": create_jwt(user_id), "user": _public_user(doc)}
 
 
@@ -123,6 +129,12 @@ async def google_session(req: GoogleSessionReq, request: Request):
             "created_at": iso(now_utc()),
         }
         await db.users.insert_one(user_doc)
+        # Attribute tagline A/B — only first-time signups (not existing users)
+        try:
+            from routers.experiments import attribute_signup_if_any
+            await attribute_signup_if_any(user_id, request.headers.get("x-tagline-variant"))
+        except Exception:
+            pass
     await _record_login(user_id, email, "google", request)
     return {"token": create_jwt(user_id), "user": _public_user(user_doc)}
 

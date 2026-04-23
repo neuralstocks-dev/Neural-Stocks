@@ -5,6 +5,7 @@ import RFRetrainCard from "@/components/RFRetrainCard";
 import IdxBudgetCard from "@/components/IdxBudgetCard";
 import IdxCatalogCard from "@/components/IdxCatalogCard";
 import PayPalWebhookCard from "@/components/PayPalWebhookCard";
+import TaglineExperimentCard from "@/components/TaglineExperimentCard";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, Link } from "react-router-dom";
 import { Loader2, ShieldCheck, Clock, RotateCcw, Timer, Search, Trash2, BellOff, DollarSign, CheckSquare, Square, AlertTriangle, Sparkles } from "lucide-react";
@@ -757,6 +758,9 @@ export default function AdminPage() {
 
                         {/* PayPal webhook health */}
                         <PayPalWebhookCard />
+
+                        {/* A/B tagline experiment */}
+                        <TaglineExperimentCard />
 
 
                         {/* Users table */}

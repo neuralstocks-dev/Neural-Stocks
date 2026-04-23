@@ -8,6 +8,11 @@ const api = axios.create({ baseURL: API_BASE });
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem("sai_token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
+    // Attribute tagline A/B conversions — if the visitor was pinned to a
+    // variant on /login or /signup, forward it so the backend can credit
+    // that variant when they register.
+    const tv = localStorage.getItem("sai_tagline_variant");
+    if (tv) config.headers["X-Tagline-Variant"] = tv;
     return config;
 });
 
