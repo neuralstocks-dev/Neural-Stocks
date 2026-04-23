@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { TrendingUp, TrendingDown, Minus, Zap, BookOpen } from "lucide-react";
 import PatternGuideDialog from "@/components/PatternGuideDialog";
 
@@ -39,12 +40,15 @@ function PatternRow({ p }) {
             </div>
             <div className="flex-1">
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                    <p
-                        className="font-serif"
-                        style={{ fontSize: "1.05rem", letterSpacing: "-0.005em" }}
+                    <Link
+                        to={`/technical#pattern-${(p.pattern || "").toLowerCase().replace(/\s+/g, "-")}`}
+                        className="font-serif hover:underline decoration-dotted underline-offset-4"
+                        style={{ fontSize: "1.05rem", letterSpacing: "-0.005em", color: "hsl(var(--text-primary))" }}
+                        title={`Methodology — ${p.pattern}`}
+                        data-testid={`pattern-methodology-${(p.pattern || "").toLowerCase().replace(/\s+/g, "-")}`}
                     >
                         {p.pattern}
-                    </p>
+                    </Link>
                     <p
                         className="font-mono text-xs"
                         style={{ color: "hsl(var(--text-muted))" }}

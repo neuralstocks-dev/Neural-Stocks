@@ -9,6 +9,7 @@ import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import AnalysisModeSelector from "@/components/AnalysisModeSelector";
 import CandlestickFindings from "@/components/CandlestickFindings";
 import MarketContextModules from "@/components/MarketContextModules";
+import MethodologyLink from "@/components/MethodologyLink";
 import { useAuth } from "@/hooks/useAuth";
 import {
     LineChart,
@@ -261,6 +262,10 @@ export default function AnalysisReportPage() {
 
                             {/* Mode selector */}
                             <div className="px-5 md:px-8 pb-5" data-testid="report-mode-row">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-overline" style={{ fontSize: "0.58rem" }}>Analysis mode</span>
+                                    <MethodologyLink anchor="modes" label="Analysis modes" variant="chip" />
+                                </div>
                                 <AnalysisModeSelector
                                     value={displayMode}
                                     onChange={setMode}
@@ -357,7 +362,10 @@ export default function AnalysisReportPage() {
                                             size={180}
                                         />
                                         <div>
-                                            <p className="text-overline">AI Verdict</p>
+                                            <p className="text-overline flex items-center gap-1.5">
+                                                AI Verdict
+                                                <MethodologyLink anchor="confidence" label="How confidence is scored" />
+                                            </p>
                                             <div className="mt-2">
                                                 <SignalBadge signal={analysis.recommendation} size="lg" />
                                             </div>
@@ -415,8 +423,8 @@ export default function AnalysisReportPage() {
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                                 <Metric label="P/E" value={analysis.fundamentals?.trailingPE?.toFixed(1)} />
                                                 <Metric label="Market Cap" value={formatCompact(analysis.fundamentals?.marketCap)} />
-                                                <Metric label="RSI (14)" value={analysis.technicals?.rsi_14?.toFixed(1)} />
-                                                <Metric label="SMA 20" value={analysis.technicals?.sma_20 != null ? formatPrice(analysis.technicals.sma_20, quote.currency) : "—"} />
+                                                <Metric anchor="rsi" label="RSI (14)" value={analysis.technicals?.rsi_14?.toFixed(1)} />
+                                                <Metric anchor="sma" label="SMA 20" value={analysis.technicals?.sma_20 != null ? formatPrice(analysis.technicals.sma_20, quote.currency) : "—"} />
                                             </div>
                                         </div>
                                     </div>
@@ -551,10 +559,13 @@ export default function AnalysisReportPage() {
     );
 }
 
-function Metric({ label, value }) {
+function Metric({ label, value, anchor }) {
     return (
         <div>
-            <p className="text-overline" style={{ fontSize: "0.56rem" }}>{label}</p>
+            <p className="text-overline flex items-center gap-1" style={{ fontSize: "0.56rem" }}>
+                {label}
+                {anchor && <MethodologyLink anchor={anchor} label={label} />}
+            </p>
             <p className="font-mono text-lg mt-1">{value ?? "—"}</p>
         </div>
     );

@@ -5,7 +5,8 @@
  * uses (and what it does NOT use) so users understand the mechanics behind
  * every verdict, price target, and confidence score.
  */
-import React from "react";
+import React, { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import AppShell from "@/components/AppShell";
 import {
     Cpu,
@@ -25,6 +26,26 @@ import {
 } from "lucide-react";
 
 export default function TechnicalPage() {
+    const loc = useLocation();
+    // Smooth-scroll to the section pointed to by the URL hash (e.g. /technical#rsi)
+    // so deep-links from the verdict page land on the right spot.
+    useEffect(() => {
+        if (!loc.hash) return;
+        const id = loc.hash.slice(1);
+        const attempt = (n = 0) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+                // Brief highlight so the landing target is obvious
+                el.classList.add("ring-flash");
+                setTimeout(() => el.classList.remove("ring-flash"), 1600);
+            } else if (n < 6) {
+                setTimeout(() => attempt(n + 1), 120);
+            }
+        };
+        attempt();
+    }, [loc.hash]);
+
     return (
         <AppShell>
             <div className="max-w-[1200px] mx-auto px-5 md:px-8 pt-10 pb-20" data-testid="technical-page">
@@ -184,7 +205,7 @@ export default function TechnicalPage() {
                     subtitle="It is not a probability. It is an explicit signal-agreement score produced by Claude."
                 />
 
-                <div className="mt-8 module p-6 md:p-10" data-testid="tech-confidence">
+                <div id="confidence" className="mt-8 module p-6 md:p-10" data-testid="tech-confidence">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
                         The LLM prompt instructs Claude to set <code>confidence_score</code> on a 0–100 scale
                         based on the agreement between four input families. When every family leans the same
@@ -246,6 +267,7 @@ export default function TechnicalPage() {
 
                 <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-4" data-testid="tech-formulas">
                     <FormulaCard
+                        id="rsi"
                         name="RSI (Relative Strength Index, 14-period)"
                         formula={`avg_gain = Wilder_MA(max(close[t] − close[t−1], 0), 14)
 avg_loss = Wilder_MA(max(close[t−1] − close[t], 0), 14)
@@ -254,11 +276,13 @@ RSI = 100 − 100 / (1 + RS)`}
                         note="Wilder smoothing (not simple MA). RSI < 30 = oversold bias; RSI > 70 = overbought bias. Input to trend-family score."
                     />
                     <FormulaCard
+                        id="sma"
                         name="SMA (Simple Moving Average, 20 / 50)"
                         formula={`SMA_n(t) = (1/n) × Σ close[t−i]  for i in [0, n−1]`}
                         note="Price above SMA-20 → short-term uptrend. Price above SMA-50 → medium-term uptrend. Bullish cross (SMA-20 crossing above SMA-50) is a trend signal."
                     />
                     <FormulaCard
+                        id="macd"
                         name="MACD (12-26-9)"
                         formula={`MACD_line  = EMA_12(close) − EMA_26(close)
 signal     = EMA_9(MACD_line)
@@ -266,6 +290,7 @@ histogram  = MACD_line − signal`}
                         note="MACD histogram flipping sign = trend momentum change. Expanding histogram = accelerating trend."
                     />
                     <FormulaCard
+                        id="volume"
                         name="Volume ratio"
                         formula={`vol_ratio = volume[t] / SMA_20(volume)`}
                         note="Context multiplier — patterns / breakouts on vol_ratio > 1.5 are weighted higher in the LLM prompt as 'high-conviction'."
@@ -315,7 +340,7 @@ histogram  = MACD_line − signal`}
                     subtitle="Same data, different weightings — mode selects which signals the LLM emphasizes."
                 />
 
-                <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4" data-testid="tech-modes">
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4" id="modes" data-testid="tech-modes">
                     <ModeCard
                         name="Standard"
                         emphasis="Fundamentals + technicals"
@@ -599,9 +624,9 @@ function ConfidenceBand({ pct, label, color, body }) {
     );
 }
 
-function FormulaCard({ name, formula, note }) {
+function FormulaCard({ id, name, formula, note }) {
     return (
-        <div className="module p-5 md:p-6">
+        <div id={id} className="module p-5 md:p-6 scroll-mt-24">
             <p className="text-overline" style={{ fontSize: "0.6rem" }}>{name}</p>
             <pre
                 className="mt-3 font-mono text-[11px] whitespace-pre-wrap leading-relaxed p-3"
@@ -622,8 +647,9 @@ function FormulaCard({ name, formula, note }) {
 
 function PatternRow({ name, bias, body }) {
     const color = bias === "bullish" ? "hsl(var(--buy))" : bias === "bearish" ? "hsl(var(--sell))" : "hsl(var(--hold))";
+    const id = `pattern-${name.toLowerCase().replace(/\s+/g, "-")}`;
     return (
-        <div className="py-2" style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
+        <div id={id} className="py-2 scroll-mt-24" style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
             <div className="flex items-baseline justify-between gap-2">
                 <span style={{ color: "hsl(var(--text-primary))" }}>{name}</span>
                 <span className="font-mono text-overline" style={{ color, fontSize: "0.56rem" }}>

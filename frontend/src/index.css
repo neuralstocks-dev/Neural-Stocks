@@ -385,6 +385,17 @@ body {
     animation: livePulse 2.2s ease-in-out infinite;
 }
 
+/* Deep-link landing flash — used when /technical is opened with a #hash */
+@keyframes ringFlash {
+    0% { box-shadow: 0 0 0 0 hsla(38, 85%, 60%, 0.9); }
+    60% { box-shadow: 0 0 0 6px hsla(38, 85%, 60%, 0); }
+    100% { box-shadow: 0 0 0 0 hsla(38, 85%, 60%, 0); }
+}
+.ring-flash {
+    animation: ringFlash 1.6s ease-out;
+    border-radius: 3px;
+}
+
 /* Checkered background utility for empty-state / hero ambience */
 .grid-bg {
     background-image: linear-gradient(
