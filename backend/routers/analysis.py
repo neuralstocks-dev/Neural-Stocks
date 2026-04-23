@@ -138,11 +138,13 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     # (augments yfinance; gracefully None on any failure → we stay on yf).
     idx_quote_task = None
     idx_keystats_task = None
+    idx_bandar_task = None
     if is_idx:
         from services import idx_rapidapi
         if idx_rapidapi.is_configured():
             idx_quote_task = idx_rapidapi.get_quote(ticker)
             idx_keystats_task = idx_rapidapi.get_key_stats(ticker)
+            idx_bandar_task = idx_rapidapi.get_bandarmology(ticker)
     # For candlestick/hybrid we also need weekly candles
     weekly_task = None
     if mode in ("candlestick", "hybrid"):
@@ -157,6 +159,8 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
         gather_args.append(idx_quote_task)
     if idx_keystats_task is not None:
         gather_args.append(idx_keystats_task)
+    if idx_bandar_task is not None:
+        gather_args.append(idx_bandar_task)
     if weekly_task is not None:
         gather_args.append(weekly_task)
     if rf_hist_task is not None:
@@ -169,6 +173,9 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
         idx += 1
     idx_keystats = results[idx] if idx_keystats_task is not None else None
     if idx_keystats_task is not None:
+        idx += 1
+    idx_bandar = results[idx] if idx_bandar_task is not None else None
+    if idx_bandar_task is not None:
         idx += 1
     weekly_history = results[idx] if weekly_task is not None else []
     if weekly_task is not None:
@@ -241,6 +248,8 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     }
     if idx_data_source is not None:
         doc["idx_data_source"] = idx_data_source  # "rapidapi" | "yfinance"
+    if is_idx and idx_bandar is not None:
+        doc["bandarmology"] = idx_bandar
     if candlestick_findings is not None:
         doc["candlestick_findings"] = candlestick_findings
 

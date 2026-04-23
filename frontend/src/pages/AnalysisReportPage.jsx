@@ -11,6 +11,7 @@ import CandlestickFindings from "@/components/CandlestickFindings";
 import MarketContextModules from "@/components/MarketContextModules";
 import MethodologyLink from "@/components/MethodologyLink";
 import RandomForestOpinion from "@/components/RandomForestOpinion";
+import BandarmologyCard from "@/components/BandarmologyCard";
 import { useAuth } from "@/hooks/useAuth";
 import {
     LineChart,
@@ -495,6 +496,7 @@ export default function AnalysisReportPage() {
 
                                 {/* Random Forest secondary opinion (renders only when model loaded) */}
                                 <RandomForestOpinion opinion={analysis.rf_opinion} />
+                                <BandarmologyCard bandarmology={analysis.bandarmology} />
 
                                 {/* Technical / Fundamental / Peer */}
                                 <section className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 mb-1 md:mb-4">

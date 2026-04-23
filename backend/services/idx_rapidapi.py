@@ -43,7 +43,7 @@ _CACHE_TTL_FUNDAMENTALS = 24 * 3600  # 24 h
 # In-process rate limiter — BASIC is 1 req/sec.
 _rate_lock = asyncio.Lock()
 _last_call_ts = 0.0
-_MIN_INTERVAL = 1.05  # 5% safety margin over 1 req/sec
+_MIN_INTERVAL = 1.3  # 30% safety margin — provider counter is strict per-second
 
 # Shared httpx client — created lazily so the import doesn't open sockets.
 _client: httpx.AsyncClient | None = None
@@ -136,25 +136,34 @@ def _strip_jk(ticker: str) -> str:
 
 async def _call(path: str, ticker: str) -> dict | None:
     """Core GET with budget + rate limit + error handling. Returns None on any
-    non-2xx / network / quota-exhausted condition."""
+    non-2xx / network / quota-exhausted condition. One retry on 429."""
     if not is_configured():
         return None
     if not await _budget_allows():
         logger.info("RapidAPI IDX budget exhausted for %s", _month_key())
         return None
-    await _rate_limited_sleep()
-    try:
-        client = await _get_client()
-        r = await client.get(f"{_BASE_URL}{path}")
-        await _increment_usage(ticker, error=None if r.status_code == 200 else f"HTTP {r.status_code}")
-        if r.status_code != 200:
-            logger.warning("RapidAPI IDX %s → %d: %s", path, r.status_code, (r.text or "")[:200])
+    for attempt in (1, 2):
+        await _rate_limited_sleep()
+        try:
+            client = await _get_client()
+            r = await client.get(f"{_BASE_URL}{path}")
+        except Exception as e:
+            logger.warning("RapidAPI IDX %s failed: %s", path, e)
+            await _increment_usage(ticker, error=str(e)[:200])
             return None
-        return r.json()
-    except Exception as e:
-        logger.warning("RapidAPI IDX %s failed: %s", path, e)
-        await _increment_usage(ticker, error=str(e)[:200])
+        await _increment_usage(
+            ticker, error=None if r.status_code == 200 else f"HTTP {r.status_code}"
+        )
+        if r.status_code == 200:
+            return r.json()
+        # Retry once on 429 with a longer sleep; bail on any other non-2xx
+        if r.status_code == 429 and attempt == 1:
+            logger.info("RapidAPI IDX %s 429 — backing off 2s then retrying", path)
+            await asyncio.sleep(2.0)
+            continue
+        logger.warning("RapidAPI IDX %s → %d: %s", path, r.status_code, (r.text or "")[:200])
         return None
+    return None
 
 
 # ------------------------------- Public API -------------------------------
@@ -167,84 +176,347 @@ async def get_quote(ticker: str) -> dict | None:
     if cached and (time.time() - cached[0] < _CACHE_TTL_QUOTE):
         return cached[1]
     raw = await _call(f"/api/emiten/{symbol}/info", ticker=symbol)
-    if not raw:
+    if not raw or not raw.get("success"):
         return None
-    # Normalise the most-used fields into a flat dict the rest of the app
-    # can consume alongside yfinance's quote shape.
     data = raw.get("data") if isinstance(raw, dict) else None
     if not isinstance(data, dict):
         return None
+
+    def _f(x):
+        """Safe float parse — API returns numerics as strings like '6425.00'."""
+        try:
+            if x is None or x == "" or x == "NA":
+                return None
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+
     normalised = {
         "symbol": f"{symbol}.JK",
-        "price": data.get("lastPrice") or data.get("last_price") or data.get("price"),
-        "change": data.get("change"),
-        "change_pct": data.get("changePercent") or data.get("change_percent"),
-        "open": data.get("openPrice") or data.get("open"),
-        "high": data.get("highPrice") or data.get("high"),
-        "low": data.get("lowPrice") or data.get("low"),
-        "prev_close": data.get("previousClose") or data.get("prev_close"),
-        "volume": data.get("volume"),
-        "value": data.get("value") or data.get("turnover"),
-        "market_cap": data.get("marketCap") or data.get("market_cap"),
-        "sector": data.get("sector") or data.get("subSector"),
-        "company_name": data.get("companyName") or data.get("name"),
+        "price": _f(data.get("price")),
+        "change": _f(data.get("change")),
+        "change_pct": _f(data.get("percentage")),
+        "prev_close": _f(data.get("previous")),
+        "volume": _f(data.get("volume")),
+        "average_volume": _f(data.get("average")),
+        "market_cap": None,  # not in /info; populated by key-stats if available
+        "sector": data.get("sector"),
+        "sub_sector": data.get("sub_sector"),
+        "company_name": data.get("name"),
+        "exchange": data.get("exchange"),
+        "country": data.get("country"),
+        "sentiment": data.get("sentiment"),
+        "time": data.get("time"),
+        "updated": data.get("updated"),
+        # orderbook bid/offer are handy for the verdict page even if we
+        # don't surface them today
+        "bid": _f((data.get("orderbook") or {}).get("bid", {}).get("price")) if isinstance(data.get("orderbook"), dict) else None,
+        "offer": _f((data.get("orderbook") or {}).get("offer", {}).get("price")) if isinstance(data.get("orderbook"), dict) else None,
         "source": "rapidapi.idx",
-        "raw": data,
     }
     _quote_cache[symbol] = (time.time(), normalised)
     return normalised
 
 
 async def get_key_stats(ticker: str) -> dict | None:
-    """Valuation + profitability ratios. Uses `/api/emiten/{symbol}/key-stats`."""
+    """Valuation + profitability ratios via `/api/emiten/{symbol}/keystats`.
+
+    The upstream shape is deeply nested:
+        data.closure_fin_items_results[].fin_name_results[].fitem = {id, name, value}
+    We flatten it into a {name: value} dict and extract the most-useful
+    ratios by name heuristic."""
     symbol = _strip_jk(ticker)
     cached = _fundamentals_cache.get(symbol)
     if cached and (time.time() - cached[0] < _CACHE_TTL_FUNDAMENTALS):
         return cached[1]
-    raw = await _call(f"/api/emiten/{symbol}/key-stats", ticker=symbol)
-    if not raw:
+    raw = await _call(f"/api/emiten/{symbol}/keystats", ticker=symbol)
+    if not raw or not raw.get("success"):
         return None
     data = raw.get("data") if isinstance(raw, dict) else None
     if not isinstance(data, dict):
         return None
+    # Walk the nested structure and flatten to {name_lowercase: value}
+    flat: dict[str, str] = {}
+    for block in (data.get("closure_fin_items_results") or []):
+        for row in (block.get("fin_name_results") or []):
+            item = row.get("fitem") or {}
+            name = (item.get("name") or "").strip()
+            value = item.get("value")
+            if name and value not in (None, "", "NA"):
+                flat[name.lower()] = value
+
+    def pick(*needles) -> float | None:
+        """Return first match (case-insensitive substring) as float."""
+        for needle in needles:
+            n = needle.lower()
+            for k, v in flat.items():
+                if n in k:
+                    try:
+                        return float(str(v).replace(",", ""))
+                    except (TypeError, ValueError):
+                        continue
+        return None
+
     normalised = {
         "symbol": f"{symbol}.JK",
-        "pe_ratio": data.get("peRatio") or data.get("pe_ratio"),
-        "pb_ratio": data.get("pbRatio") or data.get("pb_ratio"),
-        "dividend_yield": data.get("dividendYield") or data.get("dividend_yield"),
-        "roe": data.get("roe"),
-        "roa": data.get("roa"),
-        "eps": data.get("eps"),
-        "book_value": data.get("bookValue") or data.get("book_value"),
-        "debt_equity": data.get("debtToEquity") or data.get("debt_equity"),
-        "revenue_growth": data.get("revenueGrowth") or data.get("revenue_growth"),
-        "profit_margin": data.get("profitMargin") or data.get("profit_margin"),
+        "pe_ratio": pick("current pe ratio (ttm)", "current pe ratio", "pe ratio"),
+        "forward_pe": pick("forward pe"),
+        "pb_ratio": pick("price to book", "pb ratio", "p/b"),
+        "ps_ratio": pick("price to sales", "ps ratio", "p/s"),
+        "dividend_yield": pick("dividend yield"),
+        "roe": pick("return on equity", "roe"),
+        "roa": pick("return on assets", "roa"),
+        "eps": pick("earnings per share (ttm)", "eps (ttm)", "current eps"),
+        "book_value": pick("book value per share"),
+        "debt_equity": pick("debt to equity", "debt/equity"),
+        "revenue_growth": pick("revenue growth"),
+        "profit_margin": pick("net profit margin", "profit margin"),
+        "market_cap": pick("market cap", "market capitalization"),
         "source": "rapidapi.idx",
-        "raw": data,
+        "raw_count": len(flat),
     }
     _fundamentals_cache[symbol] = (time.time(), normalised)
     return normalised
 
 
 async def get_technical(ticker: str) -> dict | None:
-    """Returns SMA/EMA/RSI/MACD/Stochastic/Bollinger signals from the
-    provider's `/api/analysis/technical/{symbol}` endpoint.
+    """Returns RSI/MACD/SMA signals from `/api/analysis/technical/{symbol}`.
 
-    We keep the full payload since the UI can render the provider's
-    ready-made bullish/bearish signal strings alongside our own technicals."""
+    Response shape:
+        data = {
+            symbol, timeframe, lastPrice, lastUpdate, dataPoints,
+            indicators: { rsi: {value, signal, period}, macd: {...}, ... }
+        }
+    We pass through the indicators dict since each has its own signal string
+    (BULLISH / BEARISH / NEUTRAL) that the UI can display directly."""
     symbol = _strip_jk(ticker)
     cached = _technical_cache.get(symbol)
     if cached and (time.time() - cached[0] < _CACHE_TTL_TECHNICAL):
         return cached[1]
     raw = await _call(
-        f"/api/analysis/technical/{symbol}?indicators=sma,ema,rsi,macd,bollinger,stochastic",
+        f"/api/analysis/technical/{symbol}?indicators=rsi,macd,sma,ema",
         ticker=symbol,
     )
-    if not raw:
+    if not raw or not raw.get("success"):
         return None
-    data = raw.get("data") if isinstance(raw, dict) else raw
+    data = raw.get("data") if isinstance(raw, dict) else None
     if not isinstance(data, dict):
         return None
-    normalised = {"symbol": f"{symbol}.JK", "source": "rapidapi.idx", "indicators": data}
+    normalised = {
+        "symbol": f"{symbol}.JK",
+        "timeframe": data.get("timeframe"),
+        "last_price": data.get("lastPrice"),
+        "last_update": data.get("lastUpdate"),
+        "indicators": data.get("indicators") or {},
+        "source": "rapidapi.idx",
+    }
     _technical_cache[symbol] = (time.time(), normalised)
     return normalised
+
+
+# ---- Bandarmology (computed from insider-flow endpoint) ------------------
+# The provider's `/api/emiten/{sym}/insider` endpoint returns a list of
+# shareholder movements with action_type BUY/SELL, change in shares, and
+# badges identifying directors / commissioners ("smart money"). We compute
+# an accumulation score locally rather than calling a separate endpoint,
+# which (a) saves budget — no extra req/analysis, (b) makes the signal
+# math transparent and auditable, (c) survives provider endpoint changes.
+
+_bandarmology_cache: dict[str, tuple[float, dict]] = {}
+_CACHE_TTL_BANDARMOLOGY = 60 * 60  # 1h — insider filings don't move fast
+_trending_cache: dict[str, tuple[float, list]] = {}
+_CACHE_TTL_TRENDING = 30 * 60  # 30 min
+
+
+async def get_insider_flow(ticker: str) -> list[dict] | None:
+    """Raw insider-movement list from `/api/emiten/{sym}/insider`."""
+    symbol = _strip_jk(ticker)
+    raw = await _call(f"/api/emiten/{symbol}/insider", ticker=symbol)
+    if not raw or not raw.get("success"):
+        return None
+    data = raw.get("data") or {}
+    movements = data.get("movement") or []
+    return movements if isinstance(movements, list) else None
+
+
+def _parse_shares(s) -> float:
+    """'+147,933' → 147933.0; robust against commas and signs."""
+    if s is None:
+        return 0.0
+    try:
+        return float(str(s).replace(",", "").replace("+", ""))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+async def get_bandarmology(ticker: str) -> dict | None:
+    """Compute Accumulation / Distribution / Smart-Money signals from the
+    insider-flow feed. Single upstream call, computed locally."""
+    symbol = _strip_jk(ticker)
+    cached = _bandarmology_cache.get(symbol)
+    if cached and (time.time() - cached[0] < _CACHE_TTL_BANDARMOLOGY):
+        return cached[1]
+    movements = await get_insider_flow(ticker)
+    if movements is None:
+        return None
+
+    buy_shares = 0.0
+    sell_shares = 0.0
+    buy_count = 0
+    sell_count = 0
+    smart_money_buy = 0.0
+    smart_money_sell = 0.0
+    foreign_net = 0.0
+    recent_samples = []
+
+    SMART_BADGES = {
+        "SHAREHOLDER_BADGE_DIREKTUR",
+        "SHAREHOLDER_BADGE_KOMISARIS",
+        "SHAREHOLDER_BADGE_PRESIDENT_DIRECTOR",
+        "SHAREHOLDER_BADGE_MAJOR_SHAREHOLDER",
+    }
+
+    for m in movements:
+        action = (m.get("action_type") or "").upper()
+        change_shares = _parse_shares((m.get("changes") or {}).get("value"))
+        abs_shares = abs(change_shares)
+        is_smart = bool(set(m.get("badges") or []) & SMART_BADGES)
+        is_foreign = (m.get("nationality") or "") == "NATIONALITY_TYPE_FOREIGN"
+
+        if "BUY" in action:
+            buy_shares += abs_shares
+            buy_count += 1
+            if is_smart:
+                smart_money_buy += abs_shares
+            if is_foreign:
+                foreign_net += abs_shares
+        elif "SELL" in action:
+            sell_shares += abs_shares
+            sell_count += 1
+            if is_smart:
+                smart_money_sell += abs_shares
+            if is_foreign:
+                foreign_net -= abs_shares
+
+        if len(recent_samples) < 5:
+            recent_samples.append({
+                "name": m.get("name"),
+                "action": "BUY" if "BUY" in action else ("SELL" if "SELL" in action else "—"),
+                "shares": abs_shares,
+                "date": m.get("date"),
+                "price": m.get("price_formatted"),
+                "is_smart_money": is_smart,
+                "is_foreign": is_foreign,
+                "badges": m.get("badges") or [],
+            })
+
+    total = buy_shares + sell_shares
+    accumulation_ratio = (buy_shares / total) if total > 0 else 0.5
+    smart_total = smart_money_buy + smart_money_sell
+    smart_accumulation = (smart_money_buy / smart_total) if smart_total > 0 else None
+
+    if total == 0:
+        regime = "no_signal"
+        label = "No recent insider activity"
+    elif accumulation_ratio >= 0.7:
+        regime = "strong_accumulation"
+        label = "Strong accumulation"
+    elif accumulation_ratio >= 0.55:
+        regime = "mild_accumulation"
+        label = "Mild accumulation"
+    elif accumulation_ratio <= 0.3:
+        regime = "strong_distribution"
+        label = "Strong distribution"
+    elif accumulation_ratio <= 0.45:
+        regime = "mild_distribution"
+        label = "Mild distribution"
+    else:
+        regime = "balanced"
+        label = "Balanced flow"
+
+    result = {
+        "symbol": f"{symbol}.JK",
+        "regime": regime,
+        "label": label,
+        "accumulation_ratio": round(accumulation_ratio, 4),
+        "smart_money_accumulation": round(smart_accumulation, 4) if smart_accumulation is not None else None,
+        "buy_shares": int(buy_shares),
+        "sell_shares": int(sell_shares),
+        "buy_count": buy_count,
+        "sell_count": sell_count,
+        "smart_money_buy_shares": int(smart_money_buy),
+        "smart_money_sell_shares": int(smart_money_sell),
+        "foreign_net_shares": int(foreign_net),
+        "total_movements": len(movements),
+        "recent": recent_samples,
+        "source": "rapidapi.idx",
+    }
+    _bandarmology_cache[symbol] = (time.time(), result)
+    return result
+
+
+# ---- Multibagger — built from /api/main/trending -----------------------
+async def get_trending() -> list[dict] | None:
+    """Raw trending list from `/api/main/trending`. 1 call per ~30 min window."""
+    cached = _trending_cache.get("trending")
+    if cached and (time.time() - cached[0] < _CACHE_TTL_TRENDING):
+        return cached[1]
+    raw = await _call("/api/main/trending", ticker="TRENDING")
+    if not raw or not raw.get("success"):
+        return None
+    nested = raw.get("data") or {}
+    items = nested.get("data") if isinstance(nested, dict) else None
+    if not isinstance(items, list):
+        return None
+    _trending_cache["trending"] = (time.time(), items)
+    return items
+
+
+async def get_top_picks(limit: int = 10) -> list[dict] | None:
+    """Top N IDX picks ranked by a simple multi-factor score.
+
+    Score = 60% one-day percent-change (capped at ±10%) + 40% price
+    quality heuristic (penalise sub-100 Rp "penny stocks"). Returns a
+    clean UI-ready list with symbol, name, price, change_pct, score."""
+    items = await get_trending()
+    if not items:
+        return None
+
+    def _safe_float(x):
+        try:
+            return float(str(x).replace(",", ""))
+        except (TypeError, ValueError):
+            return 0.0
+
+    scored = []
+    for it in items:
+        if (it.get("type") or "").lower() != "saham":
+            continue
+        symbol = it.get("symbol")
+        if not symbol:
+            continue
+        change_pct = _safe_float(it.get("percent"))
+        price = _safe_float(it.get("last"))
+        if price >= 1000:
+            price_quality = 1.0
+        elif price >= 200:
+            price_quality = 0.8
+        elif price >= 50:
+            price_quality = 0.4
+        else:
+            price_quality = 0.1
+        change_component = max(-10.0, min(10.0, change_pct)) / 10.0
+        score = 0.6 * change_component + 0.4 * price_quality
+        scored.append({
+            "symbol": f"{symbol}.JK",
+            "name": it.get("name"),
+            "price": price,
+            "change": _safe_float(it.get("change")),
+            "change_pct": change_pct,
+            "score": round(score, 4),
+            "tradeable": bool(it.get("tradeable")),
+        })
+
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    return scored[:limit]
+

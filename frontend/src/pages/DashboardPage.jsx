@@ -10,6 +10,7 @@ import TestUnlockBanner from "@/components/TestUnlockBanner";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import AnalysisModeSelector from "@/components/AnalysisModeSelector";
 import LiveDeskGuide from "@/components/LiveDeskGuide";
+import IdxTopPicksDialog from "@/components/IdxTopPicksDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { formatPrice, formatPct, timeAgo } from "@/lib/format";
 import { errMessage } from "@/lib/errors";
@@ -482,7 +483,7 @@ export default function DashboardPage() {
                 <LiveDeskGuide />
 
                 {/* Quick Actions */}
-                <section className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-8">
+                <section className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-8">
                     <button
                         onClick={() => quickAnalyze("top")}
                         className="btn-quick flex items-center justify-between"
@@ -555,6 +556,7 @@ export default function DashboardPage() {
                         </span>
                         <Plus size={14} strokeWidth={1.5} />
                     </button>
+                    <IdxTopPicksDialog canUse={canQuickActions} />
                 </section>
 
                 {/* Main grid: Watchlist + Alerts + Performance */}
