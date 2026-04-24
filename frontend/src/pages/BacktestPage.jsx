@@ -513,8 +513,8 @@ export default function BacktestPage() {
                                 </p>
                             </div>
                             {chartData.length >= 2 ? (
-                                <div style={{ width: "100%", height: 320 }}>
-                                    <ResponsiveContainer width="100%" height="100%">
+                                <div style={{ width: "100%", height: 320, minWidth: 1, minHeight: 1 }}>
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                                         <LineChart data={chartData} margin={{ top: 8, right: 18, bottom: 4, left: 0 }}>
                                             <CartesianGrid
                                                 stroke="hsl(var(--border-divider))"
@@ -828,8 +828,8 @@ function MlBacktestSection({ ml }) {
                         Equity curve · ML vs SPY
                     </h3>
                     {chartData.length >= 2 ? (
-                        <div style={{ width: "100%", height: 320 }}>
-                            <ResponsiveContainer width="100%" height="100%">
+                        <div style={{ width: "100%", height: 320, minWidth: 1, minHeight: 1 }}>
+                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                                 <LineChart
                                     data={chartData}
                                     margin={{ top: 8, right: 18, bottom: 4, left: 0 }}
