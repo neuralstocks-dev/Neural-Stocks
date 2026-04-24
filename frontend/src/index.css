@@ -103,6 +103,7 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+    overflow-x: hidden; /* prevent accidental horizontal scroll from nested tables/grids on mobile */
 }
 
 ::selection {
@@ -148,6 +149,12 @@ body {
     border: 1px solid hsl(var(--border-default));
     border-radius: 2px;
     position: relative;
+    min-width: 0; /* allow children with overflow-x:auto to actually scroll instead of stretching the page */
+}
+
+/* Ensure overflow-x:auto scroll containers don't push the page width past the viewport */
+.overflow-x-auto {
+    max-width: 100%;
 }
 
 .module-elevated {
@@ -383,6 +390,16 @@ body {
     border-radius: 50%;
     background: hsl(var(--buy));
     animation: livePulse 2.2s ease-in-out infinite;
+}
+
+/* Mobile nav drawer slide-in */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 /* Deep-link landing flash — used when /technical is opened with a #hash */

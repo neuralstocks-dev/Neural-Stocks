@@ -223,10 +223,10 @@ export default function AnalysisReportPage() {
                                             </span>
                                         ) : null}
                                     </p>
-                                    <div className="flex items-baseline gap-4 mt-2">
+                                    <div className="flex items-baseline flex-wrap gap-x-4 gap-y-1 mt-2 min-w-0">
                                         <h1
-                                            className="font-mono hero-number"
-                                            style={{ fontSize: "clamp(2.5rem, 5vw, 4.5rem)" }}
+                                            className="font-mono hero-number break-all"
+                                            style={{ fontSize: "clamp(2.2rem, 5vw, 4.5rem)" }}
                                             data-testid="ticker-symbol"
                                         >
                                             {t}
