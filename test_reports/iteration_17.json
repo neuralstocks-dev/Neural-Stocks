@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend-only verification of the 3-layer analyze→verdict convergence fix on /dashboard. Added fresh ticker NFLX (admin had no prior NFLX analysis) via API, rendered on dashboard, exercised the full Analyze flow and verified every transition: No analysis → Analyzing… (with analyzing-label-NFLX testid, spinner, 20–60s sub-line) → HOLD · 62% · just now. The .verdict-revealed amber glow class was observed on the row mid-flow. The 8s safety-net GET /api/analysis/NFLX/latest fired exactly once after verdict rendered (no-op since row already had fresh data). Mobile 390px layout: no horizontal overflow. Zero console errors. Button disabled attr correctly present during run. Cleanup: NFLX removed from admin watchlist.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "analyzeOne() in DashboardPage.jsx catches `/analysis/{ticker}/latest` 404 silently (comment says this is fine), but all OTHER network errors (5xx, network down) on that fallback path are also silently swallowed. If the polling window lapses AND /latest returns 500, the row stays on 'Analyzing…' until the 8s safety-net also fails — with no user-facing error message. Consider surfacing actionError when both polling and the fallback fail.",
+    "The safety-net setTimeout inside analyzeOne is fire-and-forget — if the user unmounts /dashboard within the 8s window (navigates away), the async /latest call still fires and its setItems would no-op silently. Works today because React ignores state updates on unmounted components, but for cleanliness store the timeout id and clearTimeout in a useEffect cleanup.",
+    "Row 'verdict-revealed' class clears at 1700ms but @keyframes verdictRevealed runs 1.6s (1600ms) — the 100ms margin is fine but leaves the class attached for the last ~6% of the animation with no visual effect. Align the setTimeout exactly to 1600ms or lengthen the keyframe, minor polish.",
+    "WatchlistRow 'Analyzing…' branch only renders when item.latest_analysis?.recommendation is falsy AND analyzing is true. If the user clicks Analyze on a row that ALREADY has an older verdict, the label never shows — the old verdict stays visible throughout the run which is arguably better UX, but worth documenting that 'Analyzing…' is only visible on first-ever analysis of a ticker."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100% (9/9 frontend checks pass)"},
+  "test_credentials": "jolor69@gmail.com / admin1234 (admin). Token stored at localStorage.sai_token, user at localStorage.sai_user.",
+  "seed_data_creation": "Transiently added NFLX to admin watchlist via POST /api/watchlist during test. Deleted at end via DELETE /api/watchlist/NFLX. One NFLX analysis row was inserted in db.analyses by the real backend run (HOLD · 62% confidence) — left in place as it is a valid historical record.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The fix works end-to-end. Observation: .text-overline CSS class uppercases all copy, so 'No analysis' renders as 'NO ANALYSIS', 'Analyzing…' as 'ANALYZING…', 'just now' as 'JUST NOW', 'conf' as 'CONF'. Any future substring assertions on that area must be case-insensitive or reference the post-transform text. Login endpoint is POST /api/auth/login and returns { token, user }; admin add-ticker flow can bypass the search modal by POST /api/watchlist with {ticker, category}. Delete via DELETE /api/watchlist/{ticker}. Analyze jobs pattern: POST /analysis/{ticker}/start?mode=... returns job_id, poll GET /analysis/jobs/{job_id} until status=done. NFLX completed end-to-end in ~49s for this admin.",
+  "rca of the issue": "N/A — the 3-layer convergence fix shipped in this iteration (polling result → /latest fallback on polling timeout → 8s safety-net refetch) behaves exactly as specified. The user-reported 'stuck on No analysis' bug is resolved on the observed NFLX run: verdict converged at 49.5s via the primary polling path (status=done), the fallback and safety-net paths exist and the safety-net was observed firing at the expected 8s mark. Polling-timeout scenario (the hardest case) could not be triggered organically since NFLX completed well under 180s; the code path is reachable by throttling /analysis/jobs/{id} responses if a future regression needs to exercise it specifically."
+}

@@ -86,6 +86,22 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                             {item.latest_analysis.confidence_score}% conf · {timeAgo(item.latest_analysis.created_at)}
                         </div>
                     </div>
+                ) : analyzing ? (
+                    <div data-testid={`analyzing-label-${item.ticker}`}>
+                        <span
+                            className="text-overline inline-flex items-center gap-1.5"
+                            style={{ color: "hsl(var(--hold))" }}
+                        >
+                            <Loader2 size={10} strokeWidth={2} className="animate-spin" />
+                            Analyzing…
+                        </span>
+                        <div
+                            className="text-overline mt-1"
+                            style={{ fontSize: "0.52rem", color: "hsl(var(--text-muted))" }}
+                        >
+                            20–60 seconds · please wait
+                        </div>
+                    </div>
                 ) : (
                     <span className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
                         No analysis
@@ -334,23 +350,38 @@ export default function DashboardPage() {
                         );
                     }
                 }
-                // Optimistic update from the job result so the row reflects the
-                // new verdict instantly — defends against any read-after-write
-                // lag in the /watchlist/live aggregation. Source of truth is
-                // still re-fetched below.
+
+                // Resolve the fresh verdict. Prefer polling result when "done";
+                // otherwise the BG job may have finished writing to db.analyses
+                // even if our polling window lapsed — hit /latest directly which
+                // is the authoritative per-ticker source.
+                let freshVerdict = null;
                 if (finalJob?.status === "done" && finalJob.result) {
-                    const r = finalJob.result;
+                    freshVerdict = {
+                        recommendation: finalJob.result.recommendation,
+                        confidence_score: finalJob.result.confidence_score,
+                        created_at: finalJob.result.created_at,
+                    };
+                } else {
+                    try {
+                        const latest = await api.get(`/analysis/${ticker}/latest`);
+                        if (latest?.data?.recommendation) {
+                            freshVerdict = {
+                                recommendation: latest.data.recommendation,
+                                confidence_score: latest.data.confidence_score,
+                                created_at: latest.data.created_at,
+                            };
+                        }
+                    } catch (_) {
+                        /* /latest 404 is fine — means no analysis exists yet */
+                    }
+                }
+
+                if (freshVerdict) {
                     setItems((prev) =>
                         prev.map((it) =>
                             it.ticker === ticker
-                                ? {
-                                      ...it,
-                                      latest_analysis: {
-                                          recommendation: r.recommendation,
-                                          confidence_score: r.confidence_score,
-                                          created_at: r.created_at,
-                                      },
-                                  }
+                                ? { ...it, latest_analysis: freshVerdict }
                                 : it
                         )
                     );
@@ -362,9 +393,46 @@ export default function DashboardPage() {
                         setRevealedTicker((cur) => (cur === ticker ? null : cur));
                     }, 1700);
                 }
+
                 await fetchWatchlist();
                 await fetchAlerts();
                 await fetchQuota();
+
+                // Safety-net: the BG job can finish AFTER our polling window
+                // closes (slow IDX tickers, queue contention, etc.). Refetch
+                // /latest once more 8s later so the row converges to truth
+                // even if our main flow missed the analysis insert.
+                setTimeout(async () => {
+                    try {
+                        const r = await api.get(`/analysis/${ticker}/latest`);
+                        if (r?.data?.recommendation) {
+                            setItems((prev) =>
+                                prev.map((it) => {
+                                    if (it.ticker !== ticker) return it;
+                                    const existing = it.latest_analysis;
+                                    // Only overwrite if the server has a newer
+                                    // analysis than what we currently show.
+                                    if (
+                                        existing?.created_at &&
+                                        existing.created_at >= r.data.created_at
+                                    ) {
+                                        return it;
+                                    }
+                                    return {
+                                        ...it,
+                                        latest_analysis: {
+                                            recommendation: r.data.recommendation,
+                                            confidence_score: r.data.confidence_score,
+                                            created_at: r.data.created_at,
+                                        },
+                                    };
+                                })
+                            );
+                        }
+                    } catch (_) {
+                        /* best-effort — no-op on failure */
+                    }
+                }, 8000);
             } catch (err) {
                 if (disclaimer.promptFromError(err)) return;
                 const msg =
