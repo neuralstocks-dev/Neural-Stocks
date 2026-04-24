@@ -969,24 +969,26 @@ def _public_view(analysis: dict) -> dict:
 
 @router.post("/analysis/{analysis_id}/share")
 async def share_analysis(analysis_id: str, user=Depends(get_current_user)):
-    p = await resolved_plan_for(user)
-    if not p["share_verdicts"]:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Sharing verdicts is a Pro/Elite feature. Upgrade from {p['name']} to unlock public share links.",
-        )
-    # Daily rate limit by effective plan
-    daily_limit = p.get("share_per_day")
-    if daily_limit is not None:
-        since = iso(now_utc() - timedelta(days=1))
-        shares_today = await db.shared_verdicts.count_documents(
-            {"owner_id": user["id"], "created_at": {"$gte": since}}
-        )
-        if shares_today >= daily_limit:
+    # Admins always have unlimited share creation.
+    if not user.get("is_admin"):
+        p = await resolved_plan_for(user)
+        if not p["share_verdicts"]:
             raise HTTPException(
-                status_code=429,
-                detail=f"Daily share limit reached ({daily_limit}/day on {p['name']} plan). Upgrade to unlock more shares.",
+                status_code=402,
+                detail=f"Sharing verdicts is a Pro/Elite feature. Upgrade from {p['name']} to unlock public share links.",
             )
+        # Daily rate limit by effective plan
+        daily_limit = p.get("share_per_day")
+        if daily_limit is not None:
+            since = iso(now_utc() - timedelta(days=1))
+            shares_today = await db.shared_verdicts.count_documents(
+                {"owner_id": user["id"], "created_at": {"$gte": since}}
+            )
+            if shares_today >= daily_limit:
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Daily share limit reached ({daily_limit}/day on {p['name']} plan). Upgrade to unlock more shares.",
+                )
     analysis = await db.analyses.find_one({"id": analysis_id, "user_id": user["id"]}, {"_id": 0})
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")

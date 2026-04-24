@@ -23,13 +23,15 @@ async def get_watchlist(user=Depends(get_current_user)):
 @router.post("")
 async def add_to_watchlist(req: AddStockReq, user=Depends(get_current_user)):
     ticker = req.ticker.upper().strip()
-    p = plan_for(user)
-    count = await db.watchlist.count_documents({"user_id": user["id"]})
-    if count >= p["watchlist_limit"]:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Watchlist limit of {p['watchlist_limit']} reached on {p['name']} plan. Upgrade to add more.",
-        )
+    # Admins always have unlimited watchlist — consistent with unlimited analysis.
+    if not user.get("is_admin"):
+        p = plan_for(user)
+        count = await db.watchlist.count_documents({"user_id": user["id"]})
+        if count >= p["watchlist_limit"]:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Watchlist limit of {p['watchlist_limit']} reached on {p['name']} plan. Upgrade to add more.",
+            )
     if await db.watchlist.find_one({"user_id": user["id"], "ticker": ticker}):
         raise HTTPException(status_code=400, detail="Ticker already in watchlist")
     q = await get_quote(ticker)

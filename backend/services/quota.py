@@ -85,6 +85,15 @@ async def quota_snapshot(user: dict) -> dict:
     p = await resolved_plan_for(user)
     eff = effective_plan_key(user)
     now = now_utc()
+    # Admins get truly unlimited quotas regardless of tier_limits overrides —
+    # present the UI as "unlimited / unlimited" so the dashboard doesn't show
+    # a misleading 15/day cap on their own account.
+    if user.get("is_admin"):
+        p = dict(p)
+        p["analyses_per_day"] = None
+        p["analyses_per_week"] = None
+        p["watchlist_limit"] = 9999
+        p["share_per_day"] = None
     since_day = now - timedelta(days=1)
     since_week = now - timedelta(days=7)
     # Honour admin-initiated quota resets — analyses before quota_reset_at
@@ -128,6 +137,12 @@ async def quota_snapshot(user: dict) -> dict:
 
 
 async def enforce_analysis_quota(user: dict):
+    # Admins always have unlimited analysis. The `is_admin` flag is the
+    # ultimate unlock — distinct from `test_unlock_active` which is meant to
+    # simulate an Elite user so admins can *test* paid-tier behaviour under
+    # real quota ceilings.
+    if user.get("is_admin"):
+        return
     p = await resolved_plan_for(user)
     now = now_utc()
     # Honour `quota_reset_at` floor if an admin recently reset this user
@@ -176,6 +191,8 @@ IDX_DAILY_LIMITS = {
 async def enforce_idx_analysis_quota(user: dict):
     """Called only when the requested ticker is an IDX (.JK) symbol. Applies
     per-tier daily caps on top of the generic analysis quota."""
+    if user.get("is_admin"):
+        return  # admin bypass — consistent with enforce_analysis_quota
     plan_key = effective_plan_key(user)
     limit = IDX_DAILY_LIMITS.get(plan_key)
     if limit is None:
