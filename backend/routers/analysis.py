@@ -914,27 +914,6 @@ async def scan_watchlist_patterns(user=Depends(get_current_user)):
     }
 
 
-@router.get("/alerts")
-async def list_alerts(user=Depends(get_current_user)):
-    return (
-        await db.alerts.find({"user_id": user["id"]}, {"_id": 0})
-        .sort("created_at", -1)
-        .to_list(50)
-    )
-
-
-@router.post("/alerts/{alert_id}/read")
-async def mark_alert_read(alert_id: str, user=Depends(get_current_user)):
-    res = await db.alerts.update_one({"id": alert_id, "user_id": user["id"]}, {"$set": {"read": True}})
-    if res.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    return {"ok": True}
-
-
-@router.post("/alerts/read_all")
-async def mark_all_alerts_read(user=Depends(get_current_user)):
-    await db.alerts.update_many({"user_id": user["id"]}, {"$set": {"read": True}})
-    return {"ok": True}
 
 
 # ---------- Share Verdict ----------

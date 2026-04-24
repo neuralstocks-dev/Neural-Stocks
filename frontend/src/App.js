@@ -20,6 +20,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import TechnicalPage from "@/pages/TechnicalPage";
 import PaypalSmokeTestPage from "@/pages/PaypalSmokeTestPage";
 import BacktestPage from "@/pages/BacktestPage";
+import AlertsPage from "@/pages/AlertsPage";
 import { Loader2 } from "lucide-react";
 
 function Protected({ children }) {
@@ -98,6 +99,14 @@ function AppRoutes() {
                 element={
                     <Protected>
                         <BacktestPage />
+                    </Protected>
+                }
+            />
+            <Route
+                path="/alerts"
+                element={
+                    <Protected>
+                        <AlertsPage />
                     </Protected>
                 }
             />
