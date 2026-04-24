@@ -53,7 +53,21 @@ function BiasBadge({ bias }) {
     );
 }
 
-function PatternRow({ p }) {
+function PatternRow({ p, analysisCreatedAt }) {
+    const dateStr = p.candle_date?.slice(0, 10);
+    // Relative-time hint: how old is the pattern vs. when the analysis ran?
+    const daysAgo = useMemo(() => {
+        if (!dateStr) return null;
+        const anchor = analysisCreatedAt ? new Date(analysisCreatedAt) : new Date();
+        const patternDay = new Date(dateStr + "T12:00:00Z");
+        const ms = anchor.getTime() - patternDay.getTime();
+        const d = Math.round(ms / (1000 * 60 * 60 * 24));
+        if (d <= 0) return "today";
+        if (d === 1) return "yesterday";
+        if (d < 7) return `${d}d ago`;
+        if (d < 30) return `${Math.round(d / 7)}w ago`;
+        return `${Math.round(d / 30)}mo ago`;
+    }, [dateStr, analysisCreatedAt]);
     return (
         <div
             className="py-3 px-4 flex items-start gap-4"
@@ -77,8 +91,10 @@ function PatternRow({ p }) {
                     <p
                         className="font-mono text-xs"
                         style={{ color: "hsl(var(--text-muted))" }}
+                        title="Candle on which this pattern completed"
                     >
-                        {p.candle_date?.slice(0, 10)} · strength {p.strength}
+                        Formed {dateStr}
+                        {daysAgo ? ` · ${daysAgo}` : ""} · strength {p.strength}
                     </p>
                 </div>
                 <p
@@ -92,8 +108,9 @@ function PatternRow({ p }) {
     );
 }
 
-function TimeframeColumn({ label, data }) {
+function TimeframeColumn({ label, data, analysisCreatedAt }) {
     const patterns = data?.patterns || [];
+    const range = data?.candles_examined_range;
     return (
         <div
             className="module"
@@ -111,8 +128,12 @@ function TimeframeColumn({ label, data }) {
                     <p
                         className="font-mono text-xs mt-1"
                         style={{ color: "hsl(var(--text-muted))" }}
+                        data-testid={`candlestick-${label.toLowerCase()}-scan-window`}
                     >
                         {data?.scanned_candles || 0} candles scanned
+                        {range?.from && range?.to
+                            ? ` · ${range.from.slice(0, 10)} → ${range.to.slice(0, 10)}`
+                            : ""}
                     </p>
                 </div>
                 <BiasBadge bias={data?.net_bias || "neutral"} />
@@ -130,6 +151,7 @@ function TimeframeColumn({ label, data }) {
                         <PatternRow
                             key={`${p.pattern}-${p.candle_date}`}
                             p={p}
+                            analysisCreatedAt={analysisCreatedAt}
                         />
                     ))}
                 </div>
@@ -138,7 +160,7 @@ function TimeframeColumn({ label, data }) {
     );
 }
 
-export default function CandlestickFindings({ findings, summary, mode }) {
+export default function CandlestickFindings({ findings, summary, mode, analysisCreatedAt }) {
     const [guideOpen, setGuideOpen] = useState(false);
     const detectedNames = useMemo(() => {
         if (!findings) return [];
@@ -207,10 +229,24 @@ export default function CandlestickFindings({ findings, summary, mode }) {
             )}
 
             {any > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-4 mt-5">
-                    <TimeframeColumn label="Daily" data={daily} />
-                    <TimeframeColumn label="Weekly" data={weekly} />
-                </div>
+                <>
+                    <p
+                        className="mt-3 text-xs italic"
+                        style={{ color: "hsl(var(--text-muted))" }}
+                        data-testid="pattern-evidence-date-note"
+                    >
+                        Dates below = when each candle pattern formed on the chart.
+                        Analysis generated{" "}
+                        {analysisCreatedAt
+                            ? new Date(analysisCreatedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+                            : "today"}
+                        {" "}from live market data.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-4 mt-5">
+                        <TimeframeColumn label="Daily" data={daily} analysisCreatedAt={analysisCreatedAt} />
+                        <TimeframeColumn label="Weekly" data={weekly} analysisCreatedAt={analysisCreatedAt} />
+                    </div>
+                </>
             )}
 
             {summary && (

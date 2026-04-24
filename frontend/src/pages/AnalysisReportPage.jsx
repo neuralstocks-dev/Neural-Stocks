@@ -544,6 +544,7 @@ export default function AnalysisReportPage() {
                                         findings={analysis.candlestick_findings}
                                         summary={analysis.candlestick_summary}
                                         mode={analysis.mode}
+                                        analysisCreatedAt={analysis.created_at}
                                     />
                                 )}
 

@@ -158,16 +158,35 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
         story.append(Paragraph("Pattern evidence.", s["h2"]))
         bias = (findings.get("combined_bias") or "neutral").upper()
         story.append(Paragraph(f"Combined bias: <b>{bias}</b> &nbsp;&nbsp;Score: {findings.get('combined_score', 0)}", s["mono"]))
+        # Clarify that the dates shown below are when each pattern formed,
+        # not when the analysis was generated — a common source of user
+        # confusion (patterns can be several days old within the scan window).
+        created_at = analysis.get("created_at") or ""
+        created_display = created_at[:10] if isinstance(created_at, str) else ""
+        note = (
+            "Dates below indicate when each candlestick pattern formed on "
+            "the chart. Analysis generated"
+            f"{' ' + created_display if created_display else ''} from live market data."
+        )
+        story.append(Paragraph(f"<i>{note}</i>", s["muted"]))
         story.append(Spacer(1, 8))
         for tf_label, tf_data in (("Daily", findings.get("daily")), ("Weekly", findings.get("weekly"))):
             if not tf_data:
                 continue
             pats = tf_data.get("patterns") or []
-            story.append(Paragraph(f"{tf_label} · {tf_data.get('scanned_candles', 0)} candles · net bias {tf_data.get('net_bias', 'neutral')}", s["overline"]))
+            rng = tf_data.get("candles_examined_range") or {}
+            rng_txt = ""
+            if rng.get("from") and rng.get("to"):
+                rng_txt = f" · window {str(rng['from'])[:10]} → {str(rng['to'])[:10]}"
+            story.append(Paragraph(
+                f"{tf_label} · {tf_data.get('scanned_candles', 0)} candles · "
+                f"net bias {tf_data.get('net_bias', 'neutral')}{rng_txt}",
+                s["overline"],
+            ))
             if not pats:
                 story.append(Paragraph("No patterns detected on this timeframe.", s["muted"]))
             else:
-                rows = [["Pattern", "Bias", "Date", "Strength"]]
+                rows = [["Pattern", "Bias", "Formed on", "Strength"]]
                 for p in pats:
                     rows.append([
                         p.get("pattern", "—"),
