@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 12 — Backtest (Option C Neulab-ML + Option D live user) end-to-end verification. All 10 backend pytest assertions PASS (/api/backtest/me/status for Pro/Free, /api/backtest/me 402 gate + full payload shape for Pro, cache hit <3s + same generated_at, force_refresh=true recompute, /api/backtest/ml public no-auth with 229 equity points + 55 trades + correct metrics, /api/admin/backtest/ml/recompute admin-only with 403 for non-admin + {ok:true,status:started} for admin). Frontend verified for both Pro and Free users: Pro user lands on /backtest with all expected test-ids (backtest-page, backtest-disclaimer, backtest-kpis, kpi-total-return/+0.10%, kpi-alpha/+0.14% vs SPY, kpi-win-rate/100%, kpi-drawdown/0.00%, backtest-chart, backtest-trades, backtest-generated-at, backtest-refresh, ml-backtest-section, ml-backtest-kpis, ml-backtest-chart, ml-kpi-return/+17.63%, ml-kpi-alpha/-3.58%, ml-kpi-win/53%/29-of-55 trades, ml-kpi-drawdown/-11.72%). Free user sees backtest-gated + backtest-upgrade-cta with PRO/ELITE FEATURE badge, View Pricing CTA, and ML section still visible (public). Navigation: nav-backtest present for both tiers, click routes to /backtest; nav-backtest-mobile rendered inside hamburger drawer at 390x844. Mobile overflow check: docW=390, viewW=390, canScrollX=false (zero horizontal bleed).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/backtest (Pro)",
+        "issues": [
+          "Recharts console warnings: 'The width(-1) and height(-1) of chart should be greater than 0' emitted 4x on initial mount of /backtest (the equity-curve ResponsiveContainer renders before its parent card has settled its width). Not user-visible but noisy. Same family of warnings was flagged in iteration_11 for AnalysisReportPage candlestick — suggests a shared root cause worth a single fix (set minWidth:1 on ResponsiveContainer wrapper or gate mount until parent has layout)."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_backtest.py",
+    "/app/test_reports/pytest/iteration12_backtest.xml"
+  ],
+  "action_items": [
+    "(LOW · console hygiene) Suppress Recharts width(-1)/height(-1) warnings on BacktestPage equity chart — same fix pattern as AnalysisReportPage candlestick. Add minWidth:1/minHeight:1 to the ResponsiveContainer wrapper, or lazy-mount chart once parent has measured size."
+  ],
+  "critical_code_review_comments": [
+    "services/backtest.py:386-490 build_live_backtest — cache invalidation is correct: checks both CACHE_MAX_AGE_SECONDS (6h) AND last analysis.created_at > generated_at, so a new verdict immediately busts the cache. force_refresh query-param path is explicit and safe.",
+    "services/backtest.py:60-64 _choose_benchmark — benchmark selection correctly branches to ^JKSE when >50% of verdicts are .JK tickers, otherwise SPY. Single source of truth used consistently.",
+    "services/backtest.py:220-231 _simulate BUY handling — equal-weight sizing uses cash / (open_count+1) which is conservative but means cash sits idle when later BUYs arrive (known trade-off, documented in module docstring). No pyramiding guard (line 221) is correct.",
+    "services/backtest.py:310-336 metrics — max_drawdown is computed over the full mark-to-market curve including flat pre-first-trade days; this slightly understates true intra-trade drawdown but matches the stated 'equity curve' definition. Fine for v1.",
+    "routers/backtest.py:12-23 _gate_pro — clean 402 with descriptive detail; matches spec. Note: relies on effective_plan_key which honours admin test-unlock, so admin-elevated Pro grants work transparently.",
+    "routers/backtest.py:38-50 /ml route — correctly unauthenticated (public read) and excludes mongodb _id + user_id from projection. Returns well-formed empty-state object if never computed. Good.",
+    "CODE REVIEW — routers/backtest.py:59 MIN_VERDICTS_REQUIRED import is done inside the function body rather than top of module. Minor style nit; consider lifting to module imports to keep router deps explicit.",
+    "BacktestPage.jsx (not fully re-read but verified via live DOM) — all mandated test-ids present (backtest-page, disclaimer, kpis, chart, trades, refresh, generated-at, gated, upgrade-cta, plus all ml-* ids). Good testability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_backtest.py (new pytest suite — 10 assertions)"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 pytest assertions pass in 2.95s)",
+    "frontend": "100% — all 9 requested user-visible checks PASS (Pro KPIs render with live numbers, Free gate + upgrade CTA, ML section public for both tiers, nav link desktop + mobile hamburger, zero horizontal overflow at 390x844)"
+  },
+  "test_credentials": "tiers@demo.io / pass1234 (Pro, 72 verdicts, live backtest computed), demo@stockai.io / demo1234 (Free, gated), jolor69@gmail.com / admin1234 (admin recompute verified)",
+  "seed_data_creation": "None. Tests read-only for /me/status, /me, /ml. Admin recompute endpoint was hit once (kicks off background subprocess; harmless — the ML run was previously seeded and cache is re-overwritten on completion).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backtest test-ids fully verified and stable: backtest-page, backtest-disclaimer, backtest-kpis (kpi-total-return|alpha|win-rate|drawdown), backtest-chart, backtest-trades, backtest-generated-at, backtest-refresh, backtest-gated, backtest-upgrade-cta, ml-backtest-section, ml-backtest-kpis (ml-kpi-return|alpha|win|drawdown), ml-backtest-chart, nav-backtest, nav-backtest-mobile. Pytest regression suite at /app/backend/tests/test_backtest.py — re-run after any change to services/backtest.py or routers/backtest.py or routers/admin.py backtest section. Known live backtest numbers for tiers@demo.io as of Apr 24 2026: +0.10% total, +0.14% alpha vs SPY, 100% win rate (1 closed trade), 2-day avg hold, 3-day simulation window 2026-04-20→2026-04-24 (this is because tiers@demo.io only has verdicts from the Feb 2026 re-seed that are mostly HOLD with 1 actionable BUY). ML backtest fixed numbers: +17.63%, -3.58% alpha, 53% win (29/55 trades), -11.72% dd, 229 equity points, 25-stock universe, top-5 monthly rebalance, 11 rebalances. The Recharts width(-1)/height(-1) warning is the SAME pattern reported in iteration_11 — one fix (minWidth on ResponsiveContainer wrapper) should cover both BacktestPage and AnalysisReportPage candlestick. No blocking issues; feature is production-ready.",
+  "rca of the issue": "No blocking issue. Only non-blocking cosmetic: Recharts emits width(-1)/height(-1) warnings on BacktestPage equity chart initial mount (same root cause as iteration_11 AnalysisReportPage candlestick). Root cause: ResponsiveContainer mounts before its parent flex/grid card has computed its width, so first render fails the non-negative-dimensions check and Recharts logs twice per chart. Mitigation: set minWidth:1, minHeight:1 on the ResponsiveContainer wrapper (or <div style='width:100%; min-width:1px; height:320px'>), OR gate chart mount with a useEffect+layout effect until containerRef.current.clientWidth > 0."
+}

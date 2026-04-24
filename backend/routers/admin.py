@@ -385,6 +385,18 @@ async def rf_reload(_admin=Depends(admin_required)):
     }
 
 
+@router.post("/backtest/ml/recompute")
+async def admin_recompute_ml_backtest(_admin=Depends(admin_required)):
+    """Manually trigger a Neulab-ML walk-forward backtest recompute.
+    Runs out-of-process, typically finishes in ~15s (25 mega-caps, 11 rebalances).
+    Normally auto-runs after every RF retrain — use this only if you've
+    dropped a new model out-of-band or want a fresh snapshot between retrains."""
+    import asyncio as _a
+    from services.rf_retrain import _recompute_ml_backtest_async
+    _a.create_task(_recompute_ml_backtest_async())
+    return {"ok": True, "status": "started", "message": "ML backtest recompute running in background. Refresh /backtest in 30s."}
+
+
 # ---------- RapidAPI IDX budget tracking ----------
 @router.get("/rapidapi/usage")
 async def rapidapi_usage(_admin=Depends(admin_required)):

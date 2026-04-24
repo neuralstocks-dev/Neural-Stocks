@@ -164,6 +164,13 @@ async def trigger_retrain(triggered_by: str = "admin", years: int = 5, horizon: 
                             await _check_drift_and_alert(meta_doc, job_id)
                         except Exception as e:
                             logger.warning("RF drift check failed: %s", e)
+                    # Recompute the Neulab-ML walk-forward backtest so the
+                    # /backtest page reflects the new model. Spawn detached —
+                    # don't block retrain completion on this.
+                    try:
+                        asyncio.create_task(_recompute_ml_backtest_async())
+                    except Exception as e:
+                        logger.warning("ML backtest recompute kick-off failed: %s", e)
                 else:
                     await db.rf_retrain_jobs.update_one(
                         {"id": job_id},
@@ -372,4 +379,31 @@ async def _check_drift_and_alert(new_meta: dict, job_id: str):
         "RF DRIFT ALERT pushed to %d/%d admin(s) · reasons=%s",
         sent, len(admins), "; ".join(drift_reasons),
     )
+
+
+# ─── Neulab-ML walk-forward auto-refresh ──────────────────────────────────
+
+async def _recompute_ml_backtest_async():
+    """Fire-and-forget: spawn the ML backtest compute script as a subprocess.
+    Runs in a few minutes; on completion the new result lands in
+    `db.backtest_runs` kind="ml". Never raises."""
+    script = BACKEND_ROOT / "scripts" / "compute_ml_backtest.py"
+    if not script.exists():
+        logger.warning("ML backtest script missing: %s", script)
+        return
+    try:
+        logger.info("Kicking off ML backtest recompute subprocess")
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-m", "scripts.compute_ml_backtest",
+            cwd=str(BACKEND_ROOT),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        # Await but don't block retrain completion (called from create_task)
+        stdout, _ = await proc.communicate()
+        rc = proc.returncode
+        log_tail = (stdout or b"").decode("utf-8", errors="replace")[-2000:]
+        logger.info("ML backtest recompute rc=%s · tail=%s", rc, log_tail[-400:])
+    except Exception as e:
+        logger.warning("ML backtest recompute failed: %s", e)
 

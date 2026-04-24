@@ -8,6 +8,7 @@ const NAV_ITEMS = [
     { to: "/dashboard", label: "Dashboard", testid: "nav-dashboard" },
     { to: "/portfolio", label: "Portfolio", testid: "nav-portfolio" },
     { to: "/scorecard", label: "Scorecard", testid: "nav-scorecard" },
+    { to: "/backtest", label: "Backtest", testid: "nav-backtest" },
     { to: "/pricing", label: "Pricing", testid: "nav-pricing" },
     { to: "/why", label: "Why us", testid: "nav-why" },
     { to: "/technical", label: "Technical", testid: "nav-technical" },
