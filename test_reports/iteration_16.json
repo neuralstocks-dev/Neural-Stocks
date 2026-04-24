@@ -1,0 +1,27 @@
+{
+  "summary": "Dashboard ConfidenceDot micro-indicator + Confidence·Triage header link fully verified on desktop + mobile (390px). 18 dots render (14 signal + 4 pattern) across admin's 18 alerts, grey by default (no resolved trades yet) with correct 'no trades taken yet' tooltips. Mocked-stats run validated GREEN (72% signal) and AMBER (50% pattern) color+tooltip paths. Zero console errors. Regression clean: mark-all-read, deep-link to /analysis/{ticker}, unread count badge logic all unchanged. Backend skipped per review_request (frontend-only iteration).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_alerts_triage.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DashboardPage.jsx ConfidenceDot branch comment in the header JSDoc (line 153) says 'AMBER — 45–60% OR <3 resolved' but the actual code routes <3 resolved to the GREY branch (line 172). Comment is stale/misleading — update to reflect real behaviour: AMBER = 45≤wr<60 AND ≥3 resolved.",
+    "fetchAlerts() fires /alerts and /alerts/stats in parallel but stats is a detached .then() without error state (silently swallowed .catch(() => {})). If the stats endpoint 500s, dots stay grey forever with no user-facing signal. Consider a console.warn at minimum, consistent with fetchQuota() which does log.",
+    "rf_watchlist_scan alerts — admin currently has 0 of this type so the RED-path rendering was only validated by forcing via mocked response. Logic is sound but there is no production coverage today; seed at least one rf_watchlist_scan alert with taken+resolved losses to exercise RED in an e2e run.",
+    "ConfidenceDot uses flexShrink:0 inline but relies on the parent flex gap for spacing; on very long ticker symbols in 390px viewport the row still fits (verified), but a min-width on the ticker span would future-proof overflow."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100% (all 7 requested frontend checks pass)"},
+  "test_credentials": "jolor69@gmail.com/admin1234 (admin, 18 alerts — 14 signal + 4 pattern). Login response key is 'token'; stored as localStorage.sai_token + localStorage.sai_user.",
+  "seed_data_creation": "None on backend. Used page.route() to mock /api/alerts/stats response in-browser for colored-dot path validation — mock is automatically discarded when the playwright context closes, so no DB cleanup required.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "ConfidenceDot lives in /app/frontend/src/pages/DashboardPage.jsx (line 161). Color mapping: buy=rgb(16,183,127), hold=rgb(245,159,10), sell=rgb(213,63,63) approx, muted=rgb(73,87,105). Test by either (a) seeding alerts in Mongo with taken=true/outcome=win|loss/resolved timestamps then hitting /api/alerts/stats, or (b) page.route mocking /alerts/stats with a fake by_type payload — the second is cleaner. Admin has no rf_watchlist_scan alerts so that testid only renders after a watchlist auto-scan fires — keep in mind for future regression.",
+  "rca of the issue": "N/A — feature works end-to-end as specified. Minor stale JSDoc noted above."
+}

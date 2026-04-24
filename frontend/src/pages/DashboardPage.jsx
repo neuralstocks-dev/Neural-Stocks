@@ -145,12 +145,75 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
     );
 }
 
+/**
+ * ConfidenceDot — personalized "Neulab confidence" indicator for an
+ * alert based on the user's historical win-rate with that alert type.
+ *
+ *  · GREEN  — ≥60% win rate, ≥3 resolved trades    → "high confidence"
+ *  · AMBER  — 45–60% OR <3 resolved                 → "mixed track record"
+ *  · RED    — <45% with ≥3 resolved                 → "low historical hit-rate"
+ *  · GREY   — no taken-and-resolved alerts of type  → "not enough data yet"
+ *
+ * Tooltip shown via native `title` attribute so it works on all devices
+ * without extra dependencies. Click-through is intentionally not wired —
+ * the row itself already links to the analysis page.
+ */
+function ConfidenceDot({ alertType, stats }) {
+    const typeStat = stats?.by_type?.[alertType];
+    const channelLabel = {
+        signal: "AI Verdict",
+        pattern: "Pattern Scan",
+        rf_watchlist_scan: "RF Auto-Scan",
+    }[alertType] || "Signal";
+
+    let color = "hsl(var(--text-muted))";
+    let tooltip;
+
+    if (!typeStat || (typeStat.wins + typeStat.losses) < 3) {
+        color = "hsl(var(--text-muted))";
+        const taken = typeStat?.taken ?? 0;
+        tooltip = taken === 0
+            ? `${channelLabel}: no trades taken yet — mark alerts as taken on /alerts to start your personal track record.`
+            : `${channelLabel}: ${taken} taken, ${typeStat.resolved} resolved. Need 3+ resolved trades before confidence scores show.`;
+    } else {
+        const wr = typeStat.win_rate_pct;
+        if (wr >= 60) {
+            color = "hsl(var(--buy))";
+            tooltip = `${channelLabel}: you're ${wr}% on this channel — high confidence, follow the signal.`;
+        } else if (wr >= 45) {
+            color = "hsl(var(--hold))";
+            tooltip = `${channelLabel}: ${wr}% historical hit-rate for you — mixed. Confirm with a full analysis before acting.`;
+        } else {
+            color = "hsl(var(--sell))";
+            tooltip = `${channelLabel}: only ${wr}% historical hit-rate for you — cross-check carefully before acting.`;
+        }
+    }
+
+    return (
+        <span
+            className="inline-block"
+            style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: color,
+                boxShadow: `0 0 6px ${color}66`,
+                flexShrink: 0,
+            }}
+            title={tooltip}
+            data-testid={`confidence-dot-${alertType}`}
+            aria-label={tooltip}
+        />
+    );
+}
+
 export default function DashboardPage() {
     const { user } = useAuth();
     const disclaimer = useDisclaimer();
     const [items, setItems] = useState([]);
     const [sparks, setSparks] = useState({}); // ticker -> [closes]
     const [alerts, setAlerts] = useState([]);
+    const [alertStats, setAlertStats] = useState(null);
     const [quota, setQuota] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -179,6 +242,9 @@ export default function DashboardPage() {
     const fetchAlerts = useCallback(async () => {
         const r = await api.get("/alerts");
         setAlerts(r.data || []);
+        // Fetch scoreboard in parallel — used for per-row confidence dots.
+        // Never block the alert feed on this, it's a best-effort personalization.
+        api.get("/alerts/stats").then((s) => setAlertStats(s.data)).catch(() => {});
     }, []);
 
     const fetchQuota = useCallback(async () => {
@@ -670,9 +736,29 @@ export default function DashboardPage() {
                                 </div>
                             </div>
                             {alerts.length > 0 && (
+                                <Link
+                                    to="/alerts"
+                                    className="text-overline hover:text-[hsl(var(--text-primary))] inline-flex items-center gap-2"
+                                    data-testid="dash-alerts-triage-link"
+                                    title="Open full Alert Triage + scoreboard"
+                                >
+                                    <span
+                                        className="inline-block"
+                                        style={{
+                                            width: 6,
+                                            height: 6,
+                                            borderRadius: "50%",
+                                            background: "hsl(var(--buy))",
+                                            boxShadow: "0 0 4px hsl(var(--buy))",
+                                        }}
+                                    />
+                                    Confidence · Triage →
+                                </Link>
+                            )}
+                            {alerts.length > 0 && (
                                 <button
                                     onClick={markAllAlertsRead}
-                                    className="text-overline hover:text-[hsl(var(--text-primary))]"
+                                    className="text-overline hover:text-[hsl(var(--text-primary))] ml-3"
                                     data-testid="mark-all-read-button"
                                 >
                                     Mark all read
@@ -726,6 +812,7 @@ export default function DashboardPage() {
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
+                                                    <ConfidenceDot alertType={a.type} stats={alertStats} />
                                                     <span className="font-mono text-sm font-medium">{a.ticker}</span>
                                                     {isPattern ? (
                                                         <span
