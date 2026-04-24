@@ -318,18 +318,41 @@ export default function DashboardPage() {
                 );
                 const jobId = start.data.job_id;
                 const started = Date.now();
+                let finalJob = null;
                 // Poll up to 3 minutes. Production ingress caps sync responses
                 // at 30s; background job has its own 120s budget on the server.
                 while (Date.now() - started < 180_000) {
                     await new Promise((r) => setTimeout(r, 2500));
                     const poll = await api.get(`/analysis/jobs/${jobId}`);
                     const j = poll.data;
+                    finalJob = j;
                     if (j.status === "done") break;
                     if (j.status === "failed") {
                         throw new Error(
                             j.error || "Analysis failed. Please try again."
                         );
                     }
+                }
+                // Optimistic update from the job result so the row reflects the
+                // new verdict instantly — defends against any read-after-write
+                // lag in the /watchlist/live aggregation. Source of truth is
+                // still re-fetched below.
+                if (finalJob?.status === "done" && finalJob.result) {
+                    const r = finalJob.result;
+                    setItems((prev) =>
+                        prev.map((it) =>
+                            it.ticker === ticker
+                                ? {
+                                      ...it,
+                                      latest_analysis: {
+                                          recommendation: r.recommendation,
+                                          confidence_score: r.confidence_score,
+                                          created_at: r.created_at,
+                                      },
+                                  }
+                                : it
+                        )
+                    );
                 }
                 await fetchWatchlist();
                 await fetchAlerts();
