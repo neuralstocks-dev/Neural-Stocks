@@ -242,13 +242,37 @@ export default function DashboardPage() {
             setActionError("");
             setAnalyzingTicker(ticker);
             try {
-                await api.post(`/analysis/${ticker}?mode=${analyzeMode}`);
+                // Start-and-poll to avoid 30s production ingress timeout on
+                // slow tickers (esp. IDX .JK where RapidAPI enrichment adds
+                // latency). Pattern mirrors /analysis/quick/{kind}.
+                const start = await api.post(
+                    `/analysis/${ticker}/start?mode=${analyzeMode}`
+                );
+                const jobId = start.data.job_id;
+                const started = Date.now();
+                // Poll up to 3 minutes. Production ingress caps sync responses
+                // at 30s; background job has its own 120s budget on the server.
+                while (Date.now() - started < 180_000) {
+                    await new Promise((r) => setTimeout(r, 2500));
+                    const poll = await api.get(`/analysis/jobs/${jobId}`);
+                    const j = poll.data;
+                    if (j.status === "done") break;
+                    if (j.status === "failed") {
+                        throw new Error(
+                            j.error || "Analysis failed. Please try again."
+                        );
+                    }
+                }
                 await fetchWatchlist();
                 await fetchAlerts();
                 await fetchQuota();
             } catch (err) {
                 if (disclaimer.promptFromError(err)) return;
-                setActionError(errMessage(err?.response?.data?.detail, "Analysis failed"));
+                const msg =
+                    err?.response?.data?.detail ||
+                    err?.message ||
+                    "Analysis failed";
+                setActionError(errMessage(msg, "Analysis failed"));
             } finally {
                 setAnalyzingTicker(null);
             }

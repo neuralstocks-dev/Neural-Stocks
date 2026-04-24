@@ -28,6 +28,18 @@ QUICK_BATCH_SIZE = 3
 # Strong references to outstanding bg tasks so the GC doesn't drop them
 _BG_TASKS: set = set()
 
+
+async def _ensure_analysis_indexes():
+    """Wipe completed/failed analysis jobs after 1 hour — they're transient
+    scratchpads. Idempotent."""
+    try:
+        await db.analysis_jobs.create_index(
+            "started_at_ts",
+            expireAfterSeconds=3600,
+        )
+    except Exception:
+        pass
+
 # Supported analysis modes
 ANALYSIS_MODES = {"standard", "candlestick", "hybrid"}
 
@@ -189,6 +201,117 @@ async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
             ))
         except Exception:
             pass
+
+
+@router.post("/analysis/{ticker}/start")
+async def start_analysis(
+    ticker: str,
+    mode: str = Query("standard", description="Analysis mode: standard | candlestick | hybrid"),
+    user=Depends(get_current_user),
+):
+    """Kick off a single-ticker analysis in the background and return a
+    job_id immediately so the client can poll for completion.
+
+    Why: the full pipeline (RapidAPI IDX enrichment + yfinance + LLM) can
+    exceed 30s for some tickers, and the production ingress caps streaming
+    responses at ~30s → `POST /analysis/{ticker}` was returning 504 for
+    slow IDX tickers like BRMS.JK. Polling avoids the wall-clock limit
+    entirely. Mirrors the pattern used by `/analysis/quick/{kind}`.
+
+    Quota, disclaimer, and mode checks run synchronously so the client
+    gets an immediate 402/400 if they're over-quota. Only the expensive
+    pipeline is deferred.
+    """
+    t = (ticker or "").upper().strip()
+    if not t:
+        raise HTTPException(status_code=400, detail="Ticker is required")
+    await require_accepted(user)
+    m = (mode or "standard").lower()
+    if m not in ANALYSIS_MODES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid mode. Must be one of: {sorted(ANALYSIS_MODES)}",
+        )
+    await enforce_analysis_quota(user)
+    if is_idx_ticker(t):
+        from services.quota import enforce_idx_analysis_quota
+        await enforce_idx_analysis_quota(user)
+
+    job_id = str(uuid.uuid4())
+    await db.analysis_jobs.insert_one({
+        "id": job_id,
+        "user_id": user["id"],
+        "ticker": t,
+        "mode": m,
+        "status": "running",
+        "started_at": iso(now_utc()),
+        "started_at_ts": now_utc(),  # real datetime for Mongo TTL index
+        "finished_at": None,
+        "result": None,
+        "error": None,
+    })
+    task = asyncio.create_task(_run_single_analysis_job(job_id, t, m, user))
+    _BG_TASKS.add(task)
+    task.add_done_callback(_BG_TASKS.discard)
+    return {"job_id": job_id, "status": "running", "ticker": t, "mode": m}
+
+
+async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: dict):
+    """Background worker — writes result (or error) to db.analysis_jobs."""
+    try:
+        r = await asyncio.wait_for(
+            _create_analysis_impl(ticker, mode, user),
+            timeout=QUICK_PER_TASK_TIMEOUT,
+        )
+        await db.analysis_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "done",
+                "finished_at": iso(now_utc()),
+                "result": r,
+            }},
+        )
+    except asyncio.TimeoutError:
+        await db.analysis_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "failed",
+                "finished_at": iso(now_utc()),
+                "error": f"Analysis exceeded {int(QUICK_PER_TASK_TIMEOUT)}s timeout. Please try again.",
+            }},
+        )
+    except HTTPException as e:
+        detail = e.detail if isinstance(e.detail, str) else str(e.detail)
+        await db.analysis_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "failed",
+                "finished_at": iso(now_utc()),
+                "error": detail,
+                "status_code": e.status_code,
+            }},
+        )
+    except Exception as e:
+        await db.analysis_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "failed",
+                "finished_at": iso(now_utc()),
+                "error": str(e)[:500],
+            }},
+        )
+
+
+@router.get("/analysis/jobs/{job_id}")
+async def analysis_job_status(job_id: str, user=Depends(get_current_user)):
+    """Poll the status of an analysis job started via /analysis/{ticker}/start.
+    Client should call every 2-3s until status != 'running'."""
+    job = await db.analysis_jobs.find_one(
+        {"id": job_id, "user_id": user["id"]}, {"_id": 0, "user_id": 0}
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 @router.post("/analysis/{ticker}")

@@ -128,11 +128,39 @@ export default function AnalysisReportPage() {
             try {
                 // Re-analysis preserves the mode of the existing verdict (if any).
                 const effectiveMode = analysis?.mode || mode;
-                const r = await api.post(`/analysis/${t}?mode=${effectiveMode}`);
-                setAnalysis(r.data);
+                // Start-and-poll so long-running IDX/LLM pipelines don't hit
+                // the 30s production ingress cap.
+                const start = await api.post(
+                    `/analysis/${t}/start?mode=${effectiveMode}`
+                );
+                const jobId = start.data.job_id;
+                const started = Date.now();
+                let finalResult = null;
+                while (Date.now() - started < 180_000) {
+                    await new Promise((r) => setTimeout(r, 2500));
+                    const poll = await api.get(`/analysis/jobs/${jobId}`);
+                    const j = poll.data;
+                    if (j.status === "done") {
+                        finalResult = j.result;
+                        break;
+                    }
+                    if (j.status === "failed") {
+                        throw new Error(
+                            j.error || "Analysis failed. Please try again."
+                        );
+                    }
+                }
+                if (!finalResult) {
+                    throw new Error(
+                        "Analysis timed out after 3 minutes. Please try again."
+                    );
+                }
+                setAnalysis(finalResult);
             } catch (err) {
                 if (disclaimer.promptFromError(err)) return;
-                setError(errMessage(err?.response?.data?.detail, "Analysis failed"));
+                const msg =
+                    err?.response?.data?.detail || err?.message || "Analysis failed";
+                setError(errMessage(msg, "Analysis failed"));
             } finally {
                 setAnalyzing(false);
             }

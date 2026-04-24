@@ -62,6 +62,12 @@ async def start_background_tasks():
     _BG_TASKS.add(task)
     task.add_done_callback(_BG_TASKS.discard)
     logger.info("Started RF weekly retrain scheduler")
+    # Ensure TTL indexes (idempotent — no-op if already created).
+    try:
+        from routers.analysis import _ensure_analysis_indexes
+        await _ensure_analysis_indexes()
+    except Exception as e:
+        logger.warning("Failed to ensure analysis_jobs TTL index: %s", e)
 
 
 _BG_TASKS: set = set()
