@@ -85,6 +85,19 @@ async def list_users(limit: int = 200, _admin=Depends(admin_required)):
     )
     now = now_utc()
     day_ago = now - timedelta(days=1)
+    # Single aggregation: per-user lifetime analysis count + last-active
+    # timestamp. Avoids N round-trips (one per user) we'd otherwise need
+    # if we computed these separately. Returns docs of shape
+    # {_id: <user_id>, lifetime: <int>, last_at: <iso str>}.
+    eng_cursor = db.analyses.aggregate([
+        {"$group": {
+            "_id": "$user_id",
+            "lifetime": {"$sum": 1},
+            "last_at": {"$max": "$created_at"},
+        }},
+    ])
+    eng_by_user = {doc["_id"]: doc async for doc in eng_cursor}
+
     rows = []
     for u in users:
         base = _sanitize_user(u)
@@ -116,6 +129,10 @@ async def list_users(limit: int = 200, _admin=Depends(admin_required)):
             base["analyses_day_limit"] = None
             base["analyses_today"] = 0
             base["test_unlock_active"] = False
+        # Engagement metrics — lifetime analyses run + most recent activity.
+        eng = eng_by_user.get(u["id"]) or {}
+        base["lifetime_analyses"] = int(eng.get("lifetime") or 0)
+        base["last_active_at"] = eng.get("last_at")
         rows.append(base)
     return rows
 

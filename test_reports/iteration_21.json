@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 21 validates two unrelated enhancements. PART 1 (admin engagement columns) PASSES end-to-end: GET /api/admin/users returns new fields lifetime_analyses (int >=0) and last_active_at (ISO str or null) on every row, aggregation is internally consistent (lifetime==0 iff last_active_at==null, and users with prior analyses are timestamped correctly), and the /admin user table renders new 'LIFETIME' and 'LAST ACTIVE' columns between 'ANALYSES / DAY' and 'UNLOCK' with data-testid user-lifetime-{email} and user-last-active-{email} populated for all 200 visible users. Color coding verified: zero-activity rows render in muted grey rgb(148,163,184), last_active within 7d renders in green rgb(16,183,127) ('buy' hue). Amber (>=50 lifetime) branch could not be directly exercised because no user in the list currently has lifetime >= 50, but the code path is unchanged from the PR and static in AdminPage.jsx. All existing columns (Email/Plan/Analyses/Unlock/Logins/Last login/Actions) still present. PART 2 (QuickAnalyzeProgress floating panel) PASSES: clicking analyze-top-button immediately spawns [data-testid=quick-progress-panel-top] with 'Picking the top 3…' placeholder; within ~15-25s backend starts processing and the panel shows 3 ticker rows (TSLA/AAPL/BBCA.JK) with sequential states (Done w/ HOLD pill -> Analyzing spinner -> Queued). Counter [data-testid=quick-progress-counter] increments 0/3 -> 1/3 correctly. Panel fixed-positioned with z-index 50 in desktop, fits within the mobile 390px viewport (right=296 <= 390, max-width calc respected). Zero console errors across the full flow.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter21_admin_engagement.py",
+    "/app/test_reports/pytest/iteration21_admin_engagement.xml"
+  ],
+  "action_items": [
+    "(Doc-only, not a bug) Review request used testid names 'quick-top-button' / 'quick-bottom-button', but the actual implementation uses 'analyze-top-button' / 'analyze-bottom-button' (DashboardPage.jsx:746, :764). The floating panel testids 'quick-progress-panel-top/-bottom', 'quick-progress-row-{ticker}', and 'quick-progress-counter' ARE present and correct. If external QA specs reference 'quick-top-button', either update specs or rename the dashboard testids for consistency.",
+    "(Minor coverage gap, low priority) No seeded user has lifetime_analyses >= 50 in this environment, so the amber 'hold' tint branch for power users was not directly rendered during test. Logic is static in AdminPage.jsx (>=50 => hsl(var(--hold))) and does not require runtime verification."
+  ],
+  "critical_code_review_comments": [
+    "backend/routers/admin.py — uses a single $group aggregation over db.analyses and then in-memory joins per user (eng_by_user dict). Efficient and correct. No ObjectId leak. No regression risk.",
+    "frontend/src/components/QuickAnalyzeProgress.jsx — clean, self-contained, reads the live job shape as documented. The 'first analyzed not yet in results' heuristic for currentTicker correctly handles backend's sequential processing. Auto-dismiss (4s after status=done) is managed by parent DashboardPage.jsx timeout — verified panel persists until completion.",
+    "frontend/src/pages/AdminPage.jsx:988 — color for last_active compares Date.now() - new Date(u.last_active_at).getTime(); robust against both ISO strings and null. Good defensive `??` fallbacks on lifetime_analyses."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter21_admin_engagement.py (new)"
+  ],
+  "success_rate": {
+    "backend": "4/4 executed tests PASS (1 skipped because tiers@demo.io not present in current seed)",
+    "frontend": "All 9 atomic checks PASS — headers present, 200 testids rendered, color-coding correct for present data, panel spawn, row population, sequential state transitions, counter increment, mobile positioning, zero console errors"
+  },
+  "test_credentials": "Admin: jolor69@gmail.com / admin1234",
+  "seed_data_creation": "None. One Top-3 quick-analyze job was started during testing against admin's 4-ticker watchlist; the backend job completed TSLA (HOLD) during the test window. Normal admin analyses quota (unlimited) was used.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Both iter 21 features are shipping-ready. Minor doc/testid naming inconsistency noted (analyze-top-button vs quick-top-button in spec). For Part 1, the amber branch (lifetime>=50) wasn't exercised in runtime but is in the JSX; if ever needed, seed one user with 50+ analyses to see gold tint. For Part 2, the 4s auto-dismiss was inferred from parent component (not waited through) — if a future test wants to strictly verify, run for ~130s after click and confirm quick-progress-panel-top count drops to 0.",
+  "rca of the issue": "N/A — no defects found in this iteration."
+}

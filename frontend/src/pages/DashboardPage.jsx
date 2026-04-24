@@ -6,6 +6,7 @@ import AddStockModal from "@/components/AddStockModal";
 import TimelineFitModal from "@/components/TimelineFitModal";
 import Sparkline from "@/components/Sparkline";
 import SignalBadge from "@/components/SignalBadge";
+import QuickAnalyzeProgress from "@/components/QuickAnalyzeProgress";
 import TestUnlockBanner from "@/components/TestUnlockBanner";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import AnalysisModeSelector from "@/components/AnalysisModeSelector";
@@ -272,6 +273,10 @@ export default function DashboardPage() {
     const [analyzingTicker, setAnalyzingTicker] = useState(null);
     const [revealedTicker, setRevealedTicker] = useState(null);
     const [quickBusy, setQuickBusy] = useState(null); // 'top' | 'bottom' | null
+    // Live job state for the floating QuickAnalyzeProgress panel. Set to
+    // a polled job snapshot during a Top/Bottom 3 sweep, then cleared 4s
+    // after completion (or instantly on error).
+    const [quickJobState, setQuickJobState] = useState(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [timelineTicker, setTimelineTicker] = useState(null);
     const [actionError, setActionError] = useState("");
@@ -496,6 +501,11 @@ export default function DashboardPage() {
         disclaimer.ensureAccepted(async () => {
             setActionError("");
             setQuickBusy(kind);
+            // Reset live state and immediately surface the floating panel.
+            // Backend updates `analyzed` (selected tickers) within ~1s, so
+            // the panel transitions from "Picking the top 3…" to per-ticker
+            // rows almost instantly.
+            setQuickJobState({ status: "running", analyzed: [], results: [], progress: { total: 0, completed: 0, timed_out: 0, errored: 0 } });
             try {
                 const start = await api.post(`/analysis/quick/${kind}`);
                 const jobId = start.data.job_id;
@@ -510,6 +520,9 @@ export default function DashboardPage() {
                     await new Promise((r) => setTimeout(r, 2500));
                     const p = await api.get(`/analysis/quick/jobs/${jobId}`);
                     last = p.data;
+                    // Push the latest job snapshot to the floating panel so
+                    // each newly-completed ticker animates in real-time.
+                    setQuickJobState(last);
                     if (last.status === "done" || last.status === "failed") break;
                 }
                 if (last?.status === "failed") {
@@ -525,9 +538,13 @@ export default function DashboardPage() {
                 await fetchWatchlist();
                 await fetchAlerts();
                 await fetchQuota();
+                // Auto-dismiss the panel 4s after completion so users can
+                // glance at the final state before it slides away.
+                setTimeout(() => setQuickJobState(null), 4000);
             } catch (err) {
                 if (disclaimer.promptFromError(err)) return;
                 setActionError(errMessage(err?.response?.data?.detail, err?.message || "Quick analysis failed"));
+                setQuickJobState(null);
             } finally {
                 setQuickBusy(null);
             }
@@ -1053,6 +1070,10 @@ export default function DashboardPage() {
                     </div>
                 </section>
             </div>
+            {/* Floating live progress panel during Quick Analyze (Top/Bottom 3) */}
+            {quickJobState && (
+                <QuickAnalyzeProgress kind={quickBusy || "top"} jobState={quickJobState} />
+            )}
         </AppShell>
     );
 }

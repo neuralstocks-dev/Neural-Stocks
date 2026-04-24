@@ -850,7 +850,7 @@ export default function AdminPage() {
                                 <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
                                     <thead>
                                         <tr>
-                                            {["", "Email", "Plan", "Analyses / day", "Unlock", "Logins", "Last login", "Actions"].map(
+                                            {["", "Email", "Plan", "Analyses / day", "Lifetime", "Last active", "Unlock", "Logins", "Last login", "Actions"].map(
                                                 (h, idx) => (
                                                     <th
                                                         key={h || `col-${idx}`}
@@ -962,6 +962,40 @@ export default function AdminPage() {
                                                                 </span>
                                                             );
                                                         })()}
+                                                    </td>
+                                                    <td
+                                                        className="py-3 px-4 font-mono text-xs"
+                                                        data-testid={`user-lifetime-${u.email}`}
+                                                        style={{
+                                                            // Tint power users (≥50 lifetime) gold so they pop visually.
+                                                            color:
+                                                                (u.lifetime_analyses ?? 0) >= 50
+                                                                    ? "hsl(var(--hold))"
+                                                                    : "hsl(var(--text-secondary))",
+                                                        }}
+                                                    >
+                                                        {(u.lifetime_analyses ?? 0).toLocaleString()}
+                                                    </td>
+                                                    <td
+                                                        className="py-3 px-4 font-mono text-xs"
+                                                        data-testid={`user-last-active-${u.email}`}
+                                                        style={{
+                                                            // Engagement traffic-light: never active = grey,
+                                                            // last activity within 7 days = green ("active"),
+                                                            // 7-30 days = amber ("cooling"), >30 days = red
+                                                            // ("at-risk / churned"). Helps admin spot users who
+                                                            // were once heavy users but are slipping away.
+                                                            color: (() => {
+                                                                if (!u.last_active_at) return "hsl(var(--text-muted))";
+                                                                const ageMs = Date.now() - new Date(u.last_active_at).getTime();
+                                                                const days = ageMs / 86_400_000;
+                                                                if (days <= 7) return "hsl(var(--buy))";
+                                                                if (days <= 30) return "hsl(var(--hold))";
+                                                                return "hsl(var(--sell))";
+                                                            })(),
+                                                        }}
+                                                    >
+                                                        {u.last_active_at ? timeAgo(u.last_active_at) : "—"}
                                                     </td>
                                                     <td className="py-3 px-4 font-mono text-xs">
                                                         {unlocked ? (
