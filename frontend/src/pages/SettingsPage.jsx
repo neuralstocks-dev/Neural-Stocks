@@ -206,6 +206,26 @@ export default function SettingsPage() {
         }
     };
 
+    /**
+     * Apply a partial quiet-hours update. Backend merges over existing
+     * fields, so the user can flip enabled / hours / tz independently.
+     */
+    const setQuietHours = async (patch) => {
+        if (!tgPrefs) return;
+        const nextQh = { ...(tgPrefs.quiet_hours || {}), ...patch };
+        setTgPrefsErr("");
+        setTgPrefsBusy(true);
+        setTgPrefs({ ...tgPrefs, quiet_hours: nextQh });
+        try {
+            await api.post("/telegram/preferences", { quiet_hours: patch });
+        } catch (e) {
+            setTgPrefsErr(e?.response?.data?.detail || "Failed to save quiet hours.");
+            await loadTgPrefs();
+        } finally {
+            setTgPrefsBusy(false);
+        }
+    };
+
     return (
         <AppShell user={user}>
             <div className="max-w-[900px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="settings-page">
@@ -468,6 +488,124 @@ export default function SettingsPage() {
                                                 <X size={11} className="inline mr-1" /> {tgPrefsErr}
                                             </p>
                                         )}
+
+                                        {/* Quiet hours */}
+                                        <div
+                                            className="mt-7 pt-5"
+                                            style={{ borderTop: "1px dashed hsl(var(--border-default))" }}
+                                            data-testid="tg-quiet-hours"
+                                        >
+                                            <div className="flex items-start justify-between gap-3 flex-wrap">
+                                                <div className="min-w-0">
+                                                    <p
+                                                        className="text-overline"
+                                                        style={{ fontSize: "0.56rem", color: "hsl(var(--text-muted))" }}
+                                                    >
+                                                        Quiet hours
+                                                    </p>
+                                                    <p
+                                                        className="text-xs mt-1 max-w-md"
+                                                        style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.55 }}
+                                                    >
+                                                        During this window, even <em>realtime</em> alerts are silently
+                                                        deferred into your next daily digest — so you don't get buzzed
+                                                        at 3am when the IDX market moves.
+                                                    </p>
+                                                </div>
+                                                <Switch
+                                                    checked={!!tgPrefs.quiet_hours?.enabled}
+                                                    disabled={tgPrefsBusy}
+                                                    onCheckedChange={(v) => setQuietHours({ enabled: v })}
+                                                    data-testid="tg-qh-enabled-toggle"
+                                                />
+                                            </div>
+                                            {tgPrefs.quiet_hours?.enabled && (
+                                                <div
+                                                    className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-md"
+                                                    data-testid="tg-qh-window"
+                                                >
+                                                    <div>
+                                                        <p className="text-overline" style={{ fontSize: "0.52rem", color: "hsl(var(--text-muted))" }}>
+                                                            Start
+                                                        </p>
+                                                        <select
+                                                            value={tgPrefs.quiet_hours.start_hour}
+                                                            onChange={(e) => setQuietHours({ start_hour: parseInt(e.target.value, 10) })}
+                                                            disabled={tgPrefsBusy}
+                                                            data-testid="tg-qh-start"
+                                                            className="font-mono text-xs px-2 py-1.5 mt-1 w-full"
+                                                            style={{
+                                                                background: "hsl(var(--surface-elevated))",
+                                                                color: "hsl(var(--text-primary))",
+                                                                border: "1px solid hsl(var(--border-default))",
+                                                            }}
+                                                        >
+                                                            {Array.from({ length: 24 }, (_, h) => (
+                                                                <option key={h} value={h}>
+                                                                    {String(h).padStart(2, "0")}:00
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-overline" style={{ fontSize: "0.52rem", color: "hsl(var(--text-muted))" }}>
+                                                            End
+                                                        </p>
+                                                        <select
+                                                            value={tgPrefs.quiet_hours.end_hour}
+                                                            onChange={(e) => setQuietHours({ end_hour: parseInt(e.target.value, 10) })}
+                                                            disabled={tgPrefsBusy}
+                                                            data-testid="tg-qh-end"
+                                                            className="font-mono text-xs px-2 py-1.5 mt-1 w-full"
+                                                            style={{
+                                                                background: "hsl(var(--surface-elevated))",
+                                                                color: "hsl(var(--text-primary))",
+                                                                border: "1px solid hsl(var(--border-default))",
+                                                            }}
+                                                        >
+                                                            {Array.from({ length: 24 }, (_, h) => (
+                                                                <option key={h} value={h}>
+                                                                    {String(h).padStart(2, "0")}:00
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="col-span-2 sm:col-span-1">
+                                                        <p className="text-overline" style={{ fontSize: "0.52rem", color: "hsl(var(--text-muted))" }}>
+                                                            Timezone
+                                                        </p>
+                                                        <select
+                                                            value={tgPrefs.quiet_hours.tz}
+                                                            onChange={(e) => setQuietHours({ tz: e.target.value })}
+                                                            disabled={tgPrefsBusy}
+                                                            data-testid="tg-qh-tz"
+                                                            className="font-mono text-xs px-2 py-1.5 mt-1 w-full"
+                                                            style={{
+                                                                background: "hsl(var(--surface-elevated))",
+                                                                color: "hsl(var(--text-primary))",
+                                                                border: "1px solid hsl(var(--border-default))",
+                                                            }}
+                                                        >
+                                                            {[
+                                                                "UTC",
+                                                                "America/New_York",
+                                                                "America/Los_Angeles",
+                                                                "Europe/London",
+                                                                "Europe/Berlin",
+                                                                "Asia/Jakarta",
+                                                                "Asia/Singapore",
+                                                                "Asia/Tokyo",
+                                                                "Australia/Sydney",
+                                                            ].map((tz) => (
+                                                                <option key={tz} value={tz}>
+                                                                    {tz}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </>
                                 )}
                             </div>

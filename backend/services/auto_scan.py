@@ -151,14 +151,15 @@ async def _scan_user(user: dict, market_df: dict) -> int:
         try:
             user_doc = await db.users.find_one(
                 {"id": user_id},
-                {"_id": 0, "telegram_alert_types": 1, "telegram_alert_schedule": 1},
+                {"_id": 0, "telegram_alert_types": 1, "telegram_alert_schedule": 1, "telegram_quiet_hours": 1},
             ) or {}
             allowed_types = user_doc.get("telegram_alert_types")
             if allowed_types is None or "rf_watchlist_scan" in allowed_types:
-                from routers.telegram import _hydrate_schedule
+                from routers.telegram import _hydrate_schedule, _hydrate_quiet_hours, is_in_quiet_hours
                 from services.digest_pusher import queue_alert
                 schedule = _hydrate_schedule(user_doc.get("telegram_alert_schedule")).get("rf_watchlist_scan", "realtime")
-                if schedule == "realtime":
+                qh = _hydrate_quiet_hours(user_doc.get("telegram_quiet_hours"))
+                if schedule == "realtime" and not is_in_quiet_hours(qh):
                     await send_alert_to_user(user_id, title, body, ticker=ticker)
                 else:
                     await queue_alert(user_id, "rf_watchlist_scan", ticker=ticker, title=title, body=body)
