@@ -24,6 +24,18 @@ export default function SettingsPage() {
     const [digest, setDigest] = useState(null);
     const [digestBusy, setDigestBusy] = useState(false);
     const [digestErr, setDigestErr] = useState("");
+    const [tgPrefs, setTgPrefs] = useState(null);
+    const [tgPrefsBusy, setTgPrefsBusy] = useState(false);
+    const [tgPrefsErr, setTgPrefsErr] = useState("");
+
+    const loadTgPrefs = useCallback(async () => {
+        try {
+            const r = await api.get("/telegram/preferences");
+            setTgPrefs(r.data);
+        } catch {
+            // non-fatal
+        }
+    }, []);
 
     const loadAutoScan = useCallback(async () => {
         try {
@@ -57,7 +69,8 @@ export default function SettingsPage() {
         loadStatus();
         loadAutoScan();
         loadDigest();
-    }, [loadStatus, loadAutoScan, loadDigest]);
+        loadTgPrefs();
+    }, [loadStatus, loadAutoScan, loadDigest, loadTgPrefs]);
 
     const beginLink = async () => {
         setErr("");
@@ -99,6 +112,7 @@ export default function SettingsPage() {
         setTg({ ...tg, linked: false });
         setMsg("Unlinked from Telegram.");
         loadAutoScan();
+        loadTgPrefs();
     };
 
     const sendTest = async () => {
@@ -143,6 +157,32 @@ export default function SettingsPage() {
             setDigestErr(e?.response?.data?.detail || "Failed to update Weekly Digest preference.");
         } finally {
             setDigestBusy(false);
+        }
+    };
+
+    /**
+     * Toggle a single value inside one of the Telegram preference lists.
+     * `kind` is "alert_types" or "alert_modes". The full updated list is
+     * sent to POST /telegram/preferences which validates the subset.
+     */
+    const toggleTgPref = async (kind, value) => {
+        if (!tgPrefs) return;
+        const current = tgPrefs[kind] || [];
+        const next = current.includes(value)
+            ? current.filter((v) => v !== value)
+            : [...current, value];
+        setTgPrefsErr("");
+        setTgPrefsBusy(true);
+        // Optimistic update so the chip flips instantly
+        setTgPrefs({ ...tgPrefs, [kind]: next });
+        try {
+            await api.post("/telegram/preferences", { [kind]: next });
+        } catch (e) {
+            setTgPrefsErr(e?.response?.data?.detail || "Failed to save preference.");
+            // Roll back on failure
+            await loadTgPrefs();
+        } finally {
+            setTgPrefsBusy(false);
         }
     };
 
@@ -222,8 +262,9 @@ export default function SettingsPage() {
                     ) : tg?.linked ? (
                         <>
                             <p className="mt-4 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                                You are linked{tg.telegram_username ? ` as @${tg.telegram_username}` : ""}. All
-                                pattern alerts and verdict notifications will be pushed to your Telegram chat.
+                                You are linked{tg.telegram_username ? ` as @${tg.telegram_username}` : ""}. By default,
+                                every alert and every analysis mode is pushed to your Telegram chat. Use the filters
+                                below to narrow it down.
                             </p>
                             <div className="flex items-center gap-3 mt-5 flex-wrap">
                                 <button
@@ -241,6 +282,142 @@ export default function SettingsPage() {
                                 >
                                     <Unlink size={12} strokeWidth={1.5} /> Unlink
                                 </button>
+                            </div>
+
+                            {/* Telegram alert filters */}
+                            <div
+                                className="mt-7 pt-6"
+                                style={{ borderTop: "1px solid hsl(var(--border-default))" }}
+                                data-testid="telegram-prefs"
+                            >
+                                <p
+                                    className="text-overline"
+                                    style={{ color: "hsl(var(--hold))" }}
+                                >
+                                    Filter what reaches your Telegram
+                                </p>
+                                <p
+                                    className="text-sm mt-2 mb-5 max-w-xl"
+                                    style={{ color: "hsl(var(--text-secondary))" }}
+                                >
+                                    These filters only affect Telegram pushes — your in-app Signal Feed at{" "}
+                                    <Link
+                                        to="/alerts"
+                                        className="underline"
+                                        style={{ color: "hsl(var(--text-primary))" }}
+                                    >
+                                        /alerts
+                                    </Link>{" "}
+                                    always shows everything.
+                                </p>
+
+                                {!tgPrefs ? (
+                                    <p className="text-sm font-mono" style={{ color: "hsl(var(--text-muted))" }}>
+                                        <Loader2 size={12} className="animate-spin inline mr-2" />
+                                        Loading filters…
+                                    </p>
+                                ) : (
+                                    <>
+                                        {/* Alert type filters */}
+                                        <p
+                                            className="text-overline"
+                                            style={{ fontSize: "0.56rem", color: "hsl(var(--text-muted))" }}
+                                        >
+                                            Alert channels
+                                        </p>
+                                        <div className="flex flex-wrap gap-2 mt-2" data-testid="tg-alert-types-row">
+                                            {[
+                                                { key: "signal", label: "AI Verdicts (BUY/SELL ≥75%)" },
+                                                { key: "pattern", label: "Pattern Scans" },
+                                                { key: "rf_watchlist_scan", label: "RF Auto-Scan" },
+                                            ].map((t) => {
+                                                const active = (tgPrefs.alert_types || []).includes(t.key);
+                                                return (
+                                                    <button
+                                                        key={t.key}
+                                                        onClick={() => toggleTgPref("alert_types", t.key)}
+                                                        disabled={tgPrefsBusy}
+                                                        data-testid={`tg-type-toggle-${t.key}`}
+                                                        className="font-mono text-xs px-3 py-1.5 transition-colors"
+                                                        style={{
+                                                            background: active
+                                                                ? "hsl(var(--buy-bg))"
+                                                                : "hsl(var(--surface-elevated))",
+                                                            color: active
+                                                                ? "hsl(var(--buy))"
+                                                                : "hsl(var(--text-muted))",
+                                                            border: `1px solid ${
+                                                                active ? "hsl(var(--buy))" : "hsl(var(--border-default))"
+                                                            }`,
+                                                            letterSpacing: "0.06em",
+                                                        }}
+                                                    >
+                                                        {active ? <Check size={11} className="inline mr-1.5" strokeWidth={2.5} /> : null}
+                                                        {t.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Analysis mode filters */}
+                                        <p
+                                            className="text-overline mt-6"
+                                            style={{ fontSize: "0.56rem", color: "hsl(var(--text-muted))" }}
+                                        >
+                                            Analysis modes
+                                        </p>
+                                        <p
+                                            className="text-xs mt-1 mb-2"
+                                            style={{ color: "hsl(var(--text-muted))" }}
+                                        >
+                                            Only push verdicts run in these modes. (RF Auto-Scan is unaffected — it
+                                            has no mode.)
+                                        </p>
+                                        <div className="flex flex-wrap gap-2" data-testid="tg-alert-modes-row">
+                                            {[
+                                                { key: "standard", label: "Standard" },
+                                                { key: "candlestick", label: "Candlestick" },
+                                                { key: "hybrid", label: "Hybrid (recommended)" },
+                                            ].map((m) => {
+                                                const active = (tgPrefs.alert_modes || []).includes(m.key);
+                                                return (
+                                                    <button
+                                                        key={m.key}
+                                                        onClick={() => toggleTgPref("alert_modes", m.key)}
+                                                        disabled={tgPrefsBusy}
+                                                        data-testid={`tg-mode-toggle-${m.key}`}
+                                                        className="font-mono text-xs px-3 py-1.5 transition-colors"
+                                                        style={{
+                                                            background: active
+                                                                ? "hsl(var(--buy-bg))"
+                                                                : "hsl(var(--surface-elevated))",
+                                                            color: active
+                                                                ? "hsl(var(--buy))"
+                                                                : "hsl(var(--text-muted))",
+                                                            border: `1px solid ${
+                                                                active ? "hsl(var(--buy))" : "hsl(var(--border-default))"
+                                                            }`,
+                                                            letterSpacing: "0.06em",
+                                                        }}
+                                                    >
+                                                        {active ? <Check size={11} className="inline mr-1.5" strokeWidth={2.5} /> : null}
+                                                        {m.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {tgPrefsErr && (
+                                            <p
+                                                className="mt-3 text-xs font-mono"
+                                                style={{ color: "hsl(var(--sell))" }}
+                                                data-testid="tg-prefs-error"
+                                            >
+                                                <X size={11} className="inline mr-1" /> {tgPrefsErr}
+                                            </p>
+                                        )}
+                                    </>
+                                )}
                             </div>
                         </>
                     ) : linkCode ? (

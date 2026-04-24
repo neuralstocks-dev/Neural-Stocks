@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 22 validates the hybrid-mode Telegram alert bug fix + new /telegram/preferences endpoints + Settings UI chip filter section. BACKEND: 9/9 pytest cases PASS end-to-end (56.8s). GET /api/telegram/preferences returns the documented shape {alert_types, alert_modes, all_alert_types, all_alert_modes} with constant references matching ALERT_TYPES=['signal','pattern','rf_watchlist_scan'] and ALERT_MODES=['standard','candlestick','hybrid']; a fresh user (demo@stockai.io) correctly defaults to all-3 / all-3. POST accepts valid subsets ({alert_types:['signal']}, {alert_modes:['hybrid','candlestick']}) and fields persist independently on subsequent GETs. POST rejects invalid values with 400 and detail mentioning the canonical set for all three cases (bogus type, xyz mode, non-list input). Hybrid-mode bug fix VERIFIED LIVE: admin ran NVDA in hybrid mode via POST /api/analysis/NVDA/start?mode=hybrid, job completed (≈48s), produced BUY/SELL ≥75%, and the resulting db.alerts row has mode='hybrid' (not 'standard' as before). Filter enforcement path smoke-tested by restricting types to rf_watchlist_scan and re-querying — no crash, POST/GET roundtrip succeeds. Admin prefs reset to all-enabled at module teardown. FRONTEND: All 9 UI checks PASS with zero console errors. Admin /settings renders [data-testid=telegram-prefs] with disclaimer 'These filters only affect Telegram pushes' + /alerts link; 3 tg-type-toggle-* chips (signal/pattern/rf_watchlist_scan) + 3 tg-mode-toggle-* chips (standard/candlestick/hybrid) are all initially active (green w/ check icon). Clicking 'signal' chip flips visually (optimistic update, check icon removed), POST /telegram/preferences fires, and the off state persists after page reload. Re-click re-enables. At mobile 390px viewport, both chip rows wrap cleanly inside the 390px viewport (row width=300px at x=45, no horizontal overflow). Freshly logged-in unlinked user (demo@stockai.io) sees the telegram-prefs section HIDDEN (count=0), confirming the gating works.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter22_telegram_prefs.py",
+    "/app/test_reports/pytest/iteration22_telegram_prefs.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/routers/telegram.py — GET/POST /preferences are clean, defensive (excludes _id projection, validates against constant lists, handles null defaults). No ObjectId leaks. Good.",
+    "backend/routers/analysis.py:174-218 — _maybe_create_alert now correctly receives `mode` param from _create_analysis_impl:529 and both persists `mode` on the db.alerts row AND passes the human-readable 'Mode: {mode}' line to Telegram. Filter gates by both telegram_alert_types and telegram_alert_modes with None-means-allow semantics preserved for backward compat. Pattern-scan push at line 910 correctly only gates on alert_types (patterns have no mode). Fix is complete and symmetric across signal + pattern + rf_watchlist_scan channels.",
+    "frontend/src/pages/SettingsPage.jsx:27-38, 287-410 — tgPrefs loaded in parallel with other settings, chip styles use semantic CSS vars (--buy/--buy-bg/--text-muted), disabled during POST, optimistic update pattern is correct (local state updated before await for snappy UX). Mobile-safe — uses flex-wrap gap-2 container.",
+    "Nit (not blocking): The toggleTgPref reloads the full prefs on failure but has no visible error toast surfaced to the user beyond the inline tgPrefsErr text; consider elevating to a toast on the next polish pass. Current behavior is acceptable."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter22_telegram_prefs.py (new)"
+  ],
+  "success_rate": {
+    "backend": "9/9 PASS (100%)",
+    "frontend": "9/9 PASS (100%) — zero console errors"
+  },
+  "test_credentials": "Admin: jolor69@gmail.com / admin1234 (Telegram linked as @joelord69). Free user (unlinked): demo@stockai.io / demo1234.",
+  "seed_data_creation": "One live hybrid-mode analysis was fired against NVDA on admin's account to verify the db.alerts.mode field gets populated correctly. Alert row created with mode='hybrid' as expected. Admin's telegram_alert_types and telegram_alert_modes were toggled during testing but restored to the full defaults (all 3 types, all 3 modes) at module teardown — confirmed via a final toggle-back pass in the Playwright script.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Both the bug fix (analysis mode correctly persisted on signal alert rows) and the new feature (Telegram alert filter chips in Settings) are shipping-ready. Admin's Telegram prefs were explicitly reset to all-enabled at test end, so the next iteration starts from a clean state. Pattern-alert filter path (alert_types=['rf_watchlist_scan'] with a pattern scan triggering) and rf_watchlist_scan push path were verified by code inspection only (not runtime) because triggering them requires specific market data + auto-scan job invocation; both follow the same None-means-allow pattern as the signal path and the unit code is symmetric. Live Telegram outbound push was not intercepted (would require MITM); fire-and-forget task is verified by absence of exceptions in backend logs.",
+  "rca of the issue": "Original bug: _maybe_create_alert received the raw LLM dict (which has no 'mode' key) instead of the merged analysis doc, so the alert row was missing the `mode` field and Telegram push hardcoded 'Mode: Standard'. Fix: added `mode: str = 'standard'` param to _maybe_create_alert, call site in _create_analysis_impl passes `mode=mode`, alert row stores `mode`, and Telegram message uses `mode.capitalize()`. Verified live: NVDA hybrid → alert.mode == 'hybrid' in Mongo."
+}

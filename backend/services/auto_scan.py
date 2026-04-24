@@ -145,9 +145,16 @@ async def _scan_user(user: dict, market_df: dict) -> int:
             "read": False,
             "created_at": iso(now_utc()),
         })
-        # Fire Telegram push (best-effort)
+        # Fire Telegram push (best-effort, gated by user prefs).
+        # Filter rule: respect `telegram_alert_types`. Default = all types.
         try:
-            await send_alert_to_user(user_id, title, body, ticker=ticker)
+            user_doc = await db.users.find_one(
+                {"id": user_id},
+                {"_id": 0, "telegram_alert_types": 1},
+            ) or {}
+            allowed_types = user_doc.get("telegram_alert_types")
+            if allowed_types is None or "rf_watchlist_scan" in allowed_types:
+                await send_alert_to_user(user_id, title, body, ticker=ticker)
         except Exception as e:
             logger.warning("auto_scan: telegram send failed for user %s: %s", user_id, e)
         sent += 1

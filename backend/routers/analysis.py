@@ -171,7 +171,7 @@ async def _get_rf_market_snapshot() -> dict | None:
     return _MARKET_CACHE.get("payload")  # stale is better than nothing
 
 
-async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
+async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict, mode: str = "standard"):
     rec = analysis.get("recommendation")
     conf = int(analysis.get("confidence_score", 0))
     if rec in ("BUY", "SELL") and conf >= 75:
@@ -186,17 +186,32 @@ async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict):
             "message": analysis.get("executive_summary", ""),
             "read": False,
             "created_at": iso(now_utc()),
+            "mode": mode,
         })
-        # Fire-and-forget Telegram push (if linked)
+        # Fire-and-forget Telegram push (if linked + user prefs allow it).
+        # Filter rules: per-user `telegram_alert_types` (default: all) and
+        # `telegram_alert_modes` (default: all) gate which alerts reach
+        # Telegram. The raw alert is always written to db.alerts so the
+        # in-app feed stays complete; only the Telegram push is filtered.
         try:
+            user = await db.users.find_one(
+                {"id": user_id},
+                {"_id": 0, "telegram_alert_types": 1, "telegram_alert_modes": 1},
+            ) or {}
+            allowed_types = user.get("telegram_alert_types")
+            allowed_modes = user.get("telegram_alert_modes")
+            if allowed_types is not None and "signal" not in allowed_types:
+                return
+            if allowed_modes is not None and mode not in allowed_modes:
+                return
             from services.telegram import send_alert_to_user
             target = analysis.get("price_target")
             target_line = f"\nTarget: ${target}" if target else ""
-            mode = (analysis.get("mode") or "standard").capitalize()
+            mode_label = (mode or "standard").capitalize()
             asyncio.create_task(send_alert_to_user(
                 user_id,
                 f"{rec} · {ticker} · {conf}%",
-                f"{analysis.get('executive_summary', '')}{target_line}\n\nMode: {mode}",
+                f"{analysis.get('executive_summary', '')}{target_line}\n\nMode: {mode_label}",
                 ticker=ticker,
             ))
         except Exception:
@@ -511,7 +526,7 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     await db.analyses.insert_one(doc)
     doc.pop("_id", None)
     if not is_anon:
-        await _maybe_create_alert(user["id"], ticker, analysis)
+        await _maybe_create_alert(user["id"], ticker, analysis, mode=mode)
     return doc
 
 
@@ -892,15 +907,22 @@ async def scan_watchlist_patterns(user=Depends(get_current_user)):
             "created_at": now_iso,
         })
         alerts_created += 1
-        # Fire-and-forget Telegram push (if user is linked)
+        # Fire-and-forget Telegram push (if user is linked + prefs allow).
+        # See _maybe_create_alert for the filter contract.
         try:
-            from services.telegram import send_alert_to_user
-            asyncio.create_task(send_alert_to_user(
-                user["id"],
-                f"{best['pattern']} · {ticker}",
-                f"{best['bias'].upper()} on {best['timeframe']} · strength {best['strength']}\n\n{best.get('explanation', '')}",
-                ticker=ticker,
-            ))
+            user_doc = await db.users.find_one(
+                {"id": user["id"]},
+                {"_id": 0, "telegram_alert_types": 1},
+            ) or {}
+            allowed_types = user_doc.get("telegram_alert_types")
+            if allowed_types is None or "pattern" in allowed_types:
+                from services.telegram import send_alert_to_user
+                asyncio.create_task(send_alert_to_user(
+                    user["id"],
+                    f"{best['pattern']} · {ticker}",
+                    f"{best['bias'].upper()} on {best['timeframe']} · strength {best['strength']}\n\n{best.get('explanation', '')}",
+                    ticker=ticker,
+                ))
         except Exception:
             pass
 

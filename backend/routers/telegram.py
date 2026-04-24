@@ -47,3 +47,55 @@ async def send_test(user=Depends(get_current_user)):
     if not ok:
         raise HTTPException(status_code=400, detail="Not linked to Telegram yet, or send failed.")
     return {"sent": True}
+
+
+
+# ─── Alert preferences ──────────────────────────────────────────────────
+ALERT_TYPES = ["signal", "pattern", "rf_watchlist_scan"]
+ALERT_MODES = ["standard", "candlestick", "hybrid"]
+
+
+@router.get("/preferences")
+async def get_preferences(user=Depends(get_current_user)):
+    """Return the user's Telegram alert filter preferences. Both fields
+    default to "all enabled" for backward compatibility — existing users
+    keep receiving everything until they explicitly opt out."""
+    from core.db import db
+    u = await db.users.find_one(
+        {"id": user["id"]},
+        {"_id": 0, "telegram_alert_types": 1, "telegram_alert_modes": 1},
+    ) or {}
+    return {
+        "alert_types": u.get("telegram_alert_types") if u.get("telegram_alert_types") is not None else list(ALERT_TYPES),
+        "alert_modes": u.get("telegram_alert_modes") if u.get("telegram_alert_modes") is not None else list(ALERT_MODES),
+        "all_alert_types": list(ALERT_TYPES),
+        "all_alert_modes": list(ALERT_MODES),
+    }
+
+
+@router.post("/preferences")
+async def set_preferences(payload: dict, user=Depends(get_current_user)):
+    """Persist the user's Telegram alert filter preferences. Each list
+    must be a subset of the canonical ALERT_TYPES / ALERT_MODES — anything
+    else is rejected so the DB never holds invalid filter values."""
+    types_in = payload.get("alert_types")
+    modes_in = payload.get("alert_modes")
+    update: dict = {}
+    if types_in is not None:
+        if not isinstance(types_in, list) or any(t not in ALERT_TYPES for t in types_in):
+            raise HTTPException(
+                status_code=400,
+                detail=f"alert_types must be a subset of {ALERT_TYPES}",
+            )
+        update["telegram_alert_types"] = list(types_in)
+    if modes_in is not None:
+        if not isinstance(modes_in, list) or any(m not in ALERT_MODES for m in modes_in):
+            raise HTTPException(
+                status_code=400,
+                detail=f"alert_modes must be a subset of {ALERT_MODES}",
+            )
+        update["telegram_alert_modes"] = list(modes_in)
+    if update:
+        from core.db import db
+        await db.users.update_one({"id": user["id"]}, {"$set": update})
+    return {"ok": True, **update}
