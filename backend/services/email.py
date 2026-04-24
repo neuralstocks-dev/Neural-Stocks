@@ -1,6 +1,7 @@
 """Transactional email via Resend."""
 import asyncio
 import logging
+import os
 from typing import Optional
 import resend
 
@@ -11,12 +12,22 @@ logger = logging.getLogger(__name__)
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
+# Brand display name for every transactional email. Users see this in
+# their inbox "From" column — keeps the Neulab brand visible even while
+# the underlying sender address is `onboarding@resend.dev` pending
+# domain-level DNS verification on neulab.xyz.
+FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Neulab")
+# Where replies land. Resend's verified sender (resend.dev) can't receive
+# replies, so we route "Reply" clicks to a dedicated Gmail monitored by
+# the team. Can be overridden via env.
+REPLY_TO = os.environ.get("EMAIL_REPLY_TO", "neulab.ai@gmail.com")
+
 
 DISCLAIMER_FOOTER = """
 <hr style="border:none;border-top:1px solid #2a2a2a;margin:32px 0 16px 0" />
 <p style="font-size:11px;color:#888;font-family:'IBM Plex Mono',monospace;line-height:1.6">
   <strong style="color:#aaa">Financial Disclaimer.</strong>
-  Neural is an AI-assisted analysis tool. Content is for educational and informational
+  Neulab is an AI-assisted analysis tool. Content is for educational and informational
   purposes only and is <em>not</em> investment advice, financial advice, or a
   recommendation to buy or sell any security. Markets are volatile; past performance
   does not guarantee future results. You are solely responsible for your investment
@@ -39,13 +50,13 @@ def _receipt_html(full_name: str, plan_name: str, amount: float, subscription_id
     <tr><td align="center" style="padding:40px 16px">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#131313;border:1px solid #2a2a2a;padding:32px">
         <tr><td>
-          <p style="font-size:10px;letter-spacing:0.18em;color:#b8994f;text-transform:uppercase;margin:0">Neural · Receipt</p>
+          <p style="font-size:10px;letter-spacing:0.18em;color:#b8994f;text-transform:uppercase;margin:0">Neulab · Receipt</p>
           <h1 style="font-family:'Cormorant Garamond',Georgia,serif;font-size:32px;color:#f5f5f0;margin:8px 0 0;letter-spacing:-0.01em">
             Thank you, {greeting}.
           </h1>
           <p style="color:#a8a8a8;font-size:15px;line-height:1.65;margin-top:16px">
             Your <strong style="color:#e6e6e6">{plan_name}</strong> subscription is active.
-            You now have full access to Neural's AI-powered stock analysis engine.
+            You now have full access to Neulab's AI-powered stock analysis engine.
           </p>
 
           <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:24px;font-size:14px">
@@ -79,9 +90,10 @@ async def send_receipt_email(to_email: str, full_name: str, plan_name: str,
         return False
     html = _receipt_html(full_name, plan_name, amount, subscription_id, next_billing)
     params = {
-        "from": f"Neural <{SENDER_EMAIL}>",
+        "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
         "to": [to_email],
-        "subject": f"Receipt · Neural {plan_name} subscription",
+        "reply_to": REPLY_TO,
+        "subject": f"Receipt · {FROM_NAME} {plan_name} subscription",
         "html": html,
     }
     try:
