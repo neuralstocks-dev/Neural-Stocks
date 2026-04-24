@@ -1,0 +1,65 @@
+{
+    "name": "Neulab · Neural Stock Intelligence",
+    "short_name": "Neulab",
+    "description": "AI stock intelligence without the noise. Explainable signals, risk-aware analytics, built for disciplined decision-making.",
+    "start_url": "/dashboard",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#0A0C10",
+    "theme_color": "#0A0C10",
+    "lang": "en",
+    "dir": "ltr",
+    "categories": ["finance", "productivity", "business"],
+    "icons": [
+        {
+            "src": "/favicon-32.png",
+            "type": "image/png",
+            "sizes": "32x32"
+        },
+        {
+            "src": "/icon-192.png",
+            "type": "image/png",
+            "sizes": "192x192",
+            "purpose": "any"
+        },
+        {
+            "src": "/icon-512.png",
+            "type": "image/png",
+            "sizes": "512x512",
+            "purpose": "any"
+        },
+        {
+            "src": "/icon-maskable-192.png",
+            "type": "image/png",
+            "sizes": "192x192",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/icon-maskable-512.png",
+            "type": "image/png",
+            "sizes": "512x512",
+            "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Dashboard",
+            "short_name": "Dashboard",
+            "url": "/dashboard",
+            "description": "Your watchlist, verdicts & alerts"
+        },
+        {
+            "name": "Portfolio",
+            "short_name": "Portfolio",
+            "url": "/portfolio",
+            "description": "Live P&L across your positions"
+        },
+        {
+            "name": "Scorecard",
+            "short_name": "Scorecard",
+            "url": "/scorecard",
+            "description": "Transparent AI-accuracy tracking"
+        }
+    ]
+}

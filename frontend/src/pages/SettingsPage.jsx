@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
+import InstallAppCard from "@/components/InstallAppCard";
 import { useAuth } from "@/hooks/useAuth";
 import { Settings as SettingsIcon, Send, Check, X, Loader2, Copy, Unlink, ExternalLink } from "lucide-react";
 
@@ -293,6 +294,9 @@ export default function SettingsPage() {
                         Billing receipts and account notifications are sent to this address.
                     </p>
                 </section>
+
+                {/* Install as app (PWA) */}
+                <InstallAppCard />
             </div>
         </AppShell>
     );
