@@ -372,8 +372,14 @@ export default function DashboardPage() {
                                 created_at: latest.data.created_at,
                             };
                         }
-                    } catch (_) {
-                        /* /latest 404 is fine — means no analysis exists yet */
+                    } catch (latestErr) {
+                        // 404 = no analysis exists yet (expected when polling
+                        // legitimately timed out without the BG job finishing).
+                        // Anything else (5xx, network down) is real and worth
+                        // surfacing so the user knows to retry.
+                        if (latestErr?.response?.status !== 404) {
+                            throw latestErr;
+                        }
                     }
                 }
 
@@ -391,7 +397,7 @@ export default function DashboardPage() {
                     setRevealedTicker(ticker);
                     setTimeout(() => {
                         setRevealedTicker((cur) => (cur === ticker ? null : cur));
-                    }, 1700);
+                    }, 1600);
                 }
 
                 await fetchWatchlist();
