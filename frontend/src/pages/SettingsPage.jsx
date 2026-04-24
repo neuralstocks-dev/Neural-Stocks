@@ -3,7 +3,7 @@ import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import InstallAppCard from "@/components/InstallAppCard";
 import { useAuth } from "@/hooks/useAuth";
-import { Settings as SettingsIcon, Send, Check, X, Loader2, Copy, Unlink, ExternalLink, Radar, Lock } from "lucide-react";
+import { Settings as SettingsIcon, Send, Check, X, Loader2, Copy, Unlink, ExternalLink, Radar, Lock, Mail } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
 
@@ -21,6 +21,9 @@ export default function SettingsPage() {
     const [autoScan, setAutoScan] = useState(null);
     const [autoScanBusy, setAutoScanBusy] = useState(false);
     const [autoScanErr, setAutoScanErr] = useState("");
+    const [digest, setDigest] = useState(null);
+    const [digestBusy, setDigestBusy] = useState(false);
+    const [digestErr, setDigestErr] = useState("");
 
     const loadAutoScan = useCallback(async () => {
         try {
@@ -28,6 +31,15 @@ export default function SettingsPage() {
             setAutoScan(r.data);
         } catch {
             // non-fatal — user may not be authenticated yet
+        }
+    }, []);
+
+    const loadDigest = useCallback(async () => {
+        try {
+            const r = await api.get("/auth/me/weekly-digest");
+            setDigest(r.data);
+        } catch {
+            // non-fatal
         }
     }, []);
 
@@ -44,7 +56,8 @@ export default function SettingsPage() {
     useEffect(() => {
         loadStatus();
         loadAutoScan();
-    }, [loadStatus, loadAutoScan]);
+        loadDigest();
+    }, [loadStatus, loadAutoScan, loadDigest]);
 
     const beginLink = async () => {
         setErr("");
@@ -117,6 +130,19 @@ export default function SettingsPage() {
             setAutoScanErr(e?.response?.data?.detail || "Failed to update Auto-Scan preference.");
         } finally {
             setAutoScanBusy(false);
+        }
+    };
+
+    const toggleDigest = async (nextEnabled) => {
+        setDigestErr("");
+        setDigestBusy(true);
+        try {
+            await api.post("/auth/me/weekly-digest", { enabled: nextEnabled });
+            await loadDigest();
+        } catch (e) {
+            setDigestErr(e?.response?.data?.detail || "Failed to update Weekly Digest preference.");
+        } finally {
+            setDigestBusy(false);
         }
     };
 
@@ -441,6 +467,105 @@ export default function SettingsPage() {
                             data-testid="auto-scan-error-msg"
                         >
                             <X size={12} className="inline mr-1" /> {autoScanErr}
+                        </p>
+                    )}
+                </section>
+
+                {/* Weekly RF Digest card */}
+                <section className="module p-6 md:p-8 mt-4" data-testid="weekly-digest-module">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="min-w-0">
+                            <p className="text-overline flex items-center gap-2">
+                                <Mail size={12} strokeWidth={1.5} /> Weekly Digest Email
+                            </p>
+                            <h2
+                                className="font-serif mt-2"
+                                style={{ fontSize: "1.6rem", letterSpacing: "-0.01em" }}
+                            >
+                                Sunday recap · Top RF edges
+                            </h2>
+                            <p className="mt-3 text-sm max-w-xl" style={{ color: "hsl(var(--text-secondary))" }}>
+                                Every Sunday evening, we email you the{" "}
+                                <strong>{digest?.is_paid ? "top 5" : "top 3"}</strong>{" "}
+                                strongest BUY/SELL edges the Random-Forest model sees on
+                                your watchlist — no Telegram required. Tap any ticker to
+                                pull the full Claude verdict.
+                                {!digest?.is_paid && (
+                                    <>
+                                        {" "}Want daily pushes instead of weekly?{" "}
+                                        <Link
+                                            to="/pricing"
+                                            className="underline"
+                                            style={{ color: "hsl(var(--buy))" }}
+                                            data-testid="weekly-digest-upgrade-link"
+                                        >
+                                            Upgrade to Pro for Auto-Scan →
+                                        </Link>
+                                    </>
+                                )}
+                            </p>
+                        </div>
+                        {digest && (
+                            <div className="shrink-0">
+                                <Switch
+                                    checked={!!digest?.enabled}
+                                    disabled={digestBusy}
+                                    onCheckedChange={toggleDigest}
+                                    data-testid="weekly-digest-toggle"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {!digest ? (
+                        <p className="mt-4 text-sm" style={{ color: "hsl(var(--text-muted))" }}>
+                            <Loader2 size={14} className="animate-spin inline mr-2" /> Loading…
+                        </p>
+                    ) : digest.enabled ? (
+                        <div className="mt-5" data-testid="weekly-digest-enabled-stats">
+                            <p className="text-overline" style={{ color: "hsl(var(--buy))" }}>
+                                <Check size={12} strokeWidth={2} className="inline mr-2" /> Active · Sunday evenings
+                            </p>
+                            <div className="mt-3 grid grid-cols-2 gap-4 max-w-md">
+                                <div>
+                                    <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                                        LAST DIGEST
+                                    </p>
+                                    <p className="text-sm mt-1 font-mono">
+                                        {digest.last_run_at
+                                            ? new Date(digest.last_run_at).toLocaleString()
+                                            : "—"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                                        SIGNALS IN LAST DIGEST
+                                    </p>
+                                    <p className="text-sm mt-1 font-mono" data-testid="weekly-digest-last-count">
+                                        {typeof digest.last_signal_count === "number"
+                                            ? digest.last_signal_count
+                                            : "—"}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <p
+                            className="mt-5 text-sm font-mono"
+                            style={{ color: "hsl(var(--text-muted))" }}
+                            data-testid="weekly-digest-off-hint"
+                        >
+                            Toggle on to get your first digest this Sunday evening.
+                        </p>
+                    )}
+
+                    {digestErr && (
+                        <p
+                            className="mt-4 text-sm font-mono"
+                            style={{ color: "hsl(var(--sell))" }}
+                            data-testid="weekly-digest-error-msg"
+                        >
+                            <X size={12} className="inline mr-1" /> {digestErr}
                         </p>
                     )}
                 </section>

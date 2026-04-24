@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 14 — Weekly RF Digest email feature tested end-to-end (backend + frontend). All 10 pytest backend tests pass. Frontend admin + free flows work: toggle flips, persistence across reload confirmed, free user can opt-in (no 402), upgrade CTA renders for free only, auto-scan card regression clean, zero console errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_weekly_digest.py",
+    "/app/test_reports/pytest/iteration14_weekly_digest.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "services/weekly_digest.py has a ~150s post-boot sleep then 6h loop with a gating window (Sun 22-23 UTC). Correct and idempotent via per-user 150h cooldown. No issues.",
+    "POST /api/auth/me/weekly-digest uses free-form dict payload (no Pydantic model). Minor tightening opportunity — accept a typed model for consistency with other endpoints.",
+    "set_weekly_digest_prefs does not verify that the user doc exists before update_one. update_one with {id: user['id']} should match since get_current_user yields an existing user, so this is fine in practice.",
+    "Frontend Switch uses `disabled={digestBusy}` only — correctly allows free users to opt-in per requirement. Good.",
+    "No rate-limit / abuse protection on POST /me/weekly-digest (low risk — idempotent boolean flip, no side effects beyond DB write)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_weekly_digest.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "jolor69@gmail.com/admin1234 (admin), demo@stockai.io/demo1234 (free) — both verified working",
+  "seed_data_creation": "None. Tests leave both admin and free user with weekly_digest_enabled=false (restored after each test).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite for iteration 14 lives at /app/backend/tests/test_weekly_digest.py. Confirmed: (1) module imports + both run_weekly_digest_batch and weekly_digest_loop are async coroutines; (2) server.py registers t3 = create_task(weekly_digest_loop()) AFTER auto_scan_loop and BEFORE the index-ensure block; (3) backend startup log shows 'Started weekly RF digest scheduler' with no traceback; (4) GET/POST /api/auth/me/weekly-digest works for both admin (is_paid=true) and free (is_paid=false) — importantly NO 402 for free user on enable; (5) Settings UI renders [data-testid='weekly-digest-module'], toggle flips and persists across reload, enabled-stats render when active, free-user sees [data-testid='weekly-digest-upgrade-link'] → /pricing and 'top 3' copy; (6) Auto-scan card from iteration 13 unaffected. Real batch NOT executed (per instructions — avoids yfinance + real email sends).",
+  "rca of the issue": "No issues found."
+}

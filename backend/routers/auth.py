@@ -187,3 +187,32 @@ async def set_auto_scan_prefs(payload: dict, user=Depends(get_current_user)):
     )
     return {"ok": True, "enabled": want_enabled}
 
+
+@router.get("/me/weekly-digest")
+async def get_weekly_digest_prefs(user=Depends(get_current_user)):
+    """Current state of the user's Weekly RF Digest email preference."""
+    u = await db.users.find_one(
+        {"id": user["id"]},
+        {"_id": 0, "weekly_digest_enabled": 1, "weekly_digest_last_run_at": 1,
+         "weekly_digest_last_signal_count": 1, "plan": 1, "is_admin": 1},
+    ) or {}
+    is_paid = (u.get("plan") in ("pro", "elite", "daypass")) or bool(u.get("is_admin"))
+    return {
+        "enabled": bool(u.get("weekly_digest_enabled")),
+        "is_paid": is_paid,
+        "last_run_at": u.get("weekly_digest_last_run_at"),
+        "last_signal_count": u.get("weekly_digest_last_signal_count"),
+    }
+
+
+@router.post("/me/weekly-digest")
+async def set_weekly_digest_prefs(payload: dict, user=Depends(get_current_user)):
+    """Opt in or out of the Sunday-evening Weekly RF Digest email. Open
+    to all plans (Free gets top 3, Pro/Elite get top 5)."""
+    want_enabled = bool(payload.get("enabled"))
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"weekly_digest_enabled": want_enabled}},
+    )
+    return {"ok": True, "enabled": want_enabled}
+
