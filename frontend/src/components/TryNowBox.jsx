@@ -9,9 +9,16 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Loader2, Lock, Sparkles } from "lucide-react";
+import { useExperimentVariant, trackConversion } from "@/hooks/useExperimentVariant";
+
+const CTA_FALLBACK = {
+    key: "analyze",
+    render: { label: "ANALYZE" },
+};
 
 export default function TryNowBox({ variant = "default", className = "" }) {
     const navigate = useNavigate();
+    const cta = useExperimentVariant("try_cta", CTA_FALLBACK);
     const [ticker, setTicker] = useState("");
     const [status, setStatus] = useState(null);
     const [submitting, setSubmitting] = useState(false);
@@ -33,6 +40,7 @@ export default function TryNowBox({ variant = "default", className = "" }) {
         if (!t) return;
         setSubmitting(true);
         setError("");
+        trackConversion("try_cta");
         // Navigate to the try page — it runs the analysis itself, so the
         // visitor sees a loading state instead of a dead form.
         setTimeout(() => navigate(`/try/${encodeURIComponent(t)}`), 50);
@@ -94,7 +102,7 @@ export default function TryNowBox({ variant = "default", className = "" }) {
             >
                 {submitting ? <Loader2 size={13} className="animate-spin" /> : (
                     <>
-                        ANALYZE <ArrowRight size={11} strokeWidth={2} />
+                        {cta.render.label} <ArrowRight size={11} strokeWidth={2} />
                     </>
                 )}
             </button>

@@ -1,9 +1,15 @@
 import React, { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useExperimentVariant } from "@/hooks/useExperimentVariant";
 import { LineChart, Lock, Mail, User } from "lucide-react";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 import TryNowBox from "@/components/TryNowBox";
+
+const SIGNUP_TAGLINE_FALLBACK = {
+    key: "five_stocks_clarity",
+    render: { line1: "Five stocks.", line2: "Infinite clarity.", color: "#10B981" },
+};
 
 const BG_IMAGE =
     "https://static.prod-images.emergentagent.com/jobs/449d5842-eb76-413d-bd7e-07775c2311fa/images/da6e03e36e932405f471d2bb00616910cb10e5c8d593c7714da3cd482bc97e88.png";
@@ -17,6 +23,7 @@ function googleSignIn() {
 export default function SignupPage() {
     const { user, signup, bootstrapping } = useAuth();
     const navigate = useNavigate();
+    const tagline = useExperimentVariant("signup_tagline", SIGNUP_TAGLINE_FALLBACK);
     const [fullName, setFullName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -88,11 +95,15 @@ export default function SignupPage() {
                         <p className="text-overline mb-6" style={{ color: "rgba(255,255,255,0.55)" }}>
                             Begin here
                         </p>
-                        <h1 className="font-serif hero-number text-white" style={{ fontSize: "clamp(2.4rem, 5vw, 3.8rem)" }}>
-                            Five stocks.
+                        <h1
+                            className="font-serif hero-number text-white"
+                            style={{ fontSize: "clamp(2.4rem, 5vw, 3.8rem)" }}
+                            data-testid={`signup-tagline-${tagline.key}`}
+                        >
+                            {tagline.render.line1}
                             <br />
-                            <em className="italic" style={{ color: "#10B981" }}>
-                                Infinite clarity.
+                            <em className="italic" style={{ color: tagline.render.color }}>
+                                {tagline.render.line2}
                             </em>
                         </h1>
                         <p

@@ -1,10 +1,15 @@
 import React, { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useTaglineVariant } from "@/hooks/useTaglineVariant";
+import { useExperimentVariant } from "@/hooks/useExperimentVariant";
 import { LineChart, Lock, Mail } from "lucide-react";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 import TryNowBox from "@/components/TryNowBox";
+
+const TAGLINE_FALLBACK = {
+    key: "analyst_why",
+    render: { line1: "An analyst", line2: "who explains why.", color: "#F59E0B" },
+};
 
 const BG_IMAGE =
     "https://static.prod-images.emergentagent.com/jobs/449d5842-eb76-413d-bd7e-07775c2311fa/images/da6e03e36e932405f471d2bb00616910cb10e5c8d593c7714da3cd482bc97e88.png";
@@ -18,7 +23,7 @@ function googleSignIn() {
 export default function LoginPage() {
     const { user, login, bootstrapping } = useAuth();
     const navigate = useNavigate();
-    const tagline = useTaglineVariant();
+    const tagline = useExperimentVariant("login_tagline", TAGLINE_FALLBACK);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -96,10 +101,10 @@ export default function LoginPage() {
                             style={{ fontSize: "clamp(2.6rem, 5vw, 4.2rem)" }}
                             data-testid={`login-tagline-${tagline.key}`}
                         >
-                            {tagline.line1}
+                            {tagline.render.line1}
                             <br />
-                            <em className="italic" style={{ color: tagline.color }}>
-                                {tagline.line2}
+                            <em className="italic" style={{ color: tagline.render.color }}>
+                                {tagline.render.line2}
                             </em>
                         </h1>
                         <p

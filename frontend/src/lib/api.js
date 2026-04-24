@@ -8,11 +8,19 @@ const api = axios.create({ baseURL: API_BASE });
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem("sai_token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
-    // Attribute tagline A/B conversions — if the visitor was pinned to a
-    // variant on /login or /signup, forward it so the backend can credit
-    // that variant when they register.
-    const tv = localStorage.getItem("sai_tagline_variant");
-    if (tv) config.headers["X-Tagline-Variant"] = tv;
+    // Forward every pinned A/B variant so the backend can attribute
+    // signup-type conversions. Header format: X-Exp-{experiment_key}: {variant_key}.
+    if (typeof window !== "undefined") {
+        for (let i = 0; i < localStorage.length; i++) {
+            const storageKey = localStorage.key(i);
+            if (!storageKey || !storageKey.startsWith("sai_exp_")) continue;
+            const expKey = storageKey.slice("sai_exp_".length);
+            const variantKey = localStorage.getItem(storageKey);
+            if (variantKey) {
+                config.headers[`X-Exp-${expKey.replace(/_/g, "-")}`] = variantKey;
+            }
+        }
+    }
     return config;
 });
 

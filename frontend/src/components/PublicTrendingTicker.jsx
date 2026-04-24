@@ -9,6 +9,12 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Flame, ArrowRight } from "lucide-react";
+import { useExperimentVariant, trackConversion } from "@/hooks/useExperimentVariant";
+
+const HEADER_FALLBACK = {
+    key: "live_stats",
+    render: { prefix: "LIVE" },
+};
 
 export default function PublicTrendingTicker({
     idxOnly = false,
@@ -21,6 +27,7 @@ export default function PublicTrendingTicker({
     const [items, setItems] = useState([]);
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
+    const header = useExperimentVariant("trending_header", HEADER_FALLBACK);
 
     useEffect(() => {
         let cancelled = false;
@@ -77,7 +84,7 @@ export default function PublicTrendingTicker({
                 }}
             >
                 <Flame size={11} strokeWidth={1.8} />
-                LIVE · {stats?.users} investors · {stats?.analyses} analyses · last {windowDays}d
+                {header.render.prefix} · {stats?.users} investors · {stats?.analyses} analyses · last {windowDays}d
             </span>
 
             <span
@@ -105,6 +112,7 @@ export default function PublicTrendingTicker({
             {ctaHref && topPick && (
                 <Link
                     to={ctaHref}
+                    onClick={() => trackConversion("trending_header")}
                     className="text-overline flex-shrink-0 inline-flex items-center gap-1 group"
                     style={{
                         color: isMuted ? "rgba(255,230,180,0.95)" : "hsl(var(--accent-primary))",
