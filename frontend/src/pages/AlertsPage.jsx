@@ -373,9 +373,11 @@ export default function AlertsPage() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("all");
     const [busy, setBusy] = useState(false);
+    const [loadErr, setLoadErr] = useState("");
 
     const load = useCallback(async (nextFilter = filter) => {
         setLoading(true);
+        setLoadErr("");
         try {
             const [listRes, statsRes] = await Promise.all([
                 api.get(`/alerts?filter=${nextFilter}&limit=200`),
@@ -383,6 +385,8 @@ export default function AlertsPage() {
             ]);
             setAlerts(listRes.data || []);
             setStats(statsRes.data);
+        } catch (e) {
+            setLoadErr(e?.response?.data?.detail || "Couldn't load alerts. Reload the page to retry.");
         } finally {
             setLoading(false);
         }
@@ -412,14 +416,14 @@ export default function AlertsPage() {
         }
     };
 
-    const onTake = async (alert) => {
+    const onTake = async (a) => {
         setBusy(true);
         try {
-            await api.post(`/alerts/${alert.id}/taken`, { taken: !alert.taken });
+            await api.post(`/alerts/${a.id}/taken`, { taken: !a.taken });
             await load(filter);
         } catch (e) {
             const msg = e?.response?.data?.detail || "Couldn't update this alert — try again.";
-            alert?.id && window.alert(msg); // eslint-disable-line no-alert
+            window.alert(msg); // eslint-disable-line no-alert
         } finally {
             setBusy(false);
         }
@@ -542,7 +546,19 @@ export default function AlertsPage() {
 
                 {/* Alert list */}
                 <div className="mt-5 space-y-3" data-testid="alerts-list">
-                    {loading ? (
+                    {loadErr ? (
+                        <div
+                            className="module p-5 font-mono text-sm"
+                            style={{
+                                background: "hsl(var(--sell-bg))",
+                                color: "hsl(var(--sell))",
+                                border: "1px solid hsl(var(--sell))",
+                            }}
+                            data-testid="alerts-load-error"
+                        >
+                            {loadErr}
+                        </div>
+                    ) : loading ? (
                         <p className="text-sm font-mono py-8 text-center" style={{ color: "hsl(var(--text-muted))" }}>
                             <Loader2 size={14} className="animate-spin inline mr-2" /> Loading alerts…
                         </p>
