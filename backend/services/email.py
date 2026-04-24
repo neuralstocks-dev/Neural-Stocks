@@ -20,7 +20,7 @@ FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Neulab")
 # Where replies land. Resend's verified sender (resend.dev) can't receive
 # replies, so we route "Reply" clicks to a dedicated Gmail monitored by
 # the team. Can be overridden via env.
-REPLY_TO = os.environ.get("EMAIL_REPLY_TO", "neulab.ai@gmail.com")
+REPLY_TO = os.environ.get("EMAIL_REPLY_TO", "ai.neulab.inc@gmail.com")
 
 
 DISCLAIMER_FOOTER = """
