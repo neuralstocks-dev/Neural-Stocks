@@ -439,6 +439,16 @@ body {
     animation: verdictRevealed 1.6s ease-out;
 }
 
+/* Refreshing pill — subtle pulse so users see the row is actively
+   being re-analyzed, even while the old verdict remains on screen. */
+@keyframes refreshingPulse {
+    0%, 100% { opacity: 0.85; transform: scale(1); }
+    50%      { opacity: 1;    transform: scale(1.03); }
+}
+.refreshing-pill {
+    animation: refreshingPulse 1.4s ease-in-out infinite;
+}
+
 /* Checkered background utility for empty-state / hero ambience */
 .grid-bg {
     background-image: linear-gradient(

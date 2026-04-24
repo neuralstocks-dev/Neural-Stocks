@@ -80,11 +80,38 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
 
             <div className="col-span-3 md:col-span-2">
                 {item.latest_analysis?.recommendation ? (
-                    <div>
-                        <SignalBadge signal={item.latest_analysis.recommendation} />
-                        <div className="text-overline mt-1" style={{ fontSize: "0.56rem" }}>
-                            {item.latest_analysis.confidence_score}% conf · {timeAgo(item.latest_analysis.created_at)}
+                    <div className="relative" data-testid={`verdict-cell-${item.ticker}`}>
+                        <div
+                            style={{
+                                opacity: analyzing ? 0.4 : 1,
+                                transition: "opacity 200ms ease-out",
+                            }}
+                        >
+                            <SignalBadge signal={item.latest_analysis.recommendation} />
+                            <div className="text-overline mt-1" style={{ fontSize: "0.56rem" }}>
+                                {item.latest_analysis.confidence_score}% conf · {timeAgo(item.latest_analysis.created_at)}
+                            </div>
                         </div>
+                        {analyzing && (
+                            <div
+                                className="absolute inset-0 flex items-center justify-start pointer-events-none"
+                                data-testid={`refreshing-pill-${item.ticker}`}
+                            >
+                                <span
+                                    className="font-mono text-[10px] inline-flex items-center gap-1.5 px-2 py-1 refreshing-pill"
+                                    style={{
+                                        background: "hsl(var(--surface-elevated))",
+                                        color: "hsl(var(--hold))",
+                                        border: "1px solid hsl(var(--hold))",
+                                        letterSpacing: "0.12em",
+                                        textTransform: "uppercase",
+                                    }}
+                                >
+                                    <Loader2 size={9} strokeWidth={2} className="animate-spin" />
+                                    Refreshing…
+                                </span>
+                            </div>
+                        )}
                     </div>
                 ) : analyzing ? (
                     <div data-testid={`analyzing-label-${item.ticker}`}>
