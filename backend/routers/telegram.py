@@ -53,23 +53,39 @@ async def send_test(user=Depends(get_current_user)):
 # ─── Alert preferences ──────────────────────────────────────────────────
 ALERT_TYPES = ["signal", "pattern", "rf_watchlist_scan"]
 ALERT_MODES = ["standard", "candlestick", "hybrid"]
+ALERT_SCHEDULES = ["realtime", "digest_daily", "digest_weekly"]
+DEFAULT_SCHEDULE = {t: "realtime" for t in ALERT_TYPES}
+
+
+def _hydrate_schedule(stored):
+    """Merge a stored schedule dict (possibly partial / missing) over the
+    full default so the response always carries every known channel and
+    legacy users without the field still get sensible defaults."""
+    out = dict(DEFAULT_SCHEDULE)
+    if isinstance(stored, dict):
+        for k, v in stored.items():
+            if k in ALERT_TYPES and v in ALERT_SCHEDULES:
+                out[k] = v
+    return out
 
 
 @router.get("/preferences")
 async def get_preferences(user=Depends(get_current_user)):
-    """Return the user's Telegram alert filter preferences. Both fields
-    default to "all enabled" for backward compatibility — existing users
-    keep receiving everything until they explicitly opt out."""
+    """Return the user's Telegram alert filter + delivery preferences. All
+    fields default to "all enabled, all realtime" so legacy users keep
+    their current behavior until they explicitly change something."""
     from core.db import db
     u = await db.users.find_one(
         {"id": user["id"]},
-        {"_id": 0, "telegram_alert_types": 1, "telegram_alert_modes": 1},
+        {"_id": 0, "telegram_alert_types": 1, "telegram_alert_modes": 1, "telegram_alert_schedule": 1},
     ) or {}
     return {
         "alert_types": u.get("telegram_alert_types") if u.get("telegram_alert_types") is not None else list(ALERT_TYPES),
         "alert_modes": u.get("telegram_alert_modes") if u.get("telegram_alert_modes") is not None else list(ALERT_MODES),
+        "alert_schedule": _hydrate_schedule(u.get("telegram_alert_schedule")),
         "all_alert_types": list(ALERT_TYPES),
         "all_alert_modes": list(ALERT_MODES),
+        "all_alert_schedules": list(ALERT_SCHEDULES),
     }
 
 
@@ -77,9 +93,14 @@ async def get_preferences(user=Depends(get_current_user)):
 async def set_preferences(payload: dict, user=Depends(get_current_user)):
     """Persist the user's Telegram alert filter preferences. Each list
     must be a subset of the canonical ALERT_TYPES / ALERT_MODES — anything
-    else is rejected so the DB never holds invalid filter values."""
+    else is rejected so the DB never holds invalid filter values.
+
+    `alert_schedule` accepts a partial dict; existing channel schedules
+    are preserved and only the supplied keys are updated. Each value
+    must be in ALERT_SCHEDULES."""
     types_in = payload.get("alert_types")
     modes_in = payload.get("alert_modes")
+    sched_in = payload.get("alert_schedule")
     update: dict = {}
     if types_in is not None:
         if not isinstance(types_in, list) or any(t not in ALERT_TYPES for t in types_in):
@@ -95,6 +116,23 @@ async def set_preferences(payload: dict, user=Depends(get_current_user)):
                 detail=f"alert_modes must be a subset of {ALERT_MODES}",
             )
         update["telegram_alert_modes"] = list(modes_in)
+    if sched_in is not None:
+        if not isinstance(sched_in, dict):
+            raise HTTPException(status_code=400, detail="alert_schedule must be an object")
+        for k, v in sched_in.items():
+            if k not in ALERT_TYPES:
+                raise HTTPException(status_code=400, detail=f"unknown channel {k}")
+            if v not in ALERT_SCHEDULES:
+                raise HTTPException(status_code=400, detail=f"schedule must be one of {ALERT_SCHEDULES}")
+        # Merge over existing — partial updates only touch supplied keys.
+        from core.db import db
+        existing = await db.users.find_one(
+            {"id": user["id"]},
+            {"_id": 0, "telegram_alert_schedule": 1},
+        ) or {}
+        merged = _hydrate_schedule(existing.get("telegram_alert_schedule"))
+        merged.update(sched_in)
+        update["telegram_alert_schedule"] = merged
     if update:
         from core.db import db
         await db.users.update_one({"id": user["id"]}, {"$set": update})

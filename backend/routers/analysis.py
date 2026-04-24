@@ -188,15 +188,15 @@ async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict, mode: s
             "created_at": iso(now_utc()),
             "mode": mode,
         })
-        # Fire-and-forget Telegram push (if linked + user prefs allow it).
-        # Filter rules: per-user `telegram_alert_types` (default: all) and
-        # `telegram_alert_modes` (default: all) gate which alerts reach
-        # Telegram. The raw alert is always written to db.alerts so the
-        # in-app feed stays complete; only the Telegram push is filtered.
+        # Decide what reaches Telegram: filter (alert_types/alert_modes)
+        # gates whether we push at all; schedule (alert_schedule[channel])
+        # decides whether we push immediately or queue for digest. The raw
+        # alert is always written to db.alerts so the in-app feed stays
+        # complete — only the *Telegram* push is filtered/deferred.
         try:
             user = await db.users.find_one(
                 {"id": user_id},
-                {"_id": 0, "telegram_alert_types": 1, "telegram_alert_modes": 1},
+                {"_id": 0, "telegram_alert_types": 1, "telegram_alert_modes": 1, "telegram_alert_schedule": 1},
             ) or {}
             allowed_types = user.get("telegram_alert_types")
             allowed_modes = user.get("telegram_alert_modes")
@@ -204,16 +204,20 @@ async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict, mode: s
                 return
             if allowed_modes is not None and mode not in allowed_modes:
                 return
+            from routers.telegram import _hydrate_schedule
+            from services.digest_pusher import queue_alert
             from services.telegram import send_alert_to_user
+            schedule = _hydrate_schedule(user.get("telegram_alert_schedule")).get("signal", "realtime")
             target = analysis.get("price_target")
             target_line = f"\nTarget: ${target}" if target else ""
             mode_label = (mode or "standard").capitalize()
-            asyncio.create_task(send_alert_to_user(
-                user_id,
-                f"{rec} · {ticker} · {conf}%",
-                f"{analysis.get('executive_summary', '')}{target_line}\n\nMode: {mode_label}",
-                ticker=ticker,
-            ))
+            title = f"{rec} · {ticker} · {conf}%"
+            body = f"{analysis.get('executive_summary', '')}{target_line}\n\nMode: {mode_label}"
+            if schedule == "realtime":
+                asyncio.create_task(send_alert_to_user(user_id, title, body, ticker=ticker))
+            else:
+                # Defer: write to alert_queue for the next batched digest
+                await queue_alert(user_id, "signal", ticker=ticker, title=title, body=body)
         except Exception:
             pass
 
@@ -908,21 +912,24 @@ async def scan_watchlist_patterns(user=Depends(get_current_user)):
         })
         alerts_created += 1
         # Fire-and-forget Telegram push (if user is linked + prefs allow).
-        # See _maybe_create_alert for the filter contract.
+        # See _maybe_create_alert for the filter+schedule contract.
         try:
             user_doc = await db.users.find_one(
                 {"id": user["id"]},
-                {"_id": 0, "telegram_alert_types": 1},
+                {"_id": 0, "telegram_alert_types": 1, "telegram_alert_schedule": 1},
             ) or {}
             allowed_types = user_doc.get("telegram_alert_types")
             if allowed_types is None or "pattern" in allowed_types:
+                from routers.telegram import _hydrate_schedule
+                from services.digest_pusher import queue_alert
                 from services.telegram import send_alert_to_user
-                asyncio.create_task(send_alert_to_user(
-                    user["id"],
-                    f"{best['pattern']} · {ticker}",
-                    f"{best['bias'].upper()} on {best['timeframe']} · strength {best['strength']}\n\n{best.get('explanation', '')}",
-                    ticker=ticker,
-                ))
+                schedule = _hydrate_schedule(user_doc.get("telegram_alert_schedule")).get("pattern", "realtime")
+                title = f"{best['pattern']} · {ticker}"
+                body = f"{best['bias'].upper()} on {best['timeframe']} · strength {best['strength']}\n\n{best.get('explanation', '')}"
+                if schedule == "realtime":
+                    asyncio.create_task(send_alert_to_user(user["id"], title, body, ticker=ticker))
+                else:
+                    await queue_alert(user["id"], "pattern", ticker=ticker, title=title, body=body)
         except Exception:
             pass
 

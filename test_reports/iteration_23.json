@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 23 validates per-channel Telegram delivery scheduling (realtime / digest_daily / digest_weekly). BACKEND: 8/8 pytest cases PASS (41.3s). GET /api/telegram/preferences now returns the new `alert_schedule` dict (signal/pattern/rf_watchlist_scan → default 'realtime') and the `all_alert_schedules` constant ['realtime','digest_daily','digest_weekly']. POST alert_schedule does partial merge — {signal: 'digest_weekly'} leaves pattern+rf_watchlist_scan at previous values; a follow-up {pattern: 'digest_daily'} keeps signal at weekly. All three validation paths return 400: non-dict schedule, bogus value (signal:'bogus'), unknown channel (unknown_channel). services.digest_pusher.queue_alert writes a row with id/user_id/channel/ticker/title/body/created_at/flushed_at=None. flush_user with schedule=digest_daily + a matching queued row sends exactly ONE send_alert_to_user call (monkeypatched) with title='Neulab digest' and body containing the queued alert's title, marks the row flushed, and a second call returns 0 (idempotent). LIVE SCHEDULE PATH VERIFIED: admin.signal=digest_daily → POST /api/analysis/AAPL/start (BUY/SELL ≥75%) → db.alerts row created AND db.alert_queue row created (channel='signal', flushed_at=null) — realtime Telegram send was NOT invoked. Admin schedule reset to all-realtime at module teardown; test queue rows cleaned up. digest_pusher_loop confirmed running via backend log 'Started Telegram digest pusher scheduler'. FRONTEND: All 6 UI checks PASS with zero console errors. Admin /settings renders 3 [data-testid=tg-schedule-{channel}] selects with options Realtime / Daily digest / Weekly digest (values realtime/digest_daily/digest_weekly). Changing signal to 'Daily digest' flips instantly (optimistic), POST fires, reload confirms persistence AND pattern+rf_watchlist_scan stayed at 'Realtime' (partial-merge correctness from UI). Toggling signal chip OFF correctly disables its schedule select (disabled=true, computed opacity=0.5). Mobile 390px: select box {x:45, width:129} fits inside viewport, document.scrollWidth<=395 (no horizontal overflow). Zero console errors across the full flow.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter23_digest_schedule.py",
+    "/app/test_reports/pytest/iteration23_digest_schedule.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/routers/telegram.py:_hydrate_schedule — clean defensive merge; rejects keys not in ALERT_TYPES and values not in ALERT_SCHEDULES before writing to DB. Partial-merge merge={existing, **sched_in} gives intended semantics. No ObjectId leak (projection excludes _id).",
+    "backend/services/digest_pusher.py — queue_alert/flush_user/run_flush_batch all async+indexed on user_id/flushed_at. flush_user re-resolves current schedule per-row (correct: handles user flipping channel mid-cycle). send_alert_to_user is called with title='Neulab digest' which matches review spec. Cooldown cutoff uses ISO string comparison — relies on iso() producing lexicographically comparable timestamps (matches existing codebase pattern).",
+    "backend/routers/analysis.py:_maybe_create_alert + /patterns/scan — schedule dispatch is symmetric: realtime → asyncio.create_task(send_alert_to_user); else → await queue_alert. db.alerts row is always written regardless of schedule (in-app feed unaffected — matches PRD).",
+    "backend/services/auto_scan.py:_scan_user — same realtime-vs-queue branching for rf_watchlist_scan channel. Consistent with signal+pattern paths.",
+    "frontend/src/pages/SettingsPage.jsx — select is disabled + opacity-50 when the corresponding type chip is inactive (verified). setTgChannelSchedule uses optimistic local merge + POSTs only the partial {[channel]: schedule} — idiomatic, matches backend partial-merge contract. data-testid=tg-schedule-{channel} present on all 3 selects.",
+    "Nit (not blocking): digest_pusher.run_flush_batch relies on `last < cutoff_iso` string compare — fine as long as iso() is stable and always UTC with same format. Already the case in this codebase."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter23_digest_schedule.py (new)"
+  ],
+  "success_rate": {
+    "backend": "8/8 PASS (100%)",
+    "frontend": "6/6 PASS (100%) — zero console errors"
+  },
+  "test_credentials": "Admin: jolor69@gmail.com / admin1234 (Telegram linked).",
+  "seed_data_creation": "Live AAPL analysis fired against admin with signal=digest_daily to verify queue-path routing. Resulting db.alert_queue row was deleted after verification. Admin schedule reset to all-realtime at module teardown — confirmed by test_get_preferences_has_schedule_fields running last in a clean suite. No residual test data remains.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Per-channel alert_schedule feature is shipping-ready. Admin prefs are reset to all-realtime + all-enabled at test end so iter 24 starts clean. The hourly digest_pusher_loop runs only at UTC hour 13 (Monday for weekly) so actual batched sends are NOT triggered during a typical test run; flush_user was invoked directly with monkeypatched send_alert_to_user to verify digest body composition. Live Telegram outbound was not intercepted (asyncio.create_task on realtime path is fire-and-forget; verified via absence of exceptions and queue-row absence under realtime schedule).",
+  "rca of the issue": "Not a bug fix iteration — new feature only. Initial test attempt failed with 'Event loop is closed' because Motor's collection bindings cache the first event loop; multiple asyncio.run() calls create fresh loops. Fixed by switching to a module-scoped event_loop fixture shared across all async tests."
+}

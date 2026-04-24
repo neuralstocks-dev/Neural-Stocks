@@ -147,14 +147,21 @@ async def _scan_user(user: dict, market_df: dict) -> int:
         })
         # Fire Telegram push (best-effort, gated by user prefs).
         # Filter rule: respect `telegram_alert_types`. Default = all types.
+        # Schedule rule: per-channel realtime/digest_daily/digest_weekly.
         try:
             user_doc = await db.users.find_one(
                 {"id": user_id},
-                {"_id": 0, "telegram_alert_types": 1},
+                {"_id": 0, "telegram_alert_types": 1, "telegram_alert_schedule": 1},
             ) or {}
             allowed_types = user_doc.get("telegram_alert_types")
             if allowed_types is None or "rf_watchlist_scan" in allowed_types:
-                await send_alert_to_user(user_id, title, body, ticker=ticker)
+                from routers.telegram import _hydrate_schedule
+                from services.digest_pusher import queue_alert
+                schedule = _hydrate_schedule(user_doc.get("telegram_alert_schedule")).get("rf_watchlist_scan", "realtime")
+                if schedule == "realtime":
+                    await send_alert_to_user(user_id, title, body, ticker=ticker)
+                else:
+                    await queue_alert(user_id, "rf_watchlist_scan", ticker=ticker, title=title, body=body)
         except Exception as e:
             logger.warning("auto_scan: telegram send failed for user %s: %s", user_id, e)
         sent += 1

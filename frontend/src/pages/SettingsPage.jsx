@@ -186,6 +186,26 @@ export default function SettingsPage() {
         }
     };
 
+    /**
+     * Update the delivery schedule for a single channel. Sends a partial
+     * `alert_schedule` object so the backend merges it over existing.
+     */
+    const setTgChannelSchedule = async (channel, schedule) => {
+        if (!tgPrefs) return;
+        const nextSched = { ...(tgPrefs.alert_schedule || {}), [channel]: schedule };
+        setTgPrefsErr("");
+        setTgPrefsBusy(true);
+        setTgPrefs({ ...tgPrefs, alert_schedule: nextSched });
+        try {
+            await api.post("/telegram/preferences", { alert_schedule: { [channel]: schedule } });
+        } catch (e) {
+            setTgPrefsErr(e?.response?.data?.detail || "Failed to save schedule.");
+            await loadTgPrefs();
+        } finally {
+            setTgPrefsBusy(false);
+        }
+    };
+
     return (
         <AppShell user={user}>
             <div className="max-w-[900px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="settings-page">
@@ -323,38 +343,70 @@ export default function SettingsPage() {
                                             className="text-overline"
                                             style={{ fontSize: "0.56rem", color: "hsl(var(--text-muted))" }}
                                         >
-                                            Alert channels
+                                            Alert channels · delivery
                                         </p>
-                                        <div className="flex flex-wrap gap-2 mt-2" data-testid="tg-alert-types-row">
+                                        <p
+                                            className="text-xs mt-1 mb-3"
+                                            style={{ color: "hsl(var(--text-muted))" }}
+                                        >
+                                            Toggle a channel off to silence Telegram entirely. When on, choose how
+                                            it's delivered: <strong>realtime</strong> pushes the moment an alert
+                                            fires, <strong>daily/weekly</strong> batch them into one consolidated
+                                            digest.
+                                        </p>
+                                        <div className="space-y-2" data-testid="tg-alert-types-row">
                                             {[
                                                 { key: "signal", label: "AI Verdicts (BUY/SELL ≥75%)" },
                                                 { key: "pattern", label: "Pattern Scans" },
                                                 { key: "rf_watchlist_scan", label: "RF Auto-Scan" },
                                             ].map((t) => {
                                                 const active = (tgPrefs.alert_types || []).includes(t.key);
+                                                const sched = tgPrefs.alert_schedule?.[t.key] || "realtime";
                                                 return (
-                                                    <button
+                                                    <div
                                                         key={t.key}
-                                                        onClick={() => toggleTgPref("alert_types", t.key)}
-                                                        disabled={tgPrefsBusy}
-                                                        data-testid={`tg-type-toggle-${t.key}`}
-                                                        className="font-mono text-xs px-3 py-1.5 transition-colors"
-                                                        style={{
-                                                            background: active
-                                                                ? "hsl(var(--buy-bg))"
-                                                                : "hsl(var(--surface-elevated))",
-                                                            color: active
-                                                                ? "hsl(var(--buy))"
-                                                                : "hsl(var(--text-muted))",
-                                                            border: `1px solid ${
-                                                                active ? "hsl(var(--buy))" : "hsl(var(--border-default))"
-                                                            }`,
-                                                            letterSpacing: "0.06em",
-                                                        }}
+                                                        className="flex items-center gap-2 flex-wrap"
                                                     >
-                                                        {active ? <Check size={11} className="inline mr-1.5" strokeWidth={2.5} /> : null}
-                                                        {t.label}
-                                                    </button>
+                                                        <button
+                                                            onClick={() => toggleTgPref("alert_types", t.key)}
+                                                            disabled={tgPrefsBusy}
+                                                            data-testid={`tg-type-toggle-${t.key}`}
+                                                            className="font-mono text-xs px-3 py-1.5 transition-colors flex-1 min-w-[14rem] text-left"
+                                                            style={{
+                                                                background: active
+                                                                    ? "hsl(var(--buy-bg))"
+                                                                    : "hsl(var(--surface-elevated))",
+                                                                color: active
+                                                                    ? "hsl(var(--buy))"
+                                                                    : "hsl(var(--text-muted))",
+                                                                border: `1px solid ${
+                                                                    active ? "hsl(var(--buy))" : "hsl(var(--border-default))"
+                                                                }`,
+                                                                letterSpacing: "0.06em",
+                                                            }}
+                                                        >
+                                                            {active ? <Check size={11} className="inline mr-1.5" strokeWidth={2.5} /> : null}
+                                                            {t.label}
+                                                        </button>
+                                                        <select
+                                                            value={sched}
+                                                            disabled={!active || tgPrefsBusy}
+                                                            onChange={(e) => setTgChannelSchedule(t.key, e.target.value)}
+                                                            data-testid={`tg-schedule-${t.key}`}
+                                                            className="font-mono text-xs px-2 py-1.5"
+                                                            style={{
+                                                                background: "hsl(var(--surface-elevated))",
+                                                                color: active ? "hsl(var(--text-primary))" : "hsl(var(--text-muted))",
+                                                                border: "1px solid hsl(var(--border-default))",
+                                                                cursor: active ? "pointer" : "not-allowed",
+                                                                opacity: active ? 1 : 0.5,
+                                                            }}
+                                                        >
+                                                            <option value="realtime">Realtime</option>
+                                                            <option value="digest_daily">Daily digest</option>
+                                                            <option value="digest_weekly">Weekly digest</option>
+                                                        </select>
+                                                    </div>
                                                 );
                                             })}
                                         </div>
