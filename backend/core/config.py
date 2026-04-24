@@ -47,18 +47,23 @@ FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
 # ---------- Plans ----------
 # Default monthly prices — overridable dynamically via db.settings by admin.
 DEFAULT_PRO_PRICE = 9.0
-DEFAULT_ELITE_PRICE = 29.0
+DEFAULT_ELITE_PRICE = 24.0
 DEFAULT_ANNUAL_DISCOUNT_PCT = 20.0  # yearly price = monthly * 12 * (1 - pct/100)
-DEFAULT_DAYPASS_PRICE = 5.0
+DEFAULT_DAYPASS_PRICE = 4.99
 DEFAULT_DAYPASS_DURATION_DAYS = 7
+
+# Fair-use soft cap for Elite — displayed to the user as "Unlimited" but
+# backend enforces this ceiling to protect LLM spend from runaway usage.
+# Set to None to re-enable truly-unlimited.
+ELITE_FAIR_USE_DAILY = 50
 
 PLANS = {
     "free": {
         "name": "Free",
         "price_usd": 0,
-        "watchlist_limit": 3,
-        "analyses_per_day": 1,
-        "analyses_per_week": 2,
+        "watchlist_limit": 5,
+        "analyses_per_day": 3,
+        "analyses_per_week": 12,
         "quick_actions": False,
         "share_verdicts": True,
         "personal_backtest": False,
@@ -69,7 +74,7 @@ PLANS = {
     "pro": {
         "name": "Pro",
         "price_usd": DEFAULT_PRO_PRICE,
-        "watchlist_limit": 10,
+        "watchlist_limit": 25,
         "analyses_per_day": 15,
         "analyses_per_week": 60,
         "quick_actions": True,
@@ -82,8 +87,10 @@ PLANS = {
     "elite": {
         "name": "Elite",
         "price_usd": DEFAULT_ELITE_PRICE,
-        "watchlist_limit": 25,
-        "analyses_per_day": None,
+        "watchlist_limit": 500,  # "Unlimited" UX with a sanity ceiling to prevent DB bloat
+        "watchlist_display": "Unlimited",
+        "analyses_per_day": ELITE_FAIR_USE_DAILY,  # displayed as "Unlimited" — see pricing service
+        "analyses_per_day_display": "Unlimited",
         "analyses_per_week": None,
         "quick_actions": True,
         "share_verdicts": True,
@@ -92,22 +99,23 @@ PLANS = {
         "tag": "Institutional",
         "share_per_day": None,
     },
-    # One-time "Day Pass" — admin-configurable duration + quotas. NOT a
+    # One-time "Week Pass" — admin-configurable duration + quotas. NOT a
     # recurring subscription. Paid via PayPal Orders (capture), not Billing.
     # When user pays, backend sets user.plan="daypass" + daypass_expires_at.
-    # Auto-reverts to free when the window closes.
+    # Auto-reverts to free when the window closes. Renamed from "Day Pass"
+    # since the effective duration is 7 days — "Week Pass" is truth-in-naming.
     "daypass": {
-        "name": "Day Pass",
+        "name": "Week Pass",
         "price_usd": DEFAULT_DAYPASS_PRICE,
-        "watchlist_limit": 5,
-        "analyses_per_day": 5,
-        "analyses_per_week": 20,
+        "watchlist_limit": 10,
+        "analyses_per_day": 10,
+        "analyses_per_week": 50,
         "quick_actions": False,
         "share_verdicts": True,
         "personal_backtest": True,
         "analysis_history_days": 30,
-        "tag": "One-time",
-        "share_per_day": 10,
+        "tag": "One-time trial",
+        "share_per_day": 20,
         "duration_days": DEFAULT_DAYPASS_DURATION_DAYS,
     },
 }
