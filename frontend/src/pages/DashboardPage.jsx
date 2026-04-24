@@ -149,10 +149,10 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
  * ConfidenceDot — personalized "Neulab confidence" indicator for an
  * alert based on the user's historical win-rate with that alert type.
  *
- *  · GREEN  — ≥60% win rate, ≥3 resolved trades    → "high confidence"
- *  · AMBER  — 45–60% OR <3 resolved                 → "mixed track record"
- *  · RED    — <45% with ≥3 resolved                 → "low historical hit-rate"
- *  · GREY   — no taken-and-resolved alerts of type  → "not enough data yet"
+ *  · GREEN  — ≥60% win rate AND ≥3 decisive trades   → "high confidence"
+ *  · AMBER  — 45–60% win rate AND ≥3 decisive trades → "mixed track record"
+ *  · RED    — <45% win rate AND ≥3 decisive trades    → "low historical hit-rate"
+ *  · GREY   — <3 decisive (win+loss) trades resolved → "not enough data yet"
  *
  * Tooltip shown via native `title` attribute so it works on all devices
  * without extra dependencies. Click-through is intentionally not wired —
@@ -244,7 +244,9 @@ export default function DashboardPage() {
         setAlerts(r.data || []);
         // Fetch scoreboard in parallel — used for per-row confidence dots.
         // Never block the alert feed on this, it's a best-effort personalization.
-        api.get("/alerts/stats").then((s) => setAlertStats(s.data)).catch(() => {});
+        api.get("/alerts/stats")
+            .then((s) => setAlertStats(s.data))
+            .catch((err) => console.warn("alerts stats fetch failed:", err?.message || err));
     }, []);
 
     const fetchQuota = useCallback(async () => {
