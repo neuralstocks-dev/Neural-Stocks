@@ -142,3 +142,48 @@ async def google_session(req: GoogleSessionReq, request: Request):
 @router.get("/me")
 async def me(user=Depends(get_current_user)):
     return user
+
+@router.get("/me/auto-scan")
+async def get_auto_scan_prefs(user=Depends(get_current_user)):
+    """Current state of the user's Watchlist Auto-Scan preference + last run stats."""
+    u = await db.users.find_one(
+        {"id": user["id"]},
+        {"_id": 0, "auto_scan_enabled": 1, "auto_scan_last_run_at": 1,
+         "auto_scan_last_alerts_sent": 1, "telegram_chat_id": 1, "plan": 1, "is_admin": 1},
+    ) or {}
+    eligible_plan = (u.get("plan") in ("pro", "elite", "daypass")) or bool(u.get("is_admin"))
+    return {
+        "enabled": bool(u.get("auto_scan_enabled")),
+        "telegram_linked": bool(u.get("telegram_chat_id")),
+        "plan_eligible": eligible_plan,
+        "last_run_at": u.get("auto_scan_last_run_at"),
+        "last_alerts_sent": u.get("auto_scan_last_alerts_sent"),
+    }
+
+
+@router.post("/me/auto-scan")
+async def set_auto_scan_prefs(payload: dict, user=Depends(get_current_user)):
+    """Toggle Watchlist Auto-Scan. Requires Pro/Elite/Day-Pass/Admin plus a
+    linked Telegram chat — otherwise we won't have anywhere to push alerts."""
+    want_enabled = bool(payload.get("enabled"))
+    u = await db.users.find_one(
+        {"id": user["id"]},
+        {"_id": 0, "plan": 1, "is_admin": 1, "telegram_chat_id": 1},
+    ) or {}
+    eligible_plan = (u.get("plan") in ("pro", "elite", "daypass")) or bool(u.get("is_admin"))
+    if want_enabled and not eligible_plan:
+        raise HTTPException(
+            status_code=402,
+            detail="Watchlist Auto-Scan is a Pro/Elite/Day-Pass feature. Upgrade to enable it.",
+        )
+    if want_enabled and not u.get("telegram_chat_id"):
+        raise HTTPException(
+            status_code=400,
+            detail="Link your Telegram bot first — Auto-Scan pushes alerts over Telegram.",
+        )
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"auto_scan_enabled": want_enabled}},
+    )
+    return {"ok": True, "enabled": want_enabled}
+

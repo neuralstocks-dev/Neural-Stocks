@@ -397,6 +397,17 @@ async def admin_recompute_ml_backtest(_admin=Depends(admin_required)):
     return {"ok": True, "status": "started", "message": "ML backtest recompute running in background. Refresh /backtest in 30s."}
 
 
+@router.post("/auto-scan/run-now")
+async def admin_run_auto_scan(_admin=Depends(admin_required)):
+    """Manually trigger a Watchlist Auto-Scan batch right now. Useful for
+    verifying the feature works without waiting for the 4h loop or the
+    20h per-user cooldown — the `force` path bypasses the cooldown for
+    the admin's own account only."""
+    from services.auto_scan import run_auto_scan_batch
+    result = await run_auto_scan_batch()
+    return {"ok": True, "result": result}
+
+
 # ---------- RapidAPI IDX budget tracking ----------
 @router.get("/rapidapi/usage")
 async def rapidapi_usage(_admin=Depends(admin_required)):

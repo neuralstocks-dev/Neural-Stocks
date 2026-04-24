@@ -58,10 +58,15 @@ async def start_background_tasks():
     doesn't drop it."""
     import asyncio
     from services.rf_retrain import weekly_retrain_loop
-    task = asyncio.create_task(weekly_retrain_loop())
-    _BG_TASKS.add(task)
-    task.add_done_callback(_BG_TASKS.discard)
+    from services.auto_scan import auto_scan_loop
+    t1 = asyncio.create_task(weekly_retrain_loop())
+    _BG_TASKS.add(t1)
+    t1.add_done_callback(_BG_TASKS.discard)
     logger.info("Started RF weekly retrain scheduler")
+    t2 = asyncio.create_task(auto_scan_loop())
+    _BG_TASKS.add(t2)
+    t2.add_done_callback(_BG_TASKS.discard)
+    logger.info("Started RF watchlist auto-scan scheduler")
     # Ensure TTL indexes (idempotent — no-op if already created).
     try:
         from routers.analysis import _ensure_analysis_indexes
