@@ -18,7 +18,7 @@ const FEATURE_MATRIX = [
     { label: "Quick batch sweep (Top / Bottom 3)", key: "quick_actions", type: "bool" },
     { label: "Public share verdicts", key: "share_verdicts", type: "bool" },
     { label: "Shares / day", key: "share_per_day" },
-    { label: "Analysis history retention", key: "analysis_history_days", suffix: " days" },
+    { label: "Personal backtest · Live track record vs SPY / IDX", key: "personal_backtest", type: "bool" },
 ];
 
 function renderValue(plan, feat) {
@@ -451,10 +451,8 @@ export default function PricingPage() {
                                                     ? "Unlimited share verdicts"
                                                     : `${p.share_per_day} share verdicts / day`}
                                             </FeatureLi>
-                                            <FeatureLi>
-                                                {p.analysis_history_days >= 365
-                                                    ? `${Math.round(p.analysis_history_days / 365)}-year analysis history`
-                                                    : `${p.analysis_history_days}-day analysis history`}
+                                            <FeatureLi enabled={p.personal_backtest}>
+                                                Personal backtest &middot; P&amp;L vs SPY / IDX
                                             </FeatureLi>
                                         </ul>
 
