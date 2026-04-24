@@ -199,7 +199,7 @@ async def set_preferences(payload: dict, user=Depends(get_current_user)):
         for h_key in ("start_hour", "end_hour"):
             if h_key in qh_in:
                 v = qh_in[h_key]
-                if not isinstance(v, int) or v < 0 or v > 23:
+                if not isinstance(v, int) or isinstance(v, bool) or v < 0 or v > 23:
                     raise HTTPException(status_code=400, detail=f"quiet_hours.{h_key} must be int 0–23")
         if "tz" in qh_in and (not isinstance(qh_in["tz"], str) or not qh_in["tz"]):
             raise HTTPException(status_code=400, detail="quiet_hours.tz must be a non-empty string")
