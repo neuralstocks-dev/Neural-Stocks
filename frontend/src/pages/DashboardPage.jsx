@@ -78,19 +78,22 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                 <Sparkline data={sparkline} width={180} height={38} color="trend" />
             </div>
 
-            <div className="col-span-3 md:col-span-2">
+            <div className="col-span-3 md:col-span-2 min-w-0 overflow-hidden">
                 {item.latest_analysis?.recommendation ? (
-                    <div className="relative" data-testid={`verdict-cell-${item.ticker}`}>
+                    <div
+                        className="relative"
+                        data-testid={`verdict-cell-${item.ticker}`}
+                        // No interactive children in this subtree (SignalBadge,
+                        // conf text, refreshing-pill overlay all non-clickable).
+                        // Disable pointer events so this cell never intercepts
+                        // clicks meant for the sibling action-buttons column.
+                        style={{ pointerEvents: "none" }}
+                    >
                         <div
                             className="min-w-0"
                             style={{
                                 opacity: analyzing ? 0.4 : 1,
                                 transition: "opacity 200ms ease-out",
-                                // Verdict text/badge has no interactive children;
-                                // disable pointer events so the wrapper never
-                                // steals clicks meant for the sibling action
-                                // buttons (Analyze / View / Timeline / Remove).
-                                pointerEvents: "none",
                             }}
                         >
                             <SignalBadge signal={item.latest_analysis.recommendation} />

@@ -1,0 +1,37 @@
+{
+  "summary": "Retest of the click-interception fix (round 2). The critical blocker from iter 19 is RESOLVED. Both fixes from the action items are applied in DashboardPage.jsx — pointerEvents:'none' on the outer div.relative (line 90) that carries data-testid='verdict-cell-{ticker}', and 'min-w-0 overflow-hidden' on the parent grid cell (line 81). Normal Playwright click on [data-testid=analyze-AAPL-button] WITHOUT force=True now succeeds in <5s on both 1920-desktop and 390-mobile viewports. Follow-up dimming + refreshing-pill flow verified: refreshing-pill-AAPL appears on click, and the inner .min-w-0 wrapper computed opacity is 0.4 during analyzing state. Zero console errors observed throughout the flow. One item was not re-verified: the geometric overflow of the parent grid cell was not eliminated — verdictRight (1082px desktop, 272px mobile) still extends past analyzeBtnLeft (1020px desktop, 221px mobile); overflow-hidden on the cell clips visual children but does NOT shrink the grid track itself, so the cell still occupies a wider physical slot than its col-span-2 nominal share. This is a purely visual/DOM-measured residual — it no longer affects click behavior (automated or real) because pointer-events:none is applied. The MSFT fresh-ticker regression could not be exercised: the Add Stock modal's typeahead returned 'No results' for 'MSFT' in the admin's environment, which is unrelated to this iteration's fix and was not the target of this retest.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "WatchlistRow — parent grid cell (DashboardPage.jsx line 81)",
+        "issue": "overflow-hidden + min-w-0 were added but did not prevent the CSS grid track from stretching beyond its col-span-2 share. The parent cell itself still has bounding width 132.56px on desktop and physically extends INTO the action-buttons column (verdictRight=1082 > analyzeBtnLeft=1020). overflow-hidden clips visual children but does not constrain the track's own width. This is now purely cosmetic because pointer-events:none is also applied — clicks work fine. If ever desired, the proper grid fix is grid-template-columns: repeat(12, minmax(0, 1fr)) or switching the action-buttons column to a fixed min-width via a flex layout.",
+        "selector": "div.col-span-3.md\\:col-span-2",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Optional, low priority) The grid track for the verdict column still physically overlaps the action-buttons column. overflow-hidden does not fix the overflow of the track itself — it only clips child rendering. If you want the DOM rect to be within its nominal share, use a fixed width on the action-buttons column (e.g. 'w-[120px] flex-shrink-0' via flex layout) or enforce minmax(0,1fr) on the grid template. No functional impact while pointer-events:none remains.",
+    "(Separate bug, unrelated to this iteration) AddStockModal typeahead returns 'No results' for 'MSFT' on admin@jolor69 — fresh-ticker regression path could not be exercised. Investigate /api/stocks/search (or equivalent) to confirm MSFT is indexed in the admin's environment."
+  ],
+  "critical_code_review_comments": [
+    "DashboardPage.jsx:81 — overflow-hidden on a CSS grid item does NOT constrain the grid track's own sizing. To actually stop a col-span-N cell from widening beyond its share when content is wider, you must either set 'minmax(0, 1fr)' on the grid-template-columns, or apply overflow:hidden+min-width:0 on a CHILD wrapper (not the grid item). The current visual clipping works but the track geometry is unchanged.",
+    "DashboardPage.jsx:90 — pointerEvents:'none' on the outer verdict-cell is the correct fix and resolves the click-intercept. Safe because the subtree contains no interactive children (SignalBadge is presentational, refreshing-pill also has pointer-events-none).",
+    "Residual design smell: on 1920px desktop the four action buttons in col-span-1 have only ~65px of horizontal room — expect future overflow bugs as icons or buttons are added. Consider promoting the action column to col-span-2 (and verdict to col-span-1) or switching to a flex layout with explicit min-widths."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "n/a (frontend-only iteration)",
+    "frontend": "6/7 atomic checks PASS. (1) click w/o force desktop PASS, (2) outer pointerEvents='none' PASS, (3) parent grid cell overflow NOT eliminated (cosmetic only) FAIL, (4) refreshing pill + 0.4 opacity dimming PASS, (5) mobile 390 click w/o force PASS, (6) zero console errors PASS, (7) MSFT fresh-ticker regression SKIPPED (typeahead returned no results — unrelated)."
+  },
+  "test_credentials": "jolor69@gmail.com / admin1234 (admin). Disclaimer pre-accepted (persists). AAPL BUY verdict persists. No destructive changes made; one extra AAPL analyze was triggered during testing (will appear as a fresh BUY entry, within elite quota).",
+  "seed_data_creation": "None. MSFT was NOT added to the admin watchlist — the AddStockModal returned 'No results' for MSFT, so no cleanup needed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Click-interception saga is closed. The only remaining cosmetic is that overflow-hidden on the grid cell doesn't prevent track stretching — verdict-cell rect still extends ~62px into the action buttons column at 1920px desktop. This is purely a DOM-measured concern since pointer-events:none is applied. If the next iteration wants to make the overflow truly go away, switch to flex layout on the row or use 'minmax(0,1fr)' on the grid template. Separately, the AddStockModal's typeahead doesn't find 'MSFT' for this admin — probably a seed/search-backend issue worth a short investigation but orthogonal to UI testing.",
+  "rca of the issue": "Iter 19 found that pointerEvents:none was on the wrong wrapper. Iter 20 applied the fix in the right place (outer div.relative at line 90) and additionally added overflow-hidden + min-w-0 to the parent grid cell. Both fixes are present and verified via getComputedStyle. The click interception is gone. The secondary geometric overflow (cell rect extending into sibling column) is NOT eliminated by overflow-hidden on the grid item — that CSS only affects how children are clipped for painting, not how the grid track itself sizes. The grid track sizes based on content unless minmax(0,1fr) is applied to the grid-template-columns. However, because pointer-events:none now covers the entire verdict-cell subtree, the geometric overflow is functionally harmless: Playwright hit-testing and real pointer events both pass through to the underlying analyze button."
+}
