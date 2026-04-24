@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 13 — Watchlist Auto-Scan (Option C, RF pre-filter + Telegram) end-to-end verification. Backend 6/6 pytest assertions PASS: GET /api/auth/me/auto-scan returns correct shape for admin (plan_eligible=true, telegram_linked=true, enabled/last_run_at/last_alerts_sent keys present) and for free (plan_eligible=false); POST {enabled:true} then {enabled:false} persists for admin (verified by follow-up GET both times); POST {enabled:true} for free user correctly returns 402 with 'pro/elite' in detail; POST {enabled:true} for Pro user without Telegram correctly returns 400 with 'telegram' in detail (confirmed tiers@demo.io has no telegram_chat_id in DB); services.auto_scan module imports cleanly with run_auto_scan_batch (async, 0 args) + auto_scan_loop (async) signatures intact. Backend logs show auto_scan scheduler started and ran at 15:07 UTC with '0 users due' — no import errors on startup. Frontend verified on /settings: admin (jolor69@gmail.com) sees [data-testid=auto-scan-module] with an ENABLED [data-testid=auto-scan-toggle] (disabled=None, data-disabled=None); clicking flips data-state from 'unchecked'→'checked', state persists after full reload, and toggling back off is functional. Free user (demo@stockai.io) sees [data-testid=auto-scan-plan-locked] card with PRO/ELITE/WEEK-PASS FEATURE badge and [data-testid=auto-scan-upgrade-link] pointing to /pricing; toggle is rendered with boolean disabled attribute present. Zero console errors on /settings for both admin and free flows.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auto_scan.py",
+    "/app/test_reports/pytest/iteration13_auto_scan.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/auth.py:146-188 — Clean, atomic, correct. GET returns all 5 documented keys with proper booleans; POST gates in right order (plan check → telegram check → persist). 402 vs 400 semantics match spec (402=payment-required for plan, 400=bad-request for missing Telegram).",
+    "routers/auth.py:154 eligible_plan check uses `u.get('plan') in ('pro','elite','daypass') OR is_admin`. Note: does NOT honour admin test-unlock (test_unlock_expires_at); this is intentionally different from effective_plan_key used elsewhere. Consider unifying to effective_plan_key if test-unlocks should grant Auto-Scan. Low priority — admin flag already covers admin users.",
+    "services/auto_scan.py:162-205 run_auto_scan_batch — correct DB filter (auto_scan_enabled + telegram_chat_id + plan OR admin). Python-side cutoff filter on auto_scan_last_run_at is fine but could be pushed into the Mongo query for efficiency once scale grows; not a blocker.",
+    "services/auto_scan.py:209-224 auto_scan_loop — 120s boot delay is sensible; 09-22 UTC quiet-hours gate prevents 3am pushes; LOOP_CHECK_INTERVAL_S=4h combined with MIN_HOURS_BETWEEN_SCANS=20 correctly yields ≤1 scan per user per day even across deploys.",
+    "services/auto_scan.py:70-73 _fetch_market_context — uses a for-loop with the `t=tk` default-arg trick inside lambda to avoid late-binding bug on ticker. Good defensive pattern.",
+    "services/auto_scan.py:134-147 dashboard alert insert uses `from uuid import uuid4` inside the function; consider lifting to module imports for consistency. Minor style nit.",
+    "SettingsPage.jsx:337-346 — Switch only renders when autoScan !== null (correct loading guard). disabled prop correctly combines autoScanBusy + !plan_eligible + !telegram_linked, so free user sees disabled toggle AND plan-locked card simultaneously (verified in browser). data-testid coverage is complete: auto-scan-module, auto-scan-toggle, auto-scan-plan-locked, auto-scan-telegram-required, auto-scan-upgrade-link, auto-scan-enabled-stats, auto-scan-last-alerts, auto-scan-off-hint, auto-scan-error-msg.",
+    "SettingsPage.jsx:72,88 — loadAutoScan() is re-called after Telegram link/unlink which correctly refreshes the auto-scan UI without a page reload. Nice integration detail.",
+    "server.py:54-76 startup handler — both weekly_retrain_loop and auto_scan_loop wrapped in asyncio.create_task and held in _BG_TASKS set with done-callback for GC safety. Correct pattern."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auto_scan.py (new pytest suite — 6 assertions across 4 test classes)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 pytest assertions pass in 3.01s)",
+    "frontend": "100% — all 3 requested UI checks PASS (admin module + enabled toggle + persistence; free plan-locked card + /pricing link + disabled toggle; zero console errors both flows)"
+  },
+  "test_credentials": "jolor69@gmail.com / admin1234 (admin, elite-elevated, telegram linked 6031779675); tiers@demo.io / pass1234 (pro, NO telegram); demo@stockai.io / demo1234 (free)",
+  "seed_data_creation": "None. Tests flip admin's auto_scan_enabled on→off→on→off and leave it OFF at the end. Pro user's auto_scan prefs were never mutated (stopped at the 400 gate). Free user never mutated (stopped at 402 gate).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Auto-Scan feature is production-ready. Regression suite at /app/backend/tests/test_auto_scan.py — re-run after any change to routers/auth.py (auto-scan endpoints), services/auto_scan.py, or SettingsPage.jsx. Stable test-ids: auto-scan-module, auto-scan-toggle (shadcn Switch, uses data-state=checked|unchecked NOT aria-checked; disabled reflected as boolean attr + data-disabled), auto-scan-plan-locked, auto-scan-telegram-required, auto-scan-upgrade-link (→ /pricing), auto-scan-enabled-stats, auto-scan-last-alerts, auto-scan-off-hint, auto-scan-error-msg. LOGIN TIP: /login page has TWO buttons — anonymous 'GET MY VERDICT' (disabled until ticker typed) and 'Sign in' for member login. Always use page.get_by_role('button', name='Sign in', exact=True) to avoid clicking the wrong one. Admin user currently has auto_scan_enabled=false in DB (reset at end of test). tiers@demo.io's Pro status has no Telegram linked — if a future test needs to verify the happy-path Pro enable flow, that user needs telegram_chat_id seeded first. The 4h scheduler loop runs real yfinance calls — do not trigger run_auto_scan_batch() directly in tests; only validate imports/signatures (as done here).",
+  "rca of the issue": "No issues found. Feature works exactly as specified across backend plan/telegram gating, state persistence, and frontend conditional rendering (enabled-stats vs plan-locked vs telegram-required). Only observation during testing was that clicking the /login submit button required role-based selector because the hero section has a second disabled submit-type button ('GET MY VERDICT') that takes precedence for generic button[type=submit] selectors — cosmetic, not a bug."
+}

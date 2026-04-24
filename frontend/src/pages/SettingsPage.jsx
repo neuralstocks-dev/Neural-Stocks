@@ -3,7 +3,9 @@ import api from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import InstallAppCard from "@/components/InstallAppCard";
 import { useAuth } from "@/hooks/useAuth";
-import { Settings as SettingsIcon, Send, Check, X, Loader2, Copy, Unlink, ExternalLink } from "lucide-react";
+import { Settings as SettingsIcon, Send, Check, X, Loader2, Copy, Unlink, ExternalLink, Radar, Lock } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
     const { user } = useAuth();
@@ -16,6 +18,18 @@ export default function SettingsPage() {
     const [msg, setMsg] = useState("");
     const [err, setErr] = useState("");
     const [copied, setCopied] = useState(false);
+    const [autoScan, setAutoScan] = useState(null);
+    const [autoScanBusy, setAutoScanBusy] = useState(false);
+    const [autoScanErr, setAutoScanErr] = useState("");
+
+    const loadAutoScan = useCallback(async () => {
+        try {
+            const r = await api.get("/auth/me/auto-scan");
+            setAutoScan(r.data);
+        } catch {
+            // non-fatal — user may not be authenticated yet
+        }
+    }, []);
 
     const loadStatus = useCallback(async () => {
         try {
@@ -29,7 +43,8 @@ export default function SettingsPage() {
 
     useEffect(() => {
         loadStatus();
-    }, [loadStatus]);
+        loadAutoScan();
+    }, [loadStatus, loadAutoScan]);
 
     const beginLink = async () => {
         setErr("");
@@ -54,6 +69,7 @@ export default function SettingsPage() {
                 setLinkCode(null);
                 setMsg("Telegram account linked successfully!");
                 setTimeout(() => setMsg(""), 4000);
+                loadAutoScan();
             } else {
                 setMsg("Still waiting… send the code to the bot first, then click again.");
             }
@@ -69,6 +85,7 @@ export default function SettingsPage() {
         await api.post("/telegram/unlink");
         setTg({ ...tg, linked: false });
         setMsg("Unlinked from Telegram.");
+        loadAutoScan();
     };
 
     const sendTest = async () => {
@@ -88,6 +105,19 @@ export default function SettingsPage() {
         navigator.clipboard.writeText(linkCode);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    const toggleAutoScan = async (nextEnabled) => {
+        setAutoScanErr("");
+        setAutoScanBusy(true);
+        try {
+            await api.post("/auth/me/auto-scan", { enabled: nextEnabled });
+            await loadAutoScan();
+        } catch (e) {
+            setAutoScanErr(e?.response?.data?.detail || "Failed to update Auto-Scan preference.");
+        } finally {
+            setAutoScanBusy(false);
+        }
     };
 
     return (
@@ -280,6 +310,137 @@ export default function SettingsPage() {
                             data-testid="telegram-error-msg"
                         >
                             <X size={12} className="inline mr-1" /> {err}
+                        </p>
+                    )}
+                </section>
+
+                {/* Watchlist Auto-Scan card */}
+                <section className="module p-6 md:p-8 mt-4" data-testid="auto-scan-module">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="min-w-0">
+                            <p className="text-overline flex items-center gap-2">
+                                <Radar size={12} strokeWidth={1.5} /> Watchlist Auto-Scan
+                            </p>
+                            <h2
+                                className="font-serif mt-2"
+                                style={{ fontSize: "1.6rem", letterSpacing: "-0.01em" }}
+                            >
+                                Daily RF pre-filter · Telegram push
+                            </h2>
+                            <p className="mt-3 text-sm max-w-xl" style={{ color: "hsl(var(--text-secondary))" }}>
+                                Once a day, Neulab runs the Random-Forest model over every ticker on your watchlist.
+                                If the model shows <strong>strong conviction</strong> (|P − 50%| &gt; 15pp), you'll get
+                                a push on Telegram. This is an <em>RF-only</em> alert — not a full Claude verdict. Tap
+                                Analyze in the app for the multi-lens report before acting.
+                            </p>
+                        </div>
+                        {autoScan && (
+                            <div className="shrink-0">
+                                <Switch
+                                    checked={!!autoScan?.enabled}
+                                    disabled={autoScanBusy || !autoScan?.plan_eligible || !autoScan?.telegram_linked}
+                                    onCheckedChange={toggleAutoScan}
+                                    data-testid="auto-scan-toggle"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {!autoScan ? (
+                        <p className="mt-4 text-sm" style={{ color: "hsl(var(--text-muted))" }}>
+                            <Loader2 size={14} className="animate-spin inline mr-2" /> Loading…
+                        </p>
+                    ) : !autoScan.plan_eligible ? (
+                        <div
+                            className="mt-5 p-4 flex items-start gap-3"
+                            style={{
+                                background: "hsl(var(--surface-elevated))",
+                                border: "1px solid hsl(var(--border-default))",
+                                borderRadius: 2,
+                            }}
+                            data-testid="auto-scan-plan-locked"
+                        >
+                            <Lock size={14} strokeWidth={1.5} style={{ color: "hsl(var(--hold))", marginTop: 2 }} />
+                            <div>
+                                <p className="font-mono text-xs" style={{ color: "hsl(var(--hold))" }}>
+                                    PRO / ELITE / WEEK-PASS FEATURE
+                                </p>
+                                <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                                    Auto-Scan is available on paid plans.{" "}
+                                    <Link
+                                        to="/pricing"
+                                        className="underline"
+                                        style={{ color: "hsl(var(--buy))" }}
+                                        data-testid="auto-scan-upgrade-link"
+                                    >
+                                        View plans →
+                                    </Link>
+                                </p>
+                            </div>
+                        </div>
+                    ) : !autoScan.telegram_linked ? (
+                        <div
+                            className="mt-5 p-4"
+                            style={{
+                                background: "hsl(var(--surface-elevated))",
+                                border: "1px solid hsl(var(--border-default))",
+                                borderRadius: 2,
+                            }}
+                            data-testid="auto-scan-telegram-required"
+                        >
+                            <p className="font-mono text-xs" style={{ color: "hsl(var(--hold))" }}>
+                                ⚙︎ CONNECT TELEGRAM FIRST
+                            </p>
+                            <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                                Auto-Scan pushes alerts to Telegram. Link your Telegram account above to enable this
+                                feature.
+                            </p>
+                        </div>
+                    ) : autoScan.enabled ? (
+                        <div className="mt-5" data-testid="auto-scan-enabled-stats">
+                            <p className="text-overline" style={{ color: "hsl(var(--buy))" }}>
+                                <Check size={12} strokeWidth={2} className="inline mr-2" /> Active
+                            </p>
+                            <div className="mt-3 grid grid-cols-2 gap-4 max-w-md">
+                                <div>
+                                    <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                                        LAST SCAN
+                                    </p>
+                                    <p className="text-sm mt-1 font-mono">
+                                        {autoScan.last_run_at
+                                            ? new Date(autoScan.last_run_at).toLocaleString()
+                                            : "—"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                                        ALERTS SENT (LAST RUN)
+                                    </p>
+                                    <p className="text-sm mt-1 font-mono" data-testid="auto-scan-last-alerts">
+                                        {typeof autoScan.last_alerts_sent === "number"
+                                            ? autoScan.last_alerts_sent
+                                            : "—"}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <p
+                            className="mt-5 text-sm font-mono"
+                            style={{ color: "hsl(var(--text-muted))" }}
+                            data-testid="auto-scan-off-hint"
+                        >
+                            Toggle on to start receiving daily RF-only watchlist alerts.
+                        </p>
+                    )}
+
+                    {autoScanErr && (
+                        <p
+                            className="mt-4 text-sm font-mono"
+                            style={{ color: "hsl(var(--sell))" }}
+                            data-testid="auto-scan-error-msg"
+                        >
+                            <X size={12} className="inline mr-1" /> {autoScanErr}
                         </p>
                     )}
                 </section>
