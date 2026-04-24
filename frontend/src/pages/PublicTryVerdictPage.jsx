@@ -40,6 +40,7 @@ export default function PublicTryVerdictPage() {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
     const [error, setError] = useState("");
+    const [progress, setProgress] = useState(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -60,6 +61,7 @@ export default function PublicTryVerdictPage() {
                     if (!cancelled) {
                         setData(body);
                         setLoading(false);
+                        setProgress(null);
                     }
                     return;
                 }
@@ -70,7 +72,14 @@ export default function PublicTryVerdictPage() {
                     }
                     return;
                 }
-                // Still pending — poll again in 2s
+                // Still pending — update progress label from server-streamed stage
+                if (!cancelled) {
+                    setProgress({
+                        label: body?._job?.stage_label || null,
+                        offset: body?._job?.stage_offset_s ?? null,
+                        attempt: attempts + 1,
+                    });
+                }
                 pollTimer = setTimeout(() => pollJob(jobId, attempts + 1), 2000);
             } catch (e) {
                 if (!cancelled) {
@@ -161,18 +170,21 @@ export default function PublicTryVerdictPage() {
 
             <main className="max-w-[1200px] mx-auto px-5 md:px-8 pt-10 pb-20 relative z-10">
                 {loading && (
-                    <div className="py-24 text-center">
+                    <div className="py-24 text-center max-w-xl mx-auto">
                         <Loader2 className="animate-spin mx-auto" size={22} />
                         <p className="text-overline mt-4">
                             {isSharedView
                                 ? "Loading shared verdict…"
                                 : `Running your free verdict on ${(params.ticker || "").toUpperCase()}…`}
                         </p>
-                        <p className="text-xs mt-2" style={{ color: "hsl(var(--text-muted))" }}>
-                            {isSharedView
-                                ? "Preview mode · redacted by design"
-                                : "This typically takes 20–40 seconds · full pipeline, not a preview"}
-                        </p>
+                        {!isSharedView && (
+                            <ProgressIndicator progress={progress} />
+                        )}
+                        {isSharedView && (
+                            <p className="text-xs mt-2" style={{ color: "hsl(var(--text-muted))" }}>
+                                Preview mode · redacted by design
+                            </p>
+                        )}
                     </div>
                 )}
 
@@ -623,6 +635,58 @@ function SharePreviewButton({ verdictId }) {
                 {copied ? (<><Check size={10} strokeWidth={2} /> COPIED</>) : (<><Copy size={10} strokeWidth={1.8} /> COPY</>)}
             </button>
         </div>
+    );
+}
+
+
+
+/**
+ * ProgressIndicator — renders the 5 canonical analysis stages as a checklist
+ * with each stage marked as in-progress (spinner), done (green check), or
+ * upcoming (muted dot). Uses the server-streamed `stage_offset_s` so the
+ * UI matches the actual backend pipeline timing rather than faking it.
+ */
+const STAGES = [
+    { offset: 0,  label: "Fetching live quote · OHLC · fundamentals" },
+    { offset: 6,  label: "Detecting candlestick patterns across daily + weekly" },
+    { offset: 12, label: "Running Random Forest model · 20-day horizon" },
+    { offset: 18, label: "Gathering market context · news · peer signals" },
+    { offset: 26, label: "Synthesising verdict with Anthropic Claude" },
+];
+
+function ProgressIndicator({ progress }) {
+    // Figure out the highest-reached stage from server offset, fallback to 0
+    const reachedOffset = progress?.offset != null ? progress.offset : -1;
+    return (
+        <ul className="mt-6 text-left space-y-2 font-mono text-xs">
+            {STAGES.map((stage) => {
+                const isDone = reachedOffset > stage.offset;
+                const isActive = reachedOffset >= 0 && reachedOffset === stage.offset;
+                const isUpcoming = !isDone && !isActive;
+                return (
+                    <li
+                        key={stage.offset}
+                        className="flex items-center gap-2"
+                        style={{
+                            color: isDone
+                                ? "hsl(var(--buy))"
+                                : isActive
+                                ? "hsl(var(--text-primary))"
+                                : "hsl(var(--text-muted))",
+                            opacity: isUpcoming ? 0.55 : 1,
+                        }}
+                        data-testid={`stage-${stage.offset}`}
+                    >
+                        <span className="w-4 flex items-center justify-center">
+                            {isDone ? "✓" : isActive ? (
+                                <Loader2 size={10} className="animate-spin" />
+                            ) : "·"}
+                        </span>
+                        <span>{stage.label}</span>
+                    </li>
+                );
+            })}
+        </ul>
     );
 }
 

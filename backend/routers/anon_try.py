@@ -223,11 +223,41 @@ async def anon_try_analysis(ticker: str, request: Request, mode: str = Query("hy
     })
 
 
+async def _stage_ticker(job_id: str):
+    """Background companion to the analysis task — writes sequential stage
+    labels into the job doc at realistic intervals so the poll endpoint
+    can show a live progress indicator. Non-invasive: doesn't touch the
+    analysis pipeline itself. Cancelled by the parent when real work
+    finishes (either before or after the last scheduled stage)."""
+    stages = [
+        (0,  "Fetching live quote · OHLC · fundamentals"),
+        (6,  "Detecting candlestick patterns across daily + weekly"),
+        (12, "Running Random Forest model · 20-day horizon"),
+        (18, "Gathering market context · news · peer signals"),
+        (26, "Synthesising verdict with Anthropic Claude"),
+        (40, "Finalising · stitching reasoning · writing verdict"),
+    ]
+    start = 0
+    try:
+        for offset, label in stages:
+            wait_for = max(0, offset - start)
+            if wait_for > 0:
+                await asyncio.sleep(wait_for)
+            start = offset
+            await db.anon_try_jobs.update_one(
+                {"job_id": job_id},
+                {"$set": {"stage_label": label, "stage_offset_s": offset}},
+            )
+    except asyncio.CancelledError:
+        return  # parent finished — silent
+
+
 async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash: str, ua: str | None):
     """Background worker — runs the analysis pipeline, stores the result
     or error in `anon_try_jobs`, and updates `anon_try_usage` on success.
     Any failure is caught so the job status flips to 'error' instead of
-    leaving the client polling forever."""
+    leaving the client polling forever. A companion `_stage_ticker` task
+    streams progress labels into the job doc for the UI to show."""
     synthetic = {
         "id": f"anon:{ip_hash}",
         "email": f"anon+{ip_hash[:8]}@neulab.local",
@@ -235,6 +265,7 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
         "disclaimer_accepted": True,
         "__anon__": True,
     }
+    ticker_task = asyncio.create_task(_stage_ticker(job_id))
     try:
         result = await _create_analysis_impl(ticker_up, mode, synthetic)
         verdict_id = result["id"]
@@ -251,6 +282,7 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
                 "status": "done",
                 "verdict_id": verdict_id,
                 "finished_at": iso(now_utc()),
+                "stage_label": "Ready",
             }},
         )
     except Exception as e:
@@ -263,6 +295,13 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
                 "finished_at": iso(now_utc()),
             }},
         )
+    finally:
+        ticker_task.cancel()
+        # Await the cancellation silently so the task doesn't linger
+        try:
+            await ticker_task
+        except (asyncio.CancelledError, Exception):
+            pass
 
 
 @router.get("/job/{job_id}")
@@ -282,7 +321,13 @@ async def poll_anon_job(job_id: str):
         return payload
     if status == "error":
         return {"_job": {"status": "error", "job_id": job_id, "error": job.get("error") or "Analysis failed"}}
-    return {"_job": {"status": "pending", "job_id": job_id, "ticker": job.get("ticker")}}
+    return {"_job": {
+        "status": "pending",
+        "job_id": job_id,
+        "ticker": job.get("ticker"),
+        "stage_label": job.get("stage_label"),
+        "stage_offset_s": job.get("stage_offset_s"),
+    }}
 
 
 @router.get("/status")

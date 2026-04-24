@@ -338,7 +338,7 @@ export default function AnalysisReportPage() {
                             {/* Chart */}
                             <div className="px-2 md:px-4">
                                 <div style={{ width: "100%", height: 260 }}>
-                                    <ResponsiveContainer>
+                                    <ResponsiveContainer width="100%" height="100%" debounce={80}>
                                         <LineChart data={chartData} margin={CHART_MARGIN}>
                                             <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border-divider))" vertical={false} />
                                             <XAxis
