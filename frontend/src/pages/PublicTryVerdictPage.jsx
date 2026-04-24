@@ -43,15 +43,68 @@ export default function PublicTryVerdictPage() {
 
     useEffect(() => {
         let cancelled = false;
+        let pollTimer = null;
+
+        const pollJob = async (jobId, attempts = 0) => {
+            if (cancelled) return;
+            if (attempts > 60) {  // 60 * 2s = 2 min hard ceiling
+                setError("Analysis is taking longer than expected. Please try again in a moment.");
+                setLoading(false);
+                return;
+            }
+            try {
+                const res = await axios.get(`${API}/api/try/job/${encodeURIComponent(jobId)}`);
+                const body = res.data || {};
+                const jobStatus = body?._job?.status;
+                if (jobStatus === "done") {
+                    if (!cancelled) {
+                        setData(body);
+                        setLoading(false);
+                    }
+                    return;
+                }
+                if (jobStatus === "error") {
+                    if (!cancelled) {
+                        setError(body?._job?.error || "Analysis failed. Please try another ticker.");
+                        setLoading(false);
+                    }
+                    return;
+                }
+                // Still pending — poll again in 2s
+                pollTimer = setTimeout(() => pollJob(jobId, attempts + 1), 2000);
+            } catch (e) {
+                if (!cancelled) {
+                    setError(e?.response?.data?.detail || "Lost connection while loading analysis");
+                    setLoading(false);
+                }
+            }
+        };
+
         (async () => {
             setLoading(true);
             try {
                 if (isSharedView) {
                     const res = await axios.get(`${API}/api/try/shared/${encodeURIComponent(params.shareId)}`);
-                    if (!cancelled) setData(res.data);
-                } else {
-                    const res = await axios.post(`${API}/api/try/analysis/${encodeURIComponent(params.ticker)}?mode=hybrid`);
-                    if (!cancelled) setData(res.data);
+                    if (!cancelled) {
+                        setData(res.data);
+                        setLoading(false);
+                    }
+                    return;
+                }
+                // Fresh try: POST may return either a full verdict (200, cache hit)
+                // or a job_id (202, cache miss → poll).
+                const res = await axios.post(
+                    `${API}/api/try/analysis/${encodeURIComponent(params.ticker)}?mode=hybrid`,
+                    null,
+                    { validateStatus: (s) => s === 200 || s === 202 },
+                );
+                if (res.status === 202 && res.data?.job_id) {
+                    pollJob(res.data.job_id);
+                    return;  // poll will setData + setLoading(false)
+                }
+                if (!cancelled) {
+                    setData(res.data);
+                    setLoading(false);
                 }
             } catch (e) {
                 if (!cancelled) {
@@ -60,12 +113,14 @@ export default function PublicTryVerdictPage() {
                         e?.message ||
                         "Could not run the analysis"
                     );
+                    setLoading(false);
                 }
-            } finally {
-                if (!cancelled) setLoading(false);
             }
         })();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            if (pollTimer) clearTimeout(pollTimer);
+        };
     }, [params.ticker, params.shareId, isSharedView]);
 
     const a = data;

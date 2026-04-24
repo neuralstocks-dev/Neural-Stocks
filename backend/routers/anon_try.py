@@ -19,11 +19,14 @@ Guardrails to prevent abuse / runaway cost:
 """
 from __future__ import annotations
 
+import asyncio
+
 import hashlib
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from core.db import db
@@ -86,6 +89,14 @@ async def _ensure_indexes():
         await db.anon_try_usage.create_index(
             "created_at_ts",
             expireAfterSeconds=ANON_WINDOW_HOURS * 3600,
+        )
+    except Exception:
+        pass
+    # Wipe completed/failed jobs after 1 hour — they're transient scratchpads
+    try:
+        await db.anon_try_jobs.create_index(
+            "created_at_ts",
+            expireAfterSeconds=3600,
         )
     except Exception:
         pass
@@ -174,38 +185,104 @@ async def anon_try_analysis(ticker: str, request: Request, mode: str = Query("hy
     )
     if cached_shared:
         verdict_id = cached_shared["id"]
-    else:
-        # -- 3) Run the full pipeline with a synthetic anon user --
-        synthetic = {
-            "id": f"anon:{ip_hash}",
-            "email": f"anon+{ip_hash[:8]}@neulab.local",
-            "plan": "free",
-            "disclaimer_accepted": True,  # bypasses require_accepted
-            "__anon__": True,
-        }
-        try:
-            result = await _create_analysis_impl(ticker_up, mode, synthetic)
-            verdict_id = result["id"]
-        except HTTPException:
-            raise
-        except Exception as e:
-            _log.exception("Anon analysis failed for %s", ticker_up)
-            raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
+        # Log usage + return redacted immediately (fast path: ~100ms)
+        await db.anon_try_usage.insert_one({
+            "ip_hash": ip_hash,
+            "ticker": ticker_up,
+            "verdict_id": verdict_id,
+            "ua_fragment": (ua[:80] if ua else None),
+            "created_at_ts": now_utc(),
+        })
+        doc = await db.analyses.find_one({"id": verdict_id}, {"_id": 0})
+        if not doc:
+            raise HTTPException(status_code=500, detail="Analysis saved but could not be retrieved")
+        return _redact_for_anon(doc)
 
-    # -- 4) Log usage for rate-limit enforcement --
-    await db.anon_try_usage.insert_one({
-        "ip_hash": ip_hash,
+    # -- 3) Cache miss → spawn background job, return 202 with job_id.
+    # This dodges ingress timeouts (production ingress caps ~30s but a cold
+    # anon analysis runs Claude + yfinance + fundamentals which typically
+    # takes 25-45s). Frontend polls /api/try/job/{job_id} every 2s.
+    job_id = uuid.uuid4().hex[:16]
+    await db.anon_try_jobs.insert_one({
+        "job_id": job_id,
         "ticker": ticker_up,
-        "verdict_id": verdict_id,
+        "ip_hash": ip_hash,
+        "mode": mode,
+        "status": "pending",
+        "created_at": iso(now_utc()),
+        "created_at_ts": now_utc(),  # BSON date — used by TTL index
         "ua_fragment": (ua[:80] if ua else None),
-        "created_at_ts": now_utc(),
+    })
+    asyncio.create_task(_run_anon_analysis_job(job_id, ticker_up, mode, ip_hash, ua))
+    return JSONResponse(status_code=202, content={
+        "job_id": job_id,
+        "status": "pending",
+        "ticker": ticker_up,
+        "poll_url": f"/api/try/job/{job_id}",
+        "estimated_seconds": 30,
     })
 
-    # -- 5) Fetch the stored verdict and redact --
-    doc = await db.analyses.find_one({"id": verdict_id}, {"_id": 0})
-    if not doc:
-        raise HTTPException(status_code=500, detail="Analysis saved but could not be retrieved")
-    return _redact_for_anon(doc)
+
+async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash: str, ua: str | None):
+    """Background worker — runs the analysis pipeline, stores the result
+    or error in `anon_try_jobs`, and updates `anon_try_usage` on success.
+    Any failure is caught so the job status flips to 'error' instead of
+    leaving the client polling forever."""
+    synthetic = {
+        "id": f"anon:{ip_hash}",
+        "email": f"anon+{ip_hash[:8]}@neulab.local",
+        "plan": "free",
+        "disclaimer_accepted": True,
+        "__anon__": True,
+    }
+    try:
+        result = await _create_analysis_impl(ticker_up, mode, synthetic)
+        verdict_id = result["id"]
+        await db.anon_try_usage.insert_one({
+            "ip_hash": ip_hash,
+            "ticker": ticker_up,
+            "verdict_id": verdict_id,
+            "ua_fragment": (ua[:80] if ua else None),
+            "created_at_ts": now_utc(),
+        })
+        await db.anon_try_jobs.update_one(
+            {"job_id": job_id},
+            {"$set": {
+                "status": "done",
+                "verdict_id": verdict_id,
+                "finished_at": iso(now_utc()),
+            }},
+        )
+    except Exception as e:
+        _log.exception("Anon job failed for %s (job %s)", ticker_up, job_id)
+        await db.anon_try_jobs.update_one(
+            {"job_id": job_id},
+            {"$set": {
+                "status": "error",
+                "error": str(e)[:500],
+                "finished_at": iso(now_utc()),
+            }},
+        )
+
+
+@router.get("/job/{job_id}")
+async def poll_anon_job(job_id: str):
+    """Poll endpoint. Returns the job's current state and — if done — the
+    full redacted verdict payload. Frontend hits this every 2s."""
+    job = await db.anon_try_jobs.find_one({"job_id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    status = job.get("status", "pending")
+    if status == "done":
+        doc = await db.analyses.find_one({"id": job["verdict_id"]}, {"_id": 0})
+        if not doc:
+            raise HTTPException(status_code=500, detail="Underlying analysis no longer exists")
+        payload = _redact_for_anon(doc)
+        payload["_job"] = {"status": "done", "job_id": job_id}
+        return payload
+    if status == "error":
+        return {"_job": {"status": "error", "job_id": job_id, "error": job.get("error") or "Analysis failed"}}
+    return {"_job": {"status": "pending", "job_id": job_id, "ticker": job.get("ticker")}}
 
 
 @router.get("/status")
