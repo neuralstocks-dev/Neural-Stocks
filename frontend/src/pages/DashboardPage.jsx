@@ -82,9 +82,15 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                 {item.latest_analysis?.recommendation ? (
                     <div className="relative" data-testid={`verdict-cell-${item.ticker}`}>
                         <div
+                            className="min-w-0"
                             style={{
                                 opacity: analyzing ? 0.4 : 1,
                                 transition: "opacity 200ms ease-out",
+                                // Verdict text/badge has no interactive children;
+                                // disable pointer events so the wrapper never
+                                // steals clicks meant for the sibling action
+                                // buttons (Analyze / View / Timeline / Remove).
+                                pointerEvents: "none",
                             }}
                         >
                             <SignalBadge signal={item.latest_analysis.recommendation} />

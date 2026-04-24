@@ -1,0 +1,38 @@
+{
+  "summary": "Re-tested the click-interception fix on /dashboard. The fix is INEFFECTIVE — Playwright still fails to click [data-testid='analyze-AAPL-button'] without force=True. TEST 1 confirmed the inner wrapper now has computed pointer-events:'none' (the fix was applied correctly at the line it targeted, DashboardPage.jsx:93). However the OUTER wrapper — the div.relative that carries data-testid='verdict-cell-AAPL' at line 83 — still has pointer-events:'auto'. DOM geometry probe proves the outer div's bounding rect (x=949 → right=1082, w=132.56) is IDENTICAL to the inner wrapper's rect and overlaps the analyze-AAPL-button (left=1020 → right=1050). When Playwright does elementFromPoint at the button's center, it skips the inner child (pointer-events:none) but hits the outer div.relative which intercepts. Real mouse clicks still work (users unaffected) but automated hit-testing and potential mobile touch issues persist. Subsequent tests (pill appearance, mobile 390 layout, fresh-ticker regression, console errors) could NOT be re-verified in this iteration because the click-intercept blocks the normal Playwright flow.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "WatchlistRow — verdict-cell-{ticker} outer wrapper (DashboardPage.jsx line 83)",
+        "issue": "FIX PLACED ON WRONG ELEMENT. Iteration 18's action item asked for pointerEvents:'none' on the 'inner dimmed wrapper' and the fix was placed on the inner .min-w-0 div (line 84-95). But the INNER wrapper's bounding rect is identical to the OUTER div.relative's rect (both 949→1082px). Playwright's subtree-intercepts check walks up to the outer div.relative which still has pointer-events:auto and is therefore the actual interceptor at the analyze button's hit point (x=1020-1050 inside cell rect right=1082). Click STILL fails without force=True. Solution: move (or additionally add) pointerEvents:'none' to the outer div.relative at line 83, since its entire subtree contains no interactive children (SignalBadge, conf text, and the absolute refreshing-pill which already has pointer-events-none). Alternatively/additionally add overflow:hidden + min-w-0 on the parent grid cell (.col-span-3 md:col-span-2 at line 81) so the verdict cell stops overflowing 32px into the sibling action-buttons column in the first place.",
+        "selector": "[data-testid='verdict-cell-AAPL']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Move pointerEvents:'none' from the inner .min-w-0 wrapper (DashboardPage.jsx line 84-95) to the OUTER div.relative (line 83) that carries data-testid='verdict-cell-{ticker}'. Safe because no descendant in that subtree is interactive (pill already has pointer-events-none). Keeping it on the inner as well is fine (redundant but harmless).",
+    "(Recommended) Add className='overflow-hidden min-w-0' to the parent grid cell (line 81: 'col-span-3 md:col-span-2') so the verdict column cannot overflow 32px past its grid track into the action-buttons column. This is the underlying geometric root cause — the cell is wider than its nominal col-span-2 slot, likely due to text-overline letter-spacing:0.12em on the 'conf · 3m ago' line or SignalBadge's min-width.",
+    "After fix, re-run iter 19 Playwright suite: normal click on analyze-AAPL-button without force=True, pill visibility during analyzing, mobile 390 overflow check, fresh-ticker regression (MSFT analyzing-label path), and zero console errors."
+  ],
+  "critical_code_review_comments": [
+    "DashboardPage.jsx:82-121 — The pointer-events:none guard belongs on the verdict-cell root (line 83 div.relative), not on its inner child. Hit-testing walks the DOM tree; putting the guard on the inner child is invisible to any ancestor-based elementFromPoint because the ancestor always catches the pointer first.",
+    "DashboardPage.jsx:81 — The grid cell has no min-w-0 and no overflow hidden. In a 12-col CSS grid, a col-span-2 track will stretch beyond its fractional share when its content is wider than the track (SignalBadge + letter-spacing text). This is the real reason the verdict cell bleeds 32px into the action-buttons cell. Adding min-w-0 overflow-hidden on the grid cell would fix the geometric overlap at the source.",
+    "Consider swapping the CSS-grid layout for flex or explicit widths for the action-buttons column — col-span-1 gives the four action buttons only ~66px on 1920px which is extremely tight, making overflow-intercept bugs more likely as the app evolves."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "n/a (frontend-only iteration)",
+    "frontend": "1/6 atomic checks passed. TEST 1 (inner wrapper computed pointer-events='none') PASS. TEST 2 (normal click without force=True) FAIL — outer div.relative still intercepts. TEST 3-7 not re-run because TEST 2 blocks the normal flow."
+  },
+  "test_credentials": "jolor69@gmail.com / admin1234 (admin). Disclaimer pre-accepted in iter 18, re-accepted in iter 19 via POST /api/disclaimer/accept (idempotent, returned 200). AAPL has BUY verdict from iter 18.",
+  "seed_data_creation": "None persisted. No watchlist changes. No analyses triggered in iter 19 (TEST 2 failed before triggering analyze).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "When main agent re-applies the fix, verify by: (1) await page.locator('[data-testid=analyze-AAPL-button]').click() must succeed WITHOUT force=True within 5s, (2) getComputedStyle on the outer div[data-testid=verdict-cell-AAPL] must return pointerEvents='none' (currently returns 'auto'), (3) bounding rect of outer div may still overlap the button but that's fine once pointer-events is off. Login flow note: the 'Sign in' button is the email submit (use page.get_by_role('button', name='Sign in', exact=True)); use press_sequentially for the email/password fields so React state updates enable the button — plain .fill() left the submit disabled.",
+  "rca of the issue": "Geometry: verdict-cell-AAPL outer div has bounding rect x=949 → right=1082 (w=132.56). Its sibling action-buttons column starts at ~x=1020 with analyze-AAPL-button at x=1020-1050. Thus the verdict cell extends 32px INTO the action-buttons column. Why: the CSS grid track for the verdict cell (col-span-3 md:col-span-2) has no min-w-0 / overflow hidden, and the inner content (SignalBadge + 'X% conf · Xm ago' text-overline with letter-spacing:0.12em) is wider than its nominal 1/6 track share, so the track stretches. Interception: the iter 18 fix added pointerEvents:'none' to the inner .min-w-0 child div (line 84-95) but NOT to the outer div.relative (line 83) which owns data-testid='verdict-cell-AAPL'. Both divs have identical bounding rects. Playwright elementFromPoint at (1035, 1603) skips the inner child (pointer-events:none honored) and lands on the outer div.relative which has pointer-events:auto — so the subtree-intercepts check fails and the click is blocked. Mitigation: put pointerEvents:'none' on the OUTER div.relative (safe — no interactive children in the subtree) OR add overflow:hidden + min-w-0 on the parent grid cell so the cell physically stops overlapping the action-buttons column."
+}
