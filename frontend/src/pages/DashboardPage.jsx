@@ -30,12 +30,12 @@ import {
     Zap,
 } from "lucide-react";
 
-function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyzing, canTimeline }) {
+function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyzing, canTimeline, revealed }) {
     const q = item.quote || {};
     const up = (q.change_pct ?? 0) >= 0;
     return (
         <div
-            className="rise-in grid grid-cols-12 items-center gap-2 py-5 md:py-6 px-4 md:px-6 group"
+            className={`rise-in grid grid-cols-12 items-center gap-2 py-5 md:py-6 px-4 md:px-6 group${revealed ? " verdict-revealed" : ""}`}
             style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
             data-testid={`watchlist-card-${item.ticker}`}
         >
@@ -218,6 +218,7 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [analyzingTicker, setAnalyzingTicker] = useState(null);
+    const [revealedTicker, setRevealedTicker] = useState(null);
     const [quickBusy, setQuickBusy] = useState(null); // 'top' | 'bottom' | null
     const [modalOpen, setModalOpen] = useState(false);
     const [timelineTicker, setTimelineTicker] = useState(null);
@@ -353,6 +354,13 @@ export default function DashboardPage() {
                                 : it
                         )
                     );
+                    // Tiny "verdict revealed" glow on the row — pure CSS, 1.6s
+                    // amber wash that fades. Clear state just beyond animation
+                    // length so the class can re-trigger on the next analyze.
+                    setRevealedTicker(ticker);
+                    setTimeout(() => {
+                        setRevealedTicker((cur) => (cur === ticker ? null : cur));
+                    }, 1700);
                 }
                 await fetchWatchlist();
                 await fetchAlerts();
@@ -739,6 +747,7 @@ export default function DashboardPage() {
                                         onTimeline={(t) => disclaimer.ensureAccepted(() => setTimelineTicker(t))}
                                         canTimeline={canQuickActions}
                                         analyzing={analyzingTicker === item.ticker}
+                                        revealed={revealedTicker === item.ticker}
                                     />
                                 ))}
                             </div>
