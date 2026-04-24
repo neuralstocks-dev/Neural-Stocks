@@ -1,6 +1,6 @@
 """Admin: user management, test-unlock, login events, pricing."""
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -94,7 +94,22 @@ async def list_users(limit: int = 200, _admin=Depends(admin_required)):
             p = await resolved_plan_for(u)
             base["effective_plan"] = effective_plan_key(u)
             base["analyses_day_limit"] = p.get("analyses_per_day")  # None == unlimited
-            base["analyses_today"] = await count_analyses(u["id"], day_ago)
+            # Honour admin-initiated quota resets — analyses before
+            # `quota_reset_at` should not count toward the today usage,
+            # mirroring the same floor used by services.quota for the
+            # user-facing /api/quota endpoint. Without this, resetting
+            # a user from the admin panel left their `analyses_today`
+            # number unchanged in the same panel until 24h elapsed.
+            since_day = day_ago
+            reset_at = u.get("quota_reset_at")
+            if reset_at:
+                try:
+                    reset_dt = datetime.fromisoformat(str(reset_at).replace("Z", "+00:00"))
+                    if reset_dt > since_day:
+                        since_day = reset_dt
+                except Exception:
+                    pass
+            base["analyses_today"] = await count_analyses(u["id"], since_day)
             base["test_unlock_active"] = test_unlock_active(u)
         except Exception:
             base["effective_plan"] = base.get("plan")
