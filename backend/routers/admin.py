@@ -547,3 +547,40 @@ async def idx_bootstrap_catalog(
         try_bulk_endpoints=try_bulk_endpoints,
     )
 
+
+
+# ---------- Anonymous Try — rate-limit reset (testing) ------------------
+@router.get("/anon-try/stats")
+async def anon_try_stats(_admin=Depends(admin_required)):
+    """Returns counts for the anon 'Try one free analysis' rate-limit
+    collection so admins can sanity-check before/after a reset."""
+    total = await db.anon_try_usage.count_documents({})
+    # Distinct active IPs (hashed — no PII exposed)
+    pipeline = [{"$group": {"_id": "$ip_hash"}}, {"$count": "n"}]
+    agg = await db.anon_try_usage.aggregate(pipeline).to_list(length=1)
+    unique_ips = agg[0]["n"] if agg else 0
+    # Last 5 events for spot-check
+    recent = await db.anon_try_usage.find(
+        {}, {"_id": 0, "ip_hash": 1, "ticker": 1, "verdict_id": 1, "created_at_ts": 1, "ua_fragment": 1},
+    ).sort("created_at_ts", -1).limit(5).to_list(length=5)
+    # Serialize datetimes for JSON
+    for r in recent:
+        ts = r.get("created_at_ts")
+        if ts is not None and not isinstance(ts, str):
+            r["created_at_ts"] = iso(ts)
+    return {
+        "active_records": total,
+        "unique_ips_rate_limited": unique_ips,
+        "recent": recent,
+    }
+
+
+@router.post("/anon-try/reset")
+async def anon_try_reset(_admin=Depends(admin_required)):
+    """Wipe the entire anon_try_usage collection so every visitor gets a
+    fresh free-analysis slot. Intended for testing ONLY — recipients will
+    be able to run a new free analysis immediately after this call. The
+    TTL index is preserved (collection isn't dropped, just emptied)."""
+    res = await db.anon_try_usage.delete_many({})
+    return {"ok": True, "deleted_count": res.deleted_count}
+

@@ -6,6 +6,7 @@ import IdxBudgetCard from "@/components/IdxBudgetCard";
 import IdxCatalogCard from "@/components/IdxCatalogCard";
 import PayPalWebhookCard from "@/components/PayPalWebhookCard";
 import ExperimentsCard from "@/components/ExperimentsCard";
+import AnonTryResetCard from "@/components/AnonTryResetCard";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, Link } from "react-router-dom";
 import { Loader2, ShieldCheck, Clock, RotateCcw, Timer, Search, Trash2, BellOff, DollarSign, CheckSquare, Square, AlertTriangle, Sparkles } from "lucide-react";
@@ -761,6 +762,9 @@ export default function AdminPage() {
 
                         {/* A/B experiments */}
                         <ExperimentsCard />
+
+                        {/* Anon Try — rate-limit reset (testing) */}
+                        <AnonTryResetCard />
 
 
                         {/* Users table */}
