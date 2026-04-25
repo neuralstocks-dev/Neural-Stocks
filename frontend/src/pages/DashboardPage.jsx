@@ -8,6 +8,7 @@ import Sparkline from "@/components/Sparkline";
 import SignalBadge from "@/components/SignalBadge";
 import QuickAnalyzeProgress from "@/components/QuickAnalyzeProgress";
 import TestUnlockBanner from "@/components/TestUnlockBanner";
+import FirstTimeManualPill from "@/components/FirstTimeManualPill";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import AnalysisModeSelector from "@/components/AnalysisModeSelector";
 import LiveDeskGuide from "@/components/LiveDeskGuide";
@@ -667,6 +668,9 @@ export default function DashboardPage() {
 
                 {/* Test-unlock banner (admin-granted) */}
                 <TestUnlockBanner quota={quota} />
+
+                {/* First-time manual nudge (auto-hides after first analysis this week) */}
+                <FirstTimeManualPill quota={quota} />
 
                 {/* Quota banner */}
                 {quota && (

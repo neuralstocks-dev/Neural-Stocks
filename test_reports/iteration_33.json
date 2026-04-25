@@ -1,0 +1,50 @@
+{
+  "summary": "Iter-33 frontend-only verification of FirstTimeManualPill on the Dashboard. All 4 acceptance scenarios PASS, plus the marketing-claims jest regression remains 13/13 green.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "test1_pill_renders_for_new_user": {
+      "status": "PASS",
+      "details": "Registered fresh account via POST /api/auth/register {email, password, full_name} -> 200 with token+user. Stashed token in localStorage and navigated to /dashboard (waited 4s for quota). [data-testid='first-time-manual-pill']=1, [data-testid='first-time-manual-pill-link']=1 with href='/manual', [data-testid='first-time-manual-pill-dismiss']=1, localStorage.sai_manual_pill_dismissed_v1=null."
+    },
+    "test2_pill_dismiss_persists": {
+      "status": "PASS",
+      "details": "Clicked X on pill -> pill removed from DOM (count=0) and localStorage.sai_manual_pill_dismissed_v1='1'. After full page reload, pill stayed hidden (count=0) — flag persists across refresh."
+    },
+    "test3_link_engagement_dismisses": {
+      "status": "PASS",
+      "details": "Cleared localStorage flag, reloaded -> pill re-rendered (count=1). Clicked [data-testid='first-time-manual-pill-link'] -> URL became /manual and flag set to '1' immediately. Browser back to /dashboard -> pill count=0. Link click is correctly treated as engagement and dismisses the pill."
+    },
+    "test4_quota_hides_pill_for_existing_user": {
+      "status": "PASS",
+      "details": "Logged in as demo@stockai.io / demo1234 (analyses_this_week=4, confirmed via /api/quota response). With localStorage flag=null, [data-testid='first-time-manual-pill']=0 — quota signal alone hides the pill, matching spec."
+    },
+    "test5_marketing_claims_jest_regression": {
+      "status": "PASS",
+      "details": "cd /app/frontend && CI=1 yarn test --testPathPattern=marketing-claims --watchAll=false -> 13/13 passed in 0.352s, exit code 0."
+    }
+  },
+  "test_report_links": [
+    "/app/frontend/src/components/FirstTimeManualPill.jsx",
+    "/app/frontend/src/pages/DashboardPage.jsx",
+    "/app/frontend/src/__tests__/marketing-claims.test.jsx"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "FirstTimeManualPill.jsx is clean (~110 LOC). Initial state dismissed=true + useEffect on mount avoids first-paint flicker. Storage key versioned with `_v1` allows future re-promotion.",
+    "Wiring in DashboardPage.jsx is correct (line 11 import, line 673 render between TestUnlockBanner and quota banner) and component receives `quota` so the quota-based auto-hide works without an extra fetch.",
+    "Minor enhancement (non-blocking): could memoize `usedThisWeek` or extract a small `useFirstTimeManualPill` hook if reused on other pages — fine to leave as-is for this single-callsite feature."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "5/5 PASS (4 acceptance + 1 regression)"},
+  "test_credentials": "demo@stockai.io / demo1234 used for quota-hides scenario. Fresh user registered dynamically via POST /api/auth/register with payload {email, password, full_name}.",
+  "seed_data_creation": "Created 1 ephemeral test user 'manualpill+<timestamp>@test.io' / pass1234 via /api/auth/register for the new-user scenarios. Not deleted — feel free to ignore or prune.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "FirstTimeManualPill is fully verified (renders for new user, hides via X dismiss + persists, hides via link engagement, hides via quota>0). NOTE for any future signup tests: /api/auth/register schema requires `full_name` (NOT `name`); sending `name` returns 422.",
+  "rca of the issue": "n/a — no defects found."
+}
