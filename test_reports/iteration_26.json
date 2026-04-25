@@ -1,0 +1,37 @@
+{
+  "summary": "Iter 26 frontend retest of magic-link auto-login after StrictMode useRef guard fix in AuthContext.jsx. ALL 3 CRITICAL FLOWS PASS. (1) Fresh-device flow: cleared localStorage + valid magic token at /analysis/AAPL?autorun=1&t=<token> -> EXACTLY 1 POST /api/auth/magic returning 200, sai_token populated (188 chars), sai_user populated, NO redirect to /login, AAPL BUY verdict renders ($271.06, $305 target, $255 stop loss), 0 console errors. (2) Bogus token flow: 1 POST returning 401, redirected to /login, t= stripped from URL, no sai_token persisted (only expected 401 console error from the failed POST). (3) Already-logged-in user redeeming a fresh token: 1 POST returning 200, JWT refreshed (different token from the seeded one), session preserved as admin (jolor69@gmail.com), AAPL verdict renders, 0 console errors. The StrictMode double-fire bug from iter 25 is FULLY RESOLVED — all 3 runs show exactly ONE POST /api/auth/magic per flow. SEPARATE MINOR ISSUE FOUND (non-blocking, called out per request): in flows 1 and 3 the final URL ends up as /analysis/AAPL?t=<token> — i.e. autorun=1 is dropped (consistent with iter 25 observation) AND the t= param is somehow re-added back (NEW). The AuthContext code clearly calls params.delete('t') + window.history.replaceState, but a downstream React Router navigation (likely Analysis page consuming autorun=1 via navigate(pathname, {replace:true}) using router-stored location state which still includes t=) appears to overwrite the cleaned URL. Token is already-consumed/useless so it's not exploitable, but it does leak a one-time token into history/share/bookmarks.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "URL cleanup after magic redemption (downstream Analysis page navigation)",
+        "issue": "After successful magic redemption, AuthContext calls history.replaceState to strip ?t=<token> while preserving autorun=1. Observed final URL is /analysis/AAPL?t=<token> — autorun=1 is dropped AND t= is restored. Likely cause: Analysis page consumes autorun=1 via React Router navigate(pathname, {replace: true}); React Router's stored location.search still contains the original '?autorun=1&t=<token>' (because history.replaceState bypasses React Router's history listener) and the navigate call reapplies it without autorun=1. Result: a one-time-use, already-consumed magic token is left in the URL (no security impact since token is consumed, but it leaks into browser history, shares, and bookmarks). Severity: LOW. Not blocking the auth fix per user instructions.",
+        "affected_selectors": ["/analysis/AAPL?autorun=1&t=<token>"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter25_magic_link.py"
+  ],
+  "action_items": [
+    "(LOW / OPTIONAL) Fix URL cleanup race so the final URL is /analysis/AAPL?autorun=1 (no t=, with autorun preserved). Two clean fixes: (a) After AuthContext calls history.replaceState, also call window.dispatchEvent(new PopStateEvent('popstate')) so React Router picks up the new search; or (b) Move the redemption + URL cleanup INTO a route-aware effect using react-router's useNavigate({replace:true}) so router state stays in sync; or (c) In Analysis page, when consuming autorun, read params from window.location.search (post-cleanup) rather than from router state. Confirmed not blocking this iteration's auth fix."
+  ],
+  "critical_code_review_comments": [
+    "AuthContext.jsx StrictMode fix: clean useRef-based single-fire guard at line 18-22. The guard sets bootstrappedRef.current=true synchronously BEFORE any await, so the second StrictMode invocation short-circuits immediately. Verified live — exactly 1 POST /api/auth/magic across all 3 test flows.",
+    "AuthContext.jsx setBootstrapping(false) is now reached on every code path (success branch line 53, catch fallthrough via line 75/87). Intent is clearer; no more reliance on the catch-branch fallthrough.",
+    "Minor: AuthContext.jsx line 64-69 catch branch's URL strip duplicates the success-branch logic. Could be DRYed into a small helper stripMagicTokenFromUrl(), but not critical."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "not retested (16/16 PASS from iter 25 still stands)",
+    "frontend": "3/3 PASS (100%) — fresh-device, bogus-token, and already-logged-in flows all green"
+  },
+  "test_credentials": "Admin: jolor69@gmail.com / admin1234 (id=58c25b43-3a69-4703-9d0d-dff76de4a745). Used for flow 3 via direct POST /api/auth/login + localStorage seed (login form's primary 'Sign in' button selector ambiguity with the Google sign-in button — both match button:has-text('Sign in') — minor selector hardening opportunity, not a bug).",
+  "seed_data_creation": "Minted 2 fresh magic tokens (ade64e12... for flow 1, 93f2209c... for flow 3); both consumed during the test run. No residual data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Magic-link auto-login is fully working post-iter26 fix. Backend remains 16/16 green per /app/backend/tests/test_iter25_magic_link.py. Only outstanding item is the LOW-priority URL cleanup race (autorun=1 dropped, t= re-added by downstream React Router navigation in Analysis page) — main agent can self-verify any fix to that without a separate testing pass.",
+  "rca of the issue": "Iter 25 root cause (StrictMode double-fire causing duplicate POST /auth/magic + 401 race) is RESOLVED by the useRef guard at AuthContext.jsx line 18-22. The guard sets bootstrappedRef.current=true synchronously before the async work begins, so React.StrictMode's intentional second mount-effect invocation short-circuits on line 21 and never re-reads window.location nor re-POSTs the magic token. Verified live with network capture: exactly 1x POST /api/auth/magic per flow across 3 separate test runs (fresh-device, bogus-token, logged-in-user)."
+}

@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState, useCallback, useMemo } from "react";
+import React, { createContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import api from "@/lib/api";
 
 export const AuthContext = createContext(null);
@@ -9,8 +9,17 @@ export function AuthProvider({ children }) {
         return raw ? JSON.parse(raw) : null;
     });
     const [bootstrapping, setBootstrapping] = useState(true);
+    // React.StrictMode (and any future double-mount scenarios) intentionally
+    // fires this effect twice in dev. The magic-link redemption is a
+    // *one-time-use* server-side operation — the second fire would always
+    // 401 and race the first fire's success state, breaking auto-login.
+    // This ref guarantees the bootstrap (and especially the magic redeem)
+    // runs exactly once per AuthProvider lifetime.
+    const bootstrappedRef = useRef(false);
 
     useEffect(() => {
+        if (bootstrappedRef.current) return;
+        bootstrappedRef.current = true;
         // If we're returning from Google OAuth, skip bootstrap — AuthCallback will handle it
         if (window.location.hash?.includes("session_id=")) {
             setBootstrapping(false);
@@ -44,10 +53,12 @@ export function AuthProvider({ children }) {
                     setBootstrapping(false);
                     return;
                 } catch {
-                    // Token expired / already used / bogus — fall through
-                    // to normal bootstrap so the user lands on /login if
-                    // they aren't already authenticated. Strip the bad
-                    // param either way to avoid retry loops.
+                    // Token expired / already used / bogus — strip the
+                    // bad param so the user doesn't end up in a retry
+                    // loop, then fall through to normal session bootstrap
+                    // below. If they have an existing JWT it'll refresh
+                    // their session; if not, ProtectedRoute redirects
+                    // them to /login as expected.
                     params.delete("t");
                     const remaining = params.toString();
                     window.history.replaceState(
