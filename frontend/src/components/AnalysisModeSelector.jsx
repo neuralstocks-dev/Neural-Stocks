@@ -46,8 +46,11 @@ export default function AnalysisModeSelector({
     disabled = false,
 }) {
     const active = MODES.find((m) => m.value === value) || MODES[0];
-    const pad = size === "sm" ? "px-3 py-1.5" : "px-4 py-2";
-    const fontSize = size === "sm" ? "text-[0.68rem]" : "text-xs";
+    // Mobile-first: tighter padding so all three pills fit inside a 390px
+    // viewport without the rightmost (Hybrid) clipping. sm:+ restores the
+    // original desktop comfort.
+    const pad = size === "sm" ? "px-2 py-1.5 sm:px-3" : "px-2.5 py-2 sm:px-4";
+    const fontSize = size === "sm" ? "text-[0.68rem]" : "text-[0.7rem] sm:text-xs";
 
     return (
         <div data-testid={`${testIdPrefix}-selector`}>
@@ -59,7 +62,7 @@ export default function AnalysisModeSelector({
                     {disabled ? "Mode used" : "Mode"}
                 </span>
                 <div
-                    className="inline-flex"
+                    className="flex w-full sm:inline-flex sm:w-auto"
                     style={{
                         border: "1px solid hsl(var(--border-default))",
                         borderRadius: 2,
@@ -89,7 +92,7 @@ export default function AnalysisModeSelector({
                                         : m.description
                                 }
                                 data-testid={`${testIdPrefix}-${m.value}`}
-                                className={`${fontSize} font-mono ${pad} inline-flex items-center gap-2 transition-colors`}
+                                className={`${fontSize} font-mono ${pad} flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 sm:gap-2 min-w-0 transition-colors`}
                                 style={{
                                     background: isActive ? "hsl(var(--hold))" : "hsl(var(--surface))",
                                     color: isActive
