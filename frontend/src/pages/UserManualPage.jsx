@@ -11,6 +11,7 @@
  */
 import React from "react";
 import { Link } from "react-router-dom";
+import AppShell from "@/components/AppShell";
 import {
     LineChart,
     Sparkles,
@@ -130,7 +131,8 @@ function Section({ id, icon: Icon, title, kicker, children }) {
 
 export default function UserManualPage() {
     return (
-        <div className="max-w-4xl mx-auto px-4 md:px-8 py-12 md:py-16">
+        <AppShell>
+            <div className="max-w-4xl mx-auto px-4 md:px-8 py-12 md:py-16">
             {/* Hero */}
             <header className="mb-10" data-testid="manual-hero">
                 <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
@@ -487,6 +489,7 @@ export default function UserManualPage() {
                     Open Dashboard <ArrowRight size={16} strokeWidth={1.8} />
                 </Link>
             </section>
-        </div>
+            </div>
+        </AppShell>
     );
 }

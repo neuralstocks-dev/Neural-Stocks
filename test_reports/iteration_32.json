@@ -1,0 +1,55 @@
+{
+  "summary": "Retest after iter-31 HIGH fix: UserManualPage.jsx now wraps its content in <AppShell>. All previously PARTIAL acceptance items now PASS on direct /manual loads at both 1920x1080 and 390x844, and all previously PASS items continue to pass. Marketing-claims jest regression still 13/13.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "test1_marketing_claims_jest": {
+      "status": "PASS",
+      "details": "cd /app/frontend && CI=1 yarn test --testPathPattern=marketing-claims --watchAll=false -> 13/13 passed in 0.368s, exit code 0."
+    },
+    "test2_desktop_direct_manual_1920x1080": {
+      "status": "PASS",
+      "details": "Direct goto /manual after login. [data-testid='app-header'] count=1. Header inline style: 'backdrop-filter: blur(16px); background: hsl(var(--background) / 0.72); border-bottom: 1px solid hsl(var(--border-default)); padding-top: env(safe-area-inset-top);' — contains 'safe-area-inset-top'. [data-testid='nav-manual'] count=1, href='/manual'."
+    },
+    "test3_mobile_direct_manual_390x844": {
+      "status": "PASS",
+      "details": "Direct goto /manual at 390x844. [data-testid='app-header'] count=1. Hamburger present as [data-testid='mobile-menu-button']. After click, [data-testid='nav-manual-mobile'] count=1 with href='/manual'. document.body.scrollWidth=390, html.scrollWidth=390, innerWidth=390 -> NO horizontal overflow."
+    },
+    "test4_regression_toc_anchor": {
+      "status": "PASS",
+      "details": "Click [data-testid='toc-watchlist'] -> URL becomes /manual#watchlist; manual-section-watchlist getBoundingClientRect().top = 96.14 (matches scrollMarginTop:96)."
+    },
+    "test5_regression_final_cta": {
+      "status": "PASS",
+      "details": "Click [data-testid='manual-cta-dashboard'] -> URL navigates to /dashboard."
+    },
+    "test6_regression_verbatim_phrases": {
+      "status": "PASS",
+      "details": "manual-section-watchlist text_content contains verbatim 'watchlist does NOT auto-update'. manual-section-alerts inner_text contains 'at least 75%'."
+    },
+    "test7_regression_all_13_section_testids": {
+      "status": "PASS",
+      "details": "All 13 testids present (manual-hero, manual-toc, manual-final-cta, and 10x manual-section-{intro,dashboard,analyze,watchlist,alerts,modes,portfolio,scorecard,limits,disclaimer})."
+    }
+  },
+  "test_report_links": [
+    "/app/frontend/src/__tests__/marketing-claims.test.jsx",
+    "/app/frontend/src/pages/UserManualPage.jsx"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix verified — UserManualPage.jsx now imports `AppShell from \"@/components/AppShell\"` (line 14) and wraps its return JSX in <AppShell>...</AppShell> (lines 134 and 493). Pattern matches every other Protected route.",
+    "Carry-over architectural nit (still applies, low priority): AppShell is wrapped per-page across many components instead of a React-Router layout route. Migrating to <Route element={<AppShell />}> in a future iteration would prevent the same omission re-occurring on the next new authenticated page."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "7/7 acceptance items PASS"},
+  "test_credentials": "demo@stockai.io / demo1234 (free user) — login worked via the email/password Sign in button.",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-31 HIGH issue fully resolved. All UserManualPage acceptance items verified PASS on direct loads (deep-link / refresh / bookmark) at both desktop 1920x1080 and mobile 390x844. Marketing-claims jest 13/13 still green. No further action required for this work item."
+}
