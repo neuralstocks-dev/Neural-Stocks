@@ -49,14 +49,15 @@ export default function AnalysisModeSelector({
     // Mobile-first: tighter padding so all three pills fit inside a 390px
     // viewport without the rightmost (Hybrid) clipping. sm:+ restores the
     // original desktop comfort.
-    const pad = size === "sm" ? "px-2 py-1.5 sm:px-3" : "px-2.5 py-2 sm:px-4";
+    const pad = size === "sm" ? "px-1.5 py-1.5 sm:px-3" : "px-1.5 py-2 sm:px-4";
     const fontSize = size === "sm" ? "text-[0.68rem]" : "text-[0.7rem] sm:text-xs";
 
     return (
         <div data-testid={`${testIdPrefix}-selector`}>
-            <div className="flex items-center gap-2 flex-wrap">
+            {/* Mobile: stack label above buttons (block). Desktop: inline-flex. */}
+            <div className="block sm:flex sm:items-center sm:gap-2 sm:flex-wrap">
                 <span
-                    className="text-overline"
+                    className="text-overline block sm:inline mb-1.5 sm:mb-0"
                     style={{ color: "hsl(var(--text-muted))", fontSize: "0.56rem" }}
                 >
                     {disabled ? "Mode used" : "Mode"}
@@ -92,7 +93,7 @@ export default function AnalysisModeSelector({
                                         : m.description
                                 }
                                 data-testid={`${testIdPrefix}-${m.value}`}
-                                className={`${fontSize} font-mono ${pad} inline-flex items-center justify-center gap-1.5 sm:gap-2 min-w-0 transition-colors`}
+                                className={`${fontSize} font-mono ${pad} inline-flex items-center justify-center gap-1 sm:gap-2 min-w-0 whitespace-nowrap transition-colors`}
                                 style={{
                                     background: isActive ? "hsl(var(--hold))" : "hsl(var(--surface))",
                                     color: isActive
@@ -113,10 +114,10 @@ export default function AnalysisModeSelector({
                                 ) : (
                                     <Icon size={12} strokeWidth={1.8} />
                                 )}
-                                <span>{m.label}</span>
+                                <span className="truncate">{m.label}</span>
                                 {m.recommended && !locked && !disabled && (
                                     <span
-                                        className="text-[0.5rem]"
+                                        className="text-[0.5rem] hidden sm:inline"
                                         style={{
                                             color: isActive
                                                 ? "hsl(var(--surface))"

@@ -147,6 +147,23 @@ export default function SettingsPage() {
         }
     };
 
+    // Defensive client-side eligibility: derive from the locally cached user
+    // object so admin / paid plans NEVER see a locked card even if the
+    // /me/auto-scan response is stale, cached, or comes back with a falsy
+    // plan_eligible flag for any reason. Server still enforces real eligibility
+    // at toggle time — this just ensures the UI doesn't render an incorrectly
+    // locked state to a real paid/admin user.
+    const planIsPaid =
+        !!user?.is_admin ||
+        !!user?.test_unlock_active ||
+        ["pro", "elite", "daypass"].includes(user?.plan);
+    const effectiveAutoScan = autoScan
+        ? {
+              ...autoScan,
+              plan_eligible: autoScan.plan_eligible || planIsPaid,
+          }
+        : autoScan;
+
     const toggleDigest = async (nextEnabled) => {
         setDigestErr("");
         setDigestBusy(true);
@@ -727,11 +744,11 @@ export default function SettingsPage() {
                                 Analyze in the app for the multi-lens report before acting.
                             </p>
                         </div>
-                        {autoScan && (
+                        {effectiveAutoScan && (
                             <div className="shrink-0">
                                 <Switch
-                                    checked={!!autoScan?.enabled}
-                                    disabled={autoScanBusy || !autoScan?.plan_eligible || !autoScan?.telegram_linked}
+                                    checked={!!effectiveAutoScan?.enabled}
+                                    disabled={autoScanBusy || !effectiveAutoScan?.plan_eligible || !effectiveAutoScan?.telegram_linked}
                                     onCheckedChange={toggleAutoScan}
                                     data-testid="auto-scan-toggle"
                                 />
@@ -739,11 +756,11 @@ export default function SettingsPage() {
                         )}
                     </div>
 
-                    {!autoScan ? (
+                    {!effectiveAutoScan ? (
                         <p className="mt-4 text-sm" style={{ color: "hsl(var(--text-muted))" }}>
                             <Loader2 size={14} className="animate-spin inline mr-2" /> Loading…
                         </p>
-                    ) : !autoScan.plan_eligible ? (
+                    ) : !effectiveAutoScan.plan_eligible ? (
                         <div
                             className="mt-5 p-4 flex items-start gap-3"
                             style={{
@@ -771,7 +788,7 @@ export default function SettingsPage() {
                                 </p>
                             </div>
                         </div>
-                    ) : !autoScan.telegram_linked ? (
+                    ) : !effectiveAutoScan.telegram_linked ? (
                         <div
                             className="mt-5 p-4"
                             style={{
@@ -789,7 +806,7 @@ export default function SettingsPage() {
                                 feature.
                             </p>
                         </div>
-                    ) : autoScan.enabled ? (
+                    ) : effectiveAutoScan.enabled ? (
                         <div className="mt-5" data-testid="auto-scan-enabled-stats">
                             <p className="text-overline" style={{ color: "hsl(var(--buy))" }}>
                                 <Check size={12} strokeWidth={2} className="inline mr-2" /> Active
@@ -800,8 +817,8 @@ export default function SettingsPage() {
                                         LAST SCAN
                                     </p>
                                     <p className="text-sm mt-1 font-mono">
-                                        {autoScan.last_run_at
-                                            ? new Date(autoScan.last_run_at).toLocaleString()
+                                        {effectiveAutoScan.last_run_at
+                                            ? new Date(effectiveAutoScan.last_run_at).toLocaleString()
                                             : "—"}
                                     </p>
                                 </div>
@@ -810,8 +827,8 @@ export default function SettingsPage() {
                                         ALERTS SENT (LAST RUN)
                                     </p>
                                     <p className="text-sm mt-1 font-mono" data-testid="auto-scan-last-alerts">
-                                        {typeof autoScan.last_alerts_sent === "number"
-                                            ? autoScan.last_alerts_sent
+                                        {typeof effectiveAutoScan.last_alerts_sent === "number"
+                                            ? effectiveAutoScan.last_alerts_sent
                                             : "—"}
                                     </p>
                                 </div>

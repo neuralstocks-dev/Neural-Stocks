@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 29 frontend-only re-verification of mobile Mode selector clipping (Issue 1) and admin Auto-Scan toggle defensive override (Issue 2). Both fixes verified using correct 'dashboard-mode-*' / 'auto-scan-*' data-testids that the previous iter28 test had wrongly substituted with 'mode-*'. ALL CRITICAL ASSERTIONS PASS at 320/360/375/390/414/1920 viewports; admin card correctly unlocked + toggle checked + stats visible; free-user lock card regression intact.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard Mode selector (mobile)", "issues": ["At very narrow viewports the equal grid-cols-3 slots make the longer 'Standard' label truncate with ellipsis at 320px and 'Candlestick' truncate at 320-414px (e.g., shown as 'Candl…'). Hybrid (the user's complaint) is fully visible at every tested width, so the reported bug IS fixed. The Standard/Candlestick truncation is cosmetic and was NOT reported — but if main agent wants pixel-perfect, consider shrinking icon margin gap on mobile (gap-0.5 instead of gap-1) or using shorter labels ('Std'/'Candle') below sm: breakpoint. Non-blocker."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional cosmetic: address Standard/Candlestick label ellipsis at 320-414 px if pixel-perfect labels are desired (gap reduction or shorter mobile labels). Hybrid clipping bug reported by user IS fully resolved."
+  ],
+  "critical_code_review_comments": [
+    "AnalysisModeSelector.jsx — solid responsive structure (block→sm:flex parent, grid-cols-3→sm:flex inner). The truncate class on label spans is the correct safety net but causes visible ellipsis on the two longer labels at narrowest widths; consider conditional gap-0.5 on mobile to recover ~6px per button.",
+    "SettingsPage.jsx effectiveAutoScan derivation (lines 156-165) — correct defensive client-side eligibility override based on user.is_admin / user.test_unlock_active / user.plan. Server still enforces real eligibility on toggle action, so no security regression. Good pattern."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (5/5 critical assertions pass)"},
+  "test_credentials": "Admin jolor69@gmail.com/admin1234 — verified plan=Elite, telegram_linked, auto-scan enabled. Free demo@stockai.io/demo1234 — verified plan=free, no telegram. Both work via /api/auth/email/login.",
+  "seed_data_creation": "None — used existing seeded users.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Always use 'dashboard-mode-*' (NOT 'mode-*') for selector tests on /dashboard — 'mode-*' resolves to a different (verdict-page) instance and gave a false-pass in iter28. For Switch/Radix toggle checked-state, query data-state='checked' or aria-checked='true' instead of native .checked (returns null). Admin Settings page renders Telegram + Auto-Scan + Digest cards in that order; Auto-Scan is the second 'module' section. Backend reports last_alerts_sent=2 and last_run_at populated for jolor69 (visible in stats panel as '4/25/2026, 4:10:48 AM' and '2').",
+  "evidence": {
+    "issue1_mobile": "At 390px: Hybrid button right=348 (vw=390) span 47/47 uncut, label.bottom=329 above bg.top=349, ★ hidden. Same fit/align at 320/360/375/414.",
+    "issue1_desktop": "1920px: bgWidth=376 (inline, not stretched), label.right=341 ≤ bg.left=349 (left-of), ★ display=block.",
+    "issue2_admin": "auto-scan-module present, auto-scan-plan-locked ABSENT, auto-scan-telegram-required ABSENT, auto-scan-enabled-stats VISIBLE ('LAST SCAN 4/25/2026, 4:10:48 AM • ALERTS SENT 2'), toggle BUTTON disabled=false aria-checked=true data-state=checked.",
+    "issue2_free": "auto-scan-plan-locked PRESENT with 'View plans →' link, toggle disabled=true data-state=unchecked."
+  },
+  "rca of the issue": "Iter28 tester used 'mode-selector' / 'mode-hybrid' selectors which match either the embedded VerdictPage instance or simply did not exist on /dashboard (DashboardPage uses testIdPrefix='dashboard-mode'). Iter29 used the correct 'dashboard-mode-*' selectors and confirmed fixes are working on the actual element user sees. The current AnalysisModeSelector fix (block→sm:flex parent + grid-cols-3 + hidden sm:inline ★) is correct and complete for the user-reported Hybrid clipping. SettingsPage.jsx effectiveAutoScan override correctly flips plan_eligible to true based on local user object (is_admin / test_unlock_active / plan in pro|elite|daypass) so even a stale or bad /me/auto-scan response cannot lock the UI for legitimate paid users."
+}
