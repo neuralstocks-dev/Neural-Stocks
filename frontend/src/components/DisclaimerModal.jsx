@@ -213,7 +213,15 @@ export function useDisclaimer() {
 
     const ensureAccepted = useCallback(
         (action) => {
-            if (accepted === true) {
+            // accepted === null means the GET /disclaimer hasn't resolved
+            // yet (user clicked very fast after page load). For a returning
+            // user this is almost certainly `true` — running the action
+            // optimistically gives instant feedback (spinner appears).
+            // The downstream API will 428 if they actually haven't accepted,
+            // and the caller's `promptFromError(err)` path opens the modal.
+            // Only block (open modal up-front) when we KNOW they haven't
+            // accepted — i.e., accepted === false.
+            if (accepted !== false) {
                 action?.();
                 return;
             }
