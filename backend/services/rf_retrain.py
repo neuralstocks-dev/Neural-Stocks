@@ -356,9 +356,15 @@ async def _check_drift_and_alert(new_meta: dict, job_id: str):
         + "<i>Reload from disk or trigger another retrain from /admin if needed.</i>"
     )
 
+    # `is_admin` isn't persisted in the DB — filter by email against the
+    # ADMIN_EMAILS allow-list instead.
+    from core.config import ADMIN_EMAILS
     admins = [
         a async for a in db.users.find(
-            {"is_admin": True, "telegram_chat_id": {"$exists": True, "$ne": None}},
+            {
+                "email": {"$in": list(ADMIN_EMAILS)},
+                "telegram_chat_id": {"$exists": True, "$ne": None},
+            },
             projection={"_id": 0, "id": 1, "email": 1},
         )
     ]

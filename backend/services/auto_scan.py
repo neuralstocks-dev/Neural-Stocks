@@ -184,18 +184,19 @@ async def run_auto_scan_batch() -> dict:
     cutoff_iso = iso(cutoff)
 
     # Candidate users: auto_scan enabled + telegram linked + Pro/Elite/Admin
+    # `is_admin` isn't persisted in the DB, so we filter in Python by email
+    # against the ADMIN_EMAILS allow-list rather than relying on a DB field.
+    from core.config import ADMIN_EMAILS
     cursor = db.users.find(
         {
             "auto_scan_enabled": True,
             "telegram_chat_id": {"$exists": True, "$ne": None},
-            "$and": [
-                {"$or": [
-                    {"plan": {"$in": ["pro", "elite", "daypass"]}},
-                    {"is_admin": True},
-                ]},
+            "$or": [
+                {"plan": {"$in": ["pro", "elite", "daypass"]}},
+                {"email": {"$in": list(ADMIN_EMAILS)}},
             ],
         },
-        {"_id": 0, "id": 1, "email": 1, "plan": 1, "is_admin": 1, "auto_scan_last_run_at": 1},
+        {"_id": 0, "id": 1, "email": 1, "plan": 1, "auto_scan_last_run_at": 1},
     )
     candidates = await cursor.to_list(500)
     # Filter in Python for the "last run > MIN_HOURS_BETWEEN_SCANS ago" check

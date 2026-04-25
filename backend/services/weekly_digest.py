@@ -90,9 +90,11 @@ async def _rank_user_watchlist(user_id: str, market_df: dict) -> list[dict]:
 
 async def _send_digest_for_user(user: dict, market_df: dict) -> bool:
     """Compute digest for one user and email it. Returns True on send."""
+    from core.config import ADMIN_EMAILS
     user_id = user["id"]
     plan = user.get("plan", "free")
-    is_admin = bool(user.get("is_admin"))
+    # `is_admin` not persisted in DB — derive from email allow-list.
+    is_admin = (user.get("email") or "").lower() in ADMIN_EMAILS
     is_paid = plan in ("pro", "elite", "daypass") or is_admin
 
     signals = await _rank_user_watchlist(user_id, market_df)
@@ -140,7 +142,7 @@ async def run_weekly_digest_batch() -> dict:
 
     cursor = db.users.find(
         {"weekly_digest_enabled": True, "email": {"$exists": True, "$ne": None}},
-        {"_id": 0, "id": 1, "email": 1, "full_name": 1, "plan": 1, "is_admin": 1,
+        {"_id": 0, "id": 1, "email": 1, "full_name": 1, "plan": 1,
          "weekly_digest_last_run_at": 1},
     )
     candidates = await cursor.to_list(5000)

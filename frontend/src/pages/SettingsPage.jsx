@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const [tg, setTg] = useState(null);
     const [loading, setLoading] = useState(true);
     const [linkCode, setLinkCode] = useState(null);
@@ -66,11 +66,16 @@ export default function SettingsPage() {
     }, []);
 
     useEffect(() => {
+        // Refresh the user snapshot on every Settings mount so cached / stale
+        // is_admin / plan flags from a previous session can't leave admin or
+        // paid users locked out of plan-gated toggles. Best-effort — never
+        // blocks the page render.
+        refreshUser?.();
         loadStatus();
         loadAutoScan();
         loadDigest();
         loadTgPrefs();
-    }, [loadStatus, loadAutoScan, loadDigest, loadTgPrefs]);
+    }, [refreshUser, loadStatus, loadAutoScan, loadDigest, loadTgPrefs]);
 
     const beginLink = async () => {
         setErr("");
@@ -156,6 +161,7 @@ export default function SettingsPage() {
     const planIsPaid =
         !!user?.is_admin ||
         !!user?.test_unlock_active ||
+        !!user?.test_unlock_expires_at ||
         ["pro", "elite", "daypass"].includes(user?.plan);
     const effectiveAutoScan = autoScan
         ? {

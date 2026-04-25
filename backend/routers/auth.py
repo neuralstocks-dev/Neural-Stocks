@@ -178,9 +178,14 @@ async def get_auto_scan_prefs(user=Depends(get_current_user)):
     u = await db.users.find_one(
         {"id": user["id"]},
         {"_id": 0, "auto_scan_enabled": 1, "auto_scan_last_run_at": 1,
-         "auto_scan_last_alerts_sent": 1, "telegram_chat_id": 1, "plan": 1, "is_admin": 1},
+         "auto_scan_last_alerts_sent": 1, "telegram_chat_id": 1, "plan": 1},
     ) or {}
-    eligible_plan = (u.get("plan") in ("pro", "elite", "daypass")) or bool(u.get("is_admin"))
+    # `is_admin` is derived in auth (never persisted in DB), so always trust
+    # the in-memory user object — not the DB read.
+    eligible_plan = (
+        bool(user.get("is_admin"))
+        or u.get("plan") in ("pro", "elite", "daypass")
+    )
     return {
         "enabled": bool(u.get("auto_scan_enabled")),
         "telegram_linked": bool(u.get("telegram_chat_id")),
@@ -197,9 +202,13 @@ async def set_auto_scan_prefs(payload: dict, user=Depends(get_current_user)):
     want_enabled = bool(payload.get("enabled"))
     u = await db.users.find_one(
         {"id": user["id"]},
-        {"_id": 0, "plan": 1, "is_admin": 1, "telegram_chat_id": 1},
+        {"_id": 0, "plan": 1, "telegram_chat_id": 1},
     ) or {}
-    eligible_plan = (u.get("plan") in ("pro", "elite", "daypass")) or bool(u.get("is_admin"))
+    # Admin (derived from email allow-list, not DB) ALWAYS bypasses the plan gate.
+    eligible_plan = (
+        bool(user.get("is_admin"))
+        or u.get("plan") in ("pro", "elite", "daypass")
+    )
     if want_enabled and not eligible_plan:
         raise HTTPException(
             status_code=402,
@@ -223,9 +232,12 @@ async def get_weekly_digest_prefs(user=Depends(get_current_user)):
     u = await db.users.find_one(
         {"id": user["id"]},
         {"_id": 0, "weekly_digest_enabled": 1, "weekly_digest_last_run_at": 1,
-         "weekly_digest_last_signal_count": 1, "plan": 1, "is_admin": 1},
+         "weekly_digest_last_signal_count": 1, "plan": 1},
     ) or {}
-    is_paid = (u.get("plan") in ("pro", "elite", "daypass")) or bool(u.get("is_admin"))
+    is_paid = (
+        bool(user.get("is_admin"))
+        or u.get("plan") in ("pro", "elite", "daypass")
+    )
     return {
         "enabled": bool(u.get("weekly_digest_enabled")),
         "is_paid": is_paid,
