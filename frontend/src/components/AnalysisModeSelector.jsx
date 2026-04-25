@@ -62,7 +62,7 @@ export default function AnalysisModeSelector({
                     {disabled ? "Mode used" : "Mode"}
                 </span>
                 <div
-                    className="flex w-full sm:inline-flex sm:w-auto"
+                    className="grid grid-cols-3 w-full sm:flex sm:w-auto"
                     style={{
                         border: "1px solid hsl(var(--border-default))",
                         borderRadius: 2,
@@ -92,7 +92,7 @@ export default function AnalysisModeSelector({
                                         : m.description
                                 }
                                 data-testid={`${testIdPrefix}-${m.value}`}
-                                className={`${fontSize} font-mono ${pad} flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 sm:gap-2 min-w-0 transition-colors`}
+                                className={`${fontSize} font-mono ${pad} inline-flex items-center justify-center gap-1.5 sm:gap-2 min-w-0 transition-colors`}
                                 style={{
                                     background: isActive ? "hsl(var(--hold))" : "hsl(var(--surface))",
                                     color: isActive
