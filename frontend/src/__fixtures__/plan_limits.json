@@ -1,0 +1,30 @@
+{
+  "daypass": {
+    "analyses_per_day": 10,
+    "analyses_per_day_display": null,
+    "analyses_per_week": 50,
+    "share_per_day": 20,
+    "watchlist_limit": 10
+  },
+  "elite": {
+    "analyses_per_day": 50,
+    "analyses_per_day_display": "Unlimited",
+    "analyses_per_week": null,
+    "share_per_day": null,
+    "watchlist_limit": 500
+  },
+  "free": {
+    "analyses_per_day": 3,
+    "analyses_per_day_display": null,
+    "analyses_per_week": 12,
+    "share_per_day": 5,
+    "watchlist_limit": 5
+  },
+  "pro": {
+    "analyses_per_day": 15,
+    "analyses_per_day_display": null,
+    "analyses_per_week": 60,
+    "share_per_day": 50,
+    "watchlist_limit": 25
+  }
+}

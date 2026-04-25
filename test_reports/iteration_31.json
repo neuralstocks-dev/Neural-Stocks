@@ -1,0 +1,69 @@
+{
+  "summary": "Frontend-only verification of iter-31: (a) marketing-claims jest regression test, and (b) new /manual user-manual page. Marketing-claims passes 13/13 in 0.36s. Manual page renders all required testids, TOC anchor scroll works, beginner-critical verbatim claims (watchlist NOT auto-update, alert threshold 'at least 75%', free-tier numbers 5 & 3) are present, mobile has no horizontal overflow, and the final CTA navigates to /dashboard. HOWEVER, on a direct page load of /manual (refresh, deep-link, bookmark) the AppShell header & navigation are MISSING because UserManualPage.jsx does not wrap its JSX in <AppShell>. The Manual page therefore has no header, no nav-manual link, no mobile drawer (and consequently no env(safe-area-inset-top) padding) when entered directly. The acceptance items 'desktop nav contains a Manual link', 'mobile drawer also contains nav-manual-mobile', and 'Header still has env(safe-area-inset-top) padding-top in inline style' all fail in this state. Internal navigation from /dashboard → /manual via the Manual nav link briefly succeeds (because Dashboard's per-page AppShell DOM is still present), masking the bug.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "UserManualPage",
+        "issue": "Page does not wrap content in <AppShell>. On direct load of /manual (browser refresh, deep-link, or bookmark), the persistent header (data-testid=\"app-header\") and the desktop/mobile navigation (data-testid=\"nav-manual\" / \"nav-manual-mobile\", and ALL other nav links) are completely absent. User has no way to navigate elsewhere except by typing a URL or using the in-page links. iter-30's safe-area-inset-top inline style on the header is also absent on this page because the header itself is absent.",
+        "selector": "[data-testid=\"app-header\"], [data-testid=\"nav-manual\"], [data-testid=\"nav-manual-mobile\"]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "test1_marketing_claims_jest": {
+      "status": "PASS",
+      "details": "cd /app/frontend && CI=1 yarn test --testPathPattern=marketing-claims --watchAll=false → 13/13 tests passed in 0.359s. All 5 page-level claim assertions (WhyUsPage, PublicTryVerdictPage, SignupPage, PublicVerdictPage, TryNowBox, TechnicalPage) read the canonical fixture from src/__fixtures__/plan_limits.json and grep verbatim into the marketing copy. Test exit code 0."
+    },
+    "test2_manual_route_renders_testids": {
+      "status": "PASS",
+      "details": "After login as demo@stockai.io / demo1234 and navigating to /manual, all 13 required data-testids are present in the DOM: manual-hero, manual-toc, manual-final-cta, manual-section-{intro,dashboard,analyze,watchlist,alerts,modes,portfolio,scorecard,limits,disclaimer}. Page renders cleanly with no console errors."
+    },
+    "test3_desktop_nav_manual_link": {
+      "status": "PARTIAL",
+      "details": "On /dashboard at 1920×1080, [data-testid=\"nav-manual\"] count=1, href=\"/manual\". Clicking it routes to /manual successfully. ✗ HOWEVER — once on /manual, hard-refreshing or arriving via direct URL gives count=0 because UserManualPage.jsx does NOT wrap with <AppShell>. The link only persists transiently across the SPA transition; on a fresh /manual load the entire global nav disappears."
+    },
+    "test3b_mobile_drawer_nav_manual_mobile": {
+      "status": "PARTIAL",
+      "details": "On /dashboard at 390×844, opening the hamburger drawer (header > 3rd button with svg) reveals [data-testid=\"nav-manual-mobile\"] count=1. ✗ On a direct /manual load at 390×844, app-header count=0, hamburger absent, nav-manual-mobile count=0 — same root cause as test3."
+    },
+    "test4_toc_watchlist_anchor": {
+      "status": "PASS",
+      "details": "Click [data-testid=\"toc-watchlist\"] → URL hash becomes '#watchlist', and #watchlist section bounding rect.top = 96.14px (matches scrollMarginTop:96 set in <Section>), section is in-view. Scroll behaviour is correct."
+    },
+    "test5_beginner_critical_verbatim_claims": {
+      "status": "PASS",
+      "details": "Inside [data-testid=\"manual-section-watchlist\"]: text contains 'watchlist does not auto-update' (case-insensitive) — verbatim phrase 'Important — the watchlist does NOT auto-update' is rendered as a warn callout. Inside [data-testid=\"manual-section-alerts\"]: text contains 'at least 75%' — rendered inside the warn callout 'Confidence threshold: 75% and above'. Free-tier numbers 5 (watchlist limit) and 3 (Top 3/Bottom 3) both appear in the watchlist section body. All three explicit user requirements met."
+    },
+    "test6_mobile_no_horizontal_overflow": {
+      "status": "PASS_WITH_NOTE",
+      "details": "At 390×844, document.body.scrollWidth=390, window.innerWidth=390 → no horizontal overflow on /manual. ✗ NOTE: the second half of this acceptance ('Header still has env(safe-area-inset-top) padding-top in inline style') FAILS because [data-testid=\"app-header\"] count=0 on direct /manual load — there is no header to measure. Once UserManualPage wraps <AppShell>, this will pass automatically since AppShell.jsx already injects the inline style."
+    },
+    "test7_final_cta_navigates_to_dashboard": {
+      "status": "PASS",
+      "details": "Click [data-testid=\"manual-cta-dashboard\"] → URL becomes /dashboard, dashboard renders. <Link to=\"/dashboard\" className=\"btn-primary\"> works correctly."
+    }
+  },
+  "test_report_links": [
+    "/app/frontend/src/__tests__/marketing-claims.test.jsx"
+  ],
+  "action_items": [
+    "HIGH: Wrap UserManualPage.jsx return in <AppShell>...</AppShell> (same pattern as ScorecardPage, AdminPage, WhyUsPage, PortfolioPage, etc.). Currently the page renders raw content with no global header/nav, so direct loads of /manual lose the entire site chrome including the Manual nav link itself, the mobile hamburger drawer, and iter-30's env(safe-area-inset-top) header padding. Also fix the import: add `import AppShell from \"@/components/AppShell\";` and `import { useAuth } from \"@/hooks/useAuth\";` if needed."
+  ],
+  "critical_code_review_comments": [
+    "UserManualPage.jsx (493 LOC) is missing the <AppShell> wrapper that EVERY other authenticated page uses. This is the only Protected route that does not wrap AppShell — that asymmetry is the root cause of the failed nav/header acceptance items.",
+    "Architecture nit (carried over from iter-30): AppShell is wrapped per-page across 12 page components rather than as a React-Router layout route. Adding /manual exposes this brittleness — it is easy to forget the wrapper, as happened here. Consider migrating to <Route element={<AppShell />}>...</Route> in a future iteration so new protected pages automatically get the chrome.",
+    "marketing-claims.test.jsx is a clean, fast (<1s) regression test. The fixture-driven design (plan_limits.json synced via /app/scripts/sync_plan_limits.py) is the right pattern — single source of truth, deterministic, no network. Good work."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "5/7 acceptance items fully PASS, 2/7 PARTIAL due to a single missing <AppShell> wrapper on UserManualPage.jsx"},
+  "test_credentials": "demo@stockai.io / demo1234 (free user) — worked.",
+  "seed_data_creation": "None.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The UserManualPage acceptance set has a single fix-it-and-everything-works root cause: wrap the return value of UserManualPage in <AppShell>...</AppShell>. After that fix, re-run direct goto to /manual at both 1920×1080 and 390×844 and confirm: (a) [data-testid=\"app-header\"] count=1, (b) [data-testid=\"nav-manual\"] count=1 with href=/manual on desktop, (c) hamburger opens drawer with [data-testid=\"nav-manual-mobile\"] count=1, (d) header inline style contains 'safe-area-inset-top'. All other acceptance items already pass. Marketing-claims jest regression: confirmed PASS 13/13 in 0.36s — no further attention needed.",
+  "rca_of_the_issue": "ROOT CAUSE: UserManualPage.jsx (added in this iteration) returns a bare <div> tree with no <AppShell> wrapper. Every other Protected route in App.js (Dashboard, Portfolio, Alerts, Scorecard, Backtest, Pricing, WhyUs, Technical, Admin, AnalysisReport, PaypalSmokeTest) imports AppShell and wraps its JSX `return <AppShell user={user}>...content...</AppShell>`. UserManualPage was added without this wrapper. REPRODUCTION: 1) login, 2) navigate browser directly to /manual (or refresh while on /manual), 3) observe no header, no nav links, no mobile drawer. MITIGATION: import AppShell and wrap the entire return JSX of UserManualPage in <AppShell>...</AppShell>. ~2-line fix."
+}

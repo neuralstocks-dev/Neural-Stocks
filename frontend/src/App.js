@@ -18,6 +18,7 @@ import WhyUsPage from "@/pages/WhyUsPage";
 import PortfolioPage from "@/pages/PortfolioPage";
 import SettingsPage from "@/pages/SettingsPage";
 import TechnicalPage from "@/pages/TechnicalPage";
+import UserManualPage from "@/pages/UserManualPage";
 import PaypalSmokeTestPage from "@/pages/PaypalSmokeTestPage";
 import BacktestPage from "@/pages/BacktestPage";
 import AlertsPage from "@/pages/AlertsPage";
@@ -123,6 +124,14 @@ function AppRoutes() {
                 element={
                     <Protected>
                         <TechnicalPage />
+                    </Protected>
+                }
+            />
+            <Route
+                path="/manual"
+                element={
+                    <Protected>
+                        <UserManualPage />
                     </Protected>
                 }
             />

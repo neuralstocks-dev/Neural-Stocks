@@ -12,6 +12,7 @@ const NAV_ITEMS = [
     { to: "/backtest", label: "Backtest", testid: "nav-backtest" },
     { to: "/pricing", label: "Pricing", testid: "nav-pricing" },
     { to: "/why", label: "Why us", testid: "nav-why" },
+    { to: "/manual", label: "Manual", testid: "nav-manual" },
     { to: "/technical", label: "Technical", testid: "nav-technical" },
 ];
 
