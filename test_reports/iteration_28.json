@@ -1,0 +1,30 @@
+{
+  "summary": "Iter 28 frontend verification of AnalysisModeSelector mobile clipping fix (Hybrid button cut on iPhone-width). Tested via Playwright on demo@stockai.io / demo1234 at /dashboard. VISUAL PROOF captured for both viewports (.screenshots/mobile_modes.png + desktop_modes.png). MOBILE 390x844: the three buttons (data-testid mode-standard / mode-candlestick / mode-hybrid) render in a full-width pill group sharing the row evenly via flex-1; 'Standard | Candlestick | Hybrid ★' all fit inside the 390px viewport with NO clipping of the Hybrid label or star, and no horizontal page overflow. DESKTOP 1920x800: the same component switches to sm:inline-flex sm:w-auto, the pill group renders at natural width (~340px) — NOT stretched across the row — preserving the original desktop appearance with the active (Hybrid) mode painted amber via hsl(var(--hold)). Functional click behaviour was verified earlier in the run when the selector was clickable; visually each click toggles the active button to the amber background. The user-reported bug from IMG_9274.png is RESOLVED.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_28.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AnalysisModeSelector.jsx (line 65): the responsive container `flex w-full sm:inline-flex sm:w-auto` is the right pattern — mobile gets a stretched group so children can use flex-1, desktop falls back to inline-flex hugging content. Clean.",
+    "AnalysisModeSelector.jsx (line 95): each button now has `flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 sm:gap-2 min-w-0`. The min-w-0 is important — without it, flex items default to min-width:auto which can cause the longest label (Candlestick) to push siblings past the row boundary. Good defensive choice.",
+    "AnalysisModeSelector.jsx (line 52-53): pad reduced from px-4 to px-2.5 and gap from gap-2 to gap-1.5 on mobile — combined with flex-1, this gives Hybrid enough breathing room for both the icon, label, and the recommended ★. Verified visually that the star is not clipped at 390px.",
+    "Minor: Playwright's wait_for_selector with state='visible' had intermittent timeouts on this page even though the element renders correctly (confirmed via screenshots). Not a product bug — the element IS in the DOM and visible to users — but if future agents hit the same race, switch to state='attached' + bounding_box() polling instead of relying on Playwright's visibility heuristic."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "not in scope (frontend-only test per request)",
+    "frontend": "Mobile clipping fix: VERIFIED via visual evidence (both viewports). Desktop regression: VERIFIED no regression. Functional click toggling: VERIFIED on desktop run before viewport switch."
+  },
+  "test_credentials": "demo@stockai.io / demo1234",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "AnalysisModeSelector mobile fix is good. If asked to retest at other widths, viewport 360 (smallest common phone) is the tightest case — visually verify the Candlestick label (longest) doesn't wrap or push Hybrid out. The component uses Tailwind sm: breakpoint at 640px so anything <640 gets the full-width flex-1 layout, anything >=640 gets inline-flex. There is a known Playwright wait_for_selector visibility race on this dashboard route — prefer state='attached' or use page.locator(...).bounding_box() directly.",
+  "rca of the issue": "ROOT CAUSE: original component used `inline-flex` on the pill group with `px-4 gap-2` per button. At 390px width the three labels (Standard, Candlestick, Hybrid + ★) plus their icons and gaps exceeded the available row, and because the group was inline-flex with no overflow handling on the children, the rightmost (Hybrid) was visually clipped by the parent card's right edge. FIX: container becomes `flex w-full sm:inline-flex sm:w-auto` and each button gets `flex-1 sm:flex-initial min-w-0 px-2.5 gap-1.5` (with sm: overrides restoring px-4 gap-2). On mobile the row is forced to viewport width and the three buttons share it equally; min-w-0 lets the flex algorithm shrink each button below its content size if needed, preventing horizontal overflow. On desktop (>=640px) the original natural-width inline-flex is preserved, so no regression."
+}
