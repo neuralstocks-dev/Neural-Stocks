@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
-import AppShell from "@/components/AppShell";
-import { useAuth } from "@/hooks/useAuth";
 import {
     Inbox,
     Star,
@@ -367,7 +365,6 @@ function TypeBreakdownTable({ stats }) {
 }
 
 export default function AlertsPage() {
-    const { user } = useAuth();
     const [alerts, setAlerts] = useState([]);
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -430,7 +427,7 @@ export default function AlertsPage() {
     };
 
     return (
-        <AppShell user={user}>
+        <>
             <div className="max-w-[1100px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="alerts-page">
                 <p className="text-overline flex items-center gap-2">
                     <Inbox size={12} strokeWidth={1.5} /> Alerts · Triage
@@ -591,6 +588,6 @@ export default function AlertsPage() {
                     )}
                 </div>
             </div>
-        </AppShell>
+        </>
     );
 }

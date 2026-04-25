@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import AppShell from "@/components/AppShell";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
     Activity,
@@ -312,7 +311,7 @@ export default function WhyUsPage() {
     const [infoKey, setInfoKey] = useState(null);
     const info = infoKey ? INFO_CONTENT[infoKey] : null;
     return (
-        <AppShell>
+        <>
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="why-us-page">
                 {/* ------------------- Hero ------------------- */}
                 <section>
@@ -717,6 +716,6 @@ export default function WhyUsPage() {
                     ) : null}
                 </DialogContent>
             </Dialog>
-        </AppShell>
+        </>
     );
 }

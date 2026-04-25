@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
-import AppShell from "@/components/AppShell";
-import { useAuth } from "@/hooks/useAuth";
 import {
     ResponsiveContainer,
     LineChart,
@@ -176,7 +174,6 @@ function TradeRow({ trade }) {
 }
 
 export default function BacktestPage() {
-    const { user } = useAuth();
     const [data, setData] = useState(null);
     const [ml, setMl] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -243,7 +240,7 @@ export default function BacktestPage() {
     const m = data?.metrics || {};
 
     return (
-        <AppShell user={user}>
+        <>
             <div
                 className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16"
                 data-testid="backtest-page"
@@ -685,7 +682,7 @@ export default function BacktestPage() {
                     <MlBacktestSection ml={ml} />
                 )}
             </div>
-        </AppShell>
+        </>
     );
 }
 

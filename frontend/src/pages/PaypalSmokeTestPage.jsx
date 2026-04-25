@@ -13,7 +13,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
-import AppShell from "@/components/AppShell";
 import api from "@/lib/api";
 import { Loader2, AlertTriangle, CheckCircle2, ArrowLeft, Shield, Copy, XCircle } from "lucide-react";
 
@@ -102,7 +101,7 @@ export default function PaypalSmokeTestPage() {
     );
 
     return (
-        <AppShell>
+        <>
             <div className="max-w-4xl mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="smoke-test-page">
                 <Link
                     to="/admin"
@@ -388,7 +387,7 @@ export default function PaypalSmokeTestPage() {
                     </section>
                 )}
             </div>
-        </AppShell>
+        </>
     );
 }
 

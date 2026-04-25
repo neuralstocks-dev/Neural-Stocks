@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
-import AppShell from "@/components/AppShell";
 import AddStockModal from "@/components/AddStockModal";
 import TimelineFitModal from "@/components/TimelineFitModal";
 import Sparkline from "@/components/Sparkline";
@@ -606,7 +605,7 @@ export default function DashboardPage() {
     const unread = alerts.filter((a) => !a.read).length;
 
     return (
-        <AppShell>
+        <>
             <AddStockModal
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
@@ -1078,6 +1077,6 @@ export default function DashboardPage() {
             {quickJobState && (
                 <QuickAnalyzeProgress kind={quickBusy || "top"} jobState={quickJobState} />
             )}
-        </AppShell>
+        </>
     );
 }

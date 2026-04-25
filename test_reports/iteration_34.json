@@ -1,0 +1,66 @@
+{
+  "summary": "Iter-34 frontend-only verification of the AppShell→ProtectedLayout refactor. ALL 5 acceptance scenarios PASS. 13/13 protected routes render with single AppShell header, full nav, and primary content. Header DOM persists across in-app Link navigation (true layout-route behavior — bonus goal achieved). Mobile drawer + safe-area + no-overflow all green. Marketing-claims jest regression remains 13/13 green.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "test1_direct_load_smoke_all_13_routes": {
+      "status": "PASS",
+      "details": "Logged in via /api/auth/login (in-browser fetch) and stashed token in localStorage. Then page.goto each route directly with networkidle wait. 13/13 routes rendered exactly 1 [data-testid='app-header'], ≥10 visible nav-* links, and main-content >200 chars HTML. Routes verified: /dashboard (main_len=127k), /analysis/AAPL (184k), /pricing (126k), /scorecard (58k), /backtest (59k), /alerts (38k), /why (168k), /manual (82k), /technical (202k), /portfolio (12k), /settings (19k), /admin/paypal-smoke-test (7k). /admin verified separately as admin user jolor69@gmail.com (header=1, nav_visible=11, main_len=3.3M). No React render errors thrown on any route — only pre-existing data-fetching console messages on /pricing (duplicate key warning 'quick_actions'), /backtest (402 Pro gate), and /admin/paypal-smoke-test (403 admin gate) — none of these are caused by the refactor."
+    },
+    "test2_functional_nav_clicks": {
+      "status": "PASS",
+      "details": "From /dashboard, clicking [data-testid='nav-manual'] navigated to /manual. Clicking [data-testid='nav-portfolio'] navigated to /portfolio. Both wait_for_url succeeded within 10s."
+    },
+    "test3_header_persistence_across_link_nav": {
+      "status": "PASS",
+      "details": "On /dashboard set `document.querySelector('[data-testid=\"app-header\"]').dataset.persisted='yes'` (marker_before='yes'). Clicked [data-testid='nav-portfolio'] (in-app Link, not page.goto) → arrived at /portfolio. Re-read marker: marker_after='yes'. ✅ The AppShell DOM is the SAME instance across navigations — the layout-route refactor is working correctly. Only the <Outlet /> body re-renders. This eliminates the header re-mount flicker on slow phones, as designed."
+    },
+    "test4_mobile_drawer_390x844": {
+      "status": "PASS",
+      "details": "At 390x844 on /dashboard: hamburger found at [data-testid='mobile-menu-button'] (visible). Click opened drawer; [data-testid='nav-manual-mobile'] count=1 and visible=True."
+    },
+    "test5_mobile_overflow_and_safe_area": {
+      "status": "PASS",
+      "details": "At 390x844 on /dashboard, /portfolio, /manual: document.body.scrollWidth=390 on all three (no horizontal overflow). Header inline style on all three contains 'padding-top: env(safe-area-inset-top);' confirming iOS notch protection is preserved by the layout route. (Computed paddingTop reads as '0px' on headless Chrome because env() resolves to 0 on non-iOS — expected; on real iOS it resolves to the notch inset.)"
+    },
+    "test6_marketing_claims_jest_regression": {
+      "status": "PASS",
+      "details": "cd /app/frontend && CI=1 yarn test --testPathPattern=marketing-claims --watchAll=false → 13/13 passed in 0.347s, exit code 0. Includes WhyUsPage, PublicTryVerdictPage, SignupPage, PublicVerdictPage, TryNowBox, and TechnicalPage assertions. No regression from refactor."
+    }
+  },
+  "verification_artifacts": {
+    "stray_appshell_check": "grep -rn 'AppShell' /app/frontend/src/pages/ → 0 matches. Single AppShell render lives only in App.js ProtectedLayout (line 51-53).",
+    "protected_layout_structure": "App.js lines 40-55 define ProtectedLayout. Lines 86-100 nest 13 routes under <Route element={<ProtectedLayout/>}>. Auth gate (bootstrapping → Loader2; no user → /login redirect) is centralized.",
+    "console_warnings_observed_not_regression": [
+      "/pricing emits React duplicate-key warning (key='quick_actions') — pre-existing data issue inside the pricing page's render, unrelated to this refactor",
+      "/backtest: 402 from a Pro-only API call — expected for free demo user, not a refactor issue",
+      "/admin/paypal-smoke-test (as demo user): 403 from admin endpoint — page itself still renders; access-control behavior unchanged"
+    ]
+  },
+  "test_report_links": [
+    "/app/frontend/src/App.js",
+    "/app/frontend/src/pages/AlertsPage.jsx",
+    "/app/frontend/src/pages/PortfolioPage.jsx",
+    "/app/frontend/src/pages/BacktestPage.jsx",
+    "/app/frontend/src/__tests__/marketing-claims.test.jsx"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ProtectedLayout in App.js is clean and centralizes the auth gate + AppShell wrapper for 13 routes — exactly the right shape. Bootstrapping spinner + redirect-to-login are duplicated with RootRedirect (~10 lines); could extract a tiny <AuthGate /> helper later, but not blocking.",
+    "Layout-route refactor verified working: header DOM persists across Link navigation (dataset.persisted survived /dashboard→/portfolio), so only <Outlet /> children re-render. This is the bonus performance win the spec called out.",
+    "Pre-existing (NOT caused by this PR) — /pricing renders duplicate React keys ('quick_actions'). Recommend de-duping the source array or using array index suffix. Low priority but should be cleaned up.",
+    "Suggestion: add a lint/CI guard or a simple test in marketing-claims (or a new shell-coverage test) that imports each protected page and asserts NO <AppShell> element is rendered when the page is mounted in isolation. That would prevent the iter-31-style regression from ever recurring at the source-of-truth level."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "6/6 PASS — 13/13 routes render, header persistence confirmed, mobile + jest regression all green"},
+  "test_credentials": "demo@stockai.io / demo1234 used for 12 protected routes; jolor69@gmail.com / admin1234 used for /admin. Login performed via in-browser fetch to /api/auth/login (urllib server-side hits a 403 perimeter rule — use page.evaluate fetch instead for future iterations).",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Refactor ships clean. To programmatically log in inside the playwright runner, do NOT use server-side urllib (returns 403 from this preview env) — instead use page.evaluate(`async () => { const r = await fetch('/api/auth/login', {...}); ... localStorage.setItem('sai_token', d.token); localStorage.setItem('sai_user', JSON.stringify(d.user)); }`) then page.goto the protected route. The localStorage keys are sai_token (raw JWT) and sai_user (JSON-stringified user object).",
+  "rca of the issue": "n/a — no defects found. The refactor is correctly implemented: <ProtectedLayout> wraps a single <AppShell> around <Outlet />, all 13 protected routes are nested under it, no stray <AppShell> remains in any page, and the AppShell DOM correctly persists across in-app Link navigations (verified via dataset marker)."
+}

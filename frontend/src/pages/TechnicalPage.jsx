@@ -7,7 +7,6 @@
  */
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import AppShell from "@/components/AppShell";
 import api from "@/lib/api";
 import {
     Cpu,
@@ -55,7 +54,7 @@ export default function TechnicalPage() {
     }, [loc.hash]);
 
     return (
-        <AppShell>
+        <>
             <div className="max-w-[1200px] mx-auto px-5 md:px-8 pt-10 pb-20" data-testid="technical-page">
                 {/* Hero */}
                 <section>
@@ -856,7 +855,7 @@ Observability    Structured logs to /var/log/supervisor · per-request correlati
                     trained ML (e.g., FinBERT for sentiment) will be disclosed here with a dated changelog entry.
                 </p>
             </div>
-        </AppShell>
+        </>
     );
 }
 

@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
-import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "react-router-dom";
 import { Check, Loader2, X, Sparkles, Crown, Zap, ShieldCheck, Clock, Building2 } from "lucide-react";
@@ -135,7 +134,7 @@ export default function PricingPage() {
     const [daypassProcessing, setDaypassProcessing] = useState(false);
 
     return (
-        <AppShell>
+        <>
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="pricing-page">
                 <p className="text-overline">Pricing · Subscription tiers</p>
                 <h1 className="font-serif hero-number mt-3" style={{ fontSize: "clamp(2.4rem, 5vw, 4rem)" }}>
@@ -783,7 +782,7 @@ export default function PricingPage() {
                     anytime — no refunds for partial billing cycles.
                 </p>
             </div>
-        </AppShell>
+        </>
     );
 }
 

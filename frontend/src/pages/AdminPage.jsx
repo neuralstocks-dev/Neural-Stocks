@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
-import AppShell from "@/components/AppShell";
 import RFRetrainCard from "@/components/RFRetrainCard";
 import IdxBudgetCard from "@/components/IdxBudgetCard";
 import IdxCatalogCard from "@/components/IdxCatalogCard";
@@ -392,7 +391,7 @@ export default function AdminPage() {
     };
 
     return (
-        <AppShell>
+        <>
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="admin-page">
                 <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
                     <ShieldCheck size={12} className="inline mr-1" strokeWidth={1.5} /> Admin console
@@ -1211,6 +1210,6 @@ export default function AdminPage() {
                     </>
                 )}
             </div>
-        </AppShell>
+        </>
     );
 }

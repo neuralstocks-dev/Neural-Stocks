@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
-import AppShell from "@/components/AppShell";
 import VerdictRing from "@/components/VerdictRing";
 import SignalBadge from "@/components/SignalBadge";
 import { Loader2, Target, TrendingUp, TrendingDown, Minus } from "lucide-react";
@@ -70,7 +69,7 @@ export default function ScorecardPage() {
     const overall = s?.hit_rate;
 
     return (
-        <AppShell>
+        <>
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="scorecard-page">
                 <p className="text-overline">Accuracy Scorecard · beta</p>
                 <h1 className="font-serif hero-number mt-3" style={{ fontSize: "clamp(2.4rem, 5vw, 4rem)" }}>
@@ -406,6 +405,6 @@ export default function ScorecardPage() {
                     </>
                 )}
             </div>
-        </AppShell>
+        </>
     );
 }

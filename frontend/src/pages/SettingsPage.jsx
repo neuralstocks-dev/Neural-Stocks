@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
-import AppShell from "@/components/AppShell";
 import InstallAppCard from "@/components/InstallAppCard";
 import { useAuth } from "@/hooks/useAuth";
 import { Settings as SettingsIcon, Send, Check, X, Loader2, Copy, Unlink, ExternalLink, Radar, Lock, Mail } from "lucide-react";
@@ -250,7 +249,7 @@ export default function SettingsPage() {
     };
 
     return (
-        <AppShell user={user}>
+        <>
             <div className="max-w-[900px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="settings-page">
                 <p className="text-overline flex items-center gap-2">
                     <SettingsIcon size={12} strokeWidth={1.5} /> Settings · Notifications
@@ -974,6 +973,6 @@ export default function SettingsPage() {
                 {/* Install as app (PWA) */}
                 <InstallAppCard />
             </div>
-        </AppShell>
+        </>
     );
 }

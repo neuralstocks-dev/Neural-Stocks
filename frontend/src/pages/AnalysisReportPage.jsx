@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
-import AppShell from "@/components/AppShell";
 import VerdictRing from "@/components/VerdictRing";
 import SignalBadge from "@/components/SignalBadge";
 import ShareVerdictButton from "@/components/ShareVerdictButton";
@@ -180,7 +179,7 @@ export default function AnalysisReportPage() {
             : "hsl(var(--hold))";
 
     return (
-        <AppShell>
+        <>
             <DisclaimerModal
                 open={disclaimer.open}
                 onClose={disclaimer.onClose}
@@ -661,7 +660,7 @@ export default function AnalysisReportPage() {
                     </>
                 )}
             </div>
-        </AppShell>
+        </>
     );
 }
 

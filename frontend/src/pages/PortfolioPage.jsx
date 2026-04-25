@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
-import AppShell from "@/components/AppShell";
-import { useAuth } from "@/hooks/useAuth";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -196,7 +194,6 @@ function EditRow({ p, onSave, onCancel, busy }) {
 }
 
 export default function PortfolioPage() {
-    const { user } = useAuth();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [adding, setAdding] = useState(false);
@@ -267,7 +264,7 @@ export default function PortfolioPage() {
     }, [data, positions.length, currency]);
 
     return (
-        <AppShell user={user}>
+        <>
             <div className="max-w-[1400px] mx-auto px-5 md:px-8 pt-10 pb-16" data-testid="portfolio-page">
                 <p className="text-overline flex items-center gap-2">
                     <PieChart size={12} strokeWidth={1.5} /> Portfolio · Live P&L
@@ -458,6 +455,6 @@ export default function PortfolioPage() {
                     )}
                 </section>
             </div>
-        </AppShell>
+        </>
     );
 }
