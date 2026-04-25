@@ -226,7 +226,7 @@ export default function PublicTryVerdictPage() {
                                         )}
                                     </>
                                 ) : rateLimited ? (
-                                    <><strong>Free daily analysis used.</strong> This is your {rateLimited.previous_ticker} verdict from earlier today. Sign up to run unlimited analyses.</>
+                                    <><strong>Free daily analysis used.</strong> This is your {rateLimited.previous_ticker} verdict from earlier today. Sign up to unlock 3 analyses per day plus a 5-stock watchlist.</>
                                 ) : (
                                     <><strong>Free preview.</strong> Core verdict shown. Pattern details, risk factors, and confidence breakdown are unlocked after signup.</>
                                 )}
@@ -400,7 +400,7 @@ export default function PublicTryVerdictPage() {
                                 className="font-serif mt-3"
                                 style={{ fontSize: "clamp(1.4rem, 2.5vw, 1.8rem)", letterSpacing: "-0.01em" }}
                             >
-                                Sign up free — unlock patterns, risks, and <em className="italic" style={{ color: signalColor }}>unlimited</em> analyses.
+                                Sign up free — unlock patterns, risks, and your <em className="italic" style={{ color: signalColor }}>5-stock watchlist</em>.
                             </h3>
                             <div className="mt-5 max-w-2xl mx-auto">
                                 <PublicTrendingTicker
@@ -414,7 +414,7 @@ export default function PublicTryVerdictPage() {
                                 Create your account →
                             </Link>
                             <p className="text-[11px] mt-3" style={{ color: "hsl(var(--text-muted))" }}>
-                                Free tier · up to 5 watchlist stocks · 50 analyses / day
+                                Free tier · up to 5 watchlist stocks · 3 analyses / day
                             </p>
                         </div>
 

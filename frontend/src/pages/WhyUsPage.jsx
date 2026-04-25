@@ -53,7 +53,7 @@ const MODULES = [
         icon: BellRing,
         title: "Watchlists & Alerts",
         status: "available",
-        body: "Track up to 25 tickers, run one-click Analyze or full Pattern Scan across the list, and get push notifications the moment a high-conviction BUY/SELL verdict or candlestick reversal triggers — delivered straight to our Telegram bot (@neulab_bot). No phone number, no SMS fees.",
+        body: "Track up to 25 tickers (5 on Free, 25 on Pro, unlimited on Elite), run one-click Analyze or full Pattern Scan across the list, and get push notifications the moment a high-conviction BUY/SELL verdict or candlestick reversal triggers — delivered straight to our Telegram bot (@neulab_bot). No phone number, no SMS fees.",
     },
     {
         icon: Bot,
@@ -609,7 +609,7 @@ export default function WhyUsPage() {
                         <em style={{ color: "hsl(var(--buy))" }}>Confident decisions.</em>
                     </h2>
                     <p className="mt-6 max-w-2xl mx-auto text-base md:text-lg" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.65 }}>
-                        Free tier includes 3 watchlist positions and 1 full AI analysis per day.
+                        Free tier includes 5 watchlist tickers and 3 full AI analyses per day.
                         No credit card. Cancel anytime.
                     </p>
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
