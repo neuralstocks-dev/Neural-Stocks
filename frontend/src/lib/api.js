@@ -33,6 +33,7 @@ function resolveBackendBase() {
 }
 
 const BACKEND_URL = resolveBackendBase();
+export { BACKEND_URL };
 export const API_BASE = `${BACKEND_URL}/api`;
 
 const api = axios.create({ baseURL: API_BASE });

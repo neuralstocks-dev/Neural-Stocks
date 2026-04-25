@@ -6,8 +6,9 @@ import SignalBadge from "@/components/SignalBadge";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 import { Loader2, LineChart, AlertTriangle, Target, Shield, ArrowUpRight } from "lucide-react";
 import { formatPrice, formatPct, timeAgo, formatCompact } from "@/lib/format";
+import { API_BASE } from "@/lib/api";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = API_BASE;
 
 export default function PublicVerdictPage() {
     const { shareId } = useParams();

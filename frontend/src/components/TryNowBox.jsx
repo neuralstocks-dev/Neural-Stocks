@@ -10,6 +10,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Loader2, Lock, Sparkles } from "lucide-react";
 import { useExperimentVariant, trackConversion } from "@/hooks/useExperimentVariant";
+import { BACKEND_URL } from "@/lib/api";
 
 const CTA_FALLBACK = {
     key: "analyze",
@@ -27,8 +28,7 @@ export default function TryNowBox({ variant = "default", className = "" }) {
     useEffect(() => {
         (async () => {
             try {
-                const base = process.env.REACT_APP_BACKEND_URL || "";
-                const r = await fetch(`${base}/api/try/status`);
+                const r = await fetch(`${BACKEND_URL}/api/try/status`);
                 if (r.ok) setStatus(await r.json());
             } catch { /* ignore */ }
         })();

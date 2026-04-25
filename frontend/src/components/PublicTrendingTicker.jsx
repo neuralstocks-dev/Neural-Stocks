@@ -10,6 +10,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Flame, ArrowRight } from "lucide-react";
 import { useExperimentVariant, trackConversion } from "@/hooks/useExperimentVariant";
+import { BACKEND_URL } from "@/lib/api";
 
 const HEADER_FALLBACK = {
     key: "live_stats",
@@ -33,11 +34,10 @@ export default function PublicTrendingTicker({
         let cancelled = false;
         (async () => {
             try {
-                // Use the backend URL directly — we're rendering on public
-                // pages where the authed `api` axios instance might not be
-                // initialised yet (user isn't logged in).
-                const base = process.env.REACT_APP_BACKEND_URL || "";
-                const url = `${base}/api/trending/neulab?window_days=${windowDays}&limit=${limit}${idxOnly ? "&idx_only=true" : ""}`;
+                // Use the resolved BACKEND_URL — auto-detects same-origin in
+                // the browser so production deployments call their own backend
+                // instead of a stale env-baked preview URL.
+                const url = `${BACKEND_URL}/api/trending/neulab?window_days=${windowDays}&limit=${limit}${idxOnly ? "&idx_only=true" : ""}`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();

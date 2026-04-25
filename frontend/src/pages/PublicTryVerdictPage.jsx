@@ -27,8 +27,9 @@ import {
 import VerdictRing from "@/components/VerdictRing";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 import { formatPrice, formatPct } from "@/lib/format";
+import { BACKEND_URL } from "@/lib/api";
 
-const API = process.env.REACT_APP_BACKEND_URL;
+const API = BACKEND_URL;
 
 export default function PublicTryVerdictPage() {
     const params = useParams();

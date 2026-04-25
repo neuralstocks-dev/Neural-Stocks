@@ -18,8 +18,9 @@
  */
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { BACKEND_URL } from "@/lib/api";
 
-const API = process.env.REACT_APP_BACKEND_URL;
+const API = BACKEND_URL;
 const pinKey = (experimentKey) => `sai_exp_${experimentKey}`;
 
 export function useExperimentVariant(experimentKey, fallback) {
