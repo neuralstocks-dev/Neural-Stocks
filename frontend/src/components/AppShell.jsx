@@ -69,6 +69,10 @@ export default function AppShell({ children }) {
                     WebkitBackdropFilter: "blur(16px)",
                     background: "hsl(var(--background) / 0.72)",
                     borderBottom: "1px solid hsl(var(--border-default))",
+                    // Respect iOS notch / Android cutout. Pushes the entire
+                    // header content (logo, nav, hamburger) below the unsafe
+                    // top inset so taps actually land on the buttons.
+                    paddingTop: "env(safe-area-inset-top)",
                 }}
                 data-testid="app-header"
             >
@@ -242,6 +246,8 @@ export default function AppShell({ children }) {
                             background: "hsl(var(--background))",
                             borderLeft: "1px solid hsl(var(--border-default))",
                             animation: "slideInRight 220ms ease-out",
+                            paddingTop: "env(safe-area-inset-top)",
+                            paddingBottom: "env(safe-area-inset-bottom)",
                         }}
                     >
                         <div

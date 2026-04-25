@@ -1,0 +1,52 @@
+{
+  "summary": "Frontend-only verification of iter-30 user follow-ups: (1) shorter mobile labels for the AnalysisModeSelector (Std/Candle/Hybrid) and (2) iOS notch / safe-area padding on the persistent header & mobile drawer. Logged in as admin (jolor69@gmail.com / admin1234) and ran 6 targeted Playwright checks against the public preview URL.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "test1_mobile_short_labels": {
+      "status": "PASS",
+      "details": "Verified at 320/360/375/390/414 px on /dashboard. dashboard-mode-standard renders only 'Std' (Standard span has display:none), dashboard-mode-candlestick renders only 'Candle' (Candlestick hidden), dashboard-mode-hybrid renders 'Hybrid' (★ correctly hidden on mobile via hidden sm:inline). All three pills fit inside a 320px viewport without clipping."
+    },
+    "test2_desktop_full_labels": {
+      "status": "PASS",
+      "details": "At 1920x800: dashboard-mode-standard shows 'Standard' (visible), 'Std' is in hidden spans. dashboard-mode-candlestick shows 'Candlestick'. dashboard-mode-hybrid shows 'Hybrid' + ★. The dual-span structure (sm:hidden / hidden sm:inline) is working correctly for both breakpoints."
+    },
+    "test3_header_safe_area_inline_style": {
+      "status": "PASS",
+      "details": "On /dashboard, /settings, /portfolio at 390x844: <header data-testid='app-header'> has inline style.paddingTop === 'env(safe-area-inset-top)' on every page. Computed position is 'sticky' on every page (top:0, z-index:30). Inline style attribute contains the literal 'safe-area-inset-top' substring as expected (Playwright Chromium resolves env() to 0 — that is the correct fallback; on real iOS hardware this will push the header below the notch)."
+    },
+    "test4_header_persistence_across_nav": {
+      "status": "PASS_WITH_NOTE",
+      "details": "Functional outcome: the <header data-testid='app-header'> is visible and sticky on every page after navigating dashboard → portfolio via the mobile drawer (nav-portfolio-mobile). The mobile drawer correctly closes after navigation and the new page's header carries the same safe-area inline style. NOTE: A custom JS property attached to the header element on /dashboard does NOT survive navigation to /portfolio, indicating the DOM element is technically recreated. Root cause: AppShell is wrapped *inside each page component* (DashboardPage, PortfolioPage, SettingsPage, AlertsPage, ScorecardPage, BacktestPage, AdminPage, WhyUsPage, AnalysisReportPage, PaypalSmokeTestPage all render <AppShell>{...}</AppShell> individually) rather than being mounted once as a parent layout route. This causes a full unmount/remount of the header on every route change. User-visible behaviour (always visible, sticky, same styling) is preserved, so this does not block the iter-30 ask, but it is a latent architecture smell — flicker / scroll-pos loss / animation interruption are possible on slower devices. Recommend converting AppShell to a layout route (<Route element={<AppShell />}><Route path='/dashboard' .../></Route>) in a future iteration."
+    },
+    "test5_mobile_drawer_safe_area": {
+      "status": "PASS",
+      "details": "Hamburger opens drawer; the right-side panel div has inline style containing 'padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom)'. The X close button sits inside this padded panel, so on a notched device the close icon will not collide with the status bar."
+    },
+    "test6_mode_pill_onChange": {
+      "status": "PASS",
+      "details": "Initial state on admin user: hybrid is the active pill (bg=hsl(--hold)=rgb(245,159,10) orange). Clicking Candle → candle bg flips to orange, hybrid flips to dark. Clicking Hybrid → hybrid orange again. Clicking Std → standard orange. The dual-span label structure does NOT break the onChange wiring; active visual state correctly flips on every click. (Initial automated assertion incorrectly compared hybrid before/after on its own click — raw bg-color trace confirms full functional correctness.)"
+    }
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Optional, NOT a blocker for iter-30) Refactor AppShell into a React Router layout route so the header DOM element is reused across navigations instead of remounting on every page. Currently each page wraps <AppShell>{...}</AppShell> individually — visually identical but causes unnecessary re-mounts."
+  ],
+  "critical_code_review_comments": [
+    "AppShell.jsx: header & drawer correctly use inline style paddingTop: 'env(safe-area-inset-top)'. viewport-fit=cover is set in public/index.html. Implementation is correct for iOS Safari notch handling.",
+    "AnalysisModeSelector.jsx: dual-span pattern (truncate sm:hidden + truncate hidden sm:inline) is clean and a11y-safe — screen readers will read both labels but visually only one shows. The ★ recommended marker is correctly hidden on mobile via 'hidden sm:inline' so it does not push 'Hybrid' into clipping at 320px.",
+    "Architecture nit: AppShell is wrapped per-page across 11 page components. Consider migrating to a Route-level layout to (a) reduce duplication, (b) preserve header DOM across navigation, (c) avoid the 'flash' of header re-mount on slow devices."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% on user-facing acceptance (6/6 user requirements met)"},
+  "test_credentials": "Admin: jolor69@gmail.com / admin1234 (worked).",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter-30 acceptance points (mobile short labels Std/Candle/Hybrid at 320-414px, desktop full labels at 1920, env(safe-area-inset-top) inline style on header AND mobile drawer panel, header sticky on dashboard/settings/portfolio, mode pill onChange still works with dual-span labels) are verified PASS. The only latent finding is that AppShell is wrapped per-page rather than as a layout route — header DOM element is recreated on each navigation. This is pre-existing architecture, not a regression from iter-30, and visually invisible to the user. Login flow note: on /login there are TWO submit buttons (the home-hero analyze input + the auth form). Use page.get_by_role('button', name='Sign in', exact=True) to disambiguate.",
+  "rca_of_the_issue": "N/A — no bugs requiring RCA. The two automated 'FAIL' lines from my first script run were both test-script artefacts: (a) test4_header_persistence's __uid probe couldn't survive a re-mount that is structural to the app (per-page AppShell wrap) but the header IS visible/sticky on every destination page; (b) test6_toggle's pass/fail predicate forgot that hybrid was already the default active pill so the 'before==after on hybrid click' assertion misfired even though Candle and Standard pills flipped correctly. Raw computed-style trace confirms onChange wiring is intact."
+}

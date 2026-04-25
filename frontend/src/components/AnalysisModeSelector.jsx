@@ -6,6 +6,7 @@ const MODES = [
     {
         value: "standard",
         label: "Standard",
+        shortLabel: "Std",
         icon: Sparkles,
         description: "Classic AI analysis using technicals, fundamentals, and momentum.",
         pro: false,
@@ -13,6 +14,7 @@ const MODES = [
     {
         value: "candlestick",
         label: "Candlestick",
+        shortLabel: "Candle",
         icon: Binary,
         description: "Pure candlestick pattern strategy. Detects Doji, Hammer, Engulfing, Morning/Evening Star, Three Soldiers/Crows and 10+ more. Best for timing entries and reversals.",
         pro: false,
@@ -20,6 +22,7 @@ const MODES = [
     {
         value: "hybrid",
         label: "Hybrid",
+        shortLabel: "Hybrid",
         icon: Layers,
         description: "AI + Candlestick combined. Claude weighs fundamentals & technicals, then uses candlestick patterns for confirmation and timing. Recommended.",
         pro: false,
@@ -114,7 +117,8 @@ export default function AnalysisModeSelector({
                                 ) : (
                                     <Icon size={12} strokeWidth={1.8} />
                                 )}
-                                <span className="truncate">{m.label}</span>
+                                <span className="truncate sm:hidden">{m.shortLabel}</span>
+                                <span className="truncate hidden sm:inline">{m.label}</span>
                                 {m.recommended && !locked && !disabled && (
                                     <span
                                         className="text-[0.5rem] hidden sm:inline"
