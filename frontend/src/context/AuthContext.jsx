@@ -32,6 +32,27 @@ export function AuthProvider({ children }) {
         // then strip the param so the URL doesn't leak via shares/history.
         // Runs BEFORE the regular session bootstrap so we don't redirect
         // through /login first.
+        const stripMagicFromUrl = () => {
+            const p = new URLSearchParams(window.location.search);
+            if (!p.has("t")) return;
+            p.delete("t");
+            const q = p.toString();
+            const cleanUrl =
+                window.location.pathname +
+                (q ? "?" + q : "") +
+                window.location.hash;
+            window.history.replaceState({}, "", cleanUrl);
+            // Notify React Router (or any other history listener) that the
+            // URL just changed under their feet — without this, RR keeps
+            // its cached search state and a downstream navigate() call
+            // can re-introduce `t=` from the stale router-side location.
+            try {
+                window.dispatchEvent(new PopStateEvent("popstate"));
+            } catch {
+                /* no-op for environments without PopStateEvent */
+            }
+        };
+
         const redeemMagicAndBootstrap = async () => {
             const params = new URLSearchParams(window.location.search);
             const magicTok = params.get("t");
@@ -41,15 +62,7 @@ export function AuthProvider({ children }) {
                     localStorage.setItem("sai_token", data.token);
                     localStorage.setItem("sai_user", JSON.stringify(data.user));
                     setUser(data.user);
-                    // Strip the magic token from the URL — keep all other
-                    // query params (autorun=1 etc.) intact.
-                    params.delete("t");
-                    const remaining = params.toString();
-                    const cleanUrl =
-                        window.location.pathname +
-                        (remaining ? "?" + remaining : "") +
-                        window.location.hash;
-                    window.history.replaceState({}, "", cleanUrl);
+                    stripMagicFromUrl();
                     setBootstrapping(false);
                     return;
                 } catch {
@@ -59,14 +72,7 @@ export function AuthProvider({ children }) {
                     // below. If they have an existing JWT it'll refresh
                     // their session; if not, ProtectedRoute redirects
                     // them to /login as expected.
-                    params.delete("t");
-                    const remaining = params.toString();
-                    window.history.replaceState(
-                        {}, "",
-                        window.location.pathname +
-                            (remaining ? "?" + remaining : "") +
-                            window.location.hash
-                    );
+                    stripMagicFromUrl();
                 }
             }
 
