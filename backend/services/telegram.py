@@ -161,9 +161,11 @@ async def send_alert_to_user(user_id: str, title: str, body: str, ticker: str | 
     """Public helper: push an alert to the user's linked Telegram chat.
 
     When `ticker` is provided and `PUBLIC_APP_URL` is configured, append a
-    deep-link like "Open in app: https://.../analysis/AAPL?autorun=1" so
-    tapping it lands directly on the verdict page with the analysis auto-
-    triggered. Falls through cleanly when either value is missing."""
+    deep-link like "Open in app: https://.../analysis/AAPL?autorun=1&t=<magic>"
+    so tapping it lands directly on the verdict page with the analysis
+    auto-triggered AND the user auto-logged-in via the magic token (no
+    login screen between Telegram and the verdict). Falls through cleanly
+    when either value is missing."""
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "telegram_chat_id": 1})
     chat_id = (user or {}).get("telegram_chat_id")
     if not chat_id:
@@ -171,8 +173,18 @@ async def send_alert_to_user(user_id: str, title: str, body: str, ticker: str | 
     formatted = f"<b>{title}</b>\n\n{body}"
     if ticker and _PUBLIC_APP_URL:
         safe = ticker.strip().upper()
+        # Mint a one-time magic token for frictionless auto-login. Failure
+        # to mint must NOT block the alert — fall back to the un-magic
+        # link, the user just sees a login screen as before.
+        magic_param = ""
+        try:
+            from services.magic_link import create_magic_token
+            tok = await create_magic_token(user_id)
+            magic_param = f"&t={tok}"
+        except Exception as e:
+            logger.warning("send_alert_to_user: magic token mint failed: %s", e)
         formatted += (
-            f"\n\n<a href=\"{_PUBLIC_APP_URL}/analysis/{safe}?autorun=1\">"
+            f"\n\n<a href=\"{_PUBLIC_APP_URL}/analysis/{safe}?autorun=1{magic_param}\">"
             f"Open {safe} in app →</a>"
         )
     return await _send_message(chat_id, formatted)

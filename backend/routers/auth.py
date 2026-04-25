@@ -84,6 +84,35 @@ async def login(req: LoginReq, request: Request):
     return {"token": create_jwt(user["id"]), "user": _public_user(user)}
 
 
+@router.post("/magic", response_model=AuthResp)
+async def magic_login(payload: dict, request: Request):
+    """Redeem a one-time magic token (issued at Telegram-push time) for
+    a regular JWT. Used by the frontend's auto-login flow when a user
+    opens an alert deep link from Telegram — they should never see a
+    login screen.
+
+    Returns the same shape as /login so the frontend can store it in
+    `localStorage.sai_token` and `sai_user` without branching."""
+    from services.magic_link import redeem_magic_token
+
+    token = (payload.get("token") or "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="token required")
+
+    user_id = await redeem_magic_token(token)
+    if not user_id:
+        # Generic 401 — don't leak whether the token was wrong, expired,
+        # or already consumed. Same posture as the password login.
+        raise HTTPException(status_code=401, detail="Invalid or expired link")
+
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired link")
+
+    await _record_login(user["id"], user["email"], "magic_link", request)
+    return {"token": create_jwt(user["id"]), "user": _public_user(user)}
+
+
 # REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 @router.post("/google/session", response_model=AuthResp)
 async def google_session(req: GoogleSessionReq, request: Request):

@@ -1,0 +1,48 @@
+{
+  "summary": "Iter 25 magic-link auto-login validation. BACKEND: 16/16 pytest cases PASS — magic_link service (doc shape, TTL+unique indexes, atomic find_one_and_update, all redeem cases incl. expired/consumed/empty/None/concurrent), POST /api/auth/magic (200 success returns {token, user} same shape as /login; 400 on missing/empty token; 401 on bogus/consumed/expired; one-time-use enforced), telegram.send_alert_to_user appends &t=<uuid> when ticker+PUBLIC_APP_URL set (and the minted token actually redeems), graceful degradation when create_magic_token raises (alert still sends, &t= absent). FRONTEND: CRITICAL BUG FOUND on the exact flow the user reported. Fresh-device cleared-localStorage flow at /analysis/AAPL?autorun=1&t=<token> redirects to /login, NOT to the verdict page. Network capture shows /api/auth/magic is POSTed TWICE — first call consumes the token, second call (StrictMode-induced double useEffect in AuthContext.jsx) gets 401, the catch-branch runs, sai_token never gets persisted, ProtectedRoute sees no user → Navigate to /login. Already-logged-in flow works (user stays admin, URL is cleaned) but autorun=1 also gets dropped during a downstream /dashboard navigation — secondary issue. Bogus-token flow works as designed (URL stripped, lands on /login).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Magic-link auto-login on fresh device (Telegram → /analysis/AAPL?autorun=1&t=<token> with cleared localStorage)",
+        "issue": "AuthContext.jsx redeemMagicAndBootstrap is invoked twice on mount in React.StrictMode (dev). The first POST /api/auth/magic returns 200 and consumes the one-time token; the second POST returns 401 because the token is already consumed; the catch branch then runs, clearing the URL and exiting WITHOUT persisting the token from the first successful call (because both invocations race and the second-to-finish wins the bootstrapping=false transition with user=null). Net result: the user is redirected to /login — exactly the bug the user originally reported. Confirmed by request capture: 2x POST /api/auth/magic, last-observed status 401, final path = /login, sai_token absent. React.StrictMode is enabled in /app/frontend/src/index.js so this reproduces on every dev/preview load.",
+        "affected_selectors": ["/analysis/AAPL?autorun=1&t=<token>"]
+      },
+      {
+        "flow": "Magic-link auto-login when admin is already logged in",
+        "issue": "Magic redemption succeeds and JWT is replaced, but the page navigates from /analysis/AAPL to /dashboard (search becomes empty — autorun=1 dropped). Redirect appears to come from a downstream component, not from AuthContext. Lower priority than the fresh-device bug but the deep-link should still autorun the analysis."
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter25_magic_link.py",
+    "/app/test_reports/pytest/iteration25_magic_link.xml"
+  ],
+  "action_items": [
+    "FIX (HIGH): De-duplicate the magic-token redemption in /app/frontend/src/context/AuthContext.jsx so React.StrictMode's double useEffect doesn't double-redeem. Two clean fixes: (a) useRef guard — `const ran = useRef(false); useEffect(() => { if (ran.current) return; ran.current = true; ... }, [])` — or (b) synchronously strip the t param from window.location BEFORE the await api.post('/auth/magic', ...) so the second invocation reads no token. Either makes the fresh-device flow work in dev StrictMode and removes the race in production.",
+    "INVESTIGATE: After successful magic redemption while already authenticated, /analysis/AAPL navigates to /dashboard losing autorun=1. Likely a component-level redirect — verify the Analysis page doesn't bounce when verdict isn't pre-loaded.",
+    "OPTIONAL HARDENING: services/magic_link.py uses {'expires_at': {'$gt': now}} where `now` is timezone-aware UTC and stored expires_at is also tz-aware datetime — works correctly. No change needed, just noting."
+  ],
+  "critical_code_review_comments": [
+    "services/magic_link.py: clean implementation. _ensure_index() guards repeat creation with module-level flag; both TTL (expireAfterSeconds=0 on expires_at) and unique (token) indexes confirmed live in MongoDB index_information. find_one_and_update with strict {token, consumed_at:None, expires_at>{now}} filter correctly enforces atomic one-time-use under concurrent redemption (verified: 1 win + 2 None across 3 parallel redeems on same token).",
+    "routers/auth.py @router.post('/magic'): correct status codes (400 on missing/empty token, 401 generic for bogus/expired/consumed — good security posture not leaking which case), response shape mirrors /login exactly via _public_user, and login is recorded with method='magic_link' for audit. Solid.",
+    "services/telegram.py send_alert_to_user: graceful fallback verified — patching create_magic_token to raise still sends the alert with the un-magic deep link. The dynamic import inside the function is a small overhead but avoids circular imports — fine.",
+    "frontend/src/context/AuthContext.jsx: the bug. The async redeemMagicAndBootstrap reads window.location.search at the top, then awaits the POST before calling history.replaceState. In StrictMode the effect is intentionally invoked twice on mount — both reads see the same `t=` value and both fire POSTs. Needs a useRef guard or a synchronous URL-strip-before-await.",
+    "frontend AuthContext: even after fixing the StrictMode race, consider that the catch branch (`token expired/used/bogus`) currently strips the param but does NOT explicitly setBootstrapping(false) before exiting the function — it falls through to the `if (!token) return setBootstrapping(false)` path because localStorage.sai_token is still empty. This works today but is fragile; an early `setBootstrapping(false)` after the catch's URL strip would make intent clearer."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter25_magic_link.py (new, 16 tests, all PASS)"
+  ],
+  "success_rate": {
+    "backend": "16/16 PASS (100%)",
+    "frontend": "1/3 PASS (33%) — fresh-device flow BROKEN, bogus-token flow OK, logged-in-user flow partial (auth ok, autorun lost)"
+  },
+  "test_credentials": "Admin: jolor69@gmail.com / admin1234 (id=58c25b43-3a69-4703-9d0d-dff76de4a745).",
+  "seed_data_creation": "Minted ~12 magic tokens during test run; all consumed or self-cleaned via 7d TTL. No teardown needed per spec.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "After main agent applies the AuthContext.jsx StrictMode dedupe fix, re-run the FRONTEND test only (backend is fully green and stable). Quick repro: mint a fresh token via `from services.magic_link import create_magic_token; await create_magic_token('<admin_user_id>')`, navigate Playwright to /analysis/AAPL?autorun=1&t=<token> with localStorage cleared, capture network calls — expected: exactly ONE POST /api/auth/magic returning 200, NOT redirected to /login, sai_token populated, URL cleaned. Backend test file /app/backend/tests/test_iter25_magic_link.py can be re-run as regression any time with: `python -m pytest tests/test_iter25_magic_link.py -v` from /app/backend.",
+  "rca of the issue": "ROOT CAUSE: React.StrictMode (enabled in /app/frontend/src/index.js) intentionally double-invokes effects on mount in development to flush out non-idempotent effects. The redeemMagicAndBootstrap effect in AuthContext.jsx is NON-IDEMPOTENT — it reads `?t=` from window.location AND fires a side-effecting POST to /auth/magic which is server-side strictly one-time-use. First invocation reads token T, POSTs, server consumes T, returns {token, user}, success branch runs replaceState. Second invocation runs in parallel (effects fire synchronously back-to-back; the await yields back to the runtime which then runs the second mount's effect immediately) and ALSO reads token T (replaceState from first call hasn't fired yet because that promise hasn't resolved), POSTs T, server returns 401 (already consumed), catch branch strips the URL but never persists the JWT from the first successful call. The setUser/setBootstrapping calls from both invocations race; the second invocation's setBootstrapping(false)+user-null wins the final paint and ProtectedRoute redirects to /login. MITIGATION: Add a useRef-based single-fire guard or synchronously strip the t param from window.location BEFORE the await, so the second invocation sees no token and short-circuits. REPRODUCTION: 1) clear localStorage, 2) mint magic token via Python, 3) goto /analysis/AAPL?autorun=1&t=<token>, 4) wait 4s, 5) inspect network — observe 2x POST /auth/magic with second 401, observe page.url ends with /login. Reproduces 100% in the preview env."
+}

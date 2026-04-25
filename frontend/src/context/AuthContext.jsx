@@ -16,23 +16,67 @@ export function AuthProvider({ children }) {
             setBootstrapping(false);
             return;
         }
-        const token = localStorage.getItem("sai_token");
-        if (!token) {
-            setBootstrapping(false);
-            return;
-        }
-        api
-            .get("/auth/me")
-            .then((r) => {
+
+        // Magic-link auto-login from Telegram alerts. URL format:
+        //   /analysis/AAPL?autorun=1&t=<one-time-uuid>
+        // We redeem the token, swap our auth state for the returned JWT,
+        // then strip the param so the URL doesn't leak via shares/history.
+        // Runs BEFORE the regular session bootstrap so we don't redirect
+        // through /login first.
+        const redeemMagicAndBootstrap = async () => {
+            const params = new URLSearchParams(window.location.search);
+            const magicTok = params.get("t");
+            if (magicTok) {
+                try {
+                    const { data } = await api.post("/auth/magic", { token: magicTok });
+                    localStorage.setItem("sai_token", data.token);
+                    localStorage.setItem("sai_user", JSON.stringify(data.user));
+                    setUser(data.user);
+                    // Strip the magic token from the URL — keep all other
+                    // query params (autorun=1 etc.) intact.
+                    params.delete("t");
+                    const remaining = params.toString();
+                    const cleanUrl =
+                        window.location.pathname +
+                        (remaining ? "?" + remaining : "") +
+                        window.location.hash;
+                    window.history.replaceState({}, "", cleanUrl);
+                    setBootstrapping(false);
+                    return;
+                } catch {
+                    // Token expired / already used / bogus — fall through
+                    // to normal bootstrap so the user lands on /login if
+                    // they aren't already authenticated. Strip the bad
+                    // param either way to avoid retry loops.
+                    params.delete("t");
+                    const remaining = params.toString();
+                    window.history.replaceState(
+                        {}, "",
+                        window.location.pathname +
+                            (remaining ? "?" + remaining : "") +
+                            window.location.hash
+                    );
+                }
+            }
+
+            const token = localStorage.getItem("sai_token");
+            if (!token) {
+                setBootstrapping(false);
+                return;
+            }
+            try {
+                const r = await api.get("/auth/me");
                 setUser(r.data);
                 localStorage.setItem("sai_user", JSON.stringify(r.data));
-            })
-            .catch(() => {
+            } catch {
                 localStorage.removeItem("sai_token");
                 localStorage.removeItem("sai_user");
                 setUser(null);
-            })
-            .finally(() => setBootstrapping(false));
+            } finally {
+                setBootstrapping(false);
+            }
+        };
+        redeemMagicAndBootstrap();
     }, []);
 
     const login = useCallback(async (email, password) => {
