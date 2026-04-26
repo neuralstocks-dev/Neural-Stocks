@@ -433,10 +433,11 @@ export default function UserManualPage() {
                     </Link>
                     . The numbers there always reflect what the backend actually enforces.
                 </p>
-                <Callout tone="info" title="Day Pass for one big research session">
-                    Need a few hours of unlimited-feeling power without committing to a monthly?
-                    Buy a one-time <strong>Day Pass</strong> — 10 analyses, 10 watchlist tickers,
-                    PDF export, all valid for 24 hours.
+                <Callout tone="info" title="Week Pass for one big research stretch">
+                    Need a full week of paid-tier power without committing to a monthly?
+                    Buy a one-time <strong>Week Pass</strong> — 10 analyses per day,
+                    10 watchlist tickers, PDF export, share verdicts — all valid for{" "}
+                    <strong>7 days</strong>.
                 </Callout>
             </Section>
 

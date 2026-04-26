@@ -838,7 +838,7 @@ Market data      yfinance (public) + Finnhub.io (REST, US) + RapidAPI IDX (Indon
 IDX news         CNBC Indonesia + Detik Finance RSS scraper
 IDX smart-money  Bandarmology — insider filings parsed from RapidAPI IDX /emiten/{sym}/insider
 PDF              ReportLab (server-side, zero client dependencies)
-Payments         PayPal REST v1 (Subscriptions) + v2 (Orders for Day Pass)
+Payments         PayPal REST v1 (Subscriptions) + v2 (Orders for Week Pass)
 Email            Resend (receipts, password reset)
 Alerts           Telegram Bot API (@neulab_bot)
 Hosting          Kubernetes container on Emergent · Supervisord-managed services

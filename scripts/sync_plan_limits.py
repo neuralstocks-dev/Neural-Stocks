@@ -44,6 +44,13 @@ def main():
         snap[tier]["analyses_per_day_display"] = PLANS[tier].get(
             "analyses_per_day_display"
         )
+        # Customer-facing plan name (e.g., daypass renders as "Week Pass").
+        snap[tier]["name"] = PLANS[tier].get("name")
+
+    # Expose the daypass duration explicitly so marketing pages can be
+    # asserted against a single source of truth for "X-day access" copy.
+    if "daypass" in PLANS:
+        snap["daypass"]["duration_days"] = PLANS["daypass"].get("duration_days")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(snap, indent=2, sort_keys=True) + "\n")

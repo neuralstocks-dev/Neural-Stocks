@@ -143,5 +143,56 @@ describe("marketing claims match backend plan limits", () => {
                 new RegExp(`Pro ${pro.share_per_day}/day`)
             );
         });
+
+        test("daypass plan name in tech doc matches backend (Week Pass, NOT 'Day Pass')", () => {
+            const dp = fixture.daypass;
+            expect(src).toMatch(new RegExp(`for ${dp.name}`));
+            // Defensive: reject the legacy "Day Pass" label that drifted
+            // from the backend rename.
+            expect(src).not.toMatch(/for Day Pass\b/);
+        });
+    });
+
+    describe("Daypass copy consistency (Manual vs Pricing vs Technical)", () => {
+        const dp = fixture.daypass;
+
+        test("backend canonical fixture matches the live plan", () => {
+            // If any of these change the test should fail loudly so the dev
+            // knows to update marketing copy *and* this assertion.
+            expect(dp.name).toBe("Week Pass");
+            expect(dp.duration_days).toBe(7);
+            expect(dp.watchlist_limit).toBe(10);
+            expect(dp.analyses_per_day).toBe(10);
+        });
+
+        test("UserManualPage uses the backend plan name (Week Pass, NOT 'Day Pass')", () => {
+            const src = readFile("pages/UserManualPage.jsx");
+            expect(src).toMatch(/Week Pass/);
+            // Don't allow the legacy 'Day Pass' label or the wrong '24 hour'
+            // duration to creep back into the manual.
+            expect(src).not.toMatch(/Day Pass\b/);
+            expect(src).not.toMatch(/24\s*hour/i);
+        });
+
+        test("UserManualPage states the correct daypass duration in days", () => {
+            const src = readFile("pages/UserManualPage.jsx");
+            expect(src).toMatch(
+                new RegExp(`<strong>${dp.duration_days} days</strong>`)
+            );
+        });
+
+        test("PricingPage card heading uses 'Week Pass · One-time payment' (NOT 'Day Pass')", () => {
+            const src = readFile("pages/PricingPage.jsx");
+            expect(src).toMatch(/Week Pass · One-time payment/);
+            // Variable name `daypass` is fine; only flag the customer-facing label.
+            expect(src).not.toMatch(/Day Pass · One-time payment/);
+        });
+
+        test("PricingPage analyses-per-day matches daypass canonical", () => {
+            const src = readFile("pages/PricingPage.jsx");
+            // The page renders this dynamically as `${daypass.analyses_per_day} analyses per day`,
+            // so the literal number won't appear — instead assert the templated source.
+            expect(src).toMatch(/\$\{daypass\.analyses_per_day\}\s+analyses per day/);
+        });
     });
 });
