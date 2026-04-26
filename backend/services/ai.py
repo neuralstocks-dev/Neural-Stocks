@@ -176,9 +176,16 @@ async def _parse_ai_json_async(raw) -> dict:
 def _handle_llm_error(e: Exception):
     err_msg = str(e)
     if "Budget has been exceeded" in err_msg or "budget" in err_msg.lower():
+        # 503 + structured detail. The `error_code` lets the frontend
+        # render a richer banner (Top-up CTA + cost-economics popover)
+        # instead of a generic red string. detail.message is kept as a
+        # human-readable fallback for clients that don't read error_code.
         raise HTTPException(
             status_code=503,
-            detail="AI analysis temporarily unavailable — LLM budget exceeded. Please top up your Emergent Universal Key (Profile → Universal Key → Add Balance).",
+            detail={
+                "error_code": "llm_budget_exceeded",
+                "message": "AI analysis temporarily unavailable — LLM budget exceeded. Please top up your Emergent Universal Key (Profile → Universal Key → Add Balance).",
+            },
         )
     raise HTTPException(status_code=502, detail=f"AI provider error: {err_msg[:200]}")
 

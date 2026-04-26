@@ -7,6 +7,23 @@ import Sparkline from "@/components/Sparkline";
 import SignalBadge from "@/components/SignalBadge";
 import QuickAnalyzeProgress from "@/components/QuickAnalyzeProgress";
 import AnalysisQueueChip from "@/components/AnalysisQueueChip";
+import LLMBudgetBanner from "@/components/LLMBudgetBanner";
+
+// Tiny mirror of the detection logic in LLMBudgetBanner so the parent
+// can hide its generic red string when the friendly banner is taking
+// over. Kept in sync intentionally — same simple matcher.
+function _isBudgetError(payload) {
+    if (!payload) return false;
+    if (typeof payload === "string") {
+        const s = payload.toLowerCase();
+        return s.includes("budget exceeded") || s.includes("budget has been exceeded") || s.includes("universal key");
+    }
+    if (typeof payload === "object") {
+        if (payload.error_code === "llm_budget_exceeded") return true;
+        return _isBudgetError(payload.message);
+    }
+    return false;
+}
 import TestUnlockBanner from "@/components/TestUnlockBanner";
 import FirstTimeManualPill from "@/components/FirstTimeManualPill";
 import OnboardingWizard, { isOnboardingCompleted } from "@/components/OnboardingWizard";
@@ -282,6 +299,9 @@ export default function DashboardPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [timelineTicker, setTimelineTicker] = useState(null);
     const [actionError, setActionError] = useState("");
+    // Raw error payload (string or structured detail) for the LLM-budget
+    // friendly banner detection — kept in sync with `actionError`.
+    const [actionErrorRaw, setActionErrorRaw] = useState(null);
 
     const plan = user?.plan || "free";
     const canQuickActions = quota?.quick_actions ?? (plan !== "free");
@@ -517,10 +537,9 @@ export default function DashboardPage() {
                 }, 8000);
             } catch (err) {
                 if (disclaimer.promptFromError(err)) return;
-                const msg =
-                    err?.response?.data?.detail ||
-                    err?.message ||
-                    "Analysis failed";
+                const detail = err?.response?.data?.detail;
+                const msg = detail || err?.message || "Analysis failed";
+                setActionErrorRaw(detail || err?.message || null);
                 setActionError(errMessage(msg, "Analysis failed"));
             } finally {
                 setAnalyzingTicker(null);
@@ -763,9 +782,14 @@ export default function DashboardPage() {
                 )}
 
                 {actionError && (
-                    <div className="signal-sell px-4 py-3 mb-4 font-mono text-sm" data-testid="action-error">
-                        {actionError}
-                    </div>
+                    <>
+                        <LLMBudgetBanner error={actionErrorRaw} />
+                        {!_isBudgetError(actionErrorRaw) && (
+                            <div className="signal-sell px-4 py-3 mb-4 font-mono text-sm" data-testid="action-error">
+                                {actionError}
+                            </div>
+                        )}
+                    </>
                 )}
 
                 {/* Analysis mode selector — applies to per-row Analyze */}

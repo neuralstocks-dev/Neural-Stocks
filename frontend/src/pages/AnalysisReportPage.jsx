@@ -14,6 +14,23 @@ import BandarmologyCard from "@/components/BandarmologyCard";
 import ConfluenceChip from "@/components/ConfluenceChip";
 import AnalysisQueueChip from "@/components/AnalysisQueueChip";
 import AnalysisProgressStepper from "@/components/AnalysisProgressStepper";
+import LLMBudgetBanner from "@/components/LLMBudgetBanner";
+
+// Tiny mirror of the detection logic in LLMBudgetBanner so the parent
+// can hide its generic red string when the friendly banner is taking
+// over. Kept in sync intentionally — same simple matcher.
+function _isBudgetError(payload) {
+    if (!payload) return false;
+    if (typeof payload === "string") {
+        const s = payload.toLowerCase();
+        return s.includes("budget exceeded") || s.includes("budget has been exceeded") || s.includes("universal key");
+    }
+    if (typeof payload === "object") {
+        if (payload.error_code === "llm_budget_exceeded") return true;
+        return _isBudgetError(payload.message);
+    }
+    return false;
+}
 import { useAuth } from "@/hooks/useAuth";
 import {
     LineChart,
@@ -55,6 +72,10 @@ export default function AnalysisReportPage() {
     const [loading, setLoading] = useState(true);
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState("");
+    // Raw error payload (string or object) so specialised banners like
+    // <LLMBudgetBanner /> can detect structured codes (error_code) instead
+    // of brittle string matching. Set alongside `error` whenever we set it.
+    const [errorRaw, setErrorRaw] = useState(null);
     // Live progress snapshot from the BG job — drives the per-stage
     // stepper next to the Re-analyze button. Reset to null when not
     // analyzing so the stepper hides automatically.
@@ -81,6 +102,7 @@ export default function AnalysisReportPage() {
     const load = async () => {
         setLoading(true);
         setError("");
+        setErrorRaw(null);
         try {
             const [quoteR, histR] = await Promise.all([
                 api.get(`/stocks/${t}/quote`),
@@ -134,6 +156,7 @@ export default function AnalysisReportPage() {
         disclaimer.ensureAccepted(async () => {
             setAnalyzing(true);
             setError("");
+            setErrorRaw(null);
             setProgress(null);
             try {
                 // Re-analysis preserves the mode of the existing verdict (if any).
@@ -204,8 +227,9 @@ export default function AnalysisReportPage() {
                 setAnalysis(finalResult);
             } catch (err) {
                 if (disclaimer.promptFromError(err)) return;
-                const msg =
-                    err?.response?.data?.detail || err?.message || "Analysis failed";
+                const detail = err?.response?.data?.detail;
+                const msg = detail || err?.message || "Analysis failed";
+                setErrorRaw(detail || err?.message || null);
                 setError(errMessage(msg, "Analysis failed"));
             } finally {
                 setAnalyzing(false);
@@ -252,9 +276,17 @@ export default function AnalysisReportPage() {
                 )}
 
                 {error && !loading && (
-                    <div className="signal-sell p-4 font-mono text-sm" data-testid="analysis-error">
-                        {error}
-                    </div>
+                    <>
+                        <LLMBudgetBanner error={errorRaw} />
+                        {/* Generic red banner is hidden when the friendly
+                            LLM-budget banner is showing (it has its own
+                            structured copy + Top-up CTA). */}
+                        {!_isBudgetError(errorRaw) && (
+                            <div className="signal-sell p-4 font-mono text-sm" data-testid="analysis-error">
+                                {error}
+                            </div>
+                        )}
+                    </>
                 )}
 
                 {!loading && quote && (
