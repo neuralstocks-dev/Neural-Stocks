@@ -329,6 +329,15 @@ async def start_analysis(
         await enforce_idx_analysis_quota(user)
 
     job_id = str(uuid.uuid4())
+    # Phase plan — the BG worker will mark each off as it advances. Surfaces
+    # live progress in the UI so users see WHICH stage is active right now
+    # (data fetch / patterns / Claude / RF / calibration) instead of a
+    # featureless spinner. Phases vary by mode: candlestick/hybrid include
+    # pattern scanning; standard skips it.
+    base_phases = ["fetching_data", "computing_technicals"]
+    if m in ("candlestick", "hybrid"):
+        base_phases.append("scanning_patterns")
+    base_phases.extend(["llm_thinking", "rf_scoring", "calibrating"])
     await db.analysis_jobs.insert_one({
         "id": job_id,
         "user_id": user["id"],
@@ -340,6 +349,11 @@ async def start_analysis(
         "finished_at": None,
         "result": None,
         "error": None,
+        "progress": {
+            "phase": "queued",
+            "phases": base_phases,
+            "completed": [],
+        },
     })
     task = asyncio.create_task(_run_single_analysis_job(job_id, t, m, user))
     _BG_TASKS.add(task)
@@ -347,11 +361,40 @@ async def start_analysis(
     return {"job_id": job_id, "status": "running", "ticker": t, "mode": m}
 
 
+async def _set_job_phase(job_id: str | None, phase: str):
+    """Push a phase transition into the job doc. The previous phase (if any)
+    is moved into `completed`. Silent no-op when job_id is None — used by
+    the deprecated direct-call path that doesn't track per-phase progress."""
+    if not job_id:
+        return
+    try:
+        cur = await db.analysis_jobs.find_one({"id": job_id}, {"progress": 1, "_id": 0})
+        if not cur:
+            return
+        prog = cur.get("progress") or {}
+        completed = list(prog.get("completed") or [])
+        prev = prog.get("phase")
+        if prev and prev != "queued" and prev not in completed:
+            completed.append(prev)
+        await db.analysis_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "progress.phase": phase,
+                "progress.completed": completed,
+                "progress.updated_at": iso(now_utc()),
+            }},
+        )
+    except Exception:
+        # Progress tracking is best-effort — never fail the analysis
+        # because of a Mongo write hiccup.
+        pass
+
+
 async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: dict):
     """Background worker — writes result (or error) to db.analysis_jobs."""
     try:
         r = await asyncio.wait_for(
-            _create_analysis_impl(ticker, mode, user),
+            _create_analysis_impl(ticker, mode, user, job_id=job_id),
             timeout=QUICK_PER_TASK_TIMEOUT,
         )
         await db.analysis_jobs.update_one(
@@ -360,6 +403,7 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
                 "status": "done",
                 "finished_at": iso(now_utc()),
                 "result": r,
+                "progress.phase": "done",
             }},
         )
     except asyncio.TimeoutError:
@@ -433,7 +477,7 @@ async def create_analysis(
     return await start_analysis(ticker, mode=mode, user=user)
 
 
-async def _create_analysis_impl(ticker: str, mode: str, user: dict):
+async def _create_analysis_impl(ticker: str, mode: str, user: dict, job_id: str | None = None):
     """Throttled wrapper around the real pipeline. Acquires a global
     semaphore so we never run more than ANALYSIS_CONCURRENCY full-pipeline
     analyses concurrently on this worker. Tracks running/queued counters
@@ -450,7 +494,7 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
             try:
                 import time as _time
                 _t0 = _time.monotonic()
-                result = await _create_analysis_impl_inner(ticker, mode, user)
+                result = await _create_analysis_impl_inner(ticker, mode, user, job_id=job_id)
                 elapsed = _time.monotonic() - _t0
                 _ANALYSIS_AVG_DURATION_S = (
                     _ANALYSIS_AVG_ALPHA * elapsed
@@ -466,7 +510,7 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
             _ANALYSIS_QUEUED -= 1
 
 
-async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict):
+async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id: str | None = None):
     ticker = ticker.upper().strip()
     is_anon = bool(user.get("__anon__"))
     if not is_anon:
@@ -495,7 +539,10 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict):
     hist_task = asyncio.to_thread(_yf_history_sync, ticker, "6mo", "1d")
     fund_task = asyncio.to_thread(_yf_fundamentals_sync, ticker)
     market_ctx_task = get_market_context_idx(ticker) if is_idx else get_market_context(ticker)
-    # For IDX tickers, also pull richer quote + key stats from RapidAPI
+    # Mark "fetching_data" — the user sees this stage tick alive in the UI
+    # while the parallel asyncio.gather below pulls quotes / history /
+    # fundamentals / market context.
+    await _set_job_phase(job_id, "fetching_data")    # For IDX tickers, also pull richer quote + key stats from RapidAPI
     # (augments yfinance; gracefully None on any failure → we stay on yf).
     idx_quote_task = None
     idx_keystats_task = None
@@ -572,12 +619,15 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict):
 
     if quote.get("price") is None:
         raise HTTPException(status_code=404, detail=f"No data for ticker {ticker}")
+    await _set_job_phase(job_id, "computing_technicals")
     technicals = compute_technicals(history)
 
     candlestick_findings = None
     if mode in ("candlestick", "hybrid"):
+        await _set_job_phase(job_id, "scanning_patterns")
         candlestick_findings = scan_daily_and_weekly(history, weekly_history)
 
+    await _set_job_phase(job_id, "llm_thinking")
     if mode == "candlestick":
         analysis = await run_candlestick_analysis(
             ticker, quote, history, fundamentals, technicals, candlestick_findings
@@ -628,6 +678,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict):
     # computable (IDX tickers with short history will silently skip).
     rf_opinion_for_calibration = None
     if rf_history:
+        await _set_job_phase(job_id, "rf_scoring")
         try:
             df = pd.DataFrame(rf_history)
             df["date"] = pd.to_datetime(df["date"], utc=True)
@@ -659,6 +710,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict):
     # earnings-proximity gate and the RF-disagreement penalty. Mutates
     # `analysis` in place so the persisted doc + the response both reflect
     # the calibrated confidence.
+    await _set_job_phase(job_id, "calibrating")
     from services.verdict_calibration import calibrate_verdict
     calibrate_verdict(
         analysis,
@@ -669,6 +721,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict):
     # on `analysis` which was already spread into `doc` above; copy now).
     for k in (
         "confidence_score",
+        "confidence_score_pre_calibration",
         "confidence_adjustments",
         "earnings_gate_applied",
         "days_until_earnings",

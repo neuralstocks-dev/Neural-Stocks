@@ -487,7 +487,7 @@ histogram  = MACD_line − signal`}
                     <ModeCard
                         name="Candlestick"
                         emphasis="Pattern-first"
-                        body="Candlestick patterns drive the verdict. Technicals and fundamentals act as confirmation or rejection signals. Best for swing/short-term timing."
+                        body="Candlestick patterns drive the verdict. Technicals and fundamentals act as confirmation or rejection signals. Best for swing/short-term timing where you trust price action over the fundamental story (e.g., trading reversals, ignoring noisy earnings windows)."
                     />
                     <ModeCard
                         name="Hybrid"

@@ -13,6 +13,7 @@ import RandomForestOpinion from "@/components/RandomForestOpinion";
 import BandarmologyCard from "@/components/BandarmologyCard";
 import ConfluenceChip from "@/components/ConfluenceChip";
 import AnalysisQueueChip from "@/components/AnalysisQueueChip";
+import AnalysisProgressStepper from "@/components/AnalysisProgressStepper";
 import { useAuth } from "@/hooks/useAuth";
 import {
     LineChart,
@@ -54,6 +55,10 @@ export default function AnalysisReportPage() {
     const [loading, setLoading] = useState(true);
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState("");
+    // Live progress snapshot from the BG job — drives the per-stage
+    // stepper next to the Re-analyze button. Reset to null when not
+    // analyzing so the stepper hides automatically.
+    const [progress, setProgress] = useState(null);
     // All 3 analysis modes are available to all tiers (Feb 2026).
     const canPro = true;
     const [mode, setMode] = useState("hybrid");
@@ -125,6 +130,7 @@ export default function AnalysisReportPage() {
         disclaimer.ensureAccepted(async () => {
             setAnalyzing(true);
             setError("");
+            setProgress(null);
             try {
                 // Re-analysis preserves the mode of the existing verdict (if any).
                 const effectiveMode = analysis?.mode || mode;
@@ -161,6 +167,8 @@ export default function AnalysisReportPage() {
                         }
                         continue;
                     }
+                    // Surface live phase to the stepper UI.
+                    if (j.progress) setProgress(j.progress);
                     if (j.status === "done") {
                         finalResult = j.result;
                         break;
@@ -197,6 +205,7 @@ export default function AnalysisReportPage() {
                 setError(errMessage(msg, "Analysis failed"));
             } finally {
                 setAnalyzing(false);
+                setProgress(null);
             }
         });
     };
@@ -380,6 +389,21 @@ export default function AnalysisReportPage() {
                                     </button>
                                     <AnalysisQueueChip watch />
                                 </div>
+                                {/* Per-stage stepper — visible only while a
+                                    job is running. Reads progress.phase +
+                                    progress.completed from /analysis/jobs/
+                                    {id}. Replaces the opaque "Thinking…"
+                                    spinner with a transparent receipt so
+                                    users see WHICH part of the pipeline is
+                                    working (data fetch / patterns / Claude
+                                    / RF / calibration) right now. */}
+                                {analyzing && progress && (
+                                    <AnalysisProgressStepper
+                                        progress={progress}
+                                        mode={analysis?.mode || mode}
+                                        className="mt-3"
+                                    />
+                                )}
                             </div>
 
                             {/* Mode selector */}
@@ -551,6 +575,50 @@ export default function AnalysisReportPage() {
                                                             How?
                                                         </Link>
                                                     </p>
+                                                    {/* Score breakdown — show LLM raw → final
+                                                        whenever calibration changed the score, so
+                                                        users can audit how the Final Score was
+                                                        concluded. Uses confidence_score_pre_calibration
+                                                        captured by services/verdict_calibration.py
+                                                        before any rule runs. */}
+                                                    {typeof analysis.confidence_score_pre_calibration === "number" &&
+                                                     typeof analysis.confidence_score === "number" &&
+                                                     analysis.confidence_score_pre_calibration !== analysis.confidence_score && (
+                                                        <div
+                                                            className="mt-2 flex items-center gap-2 font-mono"
+                                                            style={{ fontSize: "0.66rem" }}
+                                                            data-testid="score-breakdown"
+                                                        >
+                                                            <span style={{ color: "hsl(var(--text-muted))" }}>
+                                                                LLM raw
+                                                            </span>
+                                                            <span style={{ color: "hsl(var(--text-primary))" }}>
+                                                                {analysis.confidence_score_pre_calibration}
+                                                            </span>
+                                                            <span style={{ color: "hsl(var(--text-muted))" }}>→</span>
+                                                            <span
+                                                                style={{
+                                                                    color: "hsl(var(--sell))",
+                                                                    background: "hsla(0,55%,55%,0.08)",
+                                                                    padding: "1px 6px",
+                                                                    borderRadius: 2,
+                                                                    border: "1px solid hsl(var(--sell))",
+                                                                }}
+                                                            >
+                                                                −{analysis.confidence_score_pre_calibration - analysis.confidence_score}
+                                                            </span>
+                                                            <span style={{ color: "hsl(var(--text-muted))" }}>→</span>
+                                                            <span
+                                                                style={{
+                                                                    color: "hsl(var(--buy))",
+                                                                    fontWeight: 600,
+                                                                }}
+                                                                data-testid="score-breakdown-final"
+                                                            >
+                                                                {analysis.confidence_score} final
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                     {(analysis.confidence_adjustments || []).length > 0 ? (
                                                         <ul className="mt-2 space-y-1.5">
                                                             {analysis.confidence_adjustments.map((msg, i) => (

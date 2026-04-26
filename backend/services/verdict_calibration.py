@@ -167,7 +167,17 @@ def calibrate_verdict(
     adjustment was needed" state instead of hiding the module entirely.
     Without this seed the field would be missing on clean verdicts and
     users couldn't tell whether V2 was active or absent.
+
+    Also captures the pre-calibration score under
+    `confidence_score_pre_calibration` so the UI can show the user how
+    the Final Score was concluded (LLM raw → after gates → final).
     """
+    # Snapshot the LLM's raw confidence BEFORE any calibration rule runs.
+    # This is what the UI labels "LLM raw" in the score-breakdown section.
+    if isinstance(verdict, dict):
+        raw = verdict.get("confidence_score")
+        if isinstance(raw, (int, float)):
+            verdict["confidence_score_pre_calibration"] = int(raw)
     apply_earnings_gate(verdict, market_context)
     apply_rf_disagreement_penalty(verdict, rf_opinion)
     if isinstance(verdict, dict):

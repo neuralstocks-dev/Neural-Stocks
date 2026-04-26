@@ -1,0 +1,36 @@
+{
+  "summary": "Iter 39 — Verified all three iterative enhancements: (A) /technical Candlestick mode card body now contains 'trust price action over the fundamental story', 'trading reversals', and 'ignoring noisy earnings windows'. (B) Per-stage progress stepper renders during /analysis/{ticker} runs with mode-conditional phases (standard=5, candlestick/hybrid=6 incl. scanning_patterns), correct visual states (done=green+check, active=amber+spinner, pending=gray+dot) — confirmed end-to-end on a live NFLX hybrid run via Playwright. (C) Score breakdown 'LLM raw 78 → −12 → 66 final' is rendered under the verdict ring for NFLX hybrid (rec=BUY, RF strong-edge down 80%, penalty=12) — exact text confirmed via [data-testid='score-breakdown']. Backend: 17/17 pytest pass (10 verdict_calibration + 7 new iter39 tests covering /start phase seeding, /jobs/{id} phase advancement, /latest pre-calibration mirror, and unit-level pre-cal snapshot logic). Live integration on NFLX hybrid round-trips pre=78 → final=66 → rf_disagreement_penalty=12 → calibration_version=v2 exactly as spec'd.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter39_progress_and_breakdown.py",
+    "/app/backend/tests/test_verdict_calibration.py",
+    "/app/test_reports/pytest/iteration39.xml",
+    "/app/test_reports/pytest/iteration39_calibration.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "verdict_calibration.calibrate_verdict correctly snapshots confidence_score_pre_calibration BEFORE any rule fires (line 178-180 of verdict_calibration.py). Even when no rule mutates the score, the snapshot is still set, so the field is always populated for v2 verdicts — UI gating on pre !== final is the right call to avoid showing a redundant '78 → 0 → 78' breakdown.",
+    "routers/analysis.py _set_job_phase is best-effort with a try/except → progress tracking never fails the analysis. Good. Note: completed list is appended only when the previous phase wasn't 'queued' (line 377), so the queued-state never lands in completed — correct.",
+    "AnalysisProgressStepper.jsx unmounts when progress.phases is null (line 30) — relies on AnalysisReportPage's finally-block clearing progress=null on completion (verified at line 208 of AnalysisReportPage.jsx).",
+    "Phase 'calibrating' likely completes in <100ms so 2s polling may never observe it as 'active' (per agent context). Acceptable trade-off — it WILL appear in the final completed list anyway, and the UI dynamically transitions to 'done' on the next poll. Verified end-to-end.",
+    "Pre-existing iter-38 finding (queue/status latency under saturation) is OUT OF SCOPE for iter-39 and was not retested."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter39_progress_and_breakdown.py"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% (3/3 — TechnicalPage copy, score-breakdown text, stepper render+states)"},
+  "test_credentials": "Admin jolor69@gmail.com / admin1234 (per /app/memory/test_credentials.md)",
+  "seed_data_creation": "None — used existing admin account; analysis docs were generated organically by the integration tests (AAPL/MSFT/GOOGL/TSLA/NFLX).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All three iter-39 enhancements are functioning. Backend test file at /app/backend/tests/test_iter39_progress_and_breakdown.py covers phase seeding (standard vs candlestick/hybrid), live phase advancement, persisted pre-calibration field, and pure unit logic. NFLX hybrid is the canonical breakdown demo (78 → −12 → 66). For UI: stepper has data-testid='analysis-progress-stepper' wrapping six pills with data-testid='progress-phase-{phase_name}' and data-phase-state attribute (done|active|pending). Score-breakdown div has data-testid='score-breakdown' and is conditionally rendered only when pre !== final.",
+  "rca of the issue": "N/A — no bugs found this iteration."
+}
