@@ -29,10 +29,62 @@ import {
 export default function TechnicalPage() {
     const loc = useLocation();
     const [rfMeta, setRfMeta] = useState(null);
+    // Live capacity telemetry — drives the "How Neulab handles load" section.
+    // Polls /analysis/queue/status every 5s, also measures the client-side
+    // round-trip latency so the "queue endpoint" cell reports the actual
+    // observed p95 instead of a hardcoded promise. Trust signal: visitors
+    // see real numbers update in their browser.
+    const [capacity, setCapacity] = useState({
+        capacity: null,
+        running: null,
+        queued: null,
+        avg_duration_s: null,
+        is_busy: false,
+        rt_ms: null,    // client-measured round-trip in ms
+        rt_p95: null,   // simple rolling p95 over last ~12 polls (60s window)
+        last_updated: null,
+    });
     useEffect(() => {
         api.get("/analysis/rf-model/meta")
             .then((r) => setRfMeta(r.data))
             .catch(() => setRfMeta({ available: false }));
+    }, []);
+    useEffect(() => {
+        let cancelled = false;
+        let timer = null;
+        const samples = []; // last 12 round-trip measurements
+
+        const tick = async () => {
+            const t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+            try {
+                const r = await api.get("/analysis/queue/status");
+                const t1 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+                const rt = Math.max(1, Math.round(t1 - t0));
+                samples.push(rt);
+                while (samples.length > 12) samples.shift();
+                const sorted = [...samples].sort((a, b) => a - b);
+                const p95Idx = Math.max(0, Math.floor(sorted.length * 0.95) - 1);
+                const p95 = sorted[Math.min(p95Idx, sorted.length - 1)] || rt;
+                if (!cancelled) {
+                    setCapacity({
+                        ...r.data,
+                        rt_ms: rt,
+                        rt_p95: p95,
+                        last_updated: new Date(),
+                    });
+                }
+            } catch {
+                // Silent — keep last known values
+            } finally {
+                if (!cancelled) timer = setTimeout(tick, 5000);
+            }
+        };
+        tick();
+
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
     }, []);
     // Smooth-scroll to the section pointed to by the URL hash (e.g. /technical#rsi)
     // so deep-links from the verdict page land on the right spot.
@@ -1046,25 +1098,70 @@ histogram  = MACD_line − signal`}
                         data-testid="tech-capacity-numbers"
                     >
                         {[
-                            { label: "Concurrent cap", value: "4", note: "per worker" },
-                            { label: "Avg pipeline", value: "~50s", note: "wall-clock per verdict" },
-                            { label: "Queue endpoint", value: "<200ms", note: "p95 even under load" },
-                            { label: "Chip refresh", value: "5s", note: "client poll interval" },
+                            {
+                                label: "Concurrent cap",
+                                value: capacity.capacity != null ? String(capacity.capacity) : "—",
+                                note: "per worker",
+                                live: capacity.capacity != null,
+                            },
+                            {
+                                label: "Avg pipeline",
+                                value:
+                                    capacity.avg_duration_s != null
+                                        ? `~${Math.round(capacity.avg_duration_s)}s`
+                                        : "—",
+                                note: "wall-clock per verdict",
+                                live: capacity.avg_duration_s != null,
+                            },
+                            {
+                                label: "Queue endpoint",
+                                value:
+                                    capacity.rt_p95 != null
+                                        ? `${capacity.rt_p95}ms`
+                                        : capacity.rt_ms != null
+                                            ? `${capacity.rt_ms}ms`
+                                            : "—",
+                                note:
+                                    capacity.rt_p95 != null
+                                        ? "p95 measured live"
+                                        : "p95 even under load",
+                                live: capacity.rt_p95 != null || capacity.rt_ms != null,
+                            },
+                            {
+                                label: "Chip refresh",
+                                value: "5s",
+                                note: "client poll interval",
+                                live: false,
+                            },
                         ].map((cell, i) => (
                             <div
                                 key={cell.label}
-                                className="p-4"
+                                className="p-4 relative"
                                 style={{
                                     borderRight: i < 3 ? "1px solid hsl(var(--border-default))" : undefined,
                                     borderBottom: i < 2 ? "1px solid hsl(var(--border-default))" : undefined,
                                 }}
+                                data-testid={`tech-capacity-cell-${i}`}
                             >
-                                <p className="text-overline" style={{ fontSize: "0.58rem", color: "hsl(var(--hold))" }}>
+                                <p className="text-overline flex items-center gap-1.5" style={{ fontSize: "0.58rem", color: "hsl(var(--hold))" }}>
                                     {cell.label}
+                                    {cell.live && (
+                                        <span
+                                            className="inline-block animate-pulse"
+                                            style={{
+                                                width: 5,
+                                                height: 5,
+                                                borderRadius: 5,
+                                                background: "hsl(var(--buy))",
+                                            }}
+                                            title="Live — fetched from /api/analysis/queue/status"
+                                        />
+                                    )}
                                 </p>
                                 <p
                                     className="font-mono mt-1.5"
                                     style={{ fontSize: "1.2rem", color: "hsl(var(--text-primary))" }}
+                                    data-testid={`tech-capacity-value-${i}`}
                                 >
                                     {cell.value}
                                 </p>
@@ -1074,6 +1171,45 @@ histogram  = MACD_line − signal`}
                             </div>
                         ))}
                     </div>
+                    {/* Live "Right now" line — turns the static promise into
+                        a live receipt visitors can verify in their own
+                        browser. Polled every 5s alongside the cells above. */}
+                    {capacity.capacity != null && (
+                        <div
+                            className="mt-4 px-4 py-3 flex items-center justify-between gap-3 flex-wrap"
+                            style={{
+                                background: "hsl(var(--bg))",
+                                border: "1px solid hsl(var(--border-divider))",
+                                borderRadius: 2,
+                            }}
+                            data-testid="tech-capacity-live"
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <span
+                                    className="inline-block animate-pulse"
+                                    style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: 6,
+                                        background: capacity.is_busy ? "hsl(var(--hold))" : "hsl(var(--buy))",
+                                    }}
+                                />
+                                <p className="text-overline" style={{ fontSize: "0.6rem", color: "hsl(var(--text-secondary))" }}>
+                                    Right now
+                                </p>
+                                <p className="font-mono text-xs" style={{ color: "hsl(var(--text-primary))", fontSize: "0.78rem" }}>
+                                    {capacity.running}/{capacity.capacity} running
+                                    {capacity.queued > 0 && ` · ${capacity.queued} queued`}
+                                    {!capacity.is_busy && capacity.queued === 0 && " · pipeline idle"}
+                                </p>
+                            </div>
+                            <p className="font-mono text-[10px]" style={{ color: "hsl(var(--text-muted))" }}>
+                                Polled {capacity.last_updated ? capacity.last_updated.toLocaleTimeString() : "—"}
+                                {" · "}
+                                refreshes every 5s
+                            </p>
+                        </div>
+                    )}
                     <p
                         className="mt-5 text-xs leading-relaxed"
                         style={{ color: "hsl(var(--text-muted))", fontSize: "0.75rem" }}
