@@ -109,33 +109,31 @@ async def _ensure_analysis_indexes():
 ANALYSIS_MODES = {"standard", "candlestick", "hybrid"}
 
 
-def _is_bandarmology_stale(bandarmology: dict, threshold_days: int = 90) -> bool:
-    """Parse the most-recent insider filing's "DD MMM YY" date string and
-    return True when it's older than `threshold_days`.
+def _bandarmology_age_days(bandarmology: dict) -> int | None:
+    """Return the age in days of the most-recent insider filing, or None
+    when the date can't be parsed.
 
     Mirrors the frontend `parseFilingDate()` parser in BandarmologyCard.jsx
-    so backend confluence detection and frontend visual de-emphasis stay in
-    sync. Defensive: returns False (treat as fresh) on any parse failure
-    rather than silently dropping confluences for valid current data.
+    so backend confluence math and frontend visual de-emphasis stay in sync.
     """
     if not isinstance(bandarmology, dict):
-        return False
+        return None
     recent = bandarmology.get("recent") or []
     if not recent:
-        return False
+        return None
     raw_date = (recent[0] or {}).get("date") or ""
     if not isinstance(raw_date, str):
-        return False
+        return None
     import re
     from datetime import datetime, timezone
     m = re.match(r"^\s*(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2,4})\s*$", raw_date)
     if not m:
-        return False
+        return None
     months = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
               "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
     mon = months.get(m.group(2).lower())
     if mon is None:
-        return False
+        return None
     day = int(m.group(1))
     year = int(m.group(3))
     if year < 100:
@@ -143,9 +141,77 @@ def _is_bandarmology_stale(bandarmology: dict, threshold_days: int = 90) -> bool
     try:
         filed = datetime(year, mon, day, tzinfo=timezone.utc)
     except ValueError:
-        return False
-    age = (now_utc() - filed).days
-    return age > threshold_days
+        return None
+    return max(0, (now_utc() - filed).days)
+
+
+def _is_bandarmology_stale(bandarmology: dict, threshold_days: int = 90) -> bool:
+    """Defensive wrapper — returns False when age can't be determined so we
+    never silently drop confluences for valid current data."""
+    age = _bandarmology_age_days(bandarmology)
+    return age is not None and age > threshold_days
+
+
+def _confluence_quality(
+    *,
+    direction: str,
+    regime: str,
+    pattern_count: int,
+    age_days: int | None,
+) -> dict:
+    """Return a 0–100 quality score + supporting factors for a confluence.
+
+    Multiplicative model, four orthogonal factors:
+      • freshness_factor   — linear decay 1.0 (today) → 0.0 (90+ days).
+                             Uses ~30 day soft floor so same-week filings
+                             dominate, then degrades evenly. Stale data is
+                             gated upstream so age >= 90 never reaches here.
+      • regime_factor      — strong=1.0, mild=0.7. Mirrors the existing
+                             `strength` label so the score doesn't claim
+                             more conviction than the regime supports.
+      • count_factor       — 1 pattern=0.7, 2=0.85, 3+=1.0. Multiple
+                             independent reversal signals on the same
+                             timeframe is structurally stronger than one.
+      • direction_factor   — confluent (bullish/bearish)=1.0, divergence=0.5.
+                             A divergence is informative but lower-conviction
+                             since the signals contradict.
+
+    quality_tier maps the score band to a human label so the frontend can
+    render a coherent badge color without re-doing the cutoffs.
+    """
+    if age_days is None:
+        # Unknown age but not gated upstream — treat as "freshness unknown".
+        # Use 0.7 so we don't fabricate full conviction off unparseable dates.
+        freshness_factor = 0.7
+    else:
+        freshness_factor = max(0.0, 1.0 - (age_days / 90.0))
+    regime_factor = 1.0 if regime in ("strong_accumulation", "strong_distribution") else 0.7
+    if pattern_count >= 3:
+        count_factor = 1.0
+    elif pattern_count == 2:
+        count_factor = 0.85
+    else:
+        count_factor = 0.7
+    direction_factor = 1.0 if direction in ("bullish", "bearish") else 0.5
+    raw = freshness_factor * regime_factor * count_factor * direction_factor
+    score = max(0, min(100, round(raw * 100)))
+    if score >= 80:
+        tier = "excellent"
+    elif score >= 60:
+        tier = "strong"
+    elif score >= 40:
+        tier = "moderate"
+    else:
+        tier = "weak"
+    return {
+        "quality_score": score,
+        "quality_tier": tier,
+        "freshness_age_days": age_days,
+        "freshness_factor": round(freshness_factor, 3),
+        "regime_factor": round(regime_factor, 3),
+        "count_factor": round(count_factor, 3),
+        "direction_factor": round(direction_factor, 3),
+    }
 
 
 def _compute_confluence(candlestick_findings: dict, bandarmology: dict) -> dict | None:
@@ -162,12 +228,18 @@ def _compute_confluence(candlestick_findings: dict, bandarmology: dict) -> dict 
                              live institutional flow — fabricating a
                              "double confirmation" off dead data would be
                              misleading; we'd rather say nothing).
+
+    Quality scoring (0–100): every fired confluence carries a quality_score
+    + quality_tier so the UI / AI can weight a same-day filing × 3-pattern
+    confluence higher than an 80-day filing × 1-pattern confluence even
+    though both pass the binary trigger.
     """
     # Stale-data short-circuit. Mirrors the frontend's >90 day threshold so
     # the analysis doc never carries a fake "smart-money accumulation"
     # confluence for tickers where insiders haven't filed in years.
     if _is_bandarmology_stale(bandarmology):
         return None
+    age_days = _bandarmology_age_days(bandarmology)
     # Extract every pattern name from both daily + weekly tiers
     bullish_patterns: list[str] = []
     bearish_patterns: list[str] = []
@@ -207,6 +279,10 @@ def _compute_confluence(candlestick_findings: dict, bandarmology: dict) -> dict 
             "label": (
                 "Double-confirmation: bullish reversal pattern + smart-money accumulation"
             ),
+            **_confluence_quality(
+                direction="bullish", regime=regime,
+                pattern_count=len(bullish_patterns), age_days=age_days,
+            ),
         }
     if bearish_patterns and bearish_regime:
         return {
@@ -219,6 +295,10 @@ def _compute_confluence(candlestick_findings: dict, bandarmology: dict) -> dict 
             "label": (
                 "Double-confirmation: bearish reversal pattern + smart-money distribution"
             ),
+            **_confluence_quality(
+                direction="bearish", regime=regime,
+                pattern_count=len(bearish_patterns), age_days=age_days,
+            ),
         }
     # Divergence (pattern vs insider flow pull in opposite directions)
     if bullish_patterns and bearish_regime:
@@ -230,6 +310,10 @@ def _compute_confluence(candlestick_findings: dict, bandarmology: dict) -> dict 
             "bandarmology_regime": regime,
             "accumulation_ratio": bandarmology.get("accumulation_ratio"),
             "label": "Signal divergence: bullish pattern vs smart-money distribution",
+            **_confluence_quality(
+                direction="divergence", regime=regime,
+                pattern_count=len(bullish_patterns), age_days=age_days,
+            ),
         }
     if bearish_patterns and bullish_regime:
         return {
@@ -240,6 +324,10 @@ def _compute_confluence(candlestick_findings: dict, bandarmology: dict) -> dict 
             "bandarmology_regime": regime,
             "accumulation_ratio": bandarmology.get("accumulation_ratio"),
             "label": "Signal divergence: bearish pattern vs smart-money accumulation",
+            **_confluence_quality(
+                direction="divergence", regime=regime,
+                pattern_count=len(bearish_patterns), age_days=age_days,
+            ),
         }
     return None
 

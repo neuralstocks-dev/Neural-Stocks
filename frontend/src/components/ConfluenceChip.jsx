@@ -32,6 +32,26 @@ const STYLE = {
     },
 };
 
+// Tier → color band. Mirrors the backend `_confluence_quality()` cutoffs
+// (excellent ≥80, strong ≥60, moderate ≥40, weak <40) so we don't have to
+// re-derive thresholds on the client.
+const QUALITY_TIER_STYLE = {
+    excellent: { color: "hsl(var(--buy))", label: "Excellent" },
+    strong:    { color: "hsl(var(--buy))", label: "Strong" },
+    moderate:  { color: "hsl(var(--hold))", label: "Moderate" },
+    weak:      { color: "hsl(var(--text-muted))", label: "Weak" },
+};
+
+function freshnessTooltip(ageDays) {
+    if (ageDays == null) return "Filing age unavailable";
+    if (ageDays === 0) return "Filed today — maximum freshness weight";
+    if (ageDays === 1) return "Filed yesterday — same-day weight";
+    if (ageDays < 30) return `Filed ${ageDays} days ago — high freshness weight`;
+    const months = Math.round(ageDays / 30);
+    if (ageDays < 60) return `Filed ${months} month${months === 1 ? "" : "s"} ago — moderate weight, signal still recent`;
+    return `Filed ${months} months ago — degrading weight, approaching stale cutoff (90d)`;
+}
+
 export default function ConfluenceChip({ confluence }) {
     if (!confluence) return null;
     const cfg = STYLE[confluence.direction] || STYLE.divergence;
@@ -70,6 +90,39 @@ export default function ConfluenceChip({ confluence }) {
                         {confluence.strength && confluence.direction !== "divergence" ? (
                             <span className="text-[11px] font-mono uppercase" style={{ color: "hsl(var(--text-muted))" }}>
                                 · {confluence.strength}
+                            </span>
+                        ) : null}
+                        {/* Quality score badge — surfaces the multiplicative
+                            weight of {freshness × regime × pattern_count ×
+                            direction}. Lets users instantly tell a same-day
+                            3-pattern strong-accumulation confluence (95+
+                            "excellent") from an 80-day 1-pattern mild one
+                            ("weak") — both pass the binary trigger but mean
+                            wildly different things. */}
+                        {typeof confluence.quality_score === "number" ? (
+                            <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 font-mono text-[10.5px]"
+                                style={{
+                                    border: `1px solid ${(QUALITY_TIER_STYLE[confluence.quality_tier] || QUALITY_TIER_STYLE.moderate).color}`,
+                                    color: (QUALITY_TIER_STYLE[confluence.quality_tier] || QUALITY_TIER_STYLE.moderate).color,
+                                    borderRadius: 2,
+                                }}
+                                data-testid="confluence-quality-badge"
+                                title={
+                                    `Quality ${confluence.quality_score}/100 (${confluence.quality_tier}). ` +
+                                    `Computed as freshness × regime × patterns × direction. ` +
+                                    freshnessTooltip(confluence.freshness_age_days)
+                                }
+                            >
+                                <span style={{ opacity: 0.7 }}>QUALITY</span>
+                                <strong>{confluence.quality_score}</strong>
+                                <span style={{ opacity: 0.55, fontSize: "0.85em" }}>/100</span>
+                                <span
+                                    className="uppercase"
+                                    style={{ fontSize: "0.85em", letterSpacing: "0.05em", opacity: 0.85 }}
+                                >
+                                    · {(QUALITY_TIER_STYLE[confluence.quality_tier] || QUALITY_TIER_STYLE.moderate).label}
+                                </span>
                             </span>
                         ) : null}
                     </div>
