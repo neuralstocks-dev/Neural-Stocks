@@ -470,11 +470,13 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
             ticker, quote, history, fundamentals, technicals,
             candlestick_findings=candlestick_findings, mode="hybrid",
             market_context=market_ctx,
+            weekly_history=weekly_history,
         )
     else:
         analysis = await run_ai_analysis(
             ticker, quote, history, fundamentals, technicals,
             market_context=market_ctx,
+            weekly_history=weekly_history,
         )
 
     doc = {
@@ -507,6 +509,7 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
     # Random Forest secondary opinion (independent of Claude). Uses ≥1y of
     # daily history. Only attaches when the model is loaded and features are
     # computable (IDX tickers with short history will silently skip).
+    rf_opinion_for_calibration = None
     if rf_history:
         try:
             df = pd.DataFrame(rf_history)
@@ -529,10 +532,33 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
                     )
                     opinion["llm_direction"] = llm_direction
                     doc["rf_opinion"] = opinion
+                    rf_opinion_for_calibration = opinion
         except Exception as e:
             # Never fail the whole analysis because of the RF layer
             import logging
             logging.getLogger(__name__).warning("RF opinion failed for %s: %s", ticker, e)
+
+    # Verdict Accuracy v2: post-LLM confidence calibration. Applies the
+    # earnings-proximity gate and the RF-disagreement penalty. Mutates
+    # `analysis` in place so the persisted doc + the response both reflect
+    # the calibrated confidence.
+    from services.verdict_calibration import calibrate_verdict
+    calibrate_verdict(
+        analysis,
+        market_context=market_ctx if isinstance(market_ctx, dict) else None,
+        rf_opinion=rf_opinion_for_calibration,
+    )
+    # Mirror calibration fields into the persisted doc (they were placed
+    # on `analysis` which was already spread into `doc` above; copy now).
+    for k in (
+        "confidence_score",
+        "confidence_adjustments",
+        "earnings_gate_applied",
+        "days_until_earnings",
+        "rf_disagreement_penalty",
+    ):
+        if k in analysis:
+            doc[k] = analysis[k]
 
     await db.analyses.insert_one(doc)
     doc.pop("_id", None)

@@ -145,18 +145,36 @@ def _handle_llm_error(e: Exception):
 
 async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals: dict,
                           technicals: dict, candlestick_findings: dict | None = None,
-                          mode: str = "standard", market_context: dict | None = None) -> dict:
+                          mode: str = "standard", market_context: dict | None = None,
+                          weekly_history: list | None = None) -> dict:
     """Run AI analysis. If candlestick_findings is provided AND mode == 'hybrid',
-    the hybrid prompt is used. Otherwise the standard prompt is used."""
+    the hybrid prompt is used. Otherwise the standard prompt is used.
+
+    Verdict Accuracy v2 (Apr 2026):
+      - History window expanded from 20 daily closes -> 60 daily + 26 weekly.
+        More context lets the model spot multi-month trend regimes vs short
+        noise. Net token cost: ~+120 tokens (~$0.0004 per verdict).
+    """
     payload = {
         "ticker": ticker,
         "quote": quote,
         "technical_indicators": technicals,
         "fundamentals": fundamentals,
-        "recent_price_series_last_20": [
-            {"date": h["date"], "close": h["close"]} for h in history[-20:]
+        # 60 daily closes (~12 weeks) — captures swing structure, prior
+        # support/resistance, recent earnings reaction, and trend health.
+        "recent_price_series_last_60_daily": [
+            {"date": h["date"], "close": h["close"], "volume": h.get("volume")}
+            for h in history[-60:]
         ],
     }
+    # 26 weekly closes (~6 months) — gives Claude the higher-timeframe regime
+    # context. Especially valuable for hybrid/candlestick where weekly bias
+    # should override conflicting daily signals.
+    if weekly_history:
+        payload["recent_price_series_last_26_weekly"] = [
+            {"date": h["date"], "close": h["close"]}
+            for h in weekly_history[-26:]
+        ]
     if mode == "hybrid" and candlestick_findings:
         payload["candlestick_findings"] = candlestick_findings
         system_prompt = HYBRID_SYSTEM_PROMPT

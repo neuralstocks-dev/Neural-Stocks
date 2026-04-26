@@ -270,9 +270,118 @@ export default function BacktestPage() {
                     buy-and-hold over the same window.
                 </p>
 
+                {/* Beginner-friendly "How this works" block. Demystifies the
+                    backtest for users who keep asking "but how do you prove
+                    the win-rate?" — explains the simulation rules in plain
+                    English with no jargon. */}
+                <section
+                    className="module mt-6 p-5 md:p-6"
+                    data-testid="backtest-how-it-works"
+                >
+                    <p
+                        className="text-overline"
+                        style={{ color: "hsl(var(--hold))", fontSize: "0.6rem" }}
+                    >
+                        How this proves it (in plain English)
+                    </p>
+                    <p
+                        className="font-serif mt-3"
+                        style={{ fontSize: "1.25rem", letterSpacing: "-0.005em", lineHeight: 1.3 }}
+                    >
+                        Imagine you had $10,000 and acted on every Neulab verdict the moment it
+                        landed.
+                    </p>
+                    <p
+                        className="text-sm mt-4 leading-relaxed"
+                        style={{ color: "hsl(var(--text-secondary))" }}
+                    >
+                        That's exactly what this page replays. We take your real verdict history,
+                        simulate the trades a disciplined follower would have made, and compare the
+                        result against simply buying the index{" "}
+                        ({m.benchmark_ticker === "^JKSE" ? "IDX Composite" : "SPY"}) and holding.
+                        No cherry-picking, no hindsight tweaks — every verdict counts, including
+                        the losers.
+                    </p>
+
+                    <div
+                        className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3"
+                        data-testid="backtest-rules-grid"
+                    >
+                        {[
+                            {
+                                step: "1",
+                                title: "Entry",
+                                body: "When the AI says BUY, the simulation buys at the next daily close. Equal-weight: each position uses the same dollar amount, so one big winner can't dominate the math.",
+                            },
+                            {
+                                step: "2",
+                                title: "Exit",
+                                body: "Position closes on the next SELL verdict for the same ticker, OR after 30 calendar days — whichever comes first. The 30-day cap prevents stale verdicts from running forever.",
+                            },
+                            {
+                                step: "3",
+                                title: "Cash buffer",
+                                body: "Between trades the simulator holds cash (no interest, no benchmark drag). Your cash sits idle the same way real cash would in a brokerage account.",
+                            },
+                            {
+                                step: "4",
+                                title: "Benchmark",
+                                body: "On the same first day, $10,000 is split into a single passive position in the benchmark and held for the whole window. That's the line you have to beat.",
+                            },
+                        ].map(({ step, title, body }) => (
+                            <div
+                                key={step}
+                                className="p-4 flex items-start gap-3"
+                                style={{
+                                    border: "1px solid hsl(var(--border-default))",
+                                    borderRadius: 2,
+                                    background: "hsl(var(--surface-elevated))",
+                                }}
+                            >
+                                <span
+                                    className="font-mono text-xs flex items-center justify-center flex-shrink-0"
+                                    style={{
+                                        width: 26,
+                                        height: 26,
+                                        borderRadius: 999,
+                                        background: "hsl(var(--hold))",
+                                        color: "hsl(var(--background))",
+                                    }}
+                                >
+                                    {step}
+                                </span>
+                                <div>
+                                    <p
+                                        className="font-serif text-sm"
+                                        style={{ letterSpacing: "-0.005em" }}
+                                    >
+                                        {title}
+                                    </p>
+                                    <p
+                                        className="text-xs mt-1.5 leading-relaxed"
+                                        style={{ color: "hsl(var(--text-secondary))" }}
+                                    >
+                                        {body}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <p
+                        className="text-xs mt-5 leading-relaxed"
+                        style={{ color: "hsl(var(--text-muted))" }}
+                    >
+                        Win-rate = closed trades that ended profitable ÷ all closed trades.
+                        Average winner / average loser tells you whether the strategy is
+                        "right often" or "right big". A win-rate of just 50% can still be
+                        very profitable if winners are 2× the size of losers — and vice versa.
+                    </p>
+                </section>
+
                 {/* Disclaimer */}
                 <section
-                    className="module mt-8 p-5 md:p-6 flex items-start gap-4"
+                    className="module mt-6 p-5 md:p-6 flex items-start gap-4"
                     data-testid="backtest-disclaimer"
                 >
                     <ShieldAlert
@@ -398,6 +507,15 @@ export default function BacktestPage() {
                             far. The longer you use Neulab, the more statistically
                             meaningful this backtest becomes — every new verdict
                             extends the simulation window.
+                        </p>
+                        <p
+                            className="mt-4 max-w-xl text-xs leading-relaxed"
+                            style={{ color: "hsl(var(--text-muted))" }}
+                        >
+                            Want to see what the result looks like before you build your own
+                            history? Scroll down to the <strong>ML Backtest</strong> below — it
+                            replays the Random-Forest secondary-opinion model on the last
+                            12 months of price action and shows real win-rate numbers right now.
                         </p>
                         <Link
                             to="/dashboard"

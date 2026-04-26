@@ -464,6 +464,43 @@ export default function AnalysisReportPage() {
                                             <p className="text-overline mt-4" style={{ fontSize: "0.56rem" }}>
                                                 Last updated {timeAgo(analysis.created_at)} · Horizon {analysis.time_horizon_weeks || 12}w
                                             </p>
+
+                                            {/* Verdict Accuracy v2 — display
+                                                confidence calibration breadcrumbs
+                                                (earnings gate, RF disagreement
+                                                penalty) so users see WHY a
+                                                verdict's confidence is what it
+                                                is. Builds trust via transparency. */}
+                                            {Array.isArray(analysis.confidence_adjustments) && analysis.confidence_adjustments.length > 0 && (
+                                                <div
+                                                    className="mt-4 p-3"
+                                                    style={{
+                                                        border: "1px solid hsl(var(--border-default))",
+                                                        borderLeft: "3px solid hsl(var(--hold))",
+                                                        background: "hsl(var(--surface-elevated))",
+                                                        borderRadius: 2,
+                                                    }}
+                                                    data-testid="confidence-calibration-breadcrumbs"
+                                                >
+                                                    <p
+                                                        className="text-overline"
+                                                        style={{ color: "hsl(var(--hold))", fontSize: "0.56rem" }}
+                                                    >
+                                                        Confidence calibrations applied
+                                                    </p>
+                                                    <ul className="mt-2 space-y-1.5">
+                                                        {analysis.confidence_adjustments.map((msg, i) => (
+                                                            <li
+                                                                key={i}
+                                                                className="text-xs"
+                                                                style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.5 }}
+                                                            >
+                                                                · {msg}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

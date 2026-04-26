@@ -19,6 +19,7 @@ import {
     Bot,
     Smartphone,
     CalendarRange,
+    Award,
 } from "lucide-react";
 
 // ---------- Product modules ----------
@@ -47,6 +48,12 @@ const MODULES = [
         title: "AI Explain Panels",
         status: "available",
         body: "AI recommendation and verdict with confidence % level on the stock and also if the stock is suitable for short, medium or long term performance.",
+    },
+    {
+        icon: Award,
+        title: "Calibrated Confidence",
+        status: "available",
+        body: "Every verdict's confidence score is post-processed by two disciplined rules: (1) the Earnings-Proximity Gate caps confidence at 65 when an earnings release is within 7 days — pre-earnings outcomes are largely event-driven and the model can't price the surprise; (2) the RF-Disagreement Penalty automatically reduces displayed confidence when our independent Random-Forest secondary opinion disagrees with the AI's direction, so users see model disagreement reflected in the verdict ring. Both adjustments leave a transparent breadcrumb under the ring — we don't quietly hand-tune scores, every change is shown and explained.",
     },
     {
         icon: BellRing,
