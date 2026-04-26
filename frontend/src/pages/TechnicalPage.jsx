@@ -984,6 +984,107 @@ histogram  = MACD_line − signal`}
                     </ul>
                 </div>
 
+                {/* How Neulab handles load — capacity transparency for the
+                    informed user. Pairs with the AnalysisQueueChip on the
+                    dashboard so they see the same numbers in real time. */}
+                <SectionHeader
+                    icon={Gauge}
+                    overline="Capacity"
+                    title="How Neulab handles load."
+                    subtitle="Transparent infrastructure — you should know what happens when many people analyze at once."
+                />
+
+                <div
+                    className="mt-8 module p-6 md:p-8"
+                    data-testid="tech-capacity"
+                    style={{
+                        background: "hsla(38,70%,55%,0.04)",
+                        borderLeft: "3px solid hsl(var(--hold))",
+                    }}
+                >
+                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                        Each verdict involves a 60-day-daily + 26-week-weekly data fetch, a Random-Forest
+                        scoring pass, and a full Claude Sonnet 4.5 round-trip — totalling
+                        <strong style={{ color: "hsl(var(--text-primary))" }}> ~50 seconds </strong>
+                        of wall-clock work per analysis. To keep the system responsive when traffic spikes,
+                        Neulab caps in-flight analyses at <strong style={{ color: "hsl(var(--text-primary))" }}>4 concurrent</strong>{" "}
+                        per backend worker via a global asyncio semaphore. Excess requests <em>queue</em> rather than
+                        slowing every other endpoint to a crawl. The Claude calls themselves run inside isolated OS
+                        threads so the main API loop stays free for trivial reads (your watchlist, alerts, login)
+                        even while several heavy analyses are mid-flight.
+                    </p>
+                    <p
+                        className="mt-4 text-sm leading-relaxed"
+                        style={{ color: "hsl(var(--text-secondary))" }}
+                    >
+                        When the pipeline is at capacity, an amber{" "}
+                        <code
+                            className="font-mono"
+                            style={{
+                                background: "hsl(var(--bg))",
+                                border: "1px solid hsl(var(--hold))",
+                                color: "hsl(var(--hold))",
+                                padding: "1px 6px",
+                                borderRadius: 2,
+                                fontSize: "0.7rem",
+                            }}
+                        >
+                            Pipeline busy · N running · M queued · ~Xs wait
+                        </code>{" "}
+                        chip appears next to the Re-analyze button and on the dashboard, polling{" "}
+                        <code className="font-mono" style={{ fontSize: "0.72rem", color: "hsl(var(--text-primary))" }}>
+                            GET /api/analysis/queue/status
+                        </code>{" "}
+                        every 5 seconds. The endpoint reads from a snapshot refreshed once per second by a
+                        background task, so it stays under 200ms even under heavy load. No invisible queues, no
+                        spinners that look stuck — you always know whether you're being served immediately or
+                        waiting your turn.
+                    </p>
+                    <div
+                        className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-0"
+                        style={{ border: "1px solid hsl(var(--border-default))" }}
+                        data-testid="tech-capacity-numbers"
+                    >
+                        {[
+                            { label: "Concurrent cap", value: "4", note: "per worker" },
+                            { label: "Avg pipeline", value: "~50s", note: "wall-clock per verdict" },
+                            { label: "Queue endpoint", value: "<200ms", note: "p95 even under load" },
+                            { label: "Chip refresh", value: "5s", note: "client poll interval" },
+                        ].map((cell, i) => (
+                            <div
+                                key={cell.label}
+                                className="p-4"
+                                style={{
+                                    borderRight: i < 3 ? "1px solid hsl(var(--border-default))" : undefined,
+                                    borderBottom: i < 2 ? "1px solid hsl(var(--border-default))" : undefined,
+                                }}
+                            >
+                                <p className="text-overline" style={{ fontSize: "0.58rem", color: "hsl(var(--hold))" }}>
+                                    {cell.label}
+                                </p>
+                                <p
+                                    className="font-mono mt-1.5"
+                                    style={{ fontSize: "1.2rem", color: "hsl(var(--text-primary))" }}
+                                >
+                                    {cell.value}
+                                </p>
+                                <p className="text-xs mt-1" style={{ color: "hsl(var(--text-muted))", fontSize: "0.7rem" }}>
+                                    {cell.note}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                    <p
+                        className="mt-5 text-xs leading-relaxed"
+                        style={{ color: "hsl(var(--text-muted))", fontSize: "0.75rem" }}
+                    >
+                        Scaling roadmap: when sustained queue depth exceeds 5+ for more than a few minutes,
+                        the next step is horizontal — bumping the uvicorn worker count from 1 to 4 (linear capacity gain)
+                        and adding a Redis-backed shared semaphore so the cap holds across all workers. We'll publish
+                        the trigger metrics here when we get there.
+                    </p>
+                </div>
+
                 {/* Stack footer */}
                 <SectionHeader
                     icon={BookOpen}
