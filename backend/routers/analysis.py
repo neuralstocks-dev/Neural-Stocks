@@ -807,6 +807,70 @@ async def analysis_pdf(analysis_id: str, user=Depends(get_current_user)):
     )
 
 
+@router.get("/analysis/{analysis_id}/trade-slip")
+async def analysis_trade_slip(analysis_id: str, user=Depends(get_current_user)):
+    """Download a one-page screenshotable Trade Slip PDF.
+
+    Pro/Elite (and admin / test-unlock / day-pass) only — same gate as
+    Share Verdict, since the slip auto-mints a public share link so the
+    QR-less footer URL leads back to a real verdict page.
+    """
+    from fastapi.responses import StreamingResponse
+    from services.pdf import generate_trade_slip_pdf
+    from services.quota import effective_plan_key
+    import io
+    import os
+
+    # Plan gate — admin / test-unlock / Pro / Elite / Day-Pass only.
+    # Trade Slip is positioned as a paid-tier viral asset (auto-mints a
+    # public share link) so we gate strictly on effective plan, not on the
+    # `share_verdicts` flag (which is enabled for Free too, just rate-limited).
+    plan_key = effective_plan_key(user)
+    if plan_key == "free":
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                "Trade Slip is a Pro/Elite feature. Upgrade from Free "
+                "to export shareable one-page slips."
+            ),
+        )
+
+    doc = await db.analyses.find_one(
+        {"id": analysis_id, "user_id": user["id"]},
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    # Reuse an existing share link or mint one so the slip footer URL is real.
+    existing = await db.shared_verdicts.find_one(
+        {"analysis_id": analysis_id, "owner_id": user["id"]},
+        {"_id": 0, "share_id": 1},
+    )
+    if existing:
+        share_id = existing["share_id"]
+    else:
+        share_id = uuid.uuid4().hex[:12]
+        await db.shared_verdicts.insert_one({
+            "share_id": share_id,
+            "analysis_id": analysis_id,
+            "owner_id": user["id"],
+            "ticker": doc["ticker"],
+            "created_at": iso(now_utc()),
+        })
+
+    public_base = os.environ.get("PUBLIC_BASE_URL") or "https://neulab.xyz"
+    share_url = f"{public_base.rstrip('/')}/v/{share_id}"
+
+    pdf_bytes = generate_trade_slip_pdf(doc, share_url=share_url)
+    filename = f"neulab-trade-slip-{doc.get('ticker', 'analysis').lower()}-{analysis_id[:8]}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/analysis/{ticker}/history")
 async def analysis_history(ticker: str, user=Depends(get_current_user)):
     return (

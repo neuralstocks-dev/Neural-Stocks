@@ -520,3 +520,266 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
     pdf_bytes = buf.getvalue()
     buf.close()
     return pdf_bytes
+
+
+
+# ---------------------------------------------------------------------------
+# Trade Slip — single-page shareable card optimized for screenshotting into
+# Discord/Telegram trading channels. Strips the full report down to: verdict,
+# calibration breadcrumb, entry/stop/target/horizon, one-liner thesis, and a
+# Neulab footer pointing back to the public share URL.
+# ---------------------------------------------------------------------------
+
+def _slip_styles():
+    base = getSampleStyleSheet()
+    return {
+        "overline": ParagraphStyle(
+            "SlipOL", parent=base["Normal"], fontName="Courier", fontSize=8,
+            leading=10, textColor=BRAND_GOLD, spaceAfter=2,
+        ),
+        "ticker": ParagraphStyle(
+            "SlipTicker", parent=base["Heading1"], fontName="Times-Bold", fontSize=42,
+            leading=46, textColor=BRAND_INK, spaceAfter=0,
+        ),
+        "company": ParagraphStyle(
+            "SlipCompany", parent=base["Normal"], fontName="Helvetica", fontSize=10,
+            leading=13, textColor=BRAND_MUTED, spaceAfter=2,
+        ),
+        "verdict": ParagraphStyle(
+            "SlipVerdict", parent=base["Heading1"], fontName="Helvetica-Bold", fontSize=44,
+            leading=46, alignment=TA_LEFT,
+        ),
+        "muted": ParagraphStyle(
+            "SlipMuted", parent=base["Normal"], fontName="Helvetica", fontSize=8,
+            leading=11, textColor=BRAND_MUTED,
+        ),
+        "thesis": ParagraphStyle(
+            "SlipThesis", parent=base["Normal"], fontName="Times-Italic", fontSize=11,
+            leading=15, textColor=BRAND_INK, spaceAfter=4,
+        ),
+        "body": ParagraphStyle(
+            "SlipBody", parent=base["Normal"], fontName="Helvetica", fontSize=9.5,
+            leading=13, textColor=BRAND_INK, alignment=TA_LEFT, spaceAfter=4,
+        ),
+        "mono": ParagraphStyle(
+            "SlipMono", parent=base["Normal"], fontName="Courier", fontSize=9,
+            leading=12, textColor=BRAND_INK,
+        ),
+        "levelLabel": ParagraphStyle(
+            "SlipLvlLabel", parent=base["Normal"], fontName="Courier", fontSize=7,
+            leading=9, textColor=BRAND_GOLD, alignment=TA_LEFT,
+        ),
+        "levelValue": ParagraphStyle(
+            "SlipLvlValue", parent=base["Normal"], fontName="Times-Bold", fontSize=14,
+            leading=16, textColor=BRAND_INK, alignment=TA_LEFT,
+        ),
+    }
+
+
+def _slip_thesis(analysis: dict) -> str:
+    """Pick the cleanest one-liner thesis available."""
+    summary = analysis.get("executive_summary") or ""
+    if summary:
+        # First sentence — prefer the punchy lead, cap at ~220 chars to keep
+        # the slip from overflowing if the LLM produced an essay-length lead.
+        first = summary.split(". ")[0].strip().rstrip(".")
+        if len(first) > 220:
+            first = first[:217].rsplit(" ", 1)[0] + "…"
+        return first + "."
+    # Fall back to reasoning's first line if executive_summary is missing.
+    reasoning = analysis.get("reasoning") or ""
+    if reasoning:
+        first = reasoning.split("\n")[0].strip()
+        if len(first) > 220:
+            first = first[:217].rsplit(" ", 1)[0] + "…"
+        return first
+    return "AI verdict generated from technicals, fundamentals, and pattern analysis."
+
+
+def _slip_drivers(analysis: dict, max_items: int = 3) -> list:
+    """Up to N short bullet drivers — prefers calibration adjustments (which
+    are already tightly written), then risks, then technical highlights.
+    """
+    out = []
+    adj = analysis.get("confidence_adjustments") or []
+    for a in adj:
+        if isinstance(a, str):
+            out.append(a)
+    if len(out) < max_items:
+        risks = analysis.get("risk_factors") or []
+        for r in risks:
+            if isinstance(r, str):
+                out.append(r)
+            if len(out) >= max_items:
+                break
+    return out[:max_items]
+
+
+def generate_trade_slip_pdf(analysis: dict, share_url: str = "") -> bytes:
+    """Render a one-page screenshotable trade slip.
+
+    Layout (5.5 × 7.5 in portrait, ~1:1.36 — fits Discord/Telegram preview):
+      1. NEULAB overline + analysis date
+      2. TICKER huge serif + company name
+      3. Big verdict (BUY/SELL/HOLD) + confidence %
+      4. Calibration breadcrumb (only if v2 data present)
+      5. 4-cell levels strip: Entry / Target / Stop / Horizon
+      6. Italic thesis one-liner
+      7. Up to 3 driver bullets
+      8. Footer: Neulab branding + share URL + micro-disclaimer
+    """
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=(5.5 * inch, 7.5 * inch),
+        leftMargin=0.42 * inch, rightMargin=0.42 * inch,
+        topMargin=0.4 * inch, bottomMargin=0.4 * inch,
+        title=f"Neulab Trade Slip · {analysis.get('ticker', '')}",
+        author="Neulab",
+    )
+    s = _slip_styles()
+    story = []
+
+    ticker = analysis.get("ticker", "—")
+    fundamentals = analysis.get("fundamentals") or {}
+    company = fundamentals.get("longName") or fundamentals.get("shortName") or ""
+    currency = (analysis.get("quote_snapshot") or {}).get("currency") or "USD"
+    rec = analysis.get("recommendation", "—")
+    conf = analysis.get("confidence_score") or 0
+
+    created = analysis.get("created_at", "") or ""
+    try:
+        created_fmt = datetime.fromisoformat(created.replace("Z", "+00:00")).strftime("%d %b %Y · %H:%M UTC")
+    except Exception:
+        created_fmt = created[:16]
+
+    # 1. Overline
+    story.append(Paragraph("NEULAB · TRADE SLIP", s["overline"]))
+    story.append(Paragraph(
+        f"<font color='#6b7280'>{created_fmt} · Mode {(analysis.get('mode') or 'standard').capitalize()}</font>",
+        s["muted"],
+    ))
+    story.append(Spacer(1, 10))
+
+    # 2. Ticker + company — keep company on one line, truncate if huge.
+    story.append(Paragraph(ticker, s["ticker"]))
+    if company:
+        if len(company) > 56:
+            company = company[:53] + "…"
+        story.append(Paragraph(company, s["company"]))
+    story.append(Spacer(1, 12))
+
+    # 3. Verdict + confidence
+    rec_style = ParagraphStyle("SV", parent=s["verdict"], textColor=_rec_color(rec))
+    story.append(Paragraph(
+        f"{rec}&nbsp;&nbsp;<font size='18' color='#6b7280'>{conf}% confidence</font>",
+        rec_style,
+    ))
+    story.append(Spacer(1, 4))
+
+    # 4. Calibration breadcrumb — single inline line, no academic prose.
+    pre = analysis.get("confidence_score_pre_calibration")
+    final = analysis.get("confidence_score")
+    adj = analysis.get("confidence_adjustments") or []
+    fired = isinstance(adj, list) and len(adj) > 0
+    if analysis.get("calibration_version") == "v2":
+        if fired and isinstance(pre, (int, float)) and isinstance(final, (int, float)) and pre != final:
+            delta = pre - final
+            sign = "−" if delta >= 0 else "+"
+            story.append(Paragraph(
+                f"<font color='#6b7280' size='8'>VERDICT ACCURACY V2 · </font>"
+                f"<font color='#6b7280'>LLM raw </font><b>{int(pre)}</b>"
+                f"<font color='#6b7280'> → </font>"
+                f"<font color='#dc2626'><b>{sign}{abs(delta)}</b></font>"
+                f"<font color='#6b7280'> → </font>"
+                f"<font color='#16a34a'><b>{int(final)} final</b></font>",
+                ParagraphStyle("SlipCal", parent=s["mono"], fontSize=10, leading=13),
+            ))
+        else:
+            story.append(Paragraph(
+                "<font color='#6b7280' size='8'>VERDICT ACCURACY V2 · </font>"
+                "<font color='#16a34a'>raw Claude output — no calibration adjustment fired</font>",
+                ParagraphStyle("SlipCalEmpty", parent=s["mono"], fontSize=9.5, leading=13),
+            ))
+        story.append(Spacer(1, 10))
+    else:
+        story.append(Spacer(1, 4))
+
+    # 5. Levels strip — 4 columns, narrow gold rule above each label.
+    horizon_w = analysis.get("time_horizon_weeks")
+    horizon_txt = f"{horizon_w} wks" if horizon_w else "—"
+    levels = [
+        ("ENTRY", _fmt_price(analysis.get("price_at_analysis"), currency)),
+        ("TARGET", _fmt_price(analysis.get("price_target"), currency)),
+        ("STOP", _fmt_price(analysis.get("stop_loss"), currency)),
+        ("HORIZON", horizon_txt),
+    ]
+    label_row = [Paragraph(lbl, s["levelLabel"]) for lbl, _ in levels]
+    value_row = [Paragraph(val or "—", s["levelValue"]) for _, val in levels]
+    levels_tbl = Table(
+        [label_row, value_row],
+        colWidths=[1.165 * inch] * 4,
+    )
+    levels_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEABOVE", (0, 0), (-1, 0), 1.5, BRAND_GOLD),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (0, -1), 6),
+        ("TOPPADDING", (1, 0), (1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
+        ("BOTTOMPADDING", (0, 1), (-1, 1), 6),
+    ]))
+    story.append(levels_tbl)
+    story.append(Spacer(1, 14))
+
+    # 6. Thesis one-liner
+    story.append(Paragraph("THESIS", s["overline"]))
+    story.append(Paragraph(_slip_thesis(analysis), s["thesis"]))
+    story.append(Spacer(1, 8))
+
+    # 7. Up to 3 drivers — only render section if we have any.
+    drivers = _slip_drivers(analysis, max_items=3)
+    if drivers:
+        story.append(Paragraph("KEY DRIVERS", s["overline"]))
+        for d in drivers:
+            story.append(Paragraph(f"• {d}", s["body"]))
+        story.append(Spacer(1, 8))
+
+    # 8. Footer — branded line + disclaimer micro-print.
+    footer_url = share_url or f"neulab.xyz/analysis/{ticker}"
+    # Strip protocol for cleaner display
+    display_url = footer_url.replace("https://", "").replace("http://", "")
+    story.append(Spacer(1, 4))
+    footer = Table(
+        [[
+            Paragraph(
+                f"<font color='{BRAND_GOLD.hexval()}' face='Times-Bold' size='10'>NEULAB</font> "
+                f"<font color='#101318' size='9'>· Neural Stock Intelligence™</font>",
+                ParagraphStyle("SlipBrand", parent=s["body"], fontSize=10, leading=13),
+            ),
+            Paragraph(
+                f"<font color='#6b7280' size='8'>full report →</font><br/>"
+                f"<font face='Courier' color='#101318' size='9'>{display_url}</font>",
+                ParagraphStyle("SlipUrl", parent=s["mono"], fontSize=9, leading=12, alignment=2),
+            ),
+        ]],
+        colWidths=[2.6 * inch, 2.06 * inch],
+    )
+    footer.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LINEABOVE", (0, 0), (-1, 0), 0.5, RULE_GREY),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    story.append(footer)
+    story.append(Paragraph(
+        "Educational only — not financial advice. Markets involve risk of loss.",
+        ParagraphStyle("SlipDisc", parent=s["muted"], fontSize=7, leading=9, textColor=BRAND_MUTED),
+    ))
+
+    doc.build(story)
+    pdf_bytes = buf.getvalue()
+    buf.close()
+    return pdf_bytes
