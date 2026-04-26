@@ -301,9 +301,32 @@ function Step2Run({ picks, onComplete, onError }) {
                 const startedAt = Date.now();
                 const phases = ["Fetching market data", "Running candlestick scan", "Asking Claude", "Composing verdict"];
                 let phaseIdx = 0;
+                let consecutiveErrors = 0;
+                const MAX_CONSECUTIVE_POLL_ERRORS = 5;
                 const pollOnce = async () => {
+                    let r;
                     try {
-                        const r = await api.get(`/analysis/jobs/${jobId}`);
+                        r = await api.get(`/analysis/jobs/${jobId}`);
+                        consecutiveErrors = 0;
+                    } catch (e) {
+                        const status = e?.response?.status;
+                        // Auth / not-found problems are real — bail out.
+                        if (cancelled) return;
+                        if (status === 401 || status === 403 || status === 404) {
+                            onError(e?.response?.data?.detail || e?.message || "Analysis failed");
+                            return;
+                        }
+                        // Tolerate transient 5xx / network blips — the BG
+                        // job keeps running on the server.
+                        consecutiveErrors += 1;
+                        if (consecutiveErrors >= MAX_CONSECUTIVE_POLL_ERRORS) {
+                            onError(e?.response?.data?.detail || e?.message || "Analysis failed");
+                            return;
+                        }
+                        pollHandle = setTimeout(pollOnce, 2000);
+                        return;
+                    }
+                    try {
                         const status = r.data?.status;
                         if (cancelled) return;
                         if (status === "done" && r.data?.result) {

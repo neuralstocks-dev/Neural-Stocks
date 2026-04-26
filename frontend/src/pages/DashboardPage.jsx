@@ -391,12 +391,32 @@ export default function DashboardPage() {
                 const jobId = start.data.job_id;
                 const started = Date.now();
                 let finalJob = null;
+                // Tolerate transient 5xx / network blips during polling —
+                // the background job keeps running on the server even if
+                // a single poll request gets nuked by an ingress hiccup.
+                // Only abort after several consecutive failures.
+                let consecutiveErrors = 0;
+                const MAX_CONSECUTIVE_POLL_ERRORS = 5;
                 // Poll up to 3 minutes. Production ingress caps sync responses
                 // at 30s; background job has its own 120s budget on the server.
                 while (Date.now() - started < 180_000) {
                     await new Promise((r) => setTimeout(r, 2500));
-                    const poll = await api.get(`/analysis/jobs/${jobId}`);
-                    const j = poll.data;
+                    let j;
+                    try {
+                        const poll = await api.get(`/analysis/jobs/${jobId}`);
+                        j = poll.data;
+                        consecutiveErrors = 0;
+                    } catch (pollErr) {
+                        const status = pollErr?.response?.status;
+                        if (status === 401 || status === 403 || status === 404) {
+                            throw pollErr;
+                        }
+                        consecutiveErrors += 1;
+                        if (consecutiveErrors >= MAX_CONSECUTIVE_POLL_ERRORS) {
+                            throw pollErr;
+                        }
+                        continue;
+                    }
                     finalJob = j;
                     if (j.status === "done") break;
                     if (j.status === "failed") {

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="5" time="64.791" timestamp="2026-04-26T07:56:32.698456+00:00" hostname="agent-env-46f95d42-5fd6-4b50-9057-08a57a221843"><testcase classname="backend.tests.test_iter37_504_fix.TestStartEndpoint" name="test_start_us_ticker_nflx" time="0.652" /><testcase classname="backend.tests.test_iter37_504_fix.TestStartEndpoint" name="test_start_idx_ticker_bbca" time="0.783" /><testcase classname="backend.tests.test_iter37_504_fix.TestDeprecatedSyncEndpoint" name="test_deprecated_returns_job_id_immediately" time="0.131" /><testcase classname="backend.tests.test_iter37_504_fix.TestHybridAnalysisCompletes" name="test_nflx_hybrid_full_pipeline" time="33.031"><failure message="requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='p1-builder.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='p1-builder.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='p1-builder.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)</failure></testcase><testcase classname="backend.tests.test_iter37_504_fix.TestPollEndpointPerformance" name="test_poll_endpoint_fast" time="30.104"><failure message="requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='p1-builder.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='p1-builder.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='p1-builder.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)</failure></testcase></testsuite></testsuites>

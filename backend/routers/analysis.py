@@ -346,7 +346,15 @@ async def create_analysis(
     mode: str = Query("standard", description="Analysis mode: standard | candlestick | hybrid"),
     user=Depends(get_current_user),
 ):
-    return await _create_analysis_impl(ticker, mode, user)
+    """Deprecated synchronous endpoint — kept only for backwards compatibility
+    with older clients (PWA cache, external scripts). The full pipeline can
+    take 50-60s, which exceeds the production ingress 30s cap and 504s.
+
+    Now delegates to the same background-job pattern as `/start`: returns
+    `{job_id, status: "running"}` immediately. Clients should then poll
+    `GET /api/analysis/jobs/{job_id}` until `status != "running"`.
+    """
+    return await start_analysis(ticker, mode=mode, user=user)
 
 
 async def _create_analysis_impl(ticker: str, mode: str, user: dict):
