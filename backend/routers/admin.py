@@ -2,7 +2,7 @@
 import logging
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 
 from core.config import UNLOCK_DURATIONS, ADMIN_EMAILS
@@ -764,3 +764,57 @@ async def set_balance_anchor(req: BalanceAnchorReq, _admin=Depends(admin_require
         upsert=True,
     )
     return {"ok": True, "credits_at_top_up": req.credits_at_top_up, "top_up_at": iso(now)}
+
+
+# --- Cost-anchor reminder preferences --------------------------------------
+# Weekly email nudge so the admin doesn't forget to refresh their Universal
+# Key balance anchor. Sent only when (anchor stale OR projection low) so we
+# don't email noise. Stored in db.app_settings._id="cost_anchor_reminder".
+
+@router.get("/cost/reminder")
+async def get_cost_reminder_pref(_admin=Depends(admin_required)):
+    """Read the current reminder enabled flag."""
+    doc = await db.app_settings.find_one(
+        {"_id": "cost_anchor_reminder"}, {"_id": 0}
+    ) or {}
+    return {
+        "enabled": bool(doc.get("enabled")),
+        "last_sent_at": doc.get("last_sent_at"),
+        "recipient": doc.get("recipient"),
+    }
+
+
+class CostReminderReq(BaseModel):
+    enabled: bool
+    recipient: Optional[EmailStr] = None  # override default (admin email)
+
+
+@router.post("/cost/reminder")
+async def set_cost_reminder_pref(
+    req: CostReminderReq,
+    admin=Depends(admin_required),
+):
+    """Enable or disable the weekly cost-anchor reminder. Stamps the
+    requesting admin's email as the recipient by default — but accepts an
+    override (useful when Resend's free tier requires the recipient to
+    match the verified Resend account email)."""
+    await db.app_settings.update_one(
+        {"_id": "cost_anchor_reminder"},
+        {"$set": {
+            "enabled": bool(req.enabled),
+            "recipient": req.recipient or admin.get("email"),
+            "updated_at": iso(now_utc()),
+        }},
+        upsert=True,
+    )
+    return {"ok": True, "enabled": req.enabled, "recipient": req.recipient or admin.get("email")}
+
+
+@router.post("/cost/reminder/test-send")
+async def send_cost_reminder_test(_admin=Depends(admin_required)):
+    """Force-send a cost-anchor reminder email NOW, bypassing the
+    Friday window + cooldown + worth-it gate. Useful for verifying the
+    template/recipient before relying on the weekly cron."""
+    from services.cost_reminder import run_cost_reminder_once
+    result = await run_cost_reminder_once(force=True)
+    return result

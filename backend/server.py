@@ -62,6 +62,7 @@ async def start_background_tasks():
     from services.auto_scan import auto_scan_loop
     from services.weekly_digest import weekly_digest_loop
     from services.digest_pusher import digest_pusher_loop
+    from services.cost_reminder import cost_reminder_loop
     t1 = asyncio.create_task(weekly_retrain_loop())
     _BG_TASKS.add(t1)
     t1.add_done_callback(_BG_TASKS.discard)
@@ -78,6 +79,10 @@ async def start_background_tasks():
     _BG_TASKS.add(t4)
     t4.add_done_callback(_BG_TASKS.discard)
     logger.info("Started Telegram digest pusher scheduler")
+    t5 = asyncio.create_task(cost_reminder_loop())
+    _BG_TASKS.add(t5)
+    t5.add_done_callback(_BG_TASKS.discard)
+    logger.info("Started cost-anchor reminder scheduler")
     # Ensure TTL indexes (idempotent — no-op if already created).
     try:
         from routers.analysis import _ensure_analysis_indexes

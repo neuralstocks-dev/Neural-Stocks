@@ -16,11 +16,11 @@
  * balance (from the Profile page) and the dashboard subtracts the
  * estimated spend since that timestamp.
  */
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
-import { Wallet, TrendingDown, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { Wallet, TrendingDown, AlertTriangle, Loader2, RefreshCw, ExternalLink, Clock, Mail, MailCheck } from "lucide-react";
 
 const _user = () => {
     try {
@@ -29,6 +29,19 @@ const _user = () => {
         return {};
     }
 };
+
+// Anchor staleness gates. Same psychology as "Last analyzed N days ago" —
+// projections drift the longer it's been since a real-world refresh, so we
+// nudge the admin to re-paste the latest balance.
+const ANCHOR_STALE_DAYS = 7;       // amber: should refresh soon
+const ANCHOR_VERY_STALE_DAYS = 14; // red: definitely refresh
+
+function _ageDays(iso) {
+    if (!iso) return null;
+    const ms = Date.now() - new Date(iso).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return null;
+    return Math.floor(ms / 86_400_000);
+}
 
 function _StatCell({ label, value, note, accent = "text-primary", testId }) {
     return (
@@ -116,6 +129,16 @@ export default function AdminCostPage() {
     const [error, setError] = useState("");
     const [anchorInput, setAnchorInput] = useState("");
     const [savingAnchor, setSavingAnchor] = useState(false);
+    // Weekly email reminder preference. Stored server-side in
+    // db.app_settings._id="cost_anchor_reminder" so it survives across
+    // sessions/devices. Toggled by the admin only.
+    const [reminderEnabled, setReminderEnabled] = useState(false);
+    const [reminderRecipient, setReminderRecipient] = useState("");
+    const [reminderSaving, setReminderSaving] = useState(false);
+    // Ref to focus the anchor input when the admin returns from Emergent
+    // (we listen for the visibilitychange event to detect the return).
+    const anchorInputRef = useRef(null);
+    const expectingReturnRef = useRef(false);
 
     const load = async () => {
         setLoading(true);
@@ -136,8 +159,94 @@ export default function AdminCostPage() {
     useEffect(() => {
         if (!isAdmin) return;
         load();
+        // Pull current reminder preference once
+        api.get("/admin/cost/reminder")
+            .then((r) => {
+                setReminderEnabled(!!r.data?.enabled);
+                if (r.data?.recipient) setReminderRecipient(r.data.recipient);
+            })
+            .catch(() => {/* fine — defaults to false */});
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [days, isAdmin]);
+
+    // When admin returns from the Emergent profile tab, auto-focus the
+    // anchor input + select existing value so they can immediately paste
+    // the new balance — saves 2-3 clicks per refresh cycle.
+    useEffect(() => {
+        const onVis = () => {
+            if (document.visibilityState === "visible" && expectingReturnRef.current) {
+                expectingReturnRef.current = false;
+                setTimeout(() => {
+                    anchorInputRef.current?.focus();
+                    anchorInputRef.current?.select();
+                }, 250);
+            }
+        };
+        document.addEventListener("visibilitychange", onVis);
+        return () => document.removeEventListener("visibilitychange", onVis);
+    }, []);
+
+    const openEmergent = () => {
+        // Mark the return so the visibilitychange listener knows to focus.
+        expectingReturnRef.current = true;
+        window.open("https://app.emergent.sh/", "_blank", "noopener,noreferrer");
+    };
+
+    const toggleReminder = async () => {
+        const next = !reminderEnabled;
+        setReminderSaving(true);
+        try {
+            const body = { enabled: next };
+            if (reminderRecipient && reminderRecipient.includes("@")) {
+                body.recipient = reminderRecipient;
+            }
+            await api.post("/admin/cost/reminder", body);
+            setReminderEnabled(next);
+        } catch (e) {
+            setError(e?.response?.data?.detail || e?.message || "Failed to update reminder");
+        } finally {
+            setReminderSaving(false);
+        }
+    };
+
+    const saveReminderRecipient = async () => {
+        if (!reminderRecipient || !reminderRecipient.includes("@")) {
+            setError("Enter a valid email address");
+            return;
+        }
+        setReminderSaving(true);
+        try {
+            await api.post("/admin/cost/reminder", {
+                enabled: reminderEnabled,
+                recipient: reminderRecipient,
+            });
+            setError("");
+        } catch (e) {
+            setError(e?.response?.data?.detail || e?.message || "Failed to save recipient");
+        } finally {
+            setReminderSaving(false);
+        }
+    };
+
+    const sendTestReminder = async () => {
+        try {
+            const r = await api.post("/admin/cost/reminder/test-send");
+            if (r.data?.sent) {
+                setError("");
+                window.alert(`Test email sent to ${r.data?.recipient}. Check your inbox.`);
+            } else {
+                const reason = r.data?.reason || "unknown";
+                const detail = r.data?.error || "";
+                window.alert(
+                    `Reminder NOT sent (${reason}).` +
+                        (detail ? `\n\n${detail}` : "") +
+                        `\n\nNote: Resend's free tier only allows sending to your own verified Resend account email. Verify a domain at resend.com/domains to send to other recipients.`
+                );
+            }
+        } catch (e) {
+            setError(e?.response?.data?.detail || e?.message || "Test send failed");
+        }
+    };
 
     const saveAnchor = async () => {
         const n = parseFloat(anchorInput);
@@ -174,6 +283,9 @@ export default function AdminCostPage() {
     if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
     const anchor = data?.balance_anchor;
+    const anchorAge = _ageDays(anchor?.top_up_at);
+    const anchorStale = anchorAge != null && anchorAge >= ANCHOR_STALE_DAYS;
+    const anchorVeryStale = anchorAge != null && anchorAge >= ANCHOR_VERY_STALE_DAYS;
     const lowBalance =
         anchor && anchor.estimated_verdicts_remaining < 10;
 
@@ -314,7 +426,7 @@ export default function AdminCostPage() {
                 }}
                 data-testid="cost-balance-card"
             >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 flex-wrap">
                     <Wallet size={16} style={{ color: lowBalance ? "hsl(var(--sell))" : "hsl(var(--buy))" }} />
                     <p
                         className="text-overline"
@@ -325,6 +437,38 @@ export default function AdminCostPage() {
                     >
                         Universal Key balance
                     </p>
+                    {/* Anchor staleness chip — green/amber/red based on
+                        age. Same psychology as "Last analyzed N days ago".
+                        Projections drift the longer it's been since the
+                        admin re-pasted a real-world balance. */}
+                    {anchor && anchorAge != null && (
+                        <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 font-mono"
+                            style={{
+                                fontSize: "0.6rem",
+                                border: `1px solid hsl(var(--${anchorVeryStale ? "sell" : anchorStale ? "hold" : "buy"}))`,
+                                color: `hsl(var(--${anchorVeryStale ? "sell" : anchorStale ? "hold" : "buy"}))`,
+                                background: anchorVeryStale
+                                    ? "hsla(0,55%,55%,0.06)"
+                                    : anchorStale
+                                        ? "hsla(38,70%,55%,0.06)"
+                                        : "hsla(142,55%,45%,0.06)",
+                                borderRadius: 2,
+                            }}
+                            data-testid="anchor-staleness-chip"
+                            title={
+                                anchorVeryStale
+                                    ? "Anchor is more than 14 days old — projections may be inaccurate."
+                                    : anchorStale
+                                        ? "Anchor is more than 7 days old — refresh recommended."
+                                        : "Anchor is fresh."
+                            }
+                        >
+                            <Clock size={9} strokeWidth={2} />
+                            {anchorAge === 0 ? "today" : `${anchorAge}d old`}
+                            {anchorVeryStale ? " · refresh" : ""}
+                        </span>
+                    )}
                 </div>
 
                 {anchor ? (
@@ -404,10 +548,24 @@ export default function AdminCostPage() {
                         className="mt-2 text-xs leading-relaxed"
                         style={{ color: "hsl(var(--text-muted))", fontSize: "0.72rem" }}
                     >
-                        Open <a href="https://app.emergent.sh/" target="_blank" rel="noopener noreferrer" className="link-underline">Emergent Profile → Universal Key</a>, copy the current credit balance, paste here, click Save. The dashboard will subtract estimated spend going forward.
+                        One-click flow: hit <strong>Open Emergent profile</strong>, copy your
+                        current credit balance from <em>Profile → Universal Key</em>, switch
+                        back to this tab — the input below will auto-focus so you can paste
+                        and save in 2 clicks.
                     </p>
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
+                        <button
+                            type="button"
+                            onClick={openEmergent}
+                            className="btn-ghost inline-flex items-center gap-1.5 text-sm"
+                            data-testid="anchor-open-emergent"
+                            style={{ borderColor: "hsl(var(--buy))" }}
+                        >
+                            <ExternalLink size={12} strokeWidth={1.7} />
+                            Open Emergent profile
+                        </button>
                         <input
+                            ref={anchorInputRef}
                             type="number"
                             step="0.01"
                             min="0"
@@ -439,6 +597,121 @@ export default function AdminCostPage() {
                             Save anchor
                         </button>
                     </div>
+
+                    {/* Weekly email reminder toggle. Sends a Friday 9am UTC
+                        email summarising current projection so the admin
+                        gets a passive nudge to refresh the anchor without
+                        having to remember on their own. */}
+                    <div
+                        className="mt-5 pt-4 flex items-center justify-between gap-3 flex-wrap"
+                        style={{ borderTop: "1px dashed hsl(var(--border-divider))" }}
+                    >
+                        <div className="flex items-start gap-2.5">
+                            {reminderEnabled ? (
+                                <MailCheck size={14} style={{ color: "hsl(var(--buy))", marginTop: 2 }} />
+                            ) : (
+                                <Mail size={14} style={{ color: "hsl(var(--text-muted))", marginTop: 2 }} />
+                            )}
+                            <div>
+                                <p
+                                    className="text-overline"
+                                    style={{
+                                        color: reminderEnabled ? "hsl(var(--buy))" : "hsl(var(--text-secondary))",
+                                        fontSize: "0.6rem",
+                                    }}
+                                >
+                                    Weekly email reminder
+                                </p>
+                                <p
+                                    className="mt-1 text-xs"
+                                    style={{ color: "hsl(var(--text-muted))", fontSize: "0.72rem", maxWidth: 480 }}
+                                >
+                                    Email me every Friday with the current anchor age and
+                                    projected verdicts left. Sent only when the anchor is{" "}
+                                    {ANCHOR_STALE_DAYS}+ days old <em>or</em> projection drops
+                                    below 25 verdicts.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={toggleReminder}
+                            disabled={reminderSaving}
+                            className="btn-ghost text-sm inline-flex items-center gap-1.5"
+                            data-testid="anchor-reminder-toggle"
+                            aria-pressed={reminderEnabled}
+                            style={{
+                                borderColor: reminderEnabled ? "hsl(var(--buy))" : "hsl(var(--border-default))",
+                                color: reminderEnabled ? "hsl(var(--buy))" : "hsl(var(--text-secondary))",
+                            }}
+                        >
+                            {reminderSaving ? (
+                                <Loader2 size={11} className="animate-spin" />
+                            ) : reminderEnabled ? (
+                                <span style={{ fontSize: "0.62rem" }}>● ON</span>
+                            ) : (
+                                <span style={{ fontSize: "0.62rem", opacity: 0.6 }}>○ OFF</span>
+                            )}
+                            {reminderEnabled ? "Disable" : "Enable"}
+                        </button>
+                        {reminderEnabled && (
+                            <button
+                                type="button"
+                                onClick={sendTestReminder}
+                                className="btn-ghost text-sm"
+                                data-testid="anchor-reminder-test"
+                                style={{ fontSize: "0.7rem" }}
+                                title="Force-send the reminder now to verify the email template"
+                            >
+                                Send test
+                            </button>
+                        )}
+                    </div>
+                    {reminderEnabled && (
+                        <div
+                            className="mt-3 flex items-center gap-2 flex-wrap"
+                            data-testid="anchor-reminder-recipient-row"
+                        >
+                            <span
+                                className="font-mono"
+                                style={{ fontSize: "0.65rem", color: "hsl(var(--text-muted))" }}
+                            >
+                                Recipient:
+                            </span>
+                            <input
+                                type="email"
+                                value={reminderRecipient}
+                                onChange={(e) => setReminderRecipient(e.target.value)}
+                                placeholder="you@example.com"
+                                className="font-mono px-2 py-1 text-xs"
+                                style={{
+                                    background: "hsl(var(--bg))",
+                                    border: "1px solid hsl(var(--border-default))",
+                                    color: "hsl(var(--text-primary))",
+                                    borderRadius: 2,
+                                    width: 240,
+                                }}
+                                data-testid="anchor-reminder-recipient-input"
+                            />
+                            <button
+                                type="button"
+                                onClick={saveReminderRecipient}
+                                disabled={reminderSaving || !reminderRecipient}
+                                className="btn-ghost text-sm"
+                                data-testid="anchor-reminder-recipient-save"
+                                style={{ fontSize: "0.7rem" }}
+                            >
+                                Save
+                            </button>
+                            <span
+                                className="font-mono"
+                                style={{ fontSize: "0.62rem", color: "hsl(var(--text-muted))", maxWidth: 320 }}
+                                title="If your Resend domain isn't verified, this must match the email tied to your Resend account."
+                            >
+                                ⓘ Resend free tier requires verified-domain or Resend-account email
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
