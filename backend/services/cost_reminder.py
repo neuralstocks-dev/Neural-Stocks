@@ -20,12 +20,18 @@ import resend
 
 from core.db import db
 from core.config import RESEND_API_KEY, SENDER_EMAIL
+from services.telegram import send_alert_to_user, is_configured as _tg_configured
 
 logger = logging.getLogger(__name__)
 
 FROM_NAME = "Neulab Admin"
 LOOP_CHECK_INTERVAL_S = 600  # 10 min
 COOLDOWN_HOURS = 150         # one send per ~6 days, mirrors weekly-digest
+# Telegram alert is more aggressive — real-time push when balance is
+# critically low. 24h cooldown keeps it actionable without becoming spam.
+TG_COOLDOWN_HOURS = 24
+TG_LOW_BALANCE_THRESHOLD = 10  # verdicts left
+TG_CHECK_INTERVAL_S = 1800     # 30 min — fast enough for a "running out" push
 
 # Match COST_PER_VERDICT_USD in routers/admin.py — keep in sync.
 COST_PER_VERDICT_USD = 0.027
@@ -192,3 +198,86 @@ async def cost_reminder_loop():
         except Exception as e:
             logger.warning("cost_reminder_loop iteration failed: %s", e)
         await asyncio.sleep(LOOP_CHECK_INTERVAL_S)
+
+
+# --- Telegram low-balance push --------------------------------------------
+# Independent of the weekly email cron. Wakes every 30 min, computes the
+# current projection, and fires a Telegram push to the linked admin user
+# IF projected verdicts left drops below the threshold (default 10) AND
+# we haven't already sent a push within the last 24h. The whole point is
+# real-time "you're about to run out" — the email is for passive weekly
+# bookkeeping, this is for "act now".
+
+
+async def run_tg_low_balance_check_once(force: bool = False) -> dict:
+    """Single iteration. Returns a debug dict so the admin 'Send test now'
+    UI button can show what happened."""
+    pref = await db.app_settings.find_one(
+        {"_id": "cost_anchor_tg_alert"}, {"_id": 0}
+    ) or {}
+    if not pref.get("enabled"):
+        return {"sent": False, "reason": "disabled"}
+    user_id = pref.get("user_id")
+    if not user_id:
+        return {"sent": False, "reason": "no_user_id"}
+    if not _tg_configured():
+        return {"sent": False, "reason": "telegram_not_configured"}
+
+    threshold = int(pref.get("threshold") or TG_LOW_BALANCE_THRESHOLD)
+    last = pref.get("last_sent_at")
+    if last and not force:
+        try:
+            last_dt = datetime.fromisoformat(last)
+            if datetime.now(timezone.utc) - last_dt < timedelta(hours=TG_COOLDOWN_HOURS):
+                return {"sent": False, "reason": "cooldown"}
+        except Exception:
+            pass
+
+    p = await _compute_projection()
+    if not p:
+        return {"sent": False, "reason": "no_anchor"}
+
+    verdicts_left = p["verdicts_left"]
+    if verdicts_left >= threshold and not force:
+        return {"sent": False, "reason": "above_threshold", "projection": p}
+
+    # Build the Telegram message — short and actionable. <b>...</b> for HTML
+    # parse mode; emoji safe across Telegram clients.
+    title = "⚠️ Universal Key low"
+    body = (
+        f"Projected <b>{verdicts_left} verdict{'s' if verdicts_left != 1 else ''}</b> left\n"
+        f"Remaining: <b>{p['remaining_credits']:.2f} credits</b> (≈ ${p['remaining_usd']:.2f})\n"
+        f"Anchor age: {p['age_days']}d · used since: {p['used_credits']:.1f} cr / {p['verdicts_since']} verdicts\n\n"
+        "Top up at app.emergent.sh → Universal Key, then refresh the anchor in /admin/cost."
+    )
+    ok = await send_alert_to_user(user_id, title, body)
+    if ok:
+        await db.app_settings.update_one(
+            {"_id": "cost_anchor_tg_alert"},
+            {"$set": {"last_sent_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        return {"sent": True, "verdicts_left": verdicts_left, "user_id": user_id}
+    return {
+        "sent": False,
+        "reason": "telegram_send_failed",
+        "verdicts_left": verdicts_left,
+        "user_id": user_id,
+    }
+
+
+async def tg_low_balance_loop():
+    """Wakes every 30 min. Independent of the weekly cron — fires whenever
+    the projection crosses the threshold, with a 24h cooldown."""
+    await asyncio.sleep(240)  # post-boot settle (offset from email loop)
+    while True:
+        try:
+            result = await run_tg_low_balance_check_once()
+            if result.get("sent"):
+                logger.info(
+                    "Telegram low-balance alert fired · verdicts_left=%s user_id=%s",
+                    result.get("verdicts_left"),
+                    result.get("user_id"),
+                )
+        except Exception as e:
+            logger.warning("tg_low_balance_loop iteration failed: %s", e)
+        await asyncio.sleep(TG_CHECK_INTERVAL_S)

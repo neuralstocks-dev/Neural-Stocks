@@ -20,7 +20,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
-import { Wallet, TrendingDown, AlertTriangle, Loader2, RefreshCw, ExternalLink, Clock, Mail, MailCheck } from "lucide-react";
+import { Wallet, TrendingDown, AlertTriangle, Loader2, RefreshCw, ExternalLink, Clock, Mail, MailCheck, Bell, BellOff } from "lucide-react";
 
 const _user = () => {
     try {
@@ -135,6 +135,15 @@ export default function AdminCostPage() {
     const [reminderEnabled, setReminderEnabled] = useState(false);
     const [reminderRecipient, setReminderRecipient] = useState("");
     const [reminderSaving, setReminderSaving] = useState(false);
+    // Telegram low-balance alert — independent of the weekly email,
+    // fires real-time when projected verdicts drop below threshold.
+    const [tgAlert, setTgAlert] = useState({
+        enabled: false,
+        threshold: 10,
+        telegram_linked: false,
+        last_sent_at: null,
+    });
+    const [tgSaving, setTgSaving] = useState(false);
     // Ref to focus the anchor input when the admin returns from Emergent
     // (we listen for the visibilitychange event to detect the return).
     const anchorInputRef = useRef(null);
@@ -166,6 +175,9 @@ export default function AdminCostPage() {
                 if (r.data?.recipient) setReminderRecipient(r.data.recipient);
             })
             .catch(() => {/* fine — defaults to false */});
+        api.get("/admin/cost/tg-alert")
+            .then((r) => setTgAlert((s) => ({ ...s, ...r.data })))
+            .catch(() => {/* fine — defaults to disabled */});
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [days, isAdmin]);
 
@@ -242,6 +254,63 @@ export default function AdminCostPage() {
                         (detail ? `\n\n${detail}` : "") +
                         `\n\nNote: Resend's free tier only allows sending to your own verified Resend account email. Verify a domain at resend.com/domains to send to other recipients.`
                 );
+            }
+        } catch (e) {
+            setError(e?.response?.data?.detail || e?.message || "Test send failed");
+        }
+    };
+
+    const toggleTgAlert = async () => {
+        const next = !tgAlert.enabled;
+        setTgSaving(true);
+        try {
+            await api.post("/admin/cost/tg-alert", {
+                enabled: next,
+                threshold: tgAlert.threshold,
+            });
+            setTgAlert((s) => ({ ...s, enabled: next }));
+        } catch (e) {
+            setError(e?.response?.data?.detail || e?.message || "Failed to update Telegram alert");
+        } finally {
+            setTgSaving(false);
+        }
+    };
+
+    const saveTgThreshold = async () => {
+        const n = parseInt(tgAlert.threshold, 10);
+        if (!Number.isFinite(n) || n < 1) {
+            setError("Threshold must be a positive integer");
+            return;
+        }
+        setTgSaving(true);
+        try {
+            await api.post("/admin/cost/tg-alert", {
+                enabled: tgAlert.enabled,
+                threshold: n,
+            });
+            setError("");
+        } catch (e) {
+            setError(e?.response?.data?.detail || e?.message || "Failed to save threshold");
+        } finally {
+            setTgSaving(false);
+        }
+    };
+
+    const sendTestTgAlert = async () => {
+        try {
+            const r = await api.post("/admin/cost/tg-alert/test-send");
+            if (r.data?.sent) {
+                setError("");
+                window.alert(`Test Telegram alert pushed (${r.data?.verdicts_left} verdicts left). Check your Telegram chat.`);
+            } else {
+                const reason = r.data?.reason || "unknown";
+                const hint =
+                    reason === "telegram_send_failed"
+                        ? "\n\nIs your Telegram chat linked? Open the dashboard, click the bell icon, and link the bot first."
+                        : reason === "no_anchor"
+                            ? "\n\nSet an anchor balance first."
+                            : "";
+                window.alert(`Telegram alert NOT sent (${reason}).${hint}`);
             }
         } catch (e) {
             setError(e?.response?.data?.detail || e?.message || "Test send failed");
@@ -710,6 +779,132 @@ export default function AdminCostPage() {
                             >
                                 ⓘ Resend free tier requires verified-domain or Resend-account email
                             </span>
+                        </div>
+                    )}
+
+                    {/* Telegram low-balance alert — pushes a real-time
+                        message when projected verdicts drop below threshold.
+                        Independent of the email reminder. */}
+                    <div
+                        className="mt-5 pt-4 flex items-center justify-between gap-3 flex-wrap"
+                        style={{ borderTop: "1px dashed hsl(var(--border-divider))" }}
+                        data-testid="tg-alert-section"
+                    >
+                        <div className="flex items-start gap-2.5">
+                            {tgAlert.enabled ? (
+                                <Bell size={14} style={{ color: "hsl(var(--buy))", marginTop: 2 }} />
+                            ) : (
+                                <BellOff size={14} style={{ color: "hsl(var(--text-muted))", marginTop: 2 }} />
+                            )}
+                            <div>
+                                <p
+                                    className="text-overline"
+                                    style={{
+                                        color: tgAlert.enabled ? "hsl(var(--buy))" : "hsl(var(--text-secondary))",
+                                        fontSize: "0.6rem",
+                                    }}
+                                >
+                                    Telegram low-balance alert
+                                </p>
+                                <p
+                                    className="mt-1 text-xs"
+                                    style={{ color: "hsl(var(--text-muted))", fontSize: "0.72rem", maxWidth: 480 }}
+                                >
+                                    Real-time push when projected verdicts drop below threshold.
+                                    24h cooldown. Polls every 30 min — independent of the weekly
+                                    email cron above.
+                                </p>
+                                {!tgAlert.telegram_linked && (
+                                    <p
+                                        className="mt-1.5 text-xs"
+                                        style={{
+                                            color: "hsl(var(--sell))",
+                                            fontSize: "0.7rem",
+                                        }}
+                                        data-testid="tg-alert-not-linked"
+                                    >
+                                        ⚠ Telegram chat not linked yet — open the dashboard, click
+                                        the bell icon, and link the bot first.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={toggleTgAlert}
+                            disabled={tgSaving || !tgAlert.telegram_linked}
+                            className="btn-ghost text-sm inline-flex items-center gap-1.5"
+                            data-testid="tg-alert-toggle"
+                            aria-pressed={tgAlert.enabled}
+                            style={{
+                                borderColor: tgAlert.enabled ? "hsl(var(--buy))" : "hsl(var(--border-default))",
+                                color: tgAlert.enabled ? "hsl(var(--buy))" : "hsl(var(--text-secondary))",
+                                opacity: tgAlert.telegram_linked ? 1 : 0.5,
+                            }}
+                            title={tgAlert.telegram_linked ? "" : "Link Telegram first via Dashboard → Bell icon"}
+                        >
+                            {tgSaving ? (
+                                <Loader2 size={11} className="animate-spin" />
+                            ) : tgAlert.enabled ? (
+                                <span style={{ fontSize: "0.62rem" }}>● ON</span>
+                            ) : (
+                                <span style={{ fontSize: "0.62rem", opacity: 0.6 }}>○ OFF</span>
+                            )}
+                            {tgAlert.enabled ? "Disable" : "Enable"}
+                        </button>
+                        {tgAlert.enabled && (
+                            <button
+                                type="button"
+                                onClick={sendTestTgAlert}
+                                className="btn-ghost text-sm"
+                                data-testid="tg-alert-test"
+                                style={{ fontSize: "0.7rem" }}
+                                title="Force-send the alert now to verify your Telegram link"
+                            >
+                                Send test
+                            </button>
+                        )}
+                    </div>
+
+                    {tgAlert.enabled && (
+                        <div
+                            className="mt-3 flex items-center gap-2 flex-wrap"
+                            data-testid="tg-alert-threshold-row"
+                        >
+                            <span
+                                className="font-mono"
+                                style={{ fontSize: "0.65rem", color: "hsl(var(--text-muted))" }}
+                            >
+                                Fire when verdicts left ≤
+                            </span>
+                            <input
+                                type="number"
+                                min="1"
+                                max="500"
+                                value={tgAlert.threshold}
+                                onChange={(e) =>
+                                    setTgAlert((s) => ({ ...s, threshold: parseInt(e.target.value, 10) || 0 }))
+                                }
+                                className="font-mono px-2 py-1 text-xs"
+                                style={{
+                                    background: "hsl(var(--bg))",
+                                    border: "1px solid hsl(var(--border-default))",
+                                    color: "hsl(var(--text-primary))",
+                                    borderRadius: 2,
+                                    width: 80,
+                                }}
+                                data-testid="tg-alert-threshold-input"
+                            />
+                            <button
+                                type="button"
+                                onClick={saveTgThreshold}
+                                disabled={tgSaving}
+                                className="btn-ghost text-sm"
+                                data-testid="tg-alert-threshold-save"
+                                style={{ fontSize: "0.7rem" }}
+                            >
+                                Save
+                            </button>
                         </div>
                     )}
                 </div>

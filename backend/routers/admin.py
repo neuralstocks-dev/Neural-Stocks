@@ -818,3 +818,62 @@ async def send_cost_reminder_test(_admin=Depends(admin_required)):
     from services.cost_reminder import run_cost_reminder_once
     result = await run_cost_reminder_once(force=True)
     return result
+
+
+# --- Telegram low-balance alert preferences --------------------------------
+# Independent of the email reminder. Pushes a Telegram message to the
+# admin's linked chat when projected verdicts drop below threshold.
+
+@router.get("/cost/tg-alert")
+async def get_tg_alert_pref(admin=Depends(admin_required)):
+    """Read current Telegram alert preference for this admin. Includes
+    the admin's linked telegram_chat_id (or null if unlinked) so the UI
+    can surface a 'link your Telegram first' hint."""
+    doc = await db.app_settings.find_one(
+        {"_id": "cost_anchor_tg_alert"}, {"_id": 0}
+    ) or {}
+    user_doc = await db.users.find_one(
+        {"id": admin["id"]}, {"_id": 0, "telegram_chat_id": 1}
+    ) or {}
+    return {
+        "enabled": bool(doc.get("enabled")),
+        "threshold": int(doc.get("threshold") or 10),
+        "last_sent_at": doc.get("last_sent_at"),
+        "telegram_linked": bool(user_doc.get("telegram_chat_id")),
+    }
+
+
+class TgAlertReq(BaseModel):
+    enabled: bool
+    threshold: Optional[int] = Field(default=None, ge=1, le=500)
+
+
+@router.post("/cost/tg-alert")
+async def set_tg_alert_pref(
+    req: TgAlertReq,
+    admin=Depends(admin_required),
+):
+    """Enable/disable the Telegram low-balance alert. Stores the admin's
+    user_id so the cron knows whose linked chat to push to."""
+    update = {
+        "enabled": bool(req.enabled),
+        "user_id": admin["id"],
+        "updated_at": iso(now_utc()),
+    }
+    if req.threshold is not None:
+        update["threshold"] = int(req.threshold)
+    await db.app_settings.update_one(
+        {"_id": "cost_anchor_tg_alert"},
+        {"$set": update},
+        upsert=True,
+    )
+    return {"ok": True, "enabled": req.enabled}
+
+
+@router.post("/cost/tg-alert/test-send")
+async def send_tg_alert_test(_admin=Depends(admin_required)):
+    """Force-send the Telegram alert right now, bypassing threshold +
+    cooldown. Useful to verify the chat is linked and the message
+    template is right."""
+    from services.cost_reminder import run_tg_low_balance_check_once
+    return await run_tg_low_balance_check_once(force=True)
