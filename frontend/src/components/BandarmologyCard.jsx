@@ -28,6 +28,30 @@ function fmtShares(n) {
     return String(n);
 }
 
+// Provider returns dates already formatted as "DD MMM YY" (e.g. "25 Mar 26").
+// Parse defensively — strings older than the data feed pre-dates produce a
+// muted "—" so we never confidently say something wrong.
+const _MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+function filingAgeBadge(dateStr) {
+    if (!dateStr || typeof dateStr !== "string") return "";
+    // Match "DD MMM YY" (e.g. "25 Mar 26") and "DD MMM YYYY".
+    const m = dateStr.trim().match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2,4})$/);
+    if (!m) return `· ${dateStr}`;
+    const day = parseInt(m[1], 10);
+    const monIdx = _MONTHS[m[2].toLowerCase()];
+    if (monIdx === undefined) return `· ${dateStr}`;
+    let year = parseInt(m[3], 10);
+    if (year < 100) year += 2000;
+    const filed = new Date(Date.UTC(year, monIdx, day));
+    const days = Math.floor((Date.now() - filed.getTime()) / 86400000);
+    if (Number.isNaN(days)) return `· ${dateStr}`;
+    if (days <= 0) return "· today";
+    if (days === 1) return "· yesterday";
+    if (days < 30) return `· ${days}d ago`;
+    if (days < 365) return `· ${Math.round(days / 30)}mo ago`;
+    return `· ${(days / 365).toFixed(1)}y ago`;
+}
+
 export default function BandarmologyCard({ bandarmology }) {
     if (!bandarmology) return null;
     const {
@@ -147,7 +171,17 @@ export default function BandarmologyCard({ bandarmology }) {
             {/* Recent sample */}
             {recent.length ? (
                 <div className="mt-5" data-testid="bandarmology-recent-list">
-                    <p className="text-overline mb-3">Most recent filings</p>
+                    <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
+                        <p className="text-overline">Most recent filings</p>
+                        <p
+                            className="font-mono text-[10px]"
+                            style={{ color: "hsl(var(--text-muted))" }}
+                            data-testid="bandarmology-recent-staleness"
+                            title="Insider filings on IDX/KSEI typically lag the actual transaction by 5–30 days. We display whatever the upstream KSEI feed has on file as of this analysis run — if a director hasn't filed since this date, it's the latest disclosure on record."
+                        >
+                            latest filing {filingAgeBadge(recent[0]?.date)}
+                        </p>
+                    </div>
                     <div style={{ border: "1px solid hsl(var(--border-default))" }}>
                         {recent.map((m, i) => (
                             <div
