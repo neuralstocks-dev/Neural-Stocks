@@ -257,7 +257,9 @@ function Step1Picks({ picks, setPicks, accepted, setAccepted, onNext, onClose })
                     }}
                     data-testid="onboarding-step1-next"
                 >
-                    Continue · {picks.length}/{MAX_PICKS}
+                    {picks.length === 0
+                        ? "Pick at least 1 stock"
+                        : `Continue with ${picks.length} ${picks.length === 1 ? "stock" : "stocks"}`}
                     <ArrowRight size={14} strokeWidth={1.8} />
                 </button>
             </div>
