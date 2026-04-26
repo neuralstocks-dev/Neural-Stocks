@@ -197,31 +197,30 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
     """Run AI analysis. If candlestick_findings is provided AND mode == 'hybrid',
     the hybrid prompt is used. Otherwise the standard prompt is used.
 
-    Verdict Accuracy v2 (Apr 2026):
-      - History window expanded from 20 daily closes -> 60 daily + 26 weekly.
-        More context lets the model spot multi-month trend regimes vs short
-        noise. Net token cost: ~+120 tokens (~$0.0004 per verdict).
+    History window (Apr 2026 — V2 cost revert):
+      Reverted from V2's "60 daily + 26 weekly closes" to V1's "20 daily
+      closes" to reduce per-verdict input tokens by ~2,500–3,200 (~0.8
+      credits / ~$0.008). User-driven cost optimisation. The post-LLM
+      calibration pipeline (earnings gate + RF disagreement penalty)
+      remains in place — it adds zero tokens. Weekly-history fetching is
+      retained server-side for hybrid/candlestick modes because the
+      pattern scanner (`scan_daily_and_weekly`) needs it to detect
+      weekly patterns — but the raw weekly closes are no longer sent
+      to Claude in the prompt payload.
     """
     payload = {
         "ticker": ticker,
         "quote": quote,
         "technical_indicators": technicals,
         "fundamentals": fundamentals,
-        # 60 daily closes (~12 weeks) — captures swing structure, prior
-        # support/resistance, recent earnings reaction, and trend health.
-        "recent_price_series_last_60_daily": [
+        # 20 daily closes (~4 weeks) — V1 baseline. Recent technicals
+        # like RSI / MACD / SMA already encode the longer-term context,
+        # so we don't need raw weekly closes in the prompt.
+        "recent_price_series_last_20_daily": [
             {"date": h["date"], "close": h["close"], "volume": h.get("volume")}
-            for h in history[-60:]
+            for h in history[-20:]
         ],
     }
-    # 26 weekly closes (~6 months) — gives Claude the higher-timeframe regime
-    # context. Especially valuable for hybrid/candlestick where weekly bias
-    # should override conflicting daily signals.
-    if weekly_history:
-        payload["recent_price_series_last_26_weekly"] = [
-            {"date": h["date"], "close": h["close"]}
-            for h in weekly_history[-26:]
-        ]
     if mode == "hybrid" and candlestick_findings:
         payload["candlestick_findings"] = candlestick_findings
         system_prompt = HYBRID_SYSTEM_PROMPT

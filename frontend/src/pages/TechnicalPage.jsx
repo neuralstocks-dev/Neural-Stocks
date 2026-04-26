@@ -1055,11 +1055,16 @@ histogram  = MACD_line − signal`}
                     }}
                 >
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Each verdict involves a 60-day-daily + 26-week-weekly data fetch, a Random-Forest
+                        Each verdict involves a 20-day daily price fetch, a Random-Forest
                         scoring pass, and a full Claude Sonnet 4.5 round-trip — totalling
-                        <strong style={{ color: "hsl(var(--text-primary))" }}> ~50 seconds </strong>
-                        of wall-clock work per analysis. To keep the system responsive when traffic spikes,
-                        Neulab caps in-flight analyses at <strong style={{ color: "hsl(var(--text-primary))" }}>4 concurrent</strong>{" "}
+                        <strong style={{ color: "hsl(var(--text-primary))" }}> ~45 seconds </strong>
+                        of wall-clock work and roughly{" "}
+                        <strong style={{ color: "hsl(var(--text-primary))" }}>
+                            $0.027 in LLM cost
+                        </strong>{" "}
+                        per analysis (3,300–4,000 input tokens to Claude, ~1,750 output). To keep the
+                        system responsive when traffic spikes, Neulab caps in-flight analyses at{" "}
+                        <strong style={{ color: "hsl(var(--text-primary))" }}>4 concurrent</strong>{" "}
                         per backend worker via a global asyncio semaphore. Excess requests <em>queue</em> rather than
                         slowing every other endpoint to a crawl. The Claude calls themselves run inside isolated OS
                         threads so the main API loop stays free for trivial reads (your watchlist, alerts, login)
@@ -1093,7 +1098,7 @@ histogram  = MACD_line − signal`}
                         waiting your turn.
                     </p>
                     <div
-                        className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-0"
+                        className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-0"
                         style={{ border: "1px solid hsl(var(--border-default))" }}
                         data-testid="tech-capacity-numbers"
                     >
@@ -1112,6 +1117,12 @@ histogram  = MACD_line − signal`}
                                         : "—",
                                 note: "wall-clock per verdict",
                                 live: capacity.avg_duration_s != null,
+                            },
+                            {
+                                label: "LLM cost",
+                                value: "~$0.027",
+                                note: "Claude Sonnet 4.5 / verdict",
+                                live: false,
                             },
                             {
                                 label: "Queue endpoint",
@@ -1138,8 +1149,8 @@ histogram  = MACD_line − signal`}
                                 key={cell.label}
                                 className="p-4 relative"
                                 style={{
-                                    borderRight: i < 3 ? "1px solid hsl(var(--border-default))" : undefined,
-                                    borderBottom: i < 2 ? "1px solid hsl(var(--border-default))" : undefined,
+                                    borderRight: i < 4 ? "1px solid hsl(var(--border-default))" : undefined,
+                                    borderBottom: i < 3 ? "1px solid hsl(var(--border-default))" : undefined,
                                 }}
                                 data-testid={`tech-capacity-cell-${i}`}
                             >
