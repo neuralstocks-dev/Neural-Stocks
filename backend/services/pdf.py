@@ -81,6 +81,123 @@ def _risk_para(risks: list, style):
     return Paragraph("<br/>".join(items), style["body"])
 
 
+def _append_calibration_block(story, analysis: dict, s, currency: str):
+    """Render the Verdict Accuracy v2 calibration audit trail.
+
+    Always renders when called — caller decides via calibration_version.
+    Two visual states mirror the web UI:
+      - Adjustments fired:  amber-bordered box, "LLM raw 78 → −12 → 66 final",
+                            bullet list of each adjustment string, academic
+                            source for the rule that triggered.
+      - No calibration:     muted box stating both gates ran clean — explicit
+                            transparency rather than silence (we say what we
+                            checked, not just what we found).
+    """
+    adjustments = analysis.get("confidence_adjustments") or []
+    pre = analysis.get("confidence_score_pre_calibration")
+    final = analysis.get("confidence_score")
+    fired = isinstance(adjustments, list) and len(adjustments) > 0
+
+    accent_hex = "#d97706" if fired else "#16a34a"
+    accent = colors.HexColor(accent_hex)
+    accent_bg = colors.HexColor("#fff7ed" if fired else "#f0fdf4")
+
+    label = "POST-LLM CALIBRATION · CONFIDENCE ADJUSTED" if fired else "POST-LLM CALIBRATION · NO ADJUSTMENT NEEDED"
+    title = "Verdict Accuracy v2"
+
+    inner = []
+    inner.append(Paragraph(label, ParagraphStyle(
+        "CalLabel", parent=s["overline"], textColor=accent, fontSize=8,
+    )))
+    inner.append(Paragraph(title, ParagraphStyle(
+        "CalTitle", parent=s["body"], fontName="Times-Bold", fontSize=13,
+        leading=16, spaceAfter=4, textColor=BRAND_INK,
+    )))
+
+    # Score-breakdown line — only render when we actually have a delta.
+    if fired and isinstance(pre, (int, float)) and isinstance(final, (int, float)) and pre != final:
+        delta = pre - final
+        sign = "−" if delta >= 0 else "+"
+        inner.append(Paragraph(
+            f"<font color='#6b7280'>LLM raw</font> "
+            f"<b>{int(pre)}</b> "
+            f"<font color='#6b7280'>→</font> "
+            f"<font color='#dc2626'><b>{sign}{abs(delta)}</b></font> "
+            f"<font color='#6b7280'>→</font> "
+            f"<font color='#16a34a'><b>{int(final)} final</b></font>",
+            ParagraphStyle("CalScore", parent=s["mono"], fontSize=11, leading=14, spaceAfter=8),
+        ))
+
+    if fired:
+        for msg in adjustments:
+            if not isinstance(msg, str):
+                continue
+            inner.append(Paragraph(f"• {msg}", ParagraphStyle(
+                "CalAdj", parent=s["body"], fontSize=9.5, leading=13, leftIndent=4,
+                spaceAfter=3,
+            )))
+        # Academic source — pick the rule that fired.
+        rf_pen = analysis.get("rf_disagreement_penalty")
+        eg = analysis.get("earnings_gate_applied")
+        sources = []
+        if rf_pen:
+            rf_op = analysis.get("rf_opinion") or {}
+            up = rf_op.get("prob_up")
+            down = rf_op.get("prob_down")
+            horizon_d = rf_op.get("horizon_days") or 20
+            if isinstance(up, (int, float)) and isinstance(down, (int, float)):
+                sources.append(
+                    f"RF probabilities: P(up) <b>{round(up*100)}%</b> · "
+                    f"P(down) <b>{round(down*100)}%</b> over {horizon_d}-day forward window. "
+                    f"Penalty rule: Krauss, Do &amp; Huck (2017) — tree-ensemble "
+                    f"disagreement with discretionary direction calls predicts ~9pp "
+                    f"lower hit-rate on equity-direction tasks."
+                )
+        if eg:
+            d = analysis.get("days_until_earnings")
+            if isinstance(d, (int, float)):
+                sources.append(
+                    f"Earnings call <b>{int(d)} day{'s' if int(d) != 1 else ''} away</b>. "
+                    f"Pre-earnings windows are event-driven — the LLM cannot price the "
+                    f"surprise — so confidence is capped at 65 to reflect that uncertainty."
+                )
+        if sources:
+            inner.append(Spacer(1, 4))
+            for src in sources:
+                inner.append(Paragraph(src, ParagraphStyle(
+                    "CalSrc", parent=s["muted"], fontSize=8, leading=11, spaceAfter=2,
+                )))
+    else:
+        inner.append(Paragraph(
+            "Earnings-proximity gate and RF-disagreement penalty both ran clean. "
+            "Confidence shown is Claude's raw output — no adjustment applied.",
+            ParagraphStyle("CalEmpty", parent=s["body"], fontSize=9.5, leading=13),
+        ))
+
+    # Footer pointer to the deep-dive on the web — keeps PDF clean while
+    # preserving conversion path back to the live drawer.
+    ticker = analysis.get("ticker", "")
+    inner.append(Spacer(1, 4))
+    inner.append(Paragraph(
+        f"<font color='#6b7280'>Full breakdown — RF top features, probability bar, methodology — "
+        f"at <i>neulab.xyz/analysis/{ticker}</i></font>",
+        ParagraphStyle("CalFoot", parent=s["muted"], fontSize=7.5, leading=10),
+    ))
+
+    # Single-cell table acts as the bordered container around `inner`.
+    container = Table([[inner]], colWidths=[6.5 * inch])
+    container.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), accent_bg),
+        ("LINEBEFORE", (0, 0), (0, 0), 2, accent),
+        ("BOX", (0, 0), (-1, -1), 0.5, RULE_GREY),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+    ]))
+    story.append(container)
+
+
 def generate_analysis_pdf(analysis: dict) -> bytes:
     """Render an analysis document to a PDF byte string."""
     buf = io.BytesIO()
@@ -127,6 +244,14 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
         s["mono"],
     ))
     story.append(Spacer(1, 16))
+
+    # Verdict Accuracy v2 calibration block — mirrors the web report rule:
+    # always show when calibration_version === "v2", even if no rule fired.
+    # Builds the audit trail users want when the PDF outlives the web view
+    # (forwarded to brokers, pasted into trade journals).
+    if analysis.get("calibration_version") == "v2" or isinstance(analysis.get("confidence_adjustments"), list):
+        _append_calibration_block(story, analysis, s, currency)
+        story.append(Spacer(1, 14))
 
     # Executive summary
     if analysis.get("executive_summary"):
