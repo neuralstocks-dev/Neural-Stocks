@@ -8,7 +8,7 @@
  * nothing otherwise (caller passes undefined).
  */
 import React from "react";
-import { TrendingUp, TrendingDown, Users, Building2, Globe } from "lucide-react";
+import { TrendingUp, TrendingDown, Users, Building2, Globe, AlertTriangle } from "lucide-react";
 
 const REGIME_STYLE = {
     strong_accumulation: { color: "hsl(var(--buy))", icon: TrendingUp, label: "Strong accumulation" },
@@ -31,25 +31,39 @@ function fmtShares(n) {
 // Provider returns dates already formatted as "DD MMM YY" (e.g. "25 Mar 26").
 // Parse defensively — strings older than the data feed pre-dates produce a
 // muted "—" so we never confidently say something wrong.
+// Provider returns dates already formatted as "DD MMM YY" (e.g. "25 Mar 26").
+// Parse defensively — strings older than the data feed pre-dates produce a
+// muted "—" so we never confidently say something wrong.
 const _MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
-function filingAgeBadge(dateStr) {
-    if (!dateStr || typeof dateStr !== "string") return "";
-    // Match "DD MMM YY" (e.g. "25 Mar 26") and "DD MMM YYYY".
+const STALE_DAYS_THRESHOLD = 90;
+
+function parseFilingDate(dateStr) {
+    if (!dateStr || typeof dateStr !== "string") return null;
     const m = dateStr.trim().match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2,4})$/);
-    if (!m) return `· ${dateStr}`;
+    if (!m) return null;
     const day = parseInt(m[1], 10);
     const monIdx = _MONTHS[m[2].toLowerCase()];
-    if (monIdx === undefined) return `· ${dateStr}`;
+    if (monIdx === undefined) return null;
     let year = parseInt(m[3], 10);
     if (year < 100) year += 2000;
     const filed = new Date(Date.UTC(year, monIdx, day));
+    if (Number.isNaN(filed.getTime())) return null;
     const days = Math.floor((Date.now() - filed.getTime()) / 86400000);
-    if (Number.isNaN(days)) return `· ${dateStr}`;
-    if (days <= 0) return "· today";
-    if (days === 1) return "· yesterday";
-    if (days < 30) return `· ${days}d ago`;
-    if (days < 365) return `· ${Math.round(days / 30)}mo ago`;
-    return `· ${(days / 365).toFixed(1)}y ago`;
+    return { date: filed, days };
+}
+
+function formatAge(days) {
+    if (days <= 0) return "today";
+    if (days === 1) return "yesterday";
+    if (days < 30) return `${days}d ago`;
+    if (days < 365) return `${Math.round(days / 30)}mo ago`;
+    return `${(days / 365).toFixed(1)}y ago`;
+}
+
+function filingAgeBadge(dateStr) {
+    const parsed = parseFilingDate(dateStr);
+    if (!parsed) return dateStr ? `· ${dateStr}` : "";
+    return `· ${formatAge(parsed.days)}`;
 }
 
 export default function BandarmologyCard({ bandarmology }) {
@@ -65,6 +79,15 @@ export default function BandarmologyCard({ bandarmology }) {
     const Icon = style.icon;
     const ratioPct = Math.round(accumulation_ratio * 100);
     const smartPct = smart_money_accumulation != null ? Math.round(smart_money_accumulation * 100) : null;
+
+    // Staleness — when the most recent filing is >90 days old we de-emphasize
+    // the live percentages so users don't act on dead signals as if they were
+    // current. The data still renders (it's historically interesting and shows
+    // what insiders did when they DID file), but visually muted with an explicit
+    // amber warning chip explaining what's happening.
+    const latestParsed = parseFilingDate(recent[0]?.date);
+    const isStale = latestParsed && latestParsed.days > STALE_DAYS_THRESHOLD;
+    const staleAge = latestParsed ? formatAge(latestParsed.days) : null;
 
     return (
         <section
@@ -98,10 +121,31 @@ export default function BandarmologyCard({ bandarmology }) {
                     <h2 className="font-serif text-3xl mt-1" style={{ letterSpacing: "-0.02em" }}>
                         {label || style.label}
                     </h2>
+                    {isStale && (
+                        <div
+                            className="inline-flex items-center gap-1.5 mt-2 px-2 py-0.5 font-mono text-[10px]"
+                            style={{
+                                border: "1px solid hsl(var(--hold))",
+                                color: "hsl(var(--hold))",
+                                background: "hsl(var(--hold) / 0.08)",
+                                borderRadius: 2,
+                            }}
+                            data-testid="bandarmology-stale-chip"
+                            title={`Latest insider filing on the IDX/KSEI feed is ${staleAge}. The percentages below reflect a historical snapshot — directors haven't disclosed any new transactions in over ${STALE_DAYS_THRESHOLD} days, so this is NOT a live smart-money signal. Treat as background context, not as a tradeable edge.`}
+                        >
+                            <AlertTriangle size={10} strokeWidth={1.75} />
+                            STALE · LATEST FILING {staleAge?.toUpperCase()}
+                        </div>
+                    )}
                 </div>
                 <div
                     className="flex items-center gap-2 px-3 py-1.5 font-mono text-[11px]"
-                    style={{ border: `1px solid ${style.color}`, color: style.color, borderRadius: 2 }}
+                    style={{
+                        border: `1px solid ${isStale ? "hsl(var(--text-muted))" : style.color}`,
+                        color: isStale ? "hsl(var(--text-muted))" : style.color,
+                        opacity: isStale ? 0.55 : 1,
+                        borderRadius: 2,
+                    }}
                     data-testid="bandarmology-regime-chip"
                 >
                     <Icon size={12} strokeWidth={1.5} />
@@ -110,7 +154,23 @@ export default function BandarmologyCard({ bandarmology }) {
             </div>
 
             {/* Accumulation bar */}
-            <div className="mt-6">
+            <div
+                className="mt-6"
+                style={{ opacity: isStale ? 0.55 : 1 }}
+                data-testid="bandarmology-accumulation-wrap"
+            >
+                {isStale && (
+                    <p
+                        className="mb-3 text-xs"
+                        style={{ color: "hsl(var(--text-muted))", lineHeight: 1.5 }}
+                        data-testid="bandarmology-stale-explainer"
+                    >
+                        <strong style={{ color: "hsl(var(--hold))" }}>Historical snapshot.</strong>{" "}
+                        Latest disclosure was {staleAge}. New insider activity hasn&apos;t hit the IDX/KSEI feed
+                        in over {STALE_DAYS_THRESHOLD} days — the percentages below describe what insiders did
+                        when they last reported, not what they&apos;re doing now.
+                    </p>
+                )}
                 <div className="flex items-center justify-between mb-2 text-[11px] font-mono" style={{ color: "hsl(var(--text-muted))" }}>
                     <span>{sell_count} sell-side insiders</span>
                     <span>{buy_count} buy-side insiders</span>
@@ -145,7 +205,10 @@ export default function BandarmologyCard({ bandarmology }) {
             {/* Secondary stats */}
             <div
                 className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-0"
-                style={{ border: "1px solid hsl(var(--border-default))" }}
+                style={{
+                    border: "1px solid hsl(var(--border-default))",
+                    opacity: isStale ? 0.55 : 1,
+                }}
             >
                 <Cell
                     label="Smart-money (directors, commissioners)"
