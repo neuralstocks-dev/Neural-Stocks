@@ -1,0 +1,69 @@
+{
+  "summary": "Iter-35 frontend-only verification of the new OnboardingWizard (3-step single-screen flow for fresh signups). ALL 9 acceptance scenarios PASS (8 wizard E2E flows + 13/13 marketing-claims jest regression). Auto-trigger fires on fresh /dashboard load, all 8 presets render (4 US + 4 IDX), max-3 cap + disclaimer gate enforce correctly, Step 1->2 transition POSTs disclaimer accept successfully, Step 2 polls and reaches Step 3 within 90s with real BUY 78% verdict for AAPL + 321-char executive_summary, Step 3 explore CTA navigates to /analysis/AAPL and persists localStorage flag, Back-to-dashboard + Skip both close cleanly with flag set, existing demo user does NOT auto-trigger.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "test1_auto_open_fresh_signup": {
+      "status": "PASS",
+      "details": "Registered wizard1+{ts}@test.io via POST /api/auth/register (200 with token in response). Stashed sai_token + sai_user. page.goto /dashboard + 4.5s wait. [data-testid='onboarding-wizard'] visible, [data-testid='onboarding-step-1'] visible, [data-testid='onboarding-steps'] indicator rendered with 5 children (3 dots + 2 connector lines)."
+    },
+    "test2_step1_presets_disclaimer_gate": {
+      "status": "PASS",
+      "details": "All 8 [data-testid^='onboarding-preset-'] buttons exist (AAPL, NVDA, TSLA, MSFT, BBCA.JK, BBRI.JK, GOTO.JK, ANTM.JK). Selected AAPL+NVDA+BBCA.JK; TSLA correctly disabled at max=3. Continue button DISABLED before disclaimer; ENABLED after [data-testid='onboarding-disclaimer-checkbox'] ticked."
+    },
+    "test3_step1_to_step2_transition": {
+      "status": "PASS",
+      "details": "Click [data-testid='onboarding-step1-next'] → POST /api/disclaimer/accept (no error banner shown). [data-testid='onboarding-step-2'] visible, [data-testid='onboarding-step-1'] removed from DOM. No [data-testid='onboarding-error'] surfaced."
+    },
+    "test4_step2_analysis_e2e": {
+      "status": "PASS",
+      "details": "Step 3 appeared in <80s. Distinct labels seen during Step 2: {'Adding to watchlist…', 'Starting analysis on AAPL…', 'Composing verdict…'} — label updates 2+ times as required. Verdict ring text: 'BUY 78%'. Heading shows AAPL. [data-testid='onboarding-step3-why'] = 321 chars: 'Apple demonstrates strong fundamental momentum with 15.7% revenue growth and 18.3% earnings growth, trading below its 52…' (real executive_summary)."
+    },
+    "test5_step3_explore_cta": {
+      "status": "PASS",
+      "details": "Click [data-testid='onboarding-step3-explore'] → URL became /analysis/AAPL within 10s. localStorage.sai_onboarding_completed_v1 == '1' confirmed."
+    },
+    "test6_back_to_dashboard": {
+      "status": "PASS",
+      "details": "Fresh signup wizardback+{ts}@test.io, completed wizard, clicked [data-testid='onboarding-step3-close']. Wizard removed from DOM. URL stays at /dashboard. localStorage flag = '1'."
+    },
+    "test7_skip_flow": {
+      "status": "PASS",
+      "details": "Fresh signup wizardskip+{ts}@test.io. Step 1 → click [data-testid='onboarding-skip']. Wizard closed, flag set to '1'. Reload /dashboard → wizard does NOT re-open."
+    },
+    "test8_existing_user_no_wizard": {
+      "status": "PASS",
+      "details": "Login demo@stockai.io / demo1234. Cleared localStorage flag explicitly (proving the dismissal flag is NOT what's gating). On /dashboard, after 6s settle, no [data-testid='onboarding-wizard'] in DOM. Note: demo user shows 0 watchlist items (free seed) but quota.analyses_this_week is non-zero (4/12 visible in dashboard header), which correctly suppresses auto-trigger per the (items===0 && analyses_this_week===0) condition."
+    },
+    "test9_marketing_claims_jest": {
+      "status": "PASS",
+      "details": "cd /app/frontend && CI=1 yarn test --testPathPattern=marketing-claims --watchAll=false → 13/13 passed in 0.358s, exit code 0. No regression from this PR."
+    }
+  },
+  "test_report_links": [
+    "/app/frontend/src/components/OnboardingWizard.jsx",
+    "/app/frontend/src/pages/DashboardPage.jsx",
+    "/app/frontend/src/__tests__/marketing-claims.test.jsx"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "OnboardingWizard.jsx is well-structured (~430 LOC, single-file but clean step-component split). Storage key versioned (sai_onboarding_completed_v1) — good. handleClose marks completed even from step 1, preventing modal-spam — correct UX choice as commented inline.",
+    "Confidence normalization in Step3Reveal handles both 0-1 and 0-100 scales — robust. Real backend returned confidence_score=78 (0-100) and ring rendered as '78%' correctly.",
+    "Auto-trigger condition is gated on (items.length===0 && analyses_this_week===0) which means the wizard CAN re-open for an existing free user who happens to have an empty state and no analyses this week if they manually clear localStorage. Acceptable; the localStorage flag is the primary gate post-dismiss.",
+    "Step 2 timeout is 90s with a friendly 'analysis taking longer than expected' fallback message preserved as soft-fail — wizard stays open so user can retry/skip. Good resilience.",
+    "Pre-existing (NOT this PR): /pricing still emits React duplicate-key warning ('quick_actions') noted in iter-31/34. Unrelated to wizard.",
+    "Minor enhancement idea: track wizard funnel via a /api/telemetry beacon (or PostHog event) at each step transition + completion vs skip — would let the team measure the 30-second goal in production. Not blocking."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "9/9 PASS — all wizard scenarios + jest regression green"},
+  "test_credentials": "demo@stockai.io / demo1234 for existing-user regression. Fresh signups created via POST /api/auth/register with full_name field (NOT name). Token returned directly in register response — no fallback login needed.",
+  "seed_data_creation": "Created 3 throwaway test users: wizard1+{ts}@test.io, wizardback+{ts}@test.io, wizardskip+{ts}@test.io (all pass1234). Each ran the wizard end-to-end (or skipped); their watchlists now contain AAPL/NVDA/BBCA.JK and one AAPL analysis on the e2e ones. Safe to leave or clean up.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Wizard ships clean. To re-test, register a fresh user with full_name (not name) — token is returned directly so no fallback login required. The auto-trigger fires reliably after ~4-5s on /dashboard (quota fetch settle). Real AAPL analysis lands in 16-25s (BUY 78% with full executive_summary). The 'existing user' regression must use a user with non-zero analyses_this_week — demo@stockai.io qualifies (4/12 weekly counter visible).",
+  "rca of the issue": "n/a — no defects found. The OnboardingWizard implementation is correct: presets render, max-3 cap enforced, disclaimer gate works, disclaimer/accept POST succeeds, watchlist + analysis pipeline runs end-to-end, verdict ring + summary render with real backend data, both completion paths (explore + close) and skip path persist the localStorage flag, and existing users with prior activity correctly do NOT see the wizard. Marketing-claims jest regression remains 13/13 green."
+}

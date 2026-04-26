@@ -8,6 +8,7 @@ import SignalBadge from "@/components/SignalBadge";
 import QuickAnalyzeProgress from "@/components/QuickAnalyzeProgress";
 import TestUnlockBanner from "@/components/TestUnlockBanner";
 import FirstTimeManualPill from "@/components/FirstTimeManualPill";
+import OnboardingWizard, { isOnboardingCompleted } from "@/components/OnboardingWizard";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import AnalysisModeSelector from "@/components/AnalysisModeSelector";
 import LiveDeskGuide from "@/components/LiveDeskGuide";
@@ -290,6 +291,19 @@ export default function DashboardPage() {
     // Candlestick & Hybrid are available to ALL tiers (Feb 2026 change) —
     // Hybrid is the default across the board since it produces the best verdicts.
     const [analyzeMode, setAnalyzeMode] = useState("hybrid");
+
+    // Onboarding wizard for fresh signups. Auto-opens once when the user
+    // has zero watchlist + zero analyses this week and hasn't dismissed.
+    const [onboardingOpen, setOnboardingOpen] = useState(false);
+    useEffect(() => {
+        if (loading) return; // wait for quota + watchlist to settle
+        if (isOnboardingCompleted()) return;
+        const noWatchlist = items.length === 0;
+        const noAnalysesThisWeek = (quota?.analyses_this_week ?? 0) === 0;
+        if (noWatchlist && noAnalysesThisWeek) {
+            setOnboardingOpen(true);
+        }
+    }, [loading, items.length, quota?.analyses_this_week]);
 
     const fetchWatchlist = useCallback(async () => {
         const r = await api.get("/watchlist/live");
@@ -670,6 +684,16 @@ export default function DashboardPage() {
 
                 {/* First-time manual nudge (auto-hides after first analysis this week) */}
                 <FirstTimeManualPill quota={quota} />
+
+                {/* Onboarding wizard — auto-opens for fresh signups */}
+                <OnboardingWizard
+                    open={onboardingOpen}
+                    onClose={() => setOnboardingOpen(false)}
+                    onWatchlistChanged={async () => {
+                        await fetchWatchlist();
+                        await fetchQuota?.();
+                    }}
+                />
 
                 {/* Quota banner */}
                 {quota && (
