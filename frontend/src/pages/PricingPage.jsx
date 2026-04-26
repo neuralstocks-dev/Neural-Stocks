@@ -760,7 +760,7 @@ export default function PricingPage() {
                                 </thead>
                                 <tbody>
                                     {FEATURE_MATRIX.map((feat) => (
-                                        <tr key={feat.key} style={{ borderTop: "1px solid hsl(var(--border-divider))" }}>
+                                        <tr key={feat.label} style={{ borderTop: "1px solid hsl(var(--border-divider))" }}>
                                             <td className="py-3 pr-4" style={{ color: "hsl(var(--text-secondary))" }}>{feat.label}</td>
                                             {ORDER.map((key) => (
                                                 <td key={key} className="py-3 px-4 text-right"
