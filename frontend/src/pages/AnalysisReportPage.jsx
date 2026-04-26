@@ -504,35 +504,71 @@ export default function AnalysisReportPage() {
                                                 (earnings gate, RF disagreement
                                                 penalty) so users see WHY a
                                                 verdict's confidence is what it
-                                                is. Builds trust via transparency. */}
-                                            {Array.isArray(analysis.confidence_adjustments) && analysis.confidence_adjustments.length > 0 && (
+                                                is. Builds trust via transparency.
+                                                When V2 ran but no rule fired,
+                                                show a positive empty-state so
+                                                users still see the system is
+                                                active. */}
+                                            {(analysis.calibration_version === "v2" || Array.isArray(analysis.confidence_adjustments)) && (
                                                 <div
                                                     className="mt-4 p-3"
                                                     style={{
                                                         border: "1px solid hsl(var(--border-default))",
-                                                        borderLeft: "3px solid hsl(var(--hold))",
+                                                        borderLeft: `3px solid hsl(var(--${
+                                                            (analysis.confidence_adjustments || []).length > 0
+                                                                ? "hold"
+                                                                : "buy"
+                                                        }))`,
                                                         background: "hsl(var(--surface-elevated))",
                                                         borderRadius: 2,
                                                     }}
                                                     data-testid="confidence-calibration-breadcrumbs"
                                                 >
                                                     <p
-                                                        className="text-overline"
-                                                        style={{ color: "hsl(var(--hold))", fontSize: "0.56rem" }}
+                                                        className="text-overline flex items-center justify-between gap-2"
+                                                        style={{
+                                                            color: `hsl(var(--${
+                                                                (analysis.confidence_adjustments || []).length > 0
+                                                                    ? "hold"
+                                                                    : "buy"
+                                                            }))`,
+                                                            fontSize: "0.56rem",
+                                                        }}
                                                     >
-                                                        Confidence calibrations applied
+                                                        <span>
+                                                            {(analysis.confidence_adjustments || []).length > 0
+                                                                ? "Confidence calibrations applied"
+                                                                : "Verdict Accuracy v2 · no calibration needed"}
+                                                        </span>
+                                                        <Link
+                                                            to="/technical#confidence-calibration"
+                                                            className="link-underline"
+                                                            style={{ fontSize: "0.56rem", color: "hsl(var(--text-muted))" }}
+                                                            data-testid="calibration-methodology-link"
+                                                        >
+                                                            How?
+                                                        </Link>
                                                     </p>
-                                                    <ul className="mt-2 space-y-1.5">
-                                                        {analysis.confidence_adjustments.map((msg, i) => (
-                                                            <li
-                                                                key={i}
-                                                                className="text-xs"
-                                                                style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.5 }}
-                                                            >
-                                                                · {msg}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
+                                                    {(analysis.confidence_adjustments || []).length > 0 ? (
+                                                        <ul className="mt-2 space-y-1.5">
+                                                            {analysis.confidence_adjustments.map((msg, i) => (
+                                                                <li
+                                                                    key={i}
+                                                                    className="text-xs"
+                                                                    style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.5 }}
+                                                                >
+                                                                    · {msg}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    ) : (
+                                                        <p
+                                                            className="text-xs mt-2"
+                                                            style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.5 }}
+                                                        >
+                                                            Earnings-proximity gate and RF-disagreement penalty both ran clean — confidence shown is Claude's raw output.
+                                                        </p>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>

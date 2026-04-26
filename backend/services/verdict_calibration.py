@@ -160,7 +160,17 @@ def calibrate_verdict(
 ) -> dict:
     """Apply all post-LLM confidence calibrations. Order matters — earnings
     gate first (event-driven uncertainty), then RF disagreement (model
-    disagreement). Both are no-ops when their preconditions aren't met."""
+    disagreement). Both are no-ops when their preconditions aren't met.
+
+    Always seeds `confidence_adjustments` to an empty list when no rule
+    fires so the UI can display a positive "V2 calibration ran, no
+    adjustment was needed" state instead of hiding the module entirely.
+    Without this seed the field would be missing on clean verdicts and
+    users couldn't tell whether V2 was active or absent.
+    """
     apply_earnings_gate(verdict, market_context)
     apply_rf_disagreement_penalty(verdict, rf_opinion)
+    if isinstance(verdict, dict):
+        verdict.setdefault("confidence_adjustments", [])
+        verdict.setdefault("calibration_version", "v2")
     return verdict

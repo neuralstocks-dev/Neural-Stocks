@@ -564,6 +564,7 @@ async def _create_analysis_impl(ticker: str, mode: str, user: dict):
         "earnings_gate_applied",
         "days_until_earnings",
         "rf_disagreement_penalty",
+        "calibration_version",
     ):
         if k in analysis:
             doc[k] = analysis[k]
