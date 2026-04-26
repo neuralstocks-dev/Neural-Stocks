@@ -76,9 +76,9 @@ export default function LLMBudgetBanner({ error }) {
                             className="mt-3 text-sm leading-relaxed"
                             style={{ color: "hsl(var(--text-secondary))" }}
                         >
-                            Every AI verdict makes one Claude Sonnet 4.5 call (~$0.01) billed against
-                            your Universal Key balance. The balance is empty — so new analyses are
-                            paused until you add credit. <strong style={{ color: "hsl(var(--text-primary))" }}>
+                            Every AI verdict makes one Claude Sonnet 4.5 call (~4.6 credits ≈ $0.046)
+                            billed against your Universal Key balance. The balance is empty — so new
+                            analyses are paused until you add credit. <strong style={{ color: "hsl(var(--text-primary))" }}>
                             Existing verdicts, charts, watchlists, alerts, PDF exports, Random-Forest
                             scans, and Telegram pushes all keep working.</strong>
                         </p>
@@ -145,11 +145,11 @@ export default function LLMBudgetBanner({ error }) {
                                         <span style={{ color: "hsl(var(--text-muted))" }}>·</span>
                                         <span>
                                             <strong style={{ color: "hsl(var(--text-primary))" }}>
-                                                Universal Key (~$0.01 per verdict)
+                                                Universal Key (~4.6 credits / $0.046 per verdict)
                                             </strong>
                                             : pays the LLM provider (Claude Sonnet 4.5) for each
-                                            analysis. Billed separately and only used for new verdicts —
-                                            re-loading existing ones is free.
+                                            analysis. 1 credit = $0.01. Billed separately and only
+                                            used for new verdicts — re-loading existing ones is free.
                                         </span>
                                     </li>
                                     <li className="flex gap-2">
@@ -158,9 +158,9 @@ export default function LLMBudgetBanner({ error }) {
                                             <strong style={{ color: "hsl(var(--text-primary))" }}>
                                                 Recommended top-up
                                             </strong>
-                                            : even a $5 add covers ~500 verdicts. Enable{" "}
-                                            <em>Auto top-up</em> on the same page so this doesn't
-                                            block you mid-flight again.
+                                            : 100 credits ($1) ≈ 22 verdicts; 500 credits ($5) ≈
+                                            108 verdicts. Enable <em>Auto top-up</em> on the same
+                                            page so this doesn't block you mid-flight again.
                                         </span>
                                     </li>
                                     <li className="flex gap-2">
