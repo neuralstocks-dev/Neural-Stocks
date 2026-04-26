@@ -84,6 +84,17 @@ async def start_background_tasks():
         await _ensure_analysis_indexes()
     except Exception as e:
         logger.warning("Failed to ensure analysis_jobs TTL index: %s", e)
+    # Start the queue-snapshot refresher so /api/analysis/queue/status
+    # reads from cache (responsive even under loop saturation).
+    try:
+        import asyncio as _asyncio
+        from routers.analysis import _queue_snapshot_loop
+        _t = _asyncio.create_task(_queue_snapshot_loop())
+        _BG_TASKS.add(_t)
+        _t.add_done_callback(_BG_TASKS.discard)
+        logger.info("Started analysis queue snapshot loop")
+    except Exception as e:
+        logger.warning("Failed to start queue snapshot loop: %s", e)
 
 
 _BG_TASKS: set = set()

@@ -113,13 +113,42 @@ Hybrid rules:
 
 
 def _run_chat(system_prompt: str, session_prefix: str, user_text: str):
-    """Returns the coroutine for the LLM response."""
+    """Returns the coroutine for the LLM response.
+
+    Note: `chat.send_message()` is technically async, but in practice the
+    LiteLLM stack does enough blocking work (httpx connection pooling,
+    streaming chunk parsing, retry logic) on the event loop that a single
+    in-flight call still chokes other endpoints. We isolate each call
+    inside its own thread + its own asyncio loop via `_run_chat_in_thread`
+    so the main loop stays responsive for trivial requests like
+    /queue/status. The trade-off is one OS thread per concurrent
+    analysis, capped by the global ANALYSIS_CONCURRENCY semaphore (=4)
+    so we never run more than 4 threads at once.
+    """
     session_id = f"{session_prefix}-{uuid.uuid4().hex[:8]}"
     chat = (
         LlmChat(api_key=EMERGENT_LLM_KEY, session_id=session_id, system_message=system_prompt)
         .with_model("anthropic", "claude-sonnet-4-5-20250929")
     )
     return chat.send_message(UserMessage(text=user_text))
+
+
+async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text: str):
+    """Run the entire Claude round-trip in an OS thread so the main asyncio
+    loop stays responsive. Each thread spins up a fresh asyncio loop just
+    for that one call; LiteLLM's internal httpx + streaming work happens
+    there instead of on the API process's main loop."""
+    import asyncio as _asyncio
+
+    def _sync_run():
+        try:
+            return _asyncio.run(_run_chat(system_prompt, session_prefix, user_text))
+        except Exception as e:
+            # Re-raise the original exception so callers see the same
+            # error class they would have seen on the main loop.
+            raise e
+
+    return await _asyncio.to_thread(_sync_run)
 
 
 def _parse_ai_json(raw) -> dict:
@@ -131,6 +160,17 @@ def _parse_ai_json(raw) -> dict:
         return json.loads(m.group(0))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"AI JSON parse error: {e}")
+
+
+async def _parse_ai_json_async(raw) -> dict:
+    """Off-loop variant of _parse_ai_json. Claude responses can be 100KB+
+    and the regex+JSON parse blocks the asyncio event loop for ~50-200ms
+    per response — multiplied by N concurrent analyses, this starves
+    every other endpoint (incl. /api/analysis/queue/status). Running the
+    parse inside a thread keeps the loop responsive for trivial requests.
+    """
+    import asyncio as _asyncio
+    return await _asyncio.to_thread(_parse_ai_json, raw)
 
 
 def _handle_llm_error(e: Exception):
@@ -202,14 +242,14 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
             payload["market_context"] = mc_slim
 
     try:
-        raw = await _run_chat(system_prompt, f"{prefix}-{ticker}",
+        raw = await _run_chat_in_thread(system_prompt, f"{prefix}-{ticker}",
                               "Analyze this stock using the data below. Return ONLY valid JSON.\n\n"
                               + json.dumps(payload, default=str))
     except HTTPException:
         raise
     except Exception as e:
         _handle_llm_error(e)
-    parsed = _parse_ai_json(raw)
+    parsed = await _parse_ai_json_async(raw)
     if parsed.get("recommendation") not in ("BUY", "SELL", "HOLD"):
         raise HTTPException(status_code=502, detail="AI returned invalid recommendation")
     return parsed
@@ -233,14 +273,14 @@ async def run_candlestick_analysis(ticker: str, quote: dict, history: list,
         ],
     }
     try:
-        raw = await _run_chat(CANDLESTICK_SYSTEM_PROMPT, f"candlestick-{ticker}",
+        raw = await _run_chat_in_thread(CANDLESTICK_SYSTEM_PROMPT, f"candlestick-{ticker}",
                               "Analyze this stock using the detected candlestick patterns plus price context. Return ONLY valid JSON.\n\n"
                               + json.dumps(payload, default=str))
     except HTTPException:
         raise
     except Exception as e:
         _handle_llm_error(e)
-    parsed = _parse_ai_json(raw)
+    parsed = await _parse_ai_json_async(raw)
     if parsed.get("recommendation") not in ("BUY", "SELL", "HOLD"):
         raise HTTPException(status_code=502, detail="AI returned invalid recommendation")
     return parsed
@@ -291,14 +331,14 @@ async def run_timeline_analysis(ticker: str, quote: dict, history: list, fundame
         ],
     }
     try:
-        raw = await _run_chat(TIMELINE_SYSTEM_PROMPT, f"timeline-{ticker}",
+        raw = await _run_chat_in_thread(TIMELINE_SYSTEM_PROMPT, f"timeline-{ticker}",
                               "Evaluate this stock's fit across short-, medium-, and long-term horizons. Return ONLY valid JSON.\n\n"
                               + json.dumps(payload, default=str))
     except HTTPException:
         raise
     except Exception as e:
         _handle_llm_error(e)
-    parsed = _parse_ai_json(raw)
+    parsed = await _parse_ai_json_async(raw)
     if parsed.get("recommended_timeline") not in ("short_term", "medium_term", "long_term"):
         raise HTTPException(status_code=502, detail="AI returned invalid timeline")
     return parsed

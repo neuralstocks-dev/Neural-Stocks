@@ -49,6 +49,50 @@ _ANALYSIS_QUEUED = 0
 _ANALYSIS_AVG_DURATION_S = 50.0
 _ANALYSIS_AVG_ALPHA = 0.2  # EMA smoothing factor
 
+# Snapshot dict refreshed by a background task every 1s. The queue-status
+# endpoint reads from this dict directly (no awaits, no locks) so it stays
+# responsive even when the event loop is saturated by concurrent Claude
+# JSON parsing. Without this, the endpoint itself stalls in exactly the
+# scenario where the chip is most useful (iter-38 testing finding).
+_QUEUE_SNAPSHOT: dict = {
+    "capacity": ANALYSIS_CONCURRENCY,
+    "running": 0,
+    "queued": 0,
+    "avg_duration_s": _ANALYSIS_AVG_DURATION_S,
+    "estimated_wait_s": 0,
+    "is_busy": False,
+}
+
+
+def _compute_queue_snapshot() -> dict:
+    """Pure function — derives the snapshot dict from the live counters."""
+    if _ANALYSIS_RUNNING < ANALYSIS_CONCURRENCY:
+        wait_s = 0
+    else:
+        position = _ANALYSIS_QUEUED + 1
+        batches_ahead = (position + ANALYSIS_CONCURRENCY - 1) // ANALYSIS_CONCURRENCY
+        wait_s = int(round(batches_ahead * _ANALYSIS_AVG_DURATION_S))
+    return {
+        "capacity": ANALYSIS_CONCURRENCY,
+        "running": _ANALYSIS_RUNNING,
+        "queued": _ANALYSIS_QUEUED,
+        "avg_duration_s": round(_ANALYSIS_AVG_DURATION_S, 1),
+        "estimated_wait_s": wait_s,
+        "is_busy": _ANALYSIS_RUNNING >= max(1, ANALYSIS_CONCURRENCY - 1),
+    }
+
+
+async def _queue_snapshot_loop():
+    """Background task: refresh _QUEUE_SNAPSHOT every 1s. Even if the
+    event loop is contended by Claude parsing, this trivial coroutine
+    will eventually be scheduled — and the snapshot lag is bounded."""
+    while True:
+        try:
+            _QUEUE_SNAPSHOT.update(_compute_queue_snapshot())
+        except Exception:
+            pass
+        await asyncio.sleep(1.0)
+
 
 async def _ensure_analysis_indexes():
     """Wipe completed/failed analysis jobs after 1 hour — they're transient
@@ -364,35 +408,12 @@ async def analysis_job_status(job_id: str, user=Depends(get_current_user)):
 @router.get("/analysis/queue/status")
 async def analysis_queue_status():
     """Live queue depth + estimated wait time for the analysis pipeline.
-    Public (no auth) so the dashboard can poll cheaply on every render
-    without churning JWT validation. Returns:
-
-      {
-        "capacity": int,         # max concurrent analyses on this worker
-        "running": int,          # how many are currently executing
-        "queued": int,           # how many are waiting on the semaphore
-        "avg_duration_s": float, # EMA of wall-clock seconds per analysis
-        "estimated_wait_s": int, # how long a freshly queued analysis would wait
-        "is_busy": bool,         # convenience flag — surface the chip when true
-      }
+    Public (no auth) so the dashboard can poll cheaply. Reads from
+    _QUEUE_SNAPSHOT (refreshed every 1s by a background task) so the
+    endpoint never blocks even when the event loop is saturated by
+    concurrent Claude JSON parsing.
     """
-    # If running < capacity, a new request runs immediately (queued=0 wait).
-    # Otherwise wait ≈ ceil(queued / capacity) batches × avg_duration.
-    if _ANALYSIS_RUNNING < ANALYSIS_CONCURRENCY:
-        wait_s = 0
-    else:
-        # +1 because the new arrival joins the back of the queue
-        position = _ANALYSIS_QUEUED + 1
-        batches_ahead = (position + ANALYSIS_CONCURRENCY - 1) // ANALYSIS_CONCURRENCY
-        wait_s = int(round(batches_ahead * _ANALYSIS_AVG_DURATION_S))
-    return {
-        "capacity": ANALYSIS_CONCURRENCY,
-        "running": _ANALYSIS_RUNNING,
-        "queued": _ANALYSIS_QUEUED,
-        "avg_duration_s": round(_ANALYSIS_AVG_DURATION_S, 1),
-        "estimated_wait_s": wait_s,
-        "is_busy": _ANALYSIS_RUNNING >= max(1, ANALYSIS_CONCURRENCY - 1),
-    }
+    return dict(_QUEUE_SNAPSHOT)
 
 
 @router.post("/analysis/{ticker}")
