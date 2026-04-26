@@ -103,14 +103,18 @@ def apply_rf_disagreement_penalty(verdict: dict, rf_opinion: dict | None) -> dic
 
     Mutates `verdict` in place AND returns it. Only fires when:
       - RF model loaded and produced a non-null opinion
-      - RF edge is at least 'moderate' (so we trust the RF call)
+      - RF edge is at least 'modest' (so we trust the RF call enough)
       - Direction disagrees with Claude's recommendation
+
+    Edge taxonomy comes from services/rf_predictor.py: "none" | "modest" |
+    "strong" (no "moderate" / "weak" — that was a stale assumption from an
+    earlier calibration draft).
     """
     if not isinstance(verdict, dict) or not isinstance(rf_opinion, dict):
         return verdict
     rf_dir = rf_opinion.get("direction")  # "up" | "down" | "neutral"
-    rf_edge = rf_opinion.get("edge")      # "strong" | "moderate" | "weak" | "none"
-    if rf_dir not in ("up", "down") or rf_edge not in ("strong", "moderate"):
+    rf_edge = rf_opinion.get("edge")      # "none" | "modest" | "strong"
+    if rf_dir not in ("up", "down") or rf_edge not in ("strong", "modest"):
         return verdict
     rec = (verdict.get("recommendation") or "").upper()
     llm_dir = "up" if rec == "BUY" else "down" if rec == "SELL" else "neutral"

@@ -61,9 +61,9 @@ def test_rf_disagreement_strong_edge_penalises():
     assert any("RF model disagrees" in s for s in v["confidence_adjustments"])
 
 
-def test_rf_disagreement_moderate_edge_smaller_penalty():
+def test_rf_disagreement_modest_edge_smaller_penalty():
     v = _v(rec="SELL", conf=78)
-    rf = {"direction": "up", "edge": "moderate", "prob_up": 0.62}
+    rf = {"direction": "up", "edge": "modest", "prob_up": 0.62}
     apply_rf_disagreement_penalty(v, rf)
     expected = 78 - int(RF_DISAGREEMENT_PENALTY * 0.65)
     assert v["confidence_score"] == expected
@@ -77,9 +77,9 @@ def test_rf_agreement_does_not_penalise():
     assert "rf_disagreement_penalty" not in v
 
 
-def test_rf_weak_edge_does_not_penalise_disagreement():
+def test_rf_none_edge_does_not_penalise_disagreement():
     v = _v(rec="BUY", conf=80)
-    rf = {"direction": "down", "edge": "weak", "prob_up": 0.45}
+    rf = {"direction": "down", "edge": "none", "prob_up": 0.49}
     apply_rf_disagreement_penalty(v, rf)
     assert v["confidence_score"] == 80
 
