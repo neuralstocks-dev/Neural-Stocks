@@ -462,3 +462,10 @@ body {
         );
     background-size: 48px 48px;
 }
+
+/* Used by the score-breakdown drawer on AnalysisReportPage. Soft entrance
+   so the click → reveal feels like an answer rather than a layout shift. */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-2px); }
+    to   { opacity: 1; transform: translateY(0); }
+}

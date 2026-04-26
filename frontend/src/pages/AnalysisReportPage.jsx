@@ -59,6 +59,10 @@ export default function AnalysisReportPage() {
     // stepper next to the Re-analyze button. Reset to null when not
     // analyzing so the stepper hides automatically.
     const [progress, setProgress] = useState(null);
+    // Score-breakdown drawer toggle — opens an inline panel under the
+    // chip showing the exact RF probabilities + academic source so the
+    // calibration math is auditable in one click.
+    const [breakdownOpen, setBreakdownOpen] = useState(false);
     // All 3 analysis modes are available to all tiers (Feb 2026).
     const canPro = true;
     const [mode, setMode] = useState("hybrid");
@@ -584,39 +588,241 @@ export default function AnalysisReportPage() {
                                                     {typeof analysis.confidence_score_pre_calibration === "number" &&
                                                      typeof analysis.confidence_score === "number" &&
                                                      analysis.confidence_score_pre_calibration !== analysis.confidence_score && (
-                                                        <div
-                                                            className="mt-2 flex items-center gap-2 font-mono"
-                                                            style={{ fontSize: "0.66rem" }}
-                                                            data-testid="score-breakdown"
-                                                        >
-                                                            <span style={{ color: "hsl(var(--text-muted))" }}>
-                                                                LLM raw
-                                                            </span>
-                                                            <span style={{ color: "hsl(var(--text-primary))" }}>
-                                                                {analysis.confidence_score_pre_calibration}
-                                                            </span>
-                                                            <span style={{ color: "hsl(var(--text-muted))" }}>→</span>
-                                                            <span
-                                                                style={{
-                                                                    color: "hsl(var(--sell))",
-                                                                    background: "hsla(0,55%,55%,0.08)",
-                                                                    padding: "1px 6px",
-                                                                    borderRadius: 2,
-                                                                    border: "1px solid hsl(var(--sell))",
-                                                                }}
+                                                        <div className="mt-2" data-testid="score-breakdown-wrap">
+                                                            <div
+                                                                className="flex items-center gap-2 font-mono"
+                                                                style={{ fontSize: "0.66rem" }}
+                                                                data-testid="score-breakdown"
                                                             >
-                                                                −{analysis.confidence_score_pre_calibration - analysis.confidence_score}
-                                                            </span>
-                                                            <span style={{ color: "hsl(var(--text-muted))" }}>→</span>
-                                                            <span
-                                                                style={{
-                                                                    color: "hsl(var(--buy))",
-                                                                    fontWeight: 600,
-                                                                }}
-                                                                data-testid="score-breakdown-final"
-                                                            >
-                                                                {analysis.confidence_score} final
-                                                            </span>
+                                                                <span style={{ color: "hsl(var(--text-muted))" }}>
+                                                                    LLM raw
+                                                                </span>
+                                                                <span style={{ color: "hsl(var(--text-primary))" }}>
+                                                                    {analysis.confidence_score_pre_calibration}
+                                                                </span>
+                                                                <span style={{ color: "hsl(var(--text-muted))" }}>→</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setBreakdownOpen((v) => !v)}
+                                                                    className="font-mono inline-flex items-center gap-1"
+                                                                    style={{
+                                                                        color: "hsl(var(--sell))",
+                                                                        background: "hsla(0,55%,55%,0.08)",
+                                                                        padding: "1px 6px",
+                                                                        borderRadius: 2,
+                                                                        border: "1px solid hsl(var(--sell))",
+                                                                        fontSize: "0.66rem",
+                                                                        cursor: "pointer",
+                                                                        transition: "background 150ms ease",
+                                                                    }}
+                                                                    onMouseEnter={(e) => (e.currentTarget.style.background = "hsla(0,55%,55%,0.16)")}
+                                                                    onMouseLeave={(e) => (e.currentTarget.style.background = "hsla(0,55%,55%,0.08)")}
+                                                                    data-testid="score-breakdown-toggle"
+                                                                    aria-expanded={breakdownOpen}
+                                                                    aria-controls="score-breakdown-drawer"
+                                                                    title="Click to inspect the calibration math"
+                                                                >
+                                                                    −{analysis.confidence_score_pre_calibration - analysis.confidence_score}
+                                                                    <span style={{ fontSize: "0.55rem", opacity: 0.7 }}>
+                                                                        {breakdownOpen ? "▾" : "▸"}
+                                                                    </span>
+                                                                </button>
+                                                                <span style={{ color: "hsl(var(--text-muted))" }}>→</span>
+                                                                <span
+                                                                    style={{
+                                                                        color: "hsl(var(--buy))",
+                                                                        fontWeight: 600,
+                                                                    }}
+                                                                    data-testid="score-breakdown-final"
+                                                                >
+                                                                    {analysis.confidence_score} final
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Inline drawer — RF probabilities + academic source.
+                                                                Lazy-rendered after toggle so we don't pay React cost
+                                                                on every verdict render. */}
+                                                            {breakdownOpen && (
+                                                                <div
+                                                                    id="score-breakdown-drawer"
+                                                                    className="mt-3 p-3"
+                                                                    style={{
+                                                                        background: "hsl(var(--bg))",
+                                                                        border: "1px solid hsl(var(--border-divider))",
+                                                                        borderRadius: 2,
+                                                                        animation: "fadeIn 220ms ease",
+                                                                    }}
+                                                                    data-testid="score-breakdown-drawer"
+                                                                >
+                                                                    {analysis.rf_disagreement_penalty && analysis.rf_opinion ? (
+                                                                        <>
+                                                                            <p
+                                                                                className="text-overline"
+                                                                                style={{ fontSize: "0.55rem", color: "hsl(var(--sell))" }}
+                                                                            >
+                                                                                Why the −{analysis.confidence_score_pre_calibration - analysis.confidence_score} penalty
+                                                                            </p>
+                                                                            <p
+                                                                                className="mt-2 text-xs leading-relaxed"
+                                                                                style={{ color: "hsl(var(--text-secondary))" }}
+                                                                            >
+                                                                                Claude said{" "}
+                                                                                <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                                                                    {analysis.recommendation}
+                                                                                </strong>
+                                                                                . The Random-Forest secondary model — trained on{" "}
+                                                                                {(analysis.rf_opinion?.model_info?.universe_size || 346).toLocaleString()}{" "}
+                                                                                US stocks since{" "}
+                                                                                {String(
+                                                                                    analysis.rf_opinion?.model_info?.training_start_date || ""
+                                                                                ).slice(0, 4) || "2021"}
+                                                                                {" "}— gave it{" "}
+                                                                                <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                                                                    {Math.round(((analysis.rf_opinion?.prob_up ?? 0)) * 100)}% up
+                                                                                </strong>
+                                                                                {" / "}
+                                                                                <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                                                                    {Math.round(((analysis.rf_opinion?.prob_down ?? 1)) * 100)}% down
+                                                                                </strong>
+                                                                                {" "}over a{" "}
+                                                                                {analysis.rf_opinion?.horizon_days || 20}-day forward window. Direction{" "}
+                                                                                <em>disagrees</em> with Claude on a{" "}
+                                                                                <strong style={{ color: "hsl(var(--sell))" }}>
+                                                                                    {analysis.rf_opinion?.edge}
+                                                                                </strong>
+                                                                                {" "}edge — so we lower the displayed confidence by{" "}
+                                                                                <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                                                                    {analysis.rf_disagreement_penalty} points
+                                                                                </strong>
+                                                                                {" "}rather than override the verdict.
+                                                                            </p>
+                                                                            {/* Probability gauge */}
+                                                                            <div className="mt-3" data-testid="score-breakdown-prob-bar">
+                                                                                <div
+                                                                                    className="flex items-center"
+                                                                                    style={{
+                                                                                        height: 18,
+                                                                                        border: "1px solid hsl(var(--border-default))",
+                                                                                        borderRadius: 2,
+                                                                                        overflow: "hidden",
+                                                                                    }}
+                                                                                >
+                                                                                    <div
+                                                                                        style={{
+                                                                                            width: `${Math.round((analysis.rf_opinion?.prob_up ?? 0) * 100)}%`,
+                                                                                            height: "100%",
+                                                                                            background: "hsl(var(--buy))",
+                                                                                            opacity: 0.8,
+                                                                                        }}
+                                                                                    />
+                                                                                    <div
+                                                                                        style={{
+                                                                                            width: `${Math.round((analysis.rf_opinion?.prob_down ?? 1) * 100)}%`,
+                                                                                            height: "100%",
+                                                                                            background: "hsl(var(--sell))",
+                                                                                            opacity: 0.8,
+                                                                                        }}
+                                                                                    />
+                                                                                </div>
+                                                                                <div
+                                                                                    className="flex justify-between mt-1 font-mono"
+                                                                                    style={{ fontSize: "0.6rem", color: "hsl(var(--text-muted))" }}
+                                                                                >
+                                                                                    <span>P(up) {Math.round((analysis.rf_opinion?.prob_up ?? 0) * 100)}%</span>
+                                                                                    <span>P(down) {Math.round((analysis.rf_opinion?.prob_down ?? 1) * 100)}%</span>
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Top RF features */}
+                                                                            {Array.isArray(analysis.rf_opinion?.top_features) &&
+                                                                                analysis.rf_opinion.top_features.length > 0 && (
+                                                                                <div className="mt-3">
+                                                                                    <p
+                                                                                        className="text-overline"
+                                                                                        style={{ fontSize: "0.55rem", color: "hsl(var(--text-muted))" }}
+                                                                                    >
+                                                                                        Top features driving RF
+                                                                                    </p>
+                                                                                    <div className="mt-1 grid grid-cols-1 gap-1 font-mono" style={{ fontSize: "0.62rem" }}>
+                                                                                        {analysis.rf_opinion.top_features.slice(0, 3).map((f) => (
+                                                                                            <div
+                                                                                                key={f.name}
+                                                                                                className="flex justify-between"
+                                                                                                style={{ color: "hsl(var(--text-secondary))" }}
+                                                                                            >
+                                                                                                <span>{f.name}</span>
+                                                                                                <span>
+                                                                                                    {typeof f.value === "number" ? f.value.toFixed(2) : f.value}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                            {/* Academic source */}
+                                                                            <p
+                                                                                className="mt-3 text-xs"
+                                                                                style={{ color: "hsl(var(--text-muted))", fontSize: "0.7rem" }}
+                                                                            >
+                                                                                Penalty rule grounded in <em>Krauss, Do &amp; Huck (2017)</em>{" "}
+                                                                                — tree-ensemble disagreement with discretionary direction
+                                                                                calls predicts ~9pp lower hit-rate on equity-direction tasks.
+                                                                                {" "}
+                                                                                <Link
+                                                                                    to="/technical#random-forest"
+                                                                                    className="link-underline"
+                                                                                    style={{ color: "hsl(var(--text-secondary))" }}
+                                                                                    data-testid="score-breakdown-source-link"
+                                                                                >
+                                                                                    See methodology →
+                                                                                </Link>
+                                                                            </p>
+                                                                        </>
+                                                                    ) : analysis.earnings_gate_applied ? (
+                                                                        <>
+                                                                            <p
+                                                                                className="text-overline"
+                                                                                style={{ fontSize: "0.55rem", color: "hsl(var(--hold))" }}
+                                                                            >
+                                                                                Why the −{analysis.confidence_score_pre_calibration - analysis.confidence_score} penalty
+                                                                            </p>
+                                                                            <p
+                                                                                className="mt-2 text-xs leading-relaxed"
+                                                                                style={{ color: "hsl(var(--text-secondary))" }}
+                                                                            >
+                                                                                Earnings call is{" "}
+                                                                                <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                                                                    {analysis.days_until_earnings} day
+                                                                                    {analysis.days_until_earnings === 1 ? "" : "s"} away
+                                                                                </strong>
+                                                                                . Pre-earnings windows are event-driven — the LLM can't price the
+                                                                                surprise — so confidence is capped at 65 to reflect that uncertainty.
+                                                                                {" "}
+                                                                                <Link
+                                                                                    to="/technical#confidence-calibration"
+                                                                                    className="link-underline"
+                                                                                    style={{ color: "hsl(var(--text-secondary))" }}
+                                                                                >
+                                                                                    See methodology →
+                                                                                </Link>
+                                                                            </p>
+                                                                        </>
+                                                                    ) : (
+                                                                        <p
+                                                                            className="text-xs leading-relaxed"
+                                                                            style={{ color: "hsl(var(--text-secondary))" }}
+                                                                        >
+                                                                            Confidence was adjusted by {analysis.confidence_score_pre_calibration - analysis.confidence_score} points by the v2 calibration pipeline.{" "}
+                                                                            <Link
+                                                                                to="/technical#confidence-calibration"
+                                                                                className="link-underline"
+                                                                                style={{ color: "hsl(var(--text-secondary))" }}
+                                                                            >
+                                                                                See methodology →
+                                                                            </Link>
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                     {(analysis.confidence_adjustments || []).length > 0 ? (
