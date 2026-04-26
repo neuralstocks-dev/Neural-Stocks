@@ -1017,6 +1017,108 @@ async def analysis_history(ticker: str, user=Depends(get_current_user)):
     )
 
 
+@router.get("/idx/top-confluences")
+async def idx_top_confluences(
+    user=Depends(get_current_user),
+    limit: int = Query(3, ge=1, le=10),
+    days: int = Query(7, ge=1, le=90),
+):
+    """Rank the user's IDX (.JK) analyses from the past `days` window by
+    `confluence.quality_score` descending and return the top `limit`.
+
+    Use case: surfaces "where the highest-conviction smart-money + candlestick
+    setups are right now across your watchlist" without forcing the user to
+    open every analysis page individually. De-duplicates by ticker (latest
+    analysis wins) so re-analyzing a stock doesn't dominate the leaderboard.
+    """
+    since = iso(now_utc() - timedelta(days=days))
+    cursor = db.analyses.find(
+        {
+            "user_id": user["id"],
+            "ticker": {"$regex": r"\.JK$"},
+            "created_at": {"$gte": since},
+            "confluence.quality_score": {"$gte": 0},
+        },
+        {
+            "_id": 0,
+            "id": 1,
+            "ticker": 1,
+            "created_at": 1,
+            "recommendation": 1,
+            "confidence_score": 1,
+            "price_at_analysis": 1,
+            "quote_snapshot.currency": 1,
+            "fundamentals.shortName": 1,
+            "fundamentals.longName": 1,
+            "confluence": 1,
+        },
+    ).sort("created_at", -1)
+    rows = await cursor.to_list(length=200)
+
+    items = _rank_top_confluences(rows, limit)
+
+    return {
+        "window_days": days,
+        "scanned": len(rows),
+        "unique_tickers": len({r.get("ticker") for r in rows}),
+        "items": items,
+    }
+
+
+def _rank_top_confluences(rows: list[dict], limit: int) -> list[dict]:
+    """Pure-Python ranking + dedup + payload slimming.
+
+    Extracted so it can be unit-tested in isolation without spinning up the
+    FastAPI app or a Motor client. Input rows are expected sorted by
+    `created_at` descending so the dedup naturally keeps the latest analysis
+    per ticker.
+    """
+    seen: set[str] = set()
+    deduped = []
+    for r in rows:
+        t = r.get("ticker")
+        if t in seen:
+            continue
+        seen.add(t)
+        deduped.append(r)
+
+    # Sort by quality DESC, ties broken by recency (newer first). Both
+    # sort keys descend → use a single tuple with reverse=True.
+    deduped.sort(
+        key=lambda r: (
+            r.get("confluence", {}).get("quality_score") or 0,
+            r.get("created_at") or "",
+        ),
+        reverse=True,
+    )
+    top = deduped[:limit]
+
+    items = []
+    for r in top:
+        c = r.get("confluence") or {}
+        items.append({
+            "analysis_id": r.get("id"),
+            "ticker": r.get("ticker"),
+            "company_name": (r.get("fundamentals") or {}).get("shortName")
+                            or (r.get("fundamentals") or {}).get("longName"),
+            "created_at": r.get("created_at"),
+            "currency": (r.get("quote_snapshot") or {}).get("currency") or "IDR",
+            "price_at_analysis": r.get("price_at_analysis"),
+            "recommendation": r.get("recommendation"),
+            "confidence_score": r.get("confidence_score"),
+            "direction": c.get("direction"),
+            "label": c.get("label"),
+            "quality_score": c.get("quality_score"),
+            "quality_tier": c.get("quality_tier"),
+            "freshness_age_days": c.get("freshness_age_days"),
+            "pattern_count": c.get("pattern_count"),
+            "patterns": c.get("patterns") or [],
+            "accumulation_ratio": c.get("accumulation_ratio"),
+            "bandarmology_regime": c.get("bandarmology_regime"),
+        })
+    return items
+
+
 # ---------- Timeline Recommendation (Pro/Elite) ----------
 @router.post("/analysis/timeline/{ticker}")
 async def timeline_recommendation(ticker: str, user=Depends(get_current_user)):

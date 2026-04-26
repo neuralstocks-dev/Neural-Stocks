@@ -8,6 +8,7 @@ import SignalBadge from "@/components/SignalBadge";
 import QuickAnalyzeProgress from "@/components/QuickAnalyzeProgress";
 import AnalysisQueueChip from "@/components/AnalysisQueueChip";
 import LLMBudgetBanner from "@/components/LLMBudgetBanner";
+import TopConfluencesModule from "@/components/TopConfluencesModule";
 
 // Tiny mirror of the detection logic in LLMBudgetBanner so the parent
 // can hide its generic red string when the friendly banner is taking
@@ -1089,6 +1090,14 @@ export default function DashboardPage() {
                                 })
                             )}
                         </div>
+                    </div>
+
+                    {/* Top IDX Confluences — silent for users with no IDX
+                        analyses in the past week, so it doesn't clutter the
+                        US-only flows. Spans full width below the watchlist
+                        + alerts row. */}
+                    <div className="lg:col-span-12">
+                        <TopConfluencesModule days={7} limit={3} />
                     </div>
 
                     {/* Performance summary */}
