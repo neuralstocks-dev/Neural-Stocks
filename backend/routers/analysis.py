@@ -28,6 +28,27 @@ QUICK_BATCH_SIZE = 3
 # Strong references to outstanding bg tasks so the GC doesn't drop them
 _BG_TASKS: set = set()
 
+# --- Global concurrency cap ------------------------------------------------
+# Limits how many full-pipeline analyses run in parallel on this worker.
+# Each job hits Claude (~50s, blocking the asyncio loop on JSON parsing) and
+# pulls 60-day daily + 26-week weekly history. With a single uvicorn worker,
+# letting >5 run concurrently makes every endpoint laggy. The semaphore
+# turns the implicit "loop saturation" failure mode into an explicit queue
+# users can see (via /api/analysis/queue/status), which the UI surfaces as a
+# transparent wait chip.
+import os
+ANALYSIS_CONCURRENCY = int(os.environ.get("ANALYSIS_CONCURRENCY", "4"))
+_ANALYSIS_SEMA = asyncio.Semaphore(ANALYSIS_CONCURRENCY)
+# Live counters — read by /queue/status. Updated only from inside
+# _create_analysis_impl after we acquire/release the semaphore so they
+# always reflect the live state.
+_ANALYSIS_RUNNING = 0
+_ANALYSIS_QUEUED = 0
+# Rolling EMA of full-pipeline wall-clock seconds, used to estimate the
+# wait-time chip in the UI. Seeded conservatively at 50s (one Claude call).
+_ANALYSIS_AVG_DURATION_S = 50.0
+_ANALYSIS_AVG_ALPHA = 0.2  # EMA smoothing factor
+
 
 async def _ensure_analysis_indexes():
     """Wipe completed/failed analysis jobs after 1 hour — they're transient
@@ -340,6 +361,40 @@ async def analysis_job_status(job_id: str, user=Depends(get_current_user)):
     return job
 
 
+@router.get("/analysis/queue/status")
+async def analysis_queue_status():
+    """Live queue depth + estimated wait time for the analysis pipeline.
+    Public (no auth) so the dashboard can poll cheaply on every render
+    without churning JWT validation. Returns:
+
+      {
+        "capacity": int,         # max concurrent analyses on this worker
+        "running": int,          # how many are currently executing
+        "queued": int,           # how many are waiting on the semaphore
+        "avg_duration_s": float, # EMA of wall-clock seconds per analysis
+        "estimated_wait_s": int, # how long a freshly queued analysis would wait
+        "is_busy": bool,         # convenience flag — surface the chip when true
+      }
+    """
+    # If running < capacity, a new request runs immediately (queued=0 wait).
+    # Otherwise wait ≈ ceil(queued / capacity) batches × avg_duration.
+    if _ANALYSIS_RUNNING < ANALYSIS_CONCURRENCY:
+        wait_s = 0
+    else:
+        # +1 because the new arrival joins the back of the queue
+        position = _ANALYSIS_QUEUED + 1
+        batches_ahead = (position + ANALYSIS_CONCURRENCY - 1) // ANALYSIS_CONCURRENCY
+        wait_s = int(round(batches_ahead * _ANALYSIS_AVG_DURATION_S))
+    return {
+        "capacity": ANALYSIS_CONCURRENCY,
+        "running": _ANALYSIS_RUNNING,
+        "queued": _ANALYSIS_QUEUED,
+        "avg_duration_s": round(_ANALYSIS_AVG_DURATION_S, 1),
+        "estimated_wait_s": wait_s,
+        "is_busy": _ANALYSIS_RUNNING >= max(1, ANALYSIS_CONCURRENCY - 1),
+    }
+
+
 @router.post("/analysis/{ticker}")
 async def create_analysis(
     ticker: str,
@@ -358,6 +413,39 @@ async def create_analysis(
 
 
 async def _create_analysis_impl(ticker: str, mode: str, user: dict):
+    """Throttled wrapper around the real pipeline. Acquires a global
+    semaphore so we never run more than ANALYSIS_CONCURRENCY full-pipeline
+    analyses concurrently on this worker. Tracks running/queued counters
+    + EMA of wall-clock duration for the queue-status endpoint.
+    """
+    global _ANALYSIS_RUNNING, _ANALYSIS_QUEUED, _ANALYSIS_AVG_DURATION_S
+    _ANALYSIS_QUEUED += 1
+    waited_in_queue = True
+    try:
+        async with _ANALYSIS_SEMA:
+            _ANALYSIS_QUEUED -= 1
+            waited_in_queue = False
+            _ANALYSIS_RUNNING += 1
+            try:
+                import time as _time
+                _t0 = _time.monotonic()
+                result = await _create_analysis_impl_inner(ticker, mode, user)
+                elapsed = _time.monotonic() - _t0
+                _ANALYSIS_AVG_DURATION_S = (
+                    _ANALYSIS_AVG_ALPHA * elapsed
+                    + (1 - _ANALYSIS_AVG_ALPHA) * _ANALYSIS_AVG_DURATION_S
+                )
+                return result
+            finally:
+                _ANALYSIS_RUNNING -= 1
+    finally:
+        # Cancellation while still waiting on the semaphore — restore
+        # the queued counter so it doesn't leak.
+        if waited_in_queue:
+            _ANALYSIS_QUEUED -= 1
+
+
+async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict):
     ticker = ticker.upper().strip()
     is_anon = bool(user.get("__anon__"))
     if not is_anon:

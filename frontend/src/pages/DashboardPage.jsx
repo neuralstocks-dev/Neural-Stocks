@@ -6,6 +6,7 @@ import TimelineFitModal from "@/components/TimelineFitModal";
 import Sparkline from "@/components/Sparkline";
 import SignalBadge from "@/components/SignalBadge";
 import QuickAnalyzeProgress from "@/components/QuickAnalyzeProgress";
+import AnalysisQueueChip from "@/components/AnalysisQueueChip";
 import TestUnlockBanner from "@/components/TestUnlockBanner";
 import FirstTimeManualPill from "@/components/FirstTimeManualPill";
 import OnboardingWizard, { isOnboardingCompleted } from "@/components/OnboardingWizard";
@@ -769,12 +770,15 @@ export default function DashboardPage() {
 
                 {/* Analysis mode selector — applies to per-row Analyze */}
                 <section className="module px-5 py-4 mb-4" data-testid="analyze-mode-section">
-                    <AnalysisModeSelector
-                        value={analyzeMode}
-                        onChange={setAnalyzeMode}
-                        canPro={true}
-                        testIdPrefix="dashboard-mode"
-                    />
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <AnalysisModeSelector
+                            value={analyzeMode}
+                            onChange={setAnalyzeMode}
+                            canPro={true}
+                            testIdPrefix="dashboard-mode"
+                        />
+                        <AnalysisQueueChip watch />
+                    </div>
                 </section>
 
                 {/* Live Desk — how-to-use guide */}

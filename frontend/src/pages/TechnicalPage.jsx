@@ -103,12 +103,24 @@ export default function TechnicalPage() {
                             We do NOT use
                         </p>
                         <ul className="space-y-3 text-sm">
-                            <MythLi>SVM (Support Vector Machines)</MythLi>
-                            <MythLi>CNN (Convolutional Neural Networks) on chart images</MythLi>
-                            <MythLi>LSTM / Transformer price-forecasting models</MythLi>
-                            <MythLi>FinBERT or any fine-tuned sentiment classifier</MythLi>
-                            <MythLi>Proprietary "alpha" datasets or insider order flow</MythLi>
-                            <MythLi>Backtested win-rate claims we can't prove</MythLi>
+                            <MythLi reason="Black-box separator hyperplanes — they output a label but can't tell you why. Bad fit for a product whose entire promise is showing its work.">
+                                SVM (Support Vector Machines)
+                            </MythLi>
+                            <MythLi reason="Treats charts as pictures and pattern-matches pixels. Easy to fool with a different timeframe or color scheme; gives a confidence number with zero auditability.">
+                                CNN (Convolutional Neural Networks) on chart images
+                            </MythLi>
+                            <MythLi reason="Train them on US large caps and they confidently mis-predict every regime shift. Academic studies repeatedly fail to beat a buy-and-hold benchmark out-of-sample.">
+                                LSTM / Transformer price-forecasting models
+                            </MythLi>
+                            <MythLi reason="Pre-trained on 2018-era financial news. Stale vocabulary, no Indonesian coverage, and gives you a sentiment score with no link back to the source sentence.">
+                                FinBERT or any fine-tuned sentiment classifier
+                            </MythLi>
+                            <MythLi reason="If we can't show you the data, we can't claim it's an edge. Most paid 'alpha' feeds are repackaged public data with a marketing wrapper.">
+                                Proprietary "alpha" datasets or insider order flow
+                            </MythLi>
+                            <MythLi reason="Self-reported backtests are easy to overfit and impossible to verify. Our Scorecard tracks every verdict forward in real time — the only honest way to grade a model.">
+                                Backtested win-rate claims we can't prove
+                            </MythLi>
                         </ul>
                     </div>
                     <div className="p-6 md:p-8" style={{ background: "hsla(142,55%,45%,0.04)" }}>
@@ -117,13 +129,27 @@ export default function TechnicalPage() {
                             We DO use
                         </p>
                         <ul className="space-y-3 text-sm">
-                            <MythLi positive>Claude Sonnet 4.5 (Anthropic LLM) for verdict reasoning</MythLi>
-                            <MythLi positive>Deterministic technical indicators (RSI, SMA, EMA, MACD)</MythLi>
-                            <MythLi positive>Rule-based 15-pattern candlestick detector</MythLi>
-                            <MythLi positive>Random Forest classifier as <em>secondary</em> probability opinion</MythLi>
-                            <MythLi positive>Transparent keyword sentiment heuristic (EN + Bahasa)</MythLi>
-                            <MythLi positive>Multi-source data (yfinance, Finnhub, IDX RSS)</MythLi>
-                            <MythLi positive>Explainable confidence scoring with visible reasoning</MythLi>
+                            <MythLi positive reason="State-of-the-art reasoning model that weighs technicals, fundamentals, and news the way a senior analyst would — and explains every step in plain English so you can challenge it.">
+                                Claude Sonnet 4.5 (Anthropic LLM) for verdict reasoning
+                            </MythLi>
+                            <MythLi positive reason="Published 1970s-era formulas (Wilder, Appel, etc.) — the same numbers every Bloomberg terminal computes. Same inputs always produce the same outputs, replicable in Excel.">
+                                Deterministic technical indicators (RSI, SMA, EMA, MACD)
+                            </MythLi>
+                            <MythLi positive reason="Hard-coded geometry rules (Hammer, Engulfing, Doji, Morning Star, etc.) with strength scores. No training data, no overfitting — just centuries-old price-action logic.">
+                                Rule-based 15-pattern candlestick detector
+                            </MythLi>
+                            <MythLi positive reason="An independent statistical second opinion that catches cases where the LLM's narrative disagrees with what historical data says. Disagreements visibly downgrade confidence — see V2 calibration above.">
+                                Random Forest classifier as <em>secondary</em> probability opinion
+                            </MythLi>
+                            <MythLi positive reason="Curated keyword lists (English + Bahasa) that you can read end-to-end. No black-box embeddings — every sentiment hit links back to the source headline.">
+                                Transparent keyword sentiment heuristic (EN + Bahasa)
+                            </MythLi>
+                            <MythLi positive reason="Cross-checking three independent feeds (yfinance, Finnhub, IDX RSS) catches data quality issues that single-source platforms silently propagate.">
+                                Multi-source data (yfinance, Finnhub, IDX RSS)
+                            </MythLi>
+                            <MythLi positive reason="Confidence is a function of evidence convergence — when technicals, fundamentals, and pattern signals agree, confidence rises. When they disagree, it falls. You see the math.">
+                                Explainable confidence scoring with visible reasoning
+                            </MythLi>
                         </ul>
                     </div>
                 </section>
@@ -427,6 +453,94 @@ histogram  = MACD_line − signal`}
                 />
 
                 <div id="random-forest" className="mt-8 module p-6 md:p-10 scroll-mt-24" data-testid="tech-random-forest">
+                    {/* Beginner-friendly intro: what RF is in 90 seconds + why
+                        it's the right model for stock probability. */}
+                    <div
+                        className="mb-8 p-5 md:p-6"
+                        style={{
+                            border: "1px solid hsl(var(--border-default))",
+                            borderLeft: "3px solid hsl(var(--buy))",
+                            background: "hsla(142,55%,45%,0.03)",
+                            borderRadius: 2,
+                        }}
+                        data-testid="rf-intro-explainer"
+                    >
+                        <p className="text-overline" style={{ color: "hsl(var(--buy))", fontSize: "0.6rem" }}>
+                            New here? Start with this 90-second primer
+                        </p>
+                        <h4 className="font-serif mt-3 mb-3" style={{ fontSize: "1.4rem", letterSpacing: "-0.005em" }}>
+                            What is a Random Forest, in plain English?
+                        </h4>
+                        <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                            Imagine asking <strong style={{ color: "hsl(var(--text-primary))" }}>400 independent analysts</strong>{" "}
+                            to look at the same stock — but each one is only allowed to see a <em>random subset</em>{" "}
+                            of the price history and a <em>random subset</em> of the indicators. Each analyst writes a
+                            yes/no answer to one question: <em>"will this stock be higher 20 trading days from now?"</em>{" "}
+                            You then take the majority vote, weighted by how confident each one was. That's a
+                            Random Forest. Each "analyst" is a small decision tree; the "forest" is all 400 trees
+                            voting together. The randomness is what makes it robust — no single tree dominates,
+                            so the model doesn't memorise quirks of one stock or one regime.
+                        </p>
+                        <h5 className="font-serif mt-5 mb-2" style={{ fontSize: "1.05rem" }}>
+                            Why this is the right model for stock direction
+                        </h5>
+                        <ul className="space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                            <TLi>
+                                <strong>Hard to overfit on noisy data</strong> — markets are mostly noise, and a single
+                                deep neural network will gleefully memorise that noise. The 400-tree vote averages it out.
+                            </TLi>
+                            <TLi>
+                                <strong>Naturally probabilistic</strong> — the vote share IS a calibrated probability
+                                ("65% of trees said up"). Perfect for the secondary-opinion role: we surface the
+                                probability, not a forced BUY/SELL label.
+                            </TLi>
+                            <TLi>
+                                <strong>Feature importance is free</strong> — RF tells you exactly which inputs (RSI,
+                                SMA-50 ratio, VIX level…) drove the prediction. Black-box neural nets don't.
+                            </TLi>
+                            <TLi>
+                                <strong>Doesn't pretend to time the market</strong> — RF predicts a 20-day-forward
+                                probability, not the next tick. That horizon matches how the average retail investor
+                                actually trades, and survives statistical scrutiny.
+                            </TLi>
+                            <TLi>
+                                <strong>Battle-tested in finance research</strong> — RF + tree ensembles have been
+                                the workhorse of equity-direction studies for 15+ years (Krauss et al. 2017,
+                                Gu/Kelly/Xiu 2020 NBER). It's the model that consistently survives out-of-sample tests.
+                            </TLi>
+                        </ul>
+                        <div
+                            className="mt-5 relative"
+                            style={{
+                                paddingBottom: "56.25%",
+                                height: 0,
+                                overflow: "hidden",
+                                border: "1px solid hsl(var(--border-default))",
+                                borderRadius: 2,
+                                background: "#000",
+                            }}
+                            data-testid="rf-youtube-embed"
+                        >
+                            <iframe
+                                src="https://www.youtube.com/embed/gkXX4h3qYm4"
+                                title="What is a Random Forest? — visual explainer"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowFullScreen
+                                style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    left: 0,
+                                    width: "100%",
+                                    height: "100%",
+                                    border: 0,
+                                }}
+                            />
+                        </div>
+                        <p className="mt-3 text-xs" style={{ color: "hsl(var(--text-muted))", fontSize: "0.72rem" }}>
+                            ↑ A 5-minute visual walkthrough — recommended before reading the methodology below.
+                        </p>
+                    </div>
+
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
                         Every verdict passes through a trained <strong>scikit-learn RandomForestClassifier</strong>{" "}
                         that produces an independent probability of a positive {rfMeta?.horizon_days ?? 20}-day
@@ -940,7 +1054,7 @@ function SectionHeader({ icon: Icon, overline, title, subtitle }) {
     );
 }
 
-function MythLi({ children, positive = false }) {
+function MythLi({ children, positive = false, reason = null }) {
     return (
         <li className="flex items-start gap-3">
             {positive ? (
@@ -948,7 +1062,17 @@ function MythLi({ children, positive = false }) {
             ) : (
                 <X size={13} strokeWidth={1.5} style={{ color: "hsl(var(--sell))", marginTop: 3 }} />
             )}
-            <span>{children}</span>
+            <div>
+                <span>{children}</span>
+                {reason && (
+                    <p
+                        className="mt-1 text-xs leading-relaxed"
+                        style={{ color: "hsl(var(--text-muted))", fontSize: "0.72rem" }}
+                    >
+                        {reason}
+                    </p>
+                )}
+            </div>
         </li>
     );
 }

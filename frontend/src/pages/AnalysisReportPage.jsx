@@ -12,6 +12,7 @@ import MethodologyLink from "@/components/MethodologyLink";
 import RandomForestOpinion from "@/components/RandomForestOpinion";
 import BandarmologyCard from "@/components/BandarmologyCard";
 import ConfluenceChip from "@/components/ConfluenceChip";
+import AnalysisQueueChip from "@/components/AnalysisQueueChip";
 import { useAuth } from "@/hooks/useAuth";
 import {
     LineChart,
@@ -377,6 +378,7 @@ export default function AnalysisReportPage() {
                                             </>
                                         )}
                                     </button>
+                                    <AnalysisQueueChip watch />
                                 </div>
                             </div>
 
