@@ -109,6 +109,45 @@ async def _ensure_analysis_indexes():
 ANALYSIS_MODES = {"standard", "candlestick", "hybrid"}
 
 
+def _is_bandarmology_stale(bandarmology: dict, threshold_days: int = 90) -> bool:
+    """Parse the most-recent insider filing's "DD MMM YY" date string and
+    return True when it's older than `threshold_days`.
+
+    Mirrors the frontend `parseFilingDate()` parser in BandarmologyCard.jsx
+    so backend confluence detection and frontend visual de-emphasis stay in
+    sync. Defensive: returns False (treat as fresh) on any parse failure
+    rather than silently dropping confluences for valid current data.
+    """
+    if not isinstance(bandarmology, dict):
+        return False
+    recent = bandarmology.get("recent") or []
+    if not recent:
+        return False
+    raw_date = (recent[0] or {}).get("date") or ""
+    if not isinstance(raw_date, str):
+        return False
+    import re
+    from datetime import datetime, timezone
+    m = re.match(r"^\s*(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2,4})\s*$", raw_date)
+    if not m:
+        return False
+    months = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+              "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+    mon = months.get(m.group(2).lower())
+    if mon is None:
+        return False
+    day = int(m.group(1))
+    year = int(m.group(3))
+    if year < 100:
+        year += 2000
+    try:
+        filed = datetime(year, mon, day, tzinfo=timezone.utc)
+    except ValueError:
+        return False
+    age = (now_utc() - filed).days
+    return age > threshold_days
+
+
 def _compute_confluence(candlestick_findings: dict, bandarmology: dict) -> dict | None:
     """Return a confluence signal when the two independent sources agree.
 
@@ -118,7 +157,17 @@ def _compute_confluence(candlestick_findings: dict, bandarmology: dict) -> dict 
       * bearish confluence = ANY bearish pattern found + distribution regime
       * divergence         = ANY pattern + opposite-direction regime
       * None               = no patterns or bandarmology regime is balanced
+                             OR insider data is stale (>90 days old, i.e.
+                             the regime reflects a historic snapshot, not
+                             live institutional flow — fabricating a
+                             "double confirmation" off dead data would be
+                             misleading; we'd rather say nothing).
     """
+    # Stale-data short-circuit. Mirrors the frontend's >90 day threshold so
+    # the analysis doc never carries a fake "smart-money accumulation"
+    # confluence for tickers where insiders haven't filed in years.
+    if _is_bandarmology_stale(bandarmology):
+        return None
     # Extract every pattern name from both daily + weekly tiers
     bullish_patterns: list[str] = []
     bearish_patterns: list[str] = []
