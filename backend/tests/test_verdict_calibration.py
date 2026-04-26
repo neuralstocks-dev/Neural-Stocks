@@ -15,7 +15,13 @@ def _v(rec="BUY", conf=82):
 
 
 def _earnings_in_days(d):
-    when = (datetime.now(timezone.utc) + timedelta(days=d)).date().isoformat()
+    """Returns market_context dict with earnings exactly `d` days from now,
+    as a full ISO timestamp. Using `.date().isoformat()` would strip the
+    time component and round earnings to midnight UTC, producing an
+    off-by-one error when tests run later in the day (delta computes to
+    d-1 instead of d). Stamping the same wall-clock time keeps delta
+    fractional but consistent across runs."""
+    when = (datetime.now(timezone.utc) + timedelta(days=d)).isoformat()
     return {"earnings": {"date": when}}
 
 

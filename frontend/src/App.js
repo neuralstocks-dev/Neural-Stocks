@@ -14,6 +14,7 @@ import PublicVerdictPage from "@/pages/PublicVerdictPage";
 import PublicTryVerdictPage from "@/pages/PublicTryVerdictPage";
 import AuthCallback from "@/pages/AuthCallback";
 import AdminPage from "@/pages/AdminPage";
+import AdminCostPage from "@/pages/AdminCostPage";
 import ScorecardPage from "@/pages/ScorecardPage";
 import WhyUsPage from "@/pages/WhyUsPage";
 import PortfolioPage from "@/pages/PortfolioPage";
@@ -94,6 +95,7 @@ function AppRoutes() {
                 <Route path="/manual" element={<UserManualPage />} />
                 <Route path="/technical" element={<TechnicalPage />} />
                 <Route path="/admin" element={<AdminPage />} />
+                <Route path="/admin/cost" element={<AdminCostPage />} />
                 <Route path="/portfolio" element={<PortfolioPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/admin/paypal-smoke-test" element={<PaypalSmokeTestPage />} />

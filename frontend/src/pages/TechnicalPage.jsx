@@ -7,6 +7,7 @@
  */
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
 import {
     Cpu,
@@ -29,6 +30,14 @@ import {
 export default function TechnicalPage() {
     const loc = useLocation();
     const [rfMeta, setRfMeta] = useState(null);
+    // Determine admin status to gate cost-economics cells from public view.
+    // Cost-per-verdict is operational data — useful for the operator, but
+    // showing it publicly leaks margin info to competitors and primes
+    // users to think in per-call terms ("this click costs you 3¢"), which
+    // is the wrong mental model for a subscription product. Reactive via
+    // useAuth so the cell appears as soon as /auth/me resolves.
+    const auth = useAuth();
+    const isAdmin = !!auth?.user?.is_admin;
     // Live capacity telemetry — drives the "How Neulab handles load" section.
     // Polls /analysis/queue/status every 5s, also measures the client-side
     // round-trip latency so the "queue endpoint" cell reports the actual
@@ -1058,13 +1067,26 @@ histogram  = MACD_line − signal`}
                         Each verdict involves a 20-day daily price fetch, a Random-Forest
                         scoring pass, and a full Claude Sonnet 4.5 round-trip — totalling
                         <strong style={{ color: "hsl(var(--text-primary))" }}> ~45 seconds </strong>
-                        of wall-clock work and roughly{" "}
-                        <strong style={{ color: "hsl(var(--text-primary))" }}>
-                            $0.027 in LLM cost
-                        </strong>{" "}
-                        per analysis (3,300–4,000 input tokens to Claude, ~1,750 output). To keep the
-                        system responsive when traffic spikes, Neulab caps in-flight analyses at{" "}
-                        <strong style={{ color: "hsl(var(--text-primary))" }}>4 concurrent</strong>{" "}
+                        of wall-clock work per analysis.
+                        {isAdmin && (
+                            <>
+                                {" "}LLM cost ≈{" "}
+                                <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                    $0.027 / verdict
+                                </strong>{" "}
+                                (~3,300–4,000 input tokens to Claude, ~1,750 output) — see{" "}
+                                <a
+                                    href="/admin/cost"
+                                    className="link-underline"
+                                    style={{ color: "hsl(var(--text-primary))" }}
+                                >
+                                    /admin/cost
+                                </a>{" "}
+                                for live spend.
+                            </>
+                        )}
+                        {" "}To keep the system responsive when traffic spikes, Neulab caps in-flight
+                        analyses at <strong style={{ color: "hsl(var(--text-primary))" }}>4 concurrent</strong>{" "}
                         per backend worker via a global asyncio semaphore. Excess requests <em>queue</em> rather than
                         slowing every other endpoint to a crawl. The Claude calls themselves run inside isolated OS
                         threads so the main API loop stays free for trivial reads (your watchlist, alerts, login)
@@ -1098,7 +1120,7 @@ histogram  = MACD_line − signal`}
                         waiting your turn.
                     </p>
                     <div
-                        className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-0"
+                        className={`mt-5 grid grid-cols-2 gap-0 ${isAdmin ? "md:grid-cols-5" : "md:grid-cols-4"}`}
                         style={{ border: "1px solid hsl(var(--border-default))" }}
                         data-testid="tech-capacity-numbers"
                     >
@@ -1118,12 +1140,18 @@ histogram  = MACD_line − signal`}
                                 note: "wall-clock per verdict",
                                 live: capacity.avg_duration_s != null,
                             },
-                            {
-                                label: "LLM cost",
-                                value: "~$0.027",
-                                note: "Claude Sonnet 4.5 / verdict",
-                                live: false,
-                            },
+                            // Cost cell is admin-only — see commentary at the
+                            // top of TechnicalPage for the rationale (margin
+                            // disclosure + wrong mental model for users).
+                            ...(isAdmin
+                                ? [{
+                                    label: "LLM cost",
+                                    value: "~$0.027",
+                                    note: "Claude Sonnet 4.5 / verdict",
+                                    live: false,
+                                    adminOnly: true,
+                                }]
+                                : []),
                             {
                                 label: "Queue endpoint",
                                 value:
@@ -1144,13 +1172,13 @@ histogram  = MACD_line − signal`}
                                 note: "client poll interval",
                                 live: false,
                             },
-                        ].map((cell, i) => (
+                        ].map((cell, i, arr) => (
                             <div
                                 key={cell.label}
                                 className="p-4 relative"
                                 style={{
-                                    borderRight: i < 4 ? "1px solid hsl(var(--border-default))" : undefined,
-                                    borderBottom: i < 3 ? "1px solid hsl(var(--border-default))" : undefined,
+                                    borderRight: i < arr.length - 1 ? "1px solid hsl(var(--border-default))" : undefined,
+                                    borderBottom: i < arr.length - 2 ? "1px solid hsl(var(--border-default))" : undefined,
                                 }}
                                 data-testid={`tech-capacity-cell-${i}`}
                             >

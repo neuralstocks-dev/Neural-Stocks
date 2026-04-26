@@ -639,3 +639,128 @@ async def anon_try_reset(_admin=Depends(admin_required)):
     res = await db.anon_try_usage.delete_many({})
     return {"ok": True, "deleted_count": res.deleted_count}
 
+
+
+# --- Cost analytics --------------------------------------------------------
+# Admin-only endpoint that turns the db.analyses collection into a per-day
+# cost table. The platform doesn't currently expose a programmatic balance
+# endpoint, so we use a "starting balance" anchor (last known top-up amount,
+# manually entered by the admin and persisted) plus the running estimated
+# spend to project remaining credits. See /admin/cost dashboard.
+
+# Cost model — kept centrally so the frontend dashboard pulls the same number
+# the backend uses to compute estimates. ~3,500 input tokens at $3/1M plus
+# ~1,750 output tokens at $15/1M ≈ $0.027 per Claude Sonnet 4.5 verdict.
+# Universal Key bills 1 credit = $0.01, so cost-in-credits = USD × 100.
+COST_PER_VERDICT_USD = 0.027
+
+
+@router.get("/cost/summary")
+async def cost_summary(
+    days: int = 30,
+    _admin=Depends(admin_required),
+):
+    """Return a per-day cost breakdown for the last `days` days.
+
+    Strategy: count analyses inserted per day (created_at ISO string) and
+    multiply by COST_PER_VERDICT_USD. Returns:
+      - daily: [{date, count, usd, credits}]
+      - totals: {count, usd, credits}
+      - cost_per_verdict_usd, cost_per_verdict_credits
+      - balance_anchor: {credits_at_top_up, top_up_at, used_credits_since,
+                         estimated_remaining_credits, estimated_verdicts_remaining}
+        (null if admin hasn't set a balance anchor yet)
+    """
+    if days < 1 or days > 365:
+        raise HTTPException(status_code=400, detail="days must be 1..365")
+
+    since = (now_utc() - timedelta(days=days)).date().isoformat()
+
+    # Count analyses by created_at date (slice ISO string at YYYY-MM-DD).
+    # Aggregation keeps Mongo doing the work instead of pulling everything
+    # into memory; matches recent analyses only.
+    pipeline = [
+        {"$match": {"created_at": {"$gte": since}}},
+        {"$project": {
+            "day": {"$substr": ["$created_at", 0, 10]},
+        }},
+        {"$group": {"_id": "$day", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}},
+    ]
+    cursor = db.analyses.aggregate(pipeline)
+    daily = []
+    total_count = 0
+    async for row in cursor:
+        c = int(row.get("count") or 0)
+        total_count += c
+        daily.append({
+            "date": row["_id"],
+            "count": c,
+            "usd": round(c * COST_PER_VERDICT_USD, 4),
+            "credits": round(c * COST_PER_VERDICT_USD * 100, 2),
+        })
+
+    totals = {
+        "count": total_count,
+        "usd": round(total_count * COST_PER_VERDICT_USD, 2),
+        "credits": round(total_count * COST_PER_VERDICT_USD * 100, 2),
+    }
+
+    # Balance anchor (admin sets this manually). Subtract credits used SINCE
+    # the top-up to estimate remaining balance.
+    anchor_doc = await db.app_settings.find_one(
+        {"_id": "credit_balance_anchor"}, {"_id": 0}
+    ) or {}
+    balance_anchor = None
+    if anchor_doc.get("credits_at_top_up") is not None:
+        anchor_iso = anchor_doc.get("top_up_at") or ""
+        anchor_date = anchor_iso[:10] if anchor_iso else None
+        # Sum verdicts created since the top-up timestamp (inclusive of day).
+        used_count = await db.analyses.count_documents(
+            {"created_at": {"$gte": anchor_iso}} if anchor_iso else {}
+        )
+        used_credits = round(used_count * COST_PER_VERDICT_USD * 100, 2)
+        starting = float(anchor_doc["credits_at_top_up"])
+        remaining = max(0.0, round(starting - used_credits, 2))
+        balance_anchor = {
+            "credits_at_top_up": starting,
+            "top_up_at": anchor_iso or None,
+            "anchor_date": anchor_date,
+            "used_credits_since": used_credits,
+            "verdicts_since": used_count,
+            "estimated_remaining_credits": remaining,
+            "estimated_remaining_usd": round(remaining * 0.01, 2),
+            "estimated_verdicts_remaining": int(remaining // (COST_PER_VERDICT_USD * 100)) if remaining > 0 else 0,
+        }
+
+    return {
+        "days": days,
+        "daily": daily,
+        "totals": totals,
+        "cost_per_verdict_usd": COST_PER_VERDICT_USD,
+        "cost_per_verdict_credits": round(COST_PER_VERDICT_USD * 100, 2),
+        "balance_anchor": balance_anchor,
+    }
+
+
+class BalanceAnchorReq(BaseModel):
+    credits_at_top_up: float = Field(ge=0, le=1_000_000)
+
+
+@router.post("/cost/balance-anchor")
+async def set_balance_anchor(req: BalanceAnchorReq, _admin=Depends(admin_required)):
+    """Persist the admin-entered Universal Key balance at this moment so the
+    summary endpoint can subtract estimated spend going forward and project
+    remaining credits. Stamps `top_up_at` server-side (UTC) so the dashboard
+    knows which verdicts to count against the anchor."""
+    now = now_utc()
+    await db.app_settings.update_one(
+        {"_id": "credit_balance_anchor"},
+        {"$set": {
+            "credits_at_top_up": float(req.credits_at_top_up),
+            "top_up_at": iso(now),
+            "updated_at": iso(now),
+        }},
+        upsert=True,
+    )
+    return {"ok": True, "credits_at_top_up": req.credits_at_top_up, "top_up_at": iso(now)}

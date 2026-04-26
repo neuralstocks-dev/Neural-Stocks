@@ -409,6 +409,14 @@ export default function AdminPage() {
 
                 <div className="mt-5 flex flex-wrap gap-3" data-testid="admin-quick-links">
                     <Link
+                        to="/admin/cost"
+                        className="btn-ghost text-sm"
+                        style={{ borderColor: "hsl(var(--buy))" }}
+                        data-testid="link-admin-cost"
+                    >
+                        💸 Cost &amp; Universal Key balance →
+                    </Link>
+                    <Link
                         to="/admin/paypal-smoke-test"
                         className="btn-ghost text-sm"
                         style={{ borderColor: "hsl(var(--hold))" }}
