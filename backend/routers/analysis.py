@@ -1235,6 +1235,21 @@ def _public_view(analysis: dict) -> dict:
         "candlestick_summary": analysis.get("candlestick_summary"),
         "candlestick_findings": analysis.get("candlestick_findings"),
         "market_context": analysis.get("market_context"),
+        # Verdict Accuracy v2 — expose calibration audit trail on shared
+        # pages so external readers see the same transparency the owner
+        # gets in the web report (RF disagreement penalty, earnings gate,
+        # raw-LLM vs final score). Builds trust for prospects landing on
+        # the share link from Discord/Telegram channels.
+        "calibration_version": analysis.get("calibration_version"),
+        "confidence_score_pre_calibration": analysis.get("confidence_score_pre_calibration"),
+        "confidence_adjustments": analysis.get("confidence_adjustments") or [],
+        "rf_disagreement_penalty": analysis.get("rf_disagreement_penalty"),
+        "earnings_gate_applied": analysis.get("earnings_gate_applied"),
+        "days_until_earnings": analysis.get("days_until_earnings"),
+        "rf_opinion": {
+            k: v for k, v in (analysis.get("rf_opinion") or {}).items()
+            if k in ("prob_up", "prob_down", "horizon_days", "edge")
+        },
         "technicals": {k: v for k, v in (analysis.get("technicals") or {}).items()
                        if k in ("rsi_14", "sma_20", "sma_50", "macd")},
         "fundamentals": {k: v for k, v in (analysis.get("fundamentals") or {}).items()

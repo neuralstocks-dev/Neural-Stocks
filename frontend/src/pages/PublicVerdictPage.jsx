@@ -170,6 +170,18 @@ export default function PublicVerdictPage() {
                             </div>
                         </section>
 
+                        {/* Verdict Accuracy v2 calibration block — mirrors the
+                            audit trail visible to the verdict's owner in the
+                            web report. Two states: amber/hold-bordered "fired"
+                            with score breakdown + bullet adjustments + RF/
+                            earnings source line, OR green/buy-bordered clean
+                            empty-state stating both gates ran. Renders only
+                            when calibration_version is present so older shares
+                            don't display the block. */}
+                        {(a.calibration_version === "v2" || Array.isArray(a.confidence_adjustments)) && (
+                            <PublicCalibrationBlock analysis={a} />
+                        )}
+
                         <section className="module p-6 md:p-10 mt-1 md:mt-4">
                             <p className="text-overline">Reasoning</p>
                             <h2
@@ -285,5 +297,159 @@ function Metric({ label, value, mono = true }) {
             <p className="text-overline" style={{ fontSize: "0.56rem" }}>{label}</p>
             <p className={`text-lg mt-1 ${mono ? "font-mono" : ""}`}>{value ?? "—"}</p>
         </div>
+    );
+}
+
+/**
+ * PublicCalibrationBlock — read-only mirror of the AnalysisReportPage
+ * calibration breadcrumb, designed for prospects landing on a share link.
+ * Two states:
+ *   - Fired (any confidence_adjustments): hold-bordered card with title,
+ *     score breakdown line `LLM raw 78 → −12 → 66 final`, bullet list of
+ *     each adjustment, academic source for the rule that fired (RF
+ *     probabilities + Krauss/Do/Huck citation, or earnings-window cap).
+ *   - Clean: buy-bordered card with explicit "no calibration needed" copy.
+ * No interactive drawer (the public view is consumption-only) — the
+ * source-of-truth deep-dive lives at /technical#confidence-calibration.
+ */
+function PublicCalibrationBlock({ analysis }) {
+    const adj = Array.isArray(analysis.confidence_adjustments)
+        ? analysis.confidence_adjustments
+        : [];
+    const fired = adj.length > 0;
+    const pre = analysis.confidence_score_pre_calibration;
+    const final = analysis.confidence_score;
+    const showBreakdown =
+        fired &&
+        typeof pre === "number" &&
+        typeof final === "number" &&
+        pre !== final;
+
+    const accent = fired ? "hold" : "buy";
+    const rfPen = analysis.rf_disagreement_penalty;
+    const eg = analysis.earnings_gate_applied;
+    const rfOp = analysis.rf_opinion || {};
+    const rfUp = rfOp.prob_up;
+    const rfDown = rfOp.prob_down;
+    const rfHorizon = rfOp.horizon_days || 20;
+    const days = analysis.days_until_earnings;
+
+    return (
+        <section
+            className="mt-1 md:mt-4 p-5 md:p-6"
+            style={{
+                border: "1px solid hsl(var(--border-default))",
+                borderLeft: `3px solid hsl(var(--${accent}))`,
+                background: "hsl(var(--surface-elevated))",
+                borderRadius: 2,
+            }}
+            data-testid="public-calibration-block"
+        >
+            <p
+                className="text-overline"
+                style={{ color: `hsl(var(--${accent}))`, fontSize: "0.56rem" }}
+            >
+                {fired
+                    ? "POST-LLM CALIBRATION · CONFIDENCE ADJUSTED"
+                    : "POST-LLM CALIBRATION · NO ADJUSTMENT NEEDED"}
+            </p>
+            <h3
+                className="font-serif mt-1"
+                style={{ fontSize: "1.4rem", letterSpacing: "-0.01em" }}
+            >
+                Verdict Accuracy v2
+            </h3>
+
+            {showBreakdown && (
+                <div
+                    className="mt-3 inline-flex items-center gap-2 font-mono"
+                    style={{ fontSize: "0.78rem" }}
+                    data-testid="public-score-breakdown"
+                >
+                    <span style={{ color: "hsl(var(--text-muted))" }}>LLM raw</span>
+                    <span style={{ color: "hsl(var(--text-primary))", fontWeight: 600 }}>{pre}</span>
+                    <span style={{ color: "hsl(var(--text-muted))" }}>→</span>
+                    <span
+                        style={{
+                            color: "hsl(var(--sell))",
+                            background: "hsla(0,55%,55%,0.08)",
+                            padding: "1px 6px",
+                            borderRadius: 2,
+                            border: "1px solid hsl(var(--sell))",
+                            fontWeight: 600,
+                        }}
+                    >
+                        −{pre - final}
+                    </span>
+                    <span style={{ color: "hsl(var(--text-muted))" }}>→</span>
+                    <span style={{ color: "hsl(var(--buy))", fontWeight: 600 }}>
+                        {final} final
+                    </span>
+                </div>
+            )}
+
+            {fired ? (
+                <>
+                    <ul className="mt-4 space-y-2 text-sm" data-testid="public-calibration-bullets">
+                        {adj.map((msg, i) => (
+                            <li
+                                key={`adj-${i}-${(msg || "").slice(0, 30)}`}
+                                className="flex gap-2"
+                                style={{ color: "hsl(var(--text-primary))" }}
+                            >
+                                <span style={{ color: `hsl(var(--${accent}))` }}>•</span>
+                                <span>{msg}</span>
+                            </li>
+                        ))}
+                    </ul>
+                    {(rfPen || eg) && (
+                        <div
+                            className="mt-4 pt-3 text-xs"
+                            style={{
+                                color: "hsl(var(--text-muted))",
+                                borderTop: "1px solid hsl(var(--border-divider))",
+                                lineHeight: 1.5,
+                            }}
+                        >
+                            {rfPen && typeof rfUp === "number" && typeof rfDown === "number" && (
+                                <p>
+                                    RF probabilities: P(up){" "}
+                                    <span style={{ color: "hsl(var(--text-primary))", fontWeight: 600 }}>
+                                        {Math.round(rfUp * 100)}%
+                                    </span>
+                                    {" · "}
+                                    P(down){" "}
+                                    <span style={{ color: "hsl(var(--text-primary))", fontWeight: 600 }}>
+                                        {Math.round(rfDown * 100)}%
+                                    </span>{" "}
+                                    over {rfHorizon}-day forward window. Penalty rule:{" "}
+                                    <span className="italic">Krauss, Do &amp; Huck (2017)</span> — tree-ensemble disagreement
+                                    with discretionary direction calls predicts ~9pp lower hit-rate on equity-direction
+                                    tasks.
+                                </p>
+                            )}
+                            {eg && typeof days === "number" && (
+                                <p className={rfPen ? "mt-2" : ""}>
+                                    Earnings call{" "}
+                                    <span style={{ color: "hsl(var(--text-primary))", fontWeight: 600 }}>
+                                        {days} day{days === 1 ? "" : "s"} away
+                                    </span>
+                                    . Pre-earnings windows are event-driven — the LLM cannot price the surprise — so
+                                    confidence is capped at 65 to reflect that uncertainty.
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </>
+            ) : (
+                <p
+                    className="mt-3 text-sm"
+                    style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.55 }}
+                >
+                    Earnings-proximity gate and RF-disagreement penalty both ran clean. Confidence shown
+                    is Claude&apos;s raw output — no adjustment applied.
+                </p>
+            )}
+        </section>
     );
 }
