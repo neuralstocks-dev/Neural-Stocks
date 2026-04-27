@@ -92,7 +92,15 @@ function MethodCell({ method, data, isPrimary, currency }) {
 }
 
 export default function IntrinsicValueChip({ anchor, currency = "USD" }) {
-    const [open, setOpen] = useState(false);
+    // Auto-open the compare drawer when the primary method is flagged as a
+    // loose fit (intangible-heavy / unrepresentative ROE / value-destroying).
+    // The drawer is the cheapest way to surface "why does the anchor read
+    // this way" in those cases — far better than expecting the user to
+    // discover the toggle after the fact. Set once on mount; if the user
+    // clicks "Hide", they own the state from then on.
+    const lowFit = typeof anchor?.primary_applicability === "string"
+        && anchor.primary_applicability.startsWith("low_fit");
+    const [open, setOpen] = useState(lowFit);
     if (!anchor || !anchor.primary_anchor || anchor.primary_anchor === "none") return null;
     const method = anchor.primary_anchor;
     const estimate = anchor.primary_estimate;
@@ -168,6 +176,22 @@ export default function IntrinsicValueChip({ anchor, currency = "USD" }) {
                             className="mt-2 pt-2.5 border-t border-[hsl(var(--border))]"
                             data-testid="intrinsic-compare-drawer"
                         >
+                            {lowFit && (
+                                <p
+                                    className="mb-2"
+                                    style={{
+                                        fontSize: "10px",
+                                        color: "hsl(var(--gold))",
+                                        background: "hsl(var(--gold) / 0.06)",
+                                        border: "1px solid hsl(var(--gold) / 0.25)",
+                                        borderRadius: "4px",
+                                        padding: "6px 8px",
+                                    }}
+                                    data-testid="intrinsic-compare-autoopen-hint"
+                                >
+                                    Shown automatically — the auto-selected method is a loose fit for this sector. Compare both anchors below for context.
+                                </p>
+                            )}
                             <div className="flex flex-col sm:flex-row gap-2">
                                 <MethodCell
                                     method="graham"
