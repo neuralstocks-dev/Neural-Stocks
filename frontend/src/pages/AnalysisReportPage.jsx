@@ -563,6 +563,53 @@ export default function AnalysisReportPage() {
                             <>
                                 {/* Verdict + targets */}
                                 <section className="grid grid-cols-12 gap-1 md:gap-4 mb-1 md:mb-4">
+                                    {/* Educational research disclaimer — sits
+                                        prominently at the top of the report
+                                        ABOVE the verdict module so it's the
+                                        first thing the reader registers.
+                                        Quoted-style left rule + serif copy
+                                        matches the tone of the sample report
+                                        (calm, paragraph-form, not a screaming
+                                        warning chip). */}
+                                    <div
+                                        className="col-span-12 module p-5 md:p-6"
+                                        style={{
+                                            borderLeft: "3px solid hsl(var(--hold))",
+                                            background: "hsl(var(--surface-elevated))",
+                                        }}
+                                        data-testid="educational-disclaimer-banner"
+                                    >
+                                        <p
+                                            className="text-overline"
+                                            style={{ fontSize: "0.56rem", color: "hsl(var(--hold))" }}
+                                        >
+                                            EDUCATIONAL RESEARCH REPORT
+                                        </p>
+                                        <p
+                                            className="font-serif mt-2"
+                                            style={{
+                                                fontSize: "1.05rem",
+                                                lineHeight: 1.55,
+                                                letterSpacing: "-0.005em",
+                                                color: "hsl(var(--text-primary))",
+                                            }}
+                                        >
+                                            This is a model-generated summary intended to help users review market
+                                            data, technical signals, and scenario analysis for a user-selected
+                                            stock. It is <strong>not</strong> personalized financial advice and{" "}
+                                            <strong>not</strong> a recommendation to buy, sell, or hold any
+                                            security.
+                                        </p>
+                                        <p
+                                            className="mt-2 text-sm"
+                                            style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.55 }}
+                                        >
+                                            <strong style={{ color: "hsl(var(--text-primary))" }}>Confidence</strong>{" "}
+                                            refers to the model&apos;s internal classification strength based on the
+                                            inputs used — <strong>not</strong> the probability of price movement or
+                                            investment success.
+                                        </p>
+                                    </div>
                                     <div className="col-span-12 md:col-span-5 module p-6 md:p-8 flex flex-col md:flex-row items-center gap-6" data-testid="verdict-module">
                                         <VerdictRing
                                             score={analysis.confidence_score}
@@ -577,6 +624,13 @@ export default function AnalysisReportPage() {
                                             <div className="mt-2">
                                                 <SignalBadge signal={analysis.recommendation} size="lg" />
                                             </div>
+                                            <p
+                                                className="text-overline mt-1.5"
+                                                style={{ fontSize: "0.56rem", color: "hsl(var(--text-muted))" }}
+                                                data-testid="analytical-bias-subtitle"
+                                            >
+                                                Analytical bias · classification, not a trade instruction
+                                            </p>
                                             <p
                                                 className="font-serif mt-4"
                                                 style={{ fontSize: "1.6rem", lineHeight: 1.15, letterSpacing: "-0.01em" }}
@@ -911,7 +965,7 @@ export default function AnalysisReportPage() {
                                     <div className="col-span-12 md:col-span-7 grid grid-cols-2 gap-1 md:gap-4">
                                         <div className="module p-5 md:p-6" data-testid="price-target-module">
                                             <p className="text-overline flex items-center gap-2">
-                                                <Target size={12} strokeWidth={1.5} /> Price Target
+                                                <Target size={12} strokeWidth={1.5} /> Scenario level
                                             </p>
                                             <div className="font-mono hero-number mt-3" style={{ fontSize: "2.2rem" }}>
                                                 {formatPrice(analysis.price_target, quote.currency)}
@@ -930,10 +984,17 @@ export default function AnalysisReportPage() {
                                                 )}{" "}
                                                 from current
                                             </p>
+                                            <p
+                                                className="text-[10px] mt-2"
+                                                style={{ color: "hsl(var(--text-muted))", lineHeight: 1.5 }}
+                                            >
+                                                Illustrative directional reference for monitoring — not a trade
+                                                instruction.
+                                            </p>
                                         </div>
                                         <div className="module p-5 md:p-6" data-testid="stop-loss-module">
                                             <p className="text-overline flex items-center gap-2">
-                                                <Shield size={12} strokeWidth={1.5} /> Stop Loss
+                                                <Shield size={12} strokeWidth={1.5} /> Invalidation level
                                             </p>
                                             <div className="font-mono hero-number mt-3" style={{ fontSize: "2.2rem" }}>
                                                 {formatPrice(analysis.stop_loss, quote.currency)}
@@ -942,7 +1003,14 @@ export default function AnalysisReportPage() {
                                                 {formatPct(
                                                     ((analysis.stop_loss - quote.price) / quote.price) * 100
                                                 )}{" "}
-                                                risk cap
+                                                from current
+                                            </p>
+                                            <p
+                                                className="text-[10px] mt-2"
+                                                style={{ color: "hsl(var(--text-muted))", lineHeight: 1.5 }}
+                                            >
+                                                Level at which the current model interpretation would be weakened
+                                                or invalidated.
                                             </p>
                                         </div>
                                         <div className="module p-5 md:p-6 col-span-2" data-testid="key-metrics-module">
@@ -1021,17 +1089,24 @@ export default function AnalysisReportPage() {
                                     </article>
                                 </section>
 
-                                {/* Risks */}
+                                {/* Risks to the model's current interpretation */}
                                 <section className="module p-6 md:p-10" data-testid="risks-module">
                                     <p className="text-overline flex items-center gap-2">
-                                        <AlertTriangle size={12} strokeWidth={1.5} /> Risk Factors
+                                        <AlertTriangle size={12} strokeWidth={1.5} /> Risks to the current interpretation
                                     </p>
                                     <h2
-                                        className="font-serif mt-2 mb-6"
+                                        className="font-serif mt-2 mb-2"
                                         style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", letterSpacing: "-0.015em" }}
                                     >
-                                        What could go wrong.
+                                        Where the read could fail.
                                     </h2>
+                                    <p
+                                        className="text-sm mb-6"
+                                        style={{ color: "hsl(var(--text-muted))", lineHeight: 1.55, maxWidth: "60ch" }}
+                                    >
+                                        These are conditions under which the current model classification would
+                                        weaken — not exhaustive risks of holding the security.
+                                    </p>
                                     <ol className="space-y-4">
                                         {(analysis.risk_factors || []).map((r, i) => (
                                             <li
@@ -1050,6 +1125,219 @@ export default function AnalysisReportPage() {
                                             </li>
                                         ))}
                                     </ol>
+                                </section>
+
+                                {/* Alternative scenarios — bullish / bearish /
+                                    neutral framings of the same data. Renders
+                                    only when the LLM produced the new field
+                                    (older analyses pre-Feb-2026 won't have it,
+                                    so we silently degrade). */}
+                                {analysis.alternative_scenarios && (
+                                    <section className="module p-6 md:p-10" data-testid="alt-scenarios-module">
+                                        <p className="text-overline">Alternative scenarios</p>
+                                        <h2
+                                            className="font-serif mt-2 mb-2"
+                                            style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", letterSpacing: "-0.015em" }}
+                                        >
+                                            How else this could read.
+                                        </h2>
+                                        <p
+                                            className="text-sm mb-6"
+                                            style={{ color: "hsl(var(--text-muted))", lineHeight: 1.55, maxWidth: "60ch" }}
+                                        >
+                                            The same data can support multiple interpretations. Below are the
+                                            conditions under which each direction would gain weight.
+                                        </p>
+                                        <div className="space-y-5">
+                                            {analysis.alternative_scenarios.bullish && (
+                                                <div
+                                                    className="p-4"
+                                                    style={{
+                                                        borderLeft: "3px solid hsl(var(--buy))",
+                                                        background: "hsl(var(--surface-elevated))",
+                                                    }}
+                                                    data-testid="alt-scenario-bullish"
+                                                >
+                                                    <p
+                                                        className="text-overline"
+                                                        style={{ fontSize: "0.56rem", color: "hsl(var(--buy))" }}
+                                                    >
+                                                        Bullish scenario
+                                                    </p>
+                                                    <p className="mt-2 text-sm leading-relaxed">
+                                                        {analysis.alternative_scenarios.bullish}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {analysis.alternative_scenarios.neutral && (
+                                                <div
+                                                    className="p-4"
+                                                    style={{
+                                                        borderLeft: "3px solid hsl(var(--hold))",
+                                                        background: "hsl(var(--surface-elevated))",
+                                                    }}
+                                                    data-testid="alt-scenario-neutral"
+                                                >
+                                                    <p
+                                                        className="text-overline"
+                                                        style={{ fontSize: "0.56rem", color: "hsl(var(--hold))" }}
+                                                    >
+                                                        Neutral scenario
+                                                    </p>
+                                                    <p className="mt-2 text-sm leading-relaxed">
+                                                        {analysis.alternative_scenarios.neutral}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {analysis.alternative_scenarios.bearish && (
+                                                <div
+                                                    className="p-4"
+                                                    style={{
+                                                        borderLeft: "3px solid hsl(var(--sell))",
+                                                        background: "hsl(var(--surface-elevated))",
+                                                    }}
+                                                    data-testid="alt-scenario-bearish"
+                                                >
+                                                    <p
+                                                        className="text-overline"
+                                                        style={{ fontSize: "0.56rem", color: "hsl(var(--sell))" }}
+                                                    >
+                                                        Bearish scenario
+                                                    </p>
+                                                    <p className="mt-2 text-sm leading-relaxed">
+                                                        {analysis.alternative_scenarios.bearish}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {/* What could change the view — concrete data
+                                    shifts that would weaken the current model
+                                    classification. Renders when LLM produced
+                                    the field. */}
+                                {Array.isArray(analysis.what_could_change_view) &&
+                                    analysis.what_could_change_view.length > 0 && (
+                                        <section
+                                            className="module p-6 md:p-10"
+                                            data-testid="what-could-change-module"
+                                        >
+                                            <p className="text-overline">What could change the view</p>
+                                            <h2
+                                                className="font-serif mt-2 mb-6"
+                                                style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", letterSpacing: "-0.015em" }}
+                                            >
+                                                Concrete shifts to monitor.
+                                            </h2>
+                                            <ul className="space-y-3">
+                                                {analysis.what_could_change_view.map((m, i) => (
+                                                    <li
+                                                        key={`wccv-${i}-${(m || "").slice(0, 30)}`}
+                                                        className="flex gap-3 text-sm leading-relaxed"
+                                                        style={{ color: "hsl(var(--text-primary))" }}
+                                                        data-testid={`wccv-item-${i}`}
+                                                    >
+                                                        <span style={{ color: "hsl(var(--hold))" }}>·</span>
+                                                        <span className="flex-1">{m}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </section>
+                                    )}
+
+                                {/* How to read this report — canned legend so
+                                    every reader (including ones landing from a
+                                    public share link) understands how to
+                                    interpret each module. */}
+                                <section
+                                    className="module p-6 md:p-10"
+                                    data-testid="how-to-read-module"
+                                >
+                                    <p className="text-overline">How to read this report</p>
+                                    <h2
+                                        className="font-serif mt-2 mb-6"
+                                        style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", letterSpacing: "-0.015em" }}
+                                    >
+                                        A quick legend.
+                                    </h2>
+                                    <dl className="space-y-4 text-sm leading-relaxed">
+                                        <div className="grid grid-cols-12 gap-3">
+                                            <dt
+                                                className="col-span-12 md:col-span-3 text-overline"
+                                                style={{ fontSize: "0.6rem", color: "hsl(var(--text-muted))" }}
+                                            >
+                                                Analytical bias
+                                            </dt>
+                                            <dd className="col-span-12 md:col-span-9">
+                                                The direction the model currently finds more evidence for. The
+                                                BUY / SELL / HOLD label is an internal classification code — read
+                                                it as <em>bullish</em>, <em>bearish</em>, or <em>neutral</em>{" "}
+                                                research framing, not a trade instruction.
+                                            </dd>
+                                        </div>
+                                        <div className="grid grid-cols-12 gap-3">
+                                            <dt
+                                                className="col-span-12 md:col-span-3 text-overline"
+                                                style={{ fontSize: "0.6rem", color: "hsl(var(--text-muted))" }}
+                                            >
+                                                Confidence
+                                            </dt>
+                                            <dd className="col-span-12 md:col-span-9">
+                                                The strength of the model&apos;s classification based on the inputs
+                                                available — <strong>not</strong> a forecast probability of price
+                                                movement or trade success.
+                                            </dd>
+                                        </div>
+                                        <div className="grid grid-cols-12 gap-3">
+                                            <dt
+                                                className="col-span-12 md:col-span-3 text-overline"
+                                                style={{ fontSize: "0.6rem", color: "hsl(var(--text-muted))" }}
+                                            >
+                                                Scenario level
+                                            </dt>
+                                            <dd className="col-span-12 md:col-span-9">
+                                                An illustrative price reference matching the current model
+                                                direction — for monitoring price behavior, not a buy/sell trigger.
+                                            </dd>
+                                        </div>
+                                        <div className="grid grid-cols-12 gap-3">
+                                            <dt
+                                                className="col-span-12 md:col-span-3 text-overline"
+                                                style={{ fontSize: "0.6rem", color: "hsl(var(--text-muted))" }}
+                                            >
+                                                Invalidation level
+                                            </dt>
+                                            <dd className="col-span-12 md:col-span-9">
+                                                The price level at which the current interpretation would weaken
+                                                or no longer hold — useful for knowing when the read has
+                                                structurally changed.
+                                            </dd>
+                                        </div>
+                                        <div className="grid grid-cols-12 gap-3">
+                                            <dt
+                                                className="col-span-12 md:col-span-3 text-overline"
+                                                style={{ fontSize: "0.6rem", color: "hsl(var(--text-muted))" }}
+                                            >
+                                                Horizon
+                                            </dt>
+                                            <dd className="col-span-12 md:col-span-9">
+                                                The window over which the current model reading is being framed —
+                                                not a holding-period recommendation.
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                    <p
+                                        className="mt-6 text-xs"
+                                        style={{ color: "hsl(var(--text-muted))", lineHeight: 1.6, maxWidth: "70ch" }}
+                                    >
+                                        This output is generated by an AI model from publicly available market
+                                        data. It is provided for informational and educational research use only,
+                                        and does not constitute financial advice, investment advice, a
+                                        solicitation, or a recommendation to buy, sell, or hold any security.
+                                        Users should conduct their own research and, where appropriate, consult a
+                                        licensed financial professional.
+                                    </p>
                                 </section>
 
                                 {/* Data sources — understated footer */}

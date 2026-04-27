@@ -229,18 +229,56 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
         f"Price at analysis: <b>{_fmt_price(price, currency)}</b> · Analyzed {created_fmt} · Mode: <b>{mode}</b>",
         s["muted"],
     ))
-    story.append(Spacer(1, 18))
+    story.append(Spacer(1, 14))
+
+    # Educational research banner — sits prominently above the verdict so
+    # it's the first thing the reader registers when forwarded the PDF.
+    # Quoted-style left rule + serif body matches the calm tone of the
+    # web report.
+    banner_para = (
+        Paragraph("EDUCATIONAL RESEARCH REPORT", ParagraphStyle(
+            "BannerOL", parent=s["overline"], textColor=BRAND_GOLD)),
+        Paragraph(
+            "This is a model-generated summary intended to help users review market "
+            "data, technical signals, and scenario analysis for a user-selected stock. "
+            "It is <b>not</b> personalized financial advice and <b>not</b> a "
+            "recommendation to buy, sell, or hold any security.",
+            ParagraphStyle("BannerBody", parent=s["body"], fontSize=10.5, leading=15)),
+        Paragraph(
+            "<b>Confidence</b> refers to the model's internal classification strength "
+            "based on the inputs used — <b>not</b> the probability of price movement "
+            "or investment success.",
+            ParagraphStyle("BannerSub", parent=s["body"], fontSize=9, leading=13,
+                           textColor=BRAND_MUTED)),
+    )
+    banner_tbl = Table([[c] for c in banner_para], colWidths=[doc.width - 12])
+    banner_tbl.setStyle(TableStyle([
+        ("LINEBEFORE", (0, 0), (0, -1), 2.5, BRAND_GOLD),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, 0), 6),
+        ("TOPPADDING", (0, 1), (-1, 1), 4),
+        ("TOPPADDING", (0, 2), (-1, 2), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    story.append(banner_tbl)
+    story.append(Spacer(1, 14))
 
     # Verdict block
     rec = analysis.get("recommendation", "—")
     conf = analysis.get("confidence_score") or 0
     rec_style = ParagraphStyle("V", parent=s["verdict"], textColor=_rec_color(rec))
     story.append(Paragraph(f"{rec}&nbsp;&nbsp;<font size='18' color='#6b7280'>{conf}% confidence</font>", rec_style))
+    story.append(Paragraph(
+        "<font color='#6b7280' size='8'>Analytical bias · classification, not a trade instruction</font>",
+        ParagraphStyle("VSub", parent=s["mono"], fontSize=8, leading=10)))
     story.append(Spacer(1, 4))
     horizon = analysis.get("time_horizon_weeks") or "—"
     story.append(Paragraph(
-        f"Target {_fmt_price(analysis.get('price_target'), currency)} &nbsp; · &nbsp; "
-        f"Stop {_fmt_price(analysis.get('stop_loss'), currency)} &nbsp; · &nbsp; Horizon {horizon} weeks",
+        f"Scenario level {_fmt_price(analysis.get('price_target'), currency)} &nbsp; · &nbsp; "
+        f"Invalidation {_fmt_price(analysis.get('stop_loss'), currency)} &nbsp; · &nbsp; "
+        f"Horizon {horizon} weeks",
         s["mono"],
     ))
     story.append(Spacer(1, 16))
@@ -349,11 +387,64 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
             if summary.get("bias_alignment"):
                 story.append(Paragraph(f"<i>{summary['bias_alignment']}</i>", s["body"]))
 
-    # Risks
+    # Risks to the current model interpretation
     risks = analysis.get("risk_factors")
     if risks:
-        story.append(Paragraph("Risks", s["h2"]))
+        story.append(Paragraph("Risks to the current interpretation", s["h2"]))
+        story.append(Paragraph(
+            "<i>Conditions under which the current model classification would weaken — "
+            "not exhaustive risks of holding the security.</i>",
+            ParagraphStyle("RisksLead", parent=s["body"], fontSize=9, leading=12,
+                           textColor=BRAND_MUTED)))
+        story.append(Spacer(1, 4))
         story.append(_risk_para(risks, s))
+
+    # Alternative scenarios — bullish / bearish / neutral framings of the
+    # same data. Renders only when the LLM produced the new field.
+    alt = analysis.get("alternative_scenarios") or {}
+    if isinstance(alt, dict) and (alt.get("bullish") or alt.get("bearish") or alt.get("neutral")):
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("Alternative scenarios", s["h2"]))
+        story.append(Paragraph(
+            "<i>The same data can support multiple interpretations — below are the "
+            "conditions under which each direction would gain weight.</i>",
+            ParagraphStyle("AltLead", parent=s["body"], fontSize=9, leading=12,
+                           textColor=BRAND_MUTED)))
+        story.append(Spacer(1, 6))
+        for label, color_hex, key in (
+            ("Bullish scenario", colors.HexColor("#16a34a"), "bullish"),
+            ("Neutral scenario", colors.HexColor("#d97706"), "neutral"),
+            ("Bearish scenario", colors.HexColor("#dc2626"), "bearish"),
+        ):
+            text = alt.get(key)
+            if not text:
+                continue
+            cell = [
+                Paragraph(label.upper(), ParagraphStyle(
+                    "AltOL", parent=s["overline"], fontSize=8, textColor=color_hex)),
+                Paragraph(text, s["body"]),
+            ]
+            tbl = Table([[c] for c in cell], colWidths=[doc.width - 8])
+            tbl.setStyle(TableStyle([
+                ("LINEBEFORE", (0, 0), (0, -1), 2.5, color_hex),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, 0), 5),
+                ("TOPPADDING", (0, 1), (-1, 1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f9fafb")),
+            ]))
+            story.append(tbl)
+            story.append(Spacer(1, 6))
+
+    # What could change the view
+    wccv = analysis.get("what_could_change_view") or []
+    if isinstance(wccv, list) and wccv:
+        story.append(Spacer(1, 8))
+        story.append(Paragraph("What could change the view", s["h2"]))
+        for m in wccv:
+            if isinstance(m, str) and m.strip():
+                story.append(Paragraph(f"·&nbsp;&nbsp;{m}", s["body"]))
 
     # Market context (Finnhub) — headlines + analyst consensus + earnings
     mc = analysis.get("market_context") or {}
@@ -476,6 +567,45 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
                     + f" · EPS est. {eps_str} · Revenue est. {rev_str}",
                     s["body"],
                 ))
+
+    # How to read this report — canned legend so any reader (forwarded the
+    # PDF, broker, journal) understands the educational framing.
+    story.append(Spacer(1, 14))
+    story.append(Paragraph("How to read this report", s["h2"]))
+    legend_rows = [
+        ("Analytical bias",
+         "The direction the model currently finds more evidence for. The BUY / SELL / HOLD label is an "
+         "internal classification code — read it as bullish, bearish, or neutral research framing, not a "
+         "trade instruction."),
+        ("Confidence",
+         "The strength of the model's classification based on the inputs available — <b>not</b> a forecast "
+         "probability of price movement or trade success."),
+        ("Scenario level",
+         "An illustrative price reference matching the current model direction — for monitoring price "
+         "behavior, not a buy/sell trigger."),
+        ("Invalidation level",
+         "The level at which the current interpretation would weaken or no longer hold — useful for "
+         "knowing when the read has structurally changed."),
+        ("Horizon",
+         "The window over which the current model reading is being framed — not a holding-period "
+         "recommendation."),
+    ]
+    for term, desc in legend_rows:
+        legend_tbl = Table(
+            [[Paragraph(term.upper(), ParagraphStyle(
+                "LegendTerm", parent=s["overline"], fontSize=8, textColor=BRAND_GOLD)),
+              Paragraph(desc, ParagraphStyle(
+                "LegendDesc", parent=s["body"], fontSize=9.5, leading=13))]],
+            colWidths=[1.5 * inch, doc.width - 1.5 * inch - 4],
+        )
+        legend_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(legend_tbl)
 
     # Footer — data sources + disclaimer
     story.append(Spacer(1, 20))

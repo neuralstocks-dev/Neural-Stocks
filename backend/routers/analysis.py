@@ -1474,6 +1474,12 @@ def _public_view(analysis: dict) -> dict:
         "candlestick_summary": analysis.get("candlestick_summary"),
         "candlestick_findings": analysis.get("candlestick_findings"),
         "market_context": analysis.get("market_context"),
+        # Educational scaffolding — Feb 2026 repositioning. These fields
+        # are optional (older analyses won't have them) but when present
+        # they drive the "Alternative Scenarios" + "What Could Change the
+        # View" sections on the public share page.
+        "alternative_scenarios": analysis.get("alternative_scenarios"),
+        "what_could_change_view": analysis.get("what_could_change_view") or [],
         # Verdict Accuracy v2 — expose calibration audit trail on shared
         # pages so external readers see the same transparency the owner
         # gets in the web report (RF disagreement penalty, earnings gate,
