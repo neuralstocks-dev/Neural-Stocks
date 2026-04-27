@@ -44,23 +44,47 @@ import {
 // of the deterministic transforms that feeds the LLM payload. Order is
 // vertical (top → bottom) for visual scan-ability — most-cited first
 // (technicals/patterns), then context, then the new anchor.
+// `target` is either a CSS selector or a data-testid we resolve at click
+// time — clicking the node smooth-scrolls the matching detail section
+// into view, turning the diagram into the page's table of contents.
 const COMPUTE_LANES = [
-    { key: "tech", icon: LineChart, label: "Technical indicators", sub: "RSI · MACD · BB · ATR · ADX" },
-    { key: "candle", icon: Layers, label: "Candlestick patterns", sub: "15-pattern rule engine · daily + weekly" },
-    { key: "ctx", icon: Newspaper, label: "Market context", sub: "Sector momentum · index trend" },
-    { key: "sent", icon: Gauge, label: "Sentiment", sub: "News · IDX filings (Bandarmology)" },
-    { key: "anchor", icon: BookOpen, label: "Intrinsic anchor", sub: "Graham + RIM · sector-aware" },
+    { key: "tech", icon: LineChart, label: "Technical indicators", sub: "RSI · MACD · BB · ATR · ADX", target: '[data-testid="pipeline-stage-02"]' },
+    { key: "candle", icon: Layers, label: "Candlestick patterns", sub: "15-pattern rule engine · daily + weekly", target: '[data-testid="pipeline-stage-03"]' },
+    { key: "ctx", icon: Newspaper, label: "Market context", sub: "Sector momentum · index trend", target: '[data-testid="pipeline-stage-04"]' },
+    { key: "sent", icon: Gauge, label: "Sentiment", sub: "News · IDX filings (Bandarmology)", target: "#bandarmology" },
+    { key: "anchor", icon: BookOpen, label: "Intrinsic anchor", sub: "Graham + RIM · sector-aware", target: "#intrinsic-anchor" },
 ];
 
 const OUTPUTS = [
-    { key: "ui", icon: FileText, label: "Web verdict", sub: "Browser report" },
-    { key: "pdf", icon: HardDrive, label: "PDF + Trade Slip", sub: "Downloadable artifacts" },
-    { key: "alert", icon: Send, label: "Telegram alerts", sub: "Confidence ≥ 75 BUY/SELL" },
+    { key: "ui", icon: FileText, label: "Web verdict", sub: "Browser report", target: '[data-testid="pipeline-stage-08"]' },
+    { key: "pdf", icon: HardDrive, label: "PDF + Trade Slip", sub: "Downloadable artifacts", target: '[data-testid="pipeline-stage-08"]' },
+    { key: "alert", icon: Send, label: "Telegram alerts", sub: "Confidence ≥ 75 BUY/SELL", target: '[data-testid="pipeline-stage-08"]' },
 ];
+
+// Resolve a `target` string (CSS selector OR `#id` fragment) to its DOM
+// element and smooth-scroll. Headers offset via the existing scroll-mt-24
+// utility on each anchor section, so a `block: "start"` scroll lands
+// flush with the page sticky header — no manual offset math needed.
+function scrollToTarget(selector) {
+    if (!selector) return;
+    const el = document.querySelector(selector);
+    if (!el || typeof el.scrollIntoView !== "function") return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Brief flash highlight so the user's eye lands on the right block.
+    el.classList.add("flow-target-flash");
+    setTimeout(() => el.classList.remove("flow-target-flash"), 900);
+}
 
 export default function PipelineFlowDiagram() {
     return (
         <div className="mt-10" data-testid="pipeline-flow-diagram">
+            <p
+                className="font-mono mb-3 text-center"
+                style={{ fontSize: "10px", color: "hsl(var(--text-muted))", letterSpacing: "0.18em" }}
+            >
+                <span aria-hidden="true">▸</span>{" "}
+                <span className="uppercase">Click any stage to jump to its details</span>
+            </p>
             {/* Desktop / tablet ─ animated SVG flow */}
             <div className="hidden md:block">
                 <FlowSVG />
@@ -132,6 +156,10 @@ function FlowSVG() {
                             0%, 100% { opacity: 0.55; }
                             50% { opacity: 1; }
                         }
+                        @keyframes target-flash {
+                            0%   { box-shadow: 0 0 0 0 hsla(45, 92%, 65%, 0.55); }
+                            100% { box-shadow: 0 0 0 14px hsla(45, 92%, 65%, 0);   }
+                        }
                         @media (prefers-reduced-motion: reduce) {
                             .flow-anim { animation: none !important; }
                         }
@@ -143,7 +171,12 @@ function FlowSVG() {
                         .flow-conn-fast { animation-duration: 0.95s; }
                         .flow-pulse { animation: pulse-soft 2.4s ease-in-out infinite; }
                         .flow-node-bg { fill: hsl(var(--surface-elevated)); stroke-width: 1.25; }
-                        .flow-node-bg:hover { fill: hsl(var(--bg)); }
+                        .flow-node-clickable { cursor: pointer; transition: filter 200ms ease; }
+                        .flow-node-clickable:hover .flow-node-bg { fill: hsl(var(--bg)); stroke-width: 2; }
+                        .flow-node-clickable:hover { filter: drop-shadow(0 0 6px hsla(45, 92%, 65%, 0.35)); }
+                        .flow-node-clickable:focus { outline: none; }
+                        .flow-node-clickable:focus-visible .flow-node-bg { stroke-width: 2.25; }
+                        .flow-target-flash { animation: target-flash 900ms ease-out; }
                     `}</style>
                 </defs>
 
@@ -201,6 +234,7 @@ function FlowSVG() {
                     sub="yfinance · Finnhub · IDX"
                     Icon={Database}
                     width={140}
+                    target='[data-testid="pipeline-stage-01"]'
                 />
 
                 {/* Compute lanes */}
@@ -215,6 +249,7 @@ function FlowSVG() {
                         sub={lane.sub}
                         Icon={lane.icon}
                         width={170}
+                        target={lane.target}
                     />
                 ))}
 
@@ -229,6 +264,7 @@ function FlowSVG() {
                     Icon={Sparkles}
                     width={170}
                     big
+                    target='[data-testid="pipeline-stage-07"]'
                 />
 
                 {/* Outputs */}
@@ -243,6 +279,7 @@ function FlowSVG() {
                         sub={o.sub}
                         Icon={o.icon}
                         width={150}
+                        target={o.target}
                     />
                 ))}
             </svg>
@@ -259,7 +296,7 @@ const COLOR_VAR = {
     green: "var(--buy)",
 };
 
-function Node({ x, y, color, overline, label, sub, Icon, width, big = false }) {
+function Node({ x, y, color, overline, label, sub, Icon, width, big = false, target }) {
     // CSS HSL values aren't valid inside SVG inline style without `hsl()` wrap.
     // For named CSS vars (gold/buy) we use `hsl(var(--gold))`; for raw hsl
     // tuples we pass them through directly.
@@ -270,8 +307,29 @@ function Node({ x, y, color, overline, label, sub, Icon, width, big = false }) {
     const w = width;
     const left = x - w / 2;
     const top = y - h / 2;
+    const interactive = !!target;
+    const onActivate = (e) => {
+        if (!target) return;
+        // Stop the SVG-level click from firing twice when activated via keyboard.
+        e?.preventDefault?.();
+        scrollToTarget(target);
+    };
     return (
-        <g className="flow-pulse">
+        <g
+            className={`flow-pulse ${interactive ? "flow-node-clickable" : ""}`}
+            onClick={interactive ? onActivate : undefined}
+            onKeyDown={
+                interactive
+                    ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") onActivate(e);
+                      }
+                    : undefined
+            }
+            tabIndex={interactive ? 0 : undefined}
+            role={interactive ? "link" : undefined}
+            aria-label={interactive ? `Jump to ${label} details` : undefined}
+            data-testid={interactive ? `flow-node-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : undefined}
+        >
             <rect
                 x={left}
                 y={top}
@@ -358,16 +416,17 @@ function LegendDot({ color, label }) {
 /* ───────────────────────── mobile vertical flow ───────────────────── */
 
 const ALL_STAGES_MOBILE = [
-    { color: "cyan", overline: "01", label: "Data ingest", sub: "yfinance · Finnhub · IDX provider", Icon: Database },
+    { color: "cyan", overline: "01", label: "Data ingest", sub: "yfinance · Finnhub · IDX provider", Icon: Database, target: '[data-testid="pipeline-stage-01"]' },
     ...COMPUTE_LANES.map((l, i) => ({
         color: "gold",
         overline: String(i + 2).padStart(2, "0"),
         label: l.label,
         sub: l.sub,
         Icon: l.icon,
+        target: l.target,
     })),
-    { color: "violet", overline: "07", label: "Claude Sonnet 4.5", sub: "LLM reasoning", Icon: Sparkles },
-    { color: "green", overline: "08", label: "Verdict + outputs", sub: "Web · PDF · Telegram", Icon: FileText },
+    { color: "violet", overline: "07", label: "Claude Sonnet 4.5", sub: "LLM reasoning", Icon: Sparkles, target: '[data-testid="pipeline-stage-07"]' },
+    { color: "green", overline: "08", label: "Verdict + outputs", sub: "Web · PDF · Telegram", Icon: FileText, target: '[data-testid="pipeline-stage-08"]' },
 ];
 
 function MobileFlow() {
@@ -396,16 +455,27 @@ function MobileFlow() {
     );
 }
 
-function MobileFlowCard({ color, overline, label, sub, Icon }) {
+function MobileFlowCard({ color, overline, label, sub, Icon, target }) {
     const c = `hsl(${COLOR_VAR[color]})`;
+    const onClick = target
+        ? (e) => {
+              e.preventDefault();
+              scrollToTarget(target);
+          }
+        : undefined;
     return (
-        <div
-            className="flex items-center gap-3 p-3 rounded-sm"
+        <button
+            type="button"
+            onClick={onClick}
+            className="flex items-center gap-3 p-3 rounded-sm w-full text-left transition-colors"
             style={{
                 border: "1px solid hsl(var(--border-divider))",
                 borderLeft: `3px solid ${c}`,
                 background: "hsl(var(--surface-elevated))",
+                minHeight: 56,
+                cursor: target ? "pointer" : "default",
             }}
+            data-testid={`flow-mobile-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
         >
             <Icon size={18} strokeWidth={1.5} style={{ color: c, flexShrink: 0 }} />
             <div className="min-w-0 flex-1">
@@ -430,6 +500,14 @@ function MobileFlowCard({ color, overline, label, sub, Icon }) {
                     {sub}
                 </p>
             </div>
-        </div>
+            {target && (
+                <span
+                    aria-hidden="true"
+                    style={{ color: "hsl(var(--text-muted))", flexShrink: 0, fontSize: "14px" }}
+                >
+                    →
+                </span>
+            )}
+        </button>
     );
 }
