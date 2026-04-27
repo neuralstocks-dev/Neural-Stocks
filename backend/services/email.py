@@ -27,12 +27,13 @@ REPLY_TO = os.environ.get("EMAIL_REPLY_TO", "ai.neulab.inc@gmail.com")
 DISCLAIMER_FOOTER = """
 <hr style="border:none;border-top:1px solid #2a2a2a;margin:32px 0 16px 0" />
 <p style="font-size:11px;color:#888;font-family:'IBM Plex Mono',monospace;line-height:1.6">
-  <strong style="color:#aaa">Financial Disclaimer.</strong>
-  Neulab is an AI-assisted analysis tool. Content is for educational and informational
-  purposes only and is <em>not</em> investment advice, financial advice, or a
-  recommendation to buy or sell any security. Markets are volatile; past performance
-  does not guarantee future results. You are solely responsible for your investment
-  decisions. Consult a licensed financial advisor before acting.
+  <strong style="color:#aaa">Educational research output.</strong>
+  Neulab is an AI-assisted research tool. All confidence and model-probability values
+  describe the strength of the model's classification based on the inputs used —
+  <em>not</em> forecasts of price movement or investment success. Content is for
+  informational and educational purposes only and is <em>not</em> personalized
+  financial advice or a recommendation to buy, sell, or hold any security. Conduct
+  your own research and, where appropriate, consult a licensed financial professional.
 </p>
 """
 
@@ -113,7 +114,13 @@ _PUBLIC_APP_URL = os.environ.get("PUBLIC_APP_URL", "").rstrip("/")
 
 def _signal_row_html(sig: dict, locked: bool = False) -> str:
     """Render a single watchlist signal row. `locked=True` blurs the row
-    for Free users beyond the free-tier limit."""
+    for Free users beyond the free-tier limit.
+
+    The internal `direction` value remains BUY/SELL (used for color routing
+    + analytics), but every user-facing label here uses the educational
+    framing — "Bullish bias" / "Bearish bias" — to stay consistent with
+    the web report, PDF, share page, and Telegram alerts.
+    """
     ticker = sig["ticker"]
     direction = sig["direction"]
     conf = sig["confidence_pct"]
@@ -121,6 +128,7 @@ def _signal_row_html(sig: dict, locked: bool = False) -> str:
     horizon = sig.get("horizon_days", 20)
 
     dir_color = "#79d694" if direction == "BUY" else "#e26c6c"
+    bias_label = "Bullish bias" if direction == "BUY" else "Bearish bias"
     close_line = f"${last_close:.2f}" if last_close else "—"
 
     if locked:
@@ -130,7 +138,7 @@ def _signal_row_html(sig: dict, locked: bool = False) -> str:
             f'<div style="display:flex;justify-content:space-between;align-items:center">'
             f'<span style="font-family:monospace;font-size:15px;color:#f5f5f0">{ticker}</span>'
             f'<span style="font-family:monospace;font-size:13px;color:{dir_color};letter-spacing:0.12em">'
-            f'{direction} · {conf}%</span>'
+            f'{bias_label} · {conf}%</span>'
             '</div></td></tr>'
         )
 
@@ -144,15 +152,15 @@ def _signal_row_html(sig: dict, locked: bool = False) -> str:
     <tr>
       <td style="font-family:monospace;font-size:16px;color:#f5f5f0;letter-spacing:0.02em">{ticker_link}</td>
       <td style="text-align:right;font-family:monospace;font-size:13px;color:{dir_color};letter-spacing:0.14em">
-        {direction} · {conf}%
+        {bias_label} · {conf}% model probability
       </td>
     </tr>
     <tr>
       <td style="padding-top:4px;font-size:12px;color:#8a8a8a;font-family:monospace">
-        Last close {close_line} · {horizon}-day horizon · RF edge
+        Last close {close_line} · {horizon}-day horizon · RF model
       </td>
       <td style="padding-top:4px;text-align:right;font-size:11px;color:#666;font-family:monospace">
-        Tap to run full verdict →
+        Tap for full research view →
       </td>
     </tr>
   </table>
@@ -167,9 +175,9 @@ def _weekly_digest_html(full_name: str, signals: list[dict], locked_count: int,
     if not signals:
         body = (
             '<p style="color:#a8a8a8;font-size:15px;line-height:1.65;margin-top:16px">'
-            'No strong edges on your watchlist this week — the Random-Forest model sees '
-            'everything you\'re tracking as roughly coin-flip. That\'s a <em>useful</em> '
-            'signal too: it means no immediate asymmetric setup is flagging. '
+            'No strong directional reads on your watchlist this week — the Random-Forest '
+            'model classifies everything you\'re tracking as roughly balanced. That\'s a '
+            '<em>useful</em> signal too: nothing is flagging an asymmetric setup right now. '
             'Stay patient.'
             '</p>'
         )
@@ -196,9 +204,9 @@ def _weekly_digest_html(full_name: str, signals: list[dict], locked_count: int,
         Want daily instead of weekly?
       </p>
       <p style="margin:8px 0 0;color:#e6e6e6;font-size:14px;line-height:1.55">
-        <strong>Watchlist Auto-Scan</strong> (Pro/Elite) pushes the same signals
-        to Telegram every day, the moment the model sees a strong edge — not 5
-        days later. $12/mo.
+        <strong>Watchlist Auto-Scan</strong> (Pro/Elite) pushes the same
+        analytical-bias reads to Telegram every day, the moment the model
+        sees a strong shift — not 5 days later. $12/mo.
       </p>
       <p style="margin:16px 0 0">
         <a href="{_PUBLIC_APP_URL}/pricing" style="display:inline-block;padding:10px 18px;background:#b8994f;color:#0b0b0b;font-family:monospace;font-size:12px;letter-spacing:0.12em;text-decoration:none;text-transform:uppercase">
@@ -225,9 +233,11 @@ def _weekly_digest_html(full_name: str, signals: list[dict], locked_count: int,
           </h1>
           <p style="color:#a8a8a8;font-size:14px;line-height:1.65;margin-top:14px">
             The Random-Forest model ran across your watchlist. Below are the
-            {len(signals)} strongest BUY/SELL edges it sees. These are
-            <strong>RF-only signals</strong> — tap any ticker to pull the full
-            Claude-assisted multi-lens verdict before acting.
+            {len(signals)} strongest directional reads it sees — framed as
+            <strong>analytical bias</strong>, not trade instructions. These
+            are <strong>RF-only signals</strong> — tap any ticker to open the
+            full Claude-assisted multi-lens research view before drawing
+            conclusions.
           </p>
           {body}
           {upgrade_cta}
@@ -252,9 +262,9 @@ async def send_weekly_digest_email(to_email: str, full_name: str, signals: list[
         return False
     html = _weekly_digest_html(full_name, signals, locked_count, is_paid, plan)
     subject = (
-        f"Your Neulab weekly digest · {len(signals)} strong RF edge"
+        f"Your Neulab weekly digest · {len(signals)} strong directional read"
         + ("s" if len(signals) != 1 else "")
-        if signals else "Your Neulab weekly digest · no strong edges this week"
+        if signals else "Your Neulab weekly digest · no strong reads this week"
     )
     params = {
         "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
