@@ -140,11 +140,16 @@ export default function TechnicalPage() {
                         className="mt-6 max-w-3xl text-base leading-relaxed"
                         style={{ color: "hsl(var(--text-secondary))" }}
                     >
-                        Every Neulab verdict is the output of a deterministic data pipeline feeding a
-                        large-language-model reasoning step. No black-box neural network predicts
-                        price direction. No trained classifier gives you a "73% probability of going up."
-                        Each decision is fully auditable — the same inputs produce the same verdict,
-                        and the verdict always shows its work.
+                        Every Neural Stock Intelligence™ verdict is the output of a deterministic data
+                        pipeline feeding a large-language-model reasoning step, with a trained
+                        Random Forest classifier as a <em>secondary</em> opinion. The RF is never
+                        authoritative — when its direction call disagrees with the LLM, we{" "}
+                        <strong>lower the displayed confidence</strong> rather than override the
+                        verdict, and its raw <code>P(up) / P(down)</code> probabilities are surfaced
+                        in the score-breakdown drawer so users can audit the math themselves. Every
+                        signal feeding a verdict — RSI, MACD, candlestick patterns, sentiment,
+                        intrinsic-value anchor, RF probabilities — is exposed in the report. The
+                        verdict always shows its work.
                     </p>
                 </section>
 

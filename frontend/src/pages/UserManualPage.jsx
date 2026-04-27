@@ -145,7 +145,7 @@ export default function UserManualPage() {
                         lineHeight: 1.05,
                     }}
                 >
-                    How to actually <em style={{ color: "hsl(var(--buy))" }}>use</em> Neulab.
+                    How to actually <em style={{ color: "hsl(var(--buy))" }}>use</em> Neural Stock Intelligence™.
                 </h1>
                 <p
                     className="mt-5 text-base md:text-lg max-w-2xl"
@@ -168,7 +168,7 @@ export default function UserManualPage() {
                 </p>
                 <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                     {[
-                        ["intro", "1. What is Neulab"],
+                        ["intro", "1. What is Neural Stock Intelligence™"],
                         ["dashboard", "2. The Dashboard"],
                         ["analyze", "3. Running an Analysis"],
                         ["watchlist", "4. Your Watchlist"],
@@ -193,10 +193,10 @@ export default function UserManualPage() {
                 </ul>
             </nav>
 
-            {/* 1. What is Neulab */}
-            <Section id="intro" icon={Sparkles} kicker="Step 1" title="What is Neulab?">
+            {/* 1. What is Neural Stock Intelligence */}
+            <Section id="intro" icon={Sparkles} kicker="Step 1" title="What is Neural Stock Intelligence™?">
                 <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                    Neulab gives you a <strong>second opinion on any stock</strong>, written by an AI
+                    Neural Stock Intelligence™ gives you a <strong>second opinion on any stock</strong>, written by an AI
                     that explains its reasoning. You give it a ticker (e.g. <code>AAPL</code> for Apple,
                     or <code>BBCA.JK</code> for Indonesian giant Bank Central Asia), and it produces a{" "}
                     <strong style={{ color: "hsl(var(--buy))" }}>BUY</strong>,{" "}
@@ -204,8 +204,8 @@ export default function UserManualPage() {
                     <strong style={{ color: "hsl(var(--sell))" }}>SELL</strong> verdict together with a{" "}
                     confidence score from 0–100% and the actual reasons behind it.
                 </p>
-                <Callout tone="info" title="Neulab is a research tool, not a robo-broker">
-                    Neulab does not place trades for you. It helps you decide. Final decisions —
+                <Callout tone="info" title="Neural Stock Intelligence™ is a research tool, not a robo-broker">
+                    Neural Stock Intelligence™ does not place trades for you. It helps you decide. Final decisions —
                     and any orders you place at your broker — are 100% yours.
                 </Callout>
             </Section>
