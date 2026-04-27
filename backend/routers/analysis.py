@@ -776,9 +776,16 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
         candlestick_findings = scan_daily_and_weekly(history, weekly_history)
 
     await _set_job_phase(job_id, "llm_thinking")
+    # Intrinsic-value anchor (Graham + RIM) computed BEFORE the LLM call so
+    # Claude can reference it in fundamental_analysis prose. Always returns
+    # a dict (never None) — `primary_anchor: "none"` when neither method
+    # fits, in which case the LLM ignores it. See services/intrinsic_value.py.
+    from services.intrinsic_value import compute_intrinsic_anchor
+    intrinsic_anchor = compute_intrinsic_anchor(fundamentals, ticker, quote.get("price"))
     if mode == "candlestick":
         analysis = await run_candlestick_analysis(
-            ticker, quote, history, fundamentals, technicals, candlestick_findings
+            ticker, quote, history, fundamentals, technicals, candlestick_findings,
+            intrinsic_anchor=intrinsic_anchor,
         )
     elif mode == "hybrid":
         analysis = await run_ai_analysis(
@@ -786,12 +793,14 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
             candlestick_findings=candlestick_findings, mode="hybrid",
             market_context=market_ctx,
             weekly_history=weekly_history,
+            intrinsic_anchor=intrinsic_anchor,
         )
     else:
         analysis = await run_ai_analysis(
             ticker, quote, history, fundamentals, technicals,
             market_context=market_ctx,
             weekly_history=weekly_history,
+            intrinsic_anchor=intrinsic_anchor,
         )
 
     doc = {
@@ -803,6 +812,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
         "quote_snapshot": quote,
         "technicals": technicals,
         "fundamentals": fundamentals,
+        "intrinsic_value_anchor": intrinsic_anchor,
         "mode": mode,
         "market_context": market_ctx if isinstance(market_ctx, dict) and market_ctx.get("configured") else None,
         **analysis,

@@ -151,6 +151,7 @@ def _yf_fundamentals_sync(ticker: str) -> dict:
         "trailingPE", "forwardPE", "priceToBook", "dividendYield", "beta",
         "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "averageVolume",
         "profitMargins", "returnOnEquity", "trailingEps",
+        "bookValue",  # per-share book value — feeds Graham Number + RIM intrinsic anchors
         "revenueGrowth", "earningsGrowth", "debtToEquity",
         "recommendationKey", "targetMeanPrice", "longBusinessSummary",
     ]
