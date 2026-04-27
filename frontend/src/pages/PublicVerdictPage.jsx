@@ -4,6 +4,7 @@ import axios from "axios";
 import VerdictRing from "@/components/VerdictRing";
 import SignalBadge from "@/components/SignalBadge";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
+import IntrinsicValueChip from "@/components/IntrinsicValueChip";
 import { Loader2, LineChart, AlertTriangle, Target, Shield, ArrowUpRight } from "lucide-react";
 import { formatPrice, formatPct, timeAgo, formatCompact } from "@/lib/format";
 import { API_BASE } from "@/lib/api";
@@ -271,6 +272,10 @@ export default function PublicVerdictPage() {
                                 <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                                     {a.fundamental_analysis}
                                 </p>
+                                <IntrinsicValueChip
+                                    anchor={a.intrinsic_value_anchor}
+                                    currency={a.quote_snapshot?.currency || "USD"}
+                                />
                             </article>
                             <article className="module p-6">
                                 <p className="text-overline">Peers</p>

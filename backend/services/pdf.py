@@ -62,6 +62,52 @@ def _kv_row(label: str, value: str, style):
     return [Paragraph(label, style["muted"]), Paragraph(value, style["mono"])]
 
 
+_INTRINSIC_INTERPRETATION_LABEL = {
+    "deep_discount": "deep discount vs anchor",
+    "modest_discount": "modest discount vs anchor",
+    "fair": "near anchor (fair zone)",
+    "modest_premium": "modest premium vs anchor",
+    "deep_premium": "deep premium vs anchor",
+}
+
+_INTRINSIC_APPLICABILITY_NOTE = {
+    "low_fit_intangible_heavy": "Note: book-value-based anchor undercounts intangibles for this sector — treat as a loose lower bound, not a fair-value floor.",
+    "low_fit_unrepresentative_roe": "Note: ROE input is structurally distorted (e.g. negative equity from buybacks) — anchor displayed for transparency only.",
+    "high_fit_value_destroying": "Note: ROE is below the cost of equity — fair value sits at or below book.",
+}
+
+
+def _append_intrinsic_anchor(story, analysis: dict, s: dict):
+    """Render the Graham/RIM valuation reference anchor as one short
+    educational note immediately after fundamental_analysis prose."""
+    anchor = analysis.get("intrinsic_value_anchor") or {}
+    method = anchor.get("primary_anchor")
+    if method in (None, "none"):
+        return
+    estimate = anchor.get("primary_estimate")
+    if estimate is None:
+        return
+    currency = (analysis.get("quote_snapshot") or {}).get("currency") or "USD"
+    method_name = "Graham Number" if method == "graham" else "Residual Income Model"
+    line = f"<b>Valuation reference · {method_name}:</b> {_fmt_price(estimate, currency)}"
+    pct = anchor.get("premium_to_anchor_pct")
+    interp = anchor.get("interpretation")
+    if pct is not None and interp:
+        sign = "+" if pct >= 0 else ""
+        label = _INTRINSIC_INTERPRETATION_LABEL.get(interp, interp)
+        line += f" &nbsp;·&nbsp; current price <b>{sign}{pct:.1f}%</b> ({label})"
+    story.append(Paragraph(line, s["mono"]))
+    note = _INTRINSIC_APPLICABILITY_NOTE.get(anchor.get("primary_applicability"))
+    if note:
+        story.append(Paragraph(note, s["muted"]))
+    story.append(Paragraph(
+        "Reference anchor only — not a price target or trading instruction. "
+        "Graham (asset-based) suits banks/utilities/industrials; RIM (earnings-based) "
+        "suits profitable services/healthcare. Sector-aware auto-select.",
+        s["muted"],
+    ))
+
+
 def _fmt_price(v, currency="USD"):
     if v is None:
         return "—"
@@ -311,6 +357,7 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
     if analysis.get("fundamental_analysis"):
         story.append(Paragraph("Fundamentals", s["h2"]))
         story.append(Paragraph(analysis["fundamental_analysis"].replace("\n", "<br/>"), s["body"]))
+        _append_intrinsic_anchor(story, analysis, s)
 
     # Candlestick findings (if present)
     findings = analysis.get("candlestick_findings")

@@ -1532,6 +1532,19 @@ def _public_view(analysis: dict) -> dict:
                        if k in ("rsi_14", "sma_20", "sma_50", "macd")},
         "fundamentals": {k: v for k, v in (analysis.get("fundamentals") or {}).items()
                          if k in ("sector", "industry", "marketCap", "trailingPE", "shortName", "longName")},
+        # Intrinsic-value anchor (Graham + RIM). Surfaced on public share
+        # pages so external readers see the same valuation reference the
+        # owner sees in their web report. Whitelist only the display
+        # fields — internal `inputs` (raw EPS / BVPS / ROE / cost-of-equity
+        # numbers) stay server-side to avoid leaking competitor signal.
+        "intrinsic_value_anchor": {
+            k: (analysis.get("intrinsic_value_anchor") or {}).get(k)
+            for k in (
+                "primary_anchor", "primary_estimate", "primary_applicability",
+                "current_price", "premium_to_anchor_pct", "interpretation",
+                "sector", "market",
+            )
+        } if (analysis.get("intrinsic_value_anchor") or {}).get("primary_anchor") not in (None, "none") else None,
         "quote_snapshot": {k: v for k, v in (analysis.get("quote_snapshot") or {}).items()
                            if k in ("name", "currency", "exchange")},
     }

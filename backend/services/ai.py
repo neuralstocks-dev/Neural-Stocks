@@ -44,6 +44,14 @@ Rules:
 - Use the *actual* current price to place price_target and stop_loss realistically (typically ±5-25% range).
 - Never recommend penny-stock speculation without warning in risk_factors.
 - This output is educational research. Avoid imperative language ("buy now", "sell immediately"). Use observational language ("price is trading below…", "the model classifies…", "an alternative read would be…").
+
+INTRINSIC-VALUE ANCHOR — when the payload includes `intrinsic_value_anchor` and its `primary_anchor` is NOT "none":
+- Treat the anchor as a deterministic VALUATION REFERENCE point computed from `bookValue` × method (Graham Number for asset-heavy sectors, 1-year Residual Income Model for earnings-power-heavy sectors). It is a yardstick, NOT a price target or forecast.
+- In `fundamental_analysis`, briefly anchor the prose against it. Example phrasings: "Trading at a modest discount to the Graham fair-value anchor of $X (≈12% gap)", or "Current price sits at a deep premium to the RIM anchor of $X — fundamentals would need to materially improve to justify the multiple". Cite the actual `primary_estimate` and `premium_to_anchor_pct` from the payload.
+- Use the `interpretation` field's bucket name in your prose (deep_discount / modest_discount / fair / modest_premium / deep_premium) — translate to plain English (e.g. "deep discount" → "well below the anchor").
+- If `primary_applicability` is "low_fit_intangible_heavy" or "low_fit_unrepresentative_roe", caveat with one sentence noting the anchor method is structurally weaker for this sector (e.g. "book value undercounts intangibles for software businesses, so the Graham anchor is a loose lower bound, not a fair-value floor").
+- NEVER frame the anchor as a buy/sell trigger. It is a reference number for valuation context.
+- If `primary_anchor` is "none", omit anchor language entirely.
 """
 
 # Backwards-compatibility alias
@@ -98,6 +106,13 @@ Candlestick rules:
 - "stop_loss" should be placed beyond the pattern invalidation level (e.g., below hammer low, above shooting star high) — describe it as "invalidation level" in prose.
 - Never invent patterns that aren't in the supplied candlestick_findings. Only reason over what was detected.
 - Educational tone throughout — observational, never imperative.
+
+INTRINSIC-VALUE ANCHOR — when the payload includes `intrinsic_value_anchor` and its `primary_anchor` is NOT "none":
+- Treat the anchor as a deterministic VALUATION REFERENCE point — useful CONTEXT for `fundamental_analysis` even though this mode is primarily price-action. It is a yardstick, NOT a price target.
+- In `fundamental_analysis`, mention it in one short sentence — e.g. "Fundamentals are a secondary lens here; for context, price trades at a modest discount to the $X RIM anchor." Cite the actual `primary_estimate` and `interpretation`.
+- If `primary_applicability` flags a low-fit (`low_fit_intangible_heavy` or `low_fit_unrepresentative_roe`), add a brief caveat.
+- NEVER convert the anchor into a candlestick "target" — it is fundamental context, not a price-action level.
+- If `primary_anchor` is "none", omit anchor language entirely.
 """
 
 
@@ -152,6 +167,14 @@ Hybrid rules:
   * When patterns WERE detected, at least one of primary_patterns or confirmation_patterns must be non-empty — classify the strongest detected pattern in one of those buckets even if its bias disagrees (a bearish pattern is a "primary signal" for a bearish classification; a bullish pattern detected during a bearish classification is a "rejected" signal, not an empty primary).
   * Only leave ALL THREE arrays empty if NO patterns at all were detected in the supplied candlestick_findings.
   * Name each entry with the PATTERN NAME first (e.g., "Doji · indecision, no bullish confirmation after 34% surge"), not an opaque description.
+
+INTRINSIC-VALUE ANCHOR — when the payload includes `intrinsic_value_anchor` and its `primary_anchor` is NOT "none":
+- Treat the anchor as a deterministic VALUATION REFERENCE point computed from `bookValue` × method (Graham Number for asset-heavy sectors, 1-year Residual Income Model otherwise). It is a yardstick, NOT a price target or forecast.
+- In `fundamental_analysis`, briefly anchor the prose against it (cite `primary_estimate` + `premium_to_anchor_pct` + `interpretation` bucket in plain English).
+- In the integrated `reasoning`, note how the valuation anchor agrees or disagrees with the technicals + candlestick lens (e.g. "Bullish candlestick reversal aligns with a deep-discount valuation read — three lenses converge", or "Bearish candlestick reversal but trading at a modest discount to the RIM anchor — partial divergence the user should weigh").
+- If `primary_applicability` is "low_fit_intangible_heavy" or "low_fit_unrepresentative_roe", caveat with one sentence noting the method is structurally weaker for this sector.
+- NEVER frame the anchor as a buy/sell trigger.
+- If `primary_anchor` is "none", omit anchor language entirely.
 """
 
 
@@ -236,7 +259,8 @@ def _handle_llm_error(e: Exception):
 async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals: dict,
                           technicals: dict, candlestick_findings: dict | None = None,
                           mode: str = "standard", market_context: dict | None = None,
-                          weekly_history: list | None = None) -> dict:
+                          weekly_history: list | None = None,
+                          intrinsic_anchor: dict | None = None) -> dict:
     """Run AI analysis. If candlestick_findings is provided AND mode == 'hybrid',
     the hybrid prompt is used. Otherwise the standard prompt is used.
 
@@ -272,6 +296,19 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
         system_prompt = STANDARD_SYSTEM_PROMPT
         prefix = "analysis"
 
+    # Intrinsic-value anchor (Graham + RIM). Only inject the SLIM payload —
+    # `primary_anchor`, `primary_estimate`, `primary_applicability`,
+    # `premium_to_anchor_pct`, `interpretation`, `sector`. Skip when the
+    # anchor is not applicable to keep prompt tokens lean.
+    if isinstance(intrinsic_anchor, dict) and intrinsic_anchor.get("primary_anchor") and intrinsic_anchor.get("primary_anchor") != "none":
+        payload["intrinsic_value_anchor"] = {
+            k: intrinsic_anchor.get(k) for k in (
+                "primary_anchor", "primary_estimate", "primary_applicability",
+                "current_price", "premium_to_anchor_pct", "interpretation",
+                "sector", "market",
+            ) if intrinsic_anchor.get(k) is not None
+        }
+
     # Add market context (news headlines, analyst consensus, next earnings) if available
     if market_context and isinstance(market_context, dict) and market_context.get("configured"):
         mc_slim = {}
@@ -306,7 +343,8 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
 
 async def run_candlestick_analysis(ticker: str, quote: dict, history: list,
                                    fundamentals: dict, technicals: dict,
-                                   candlestick_findings: dict) -> dict:
+                                   candlestick_findings: dict,
+                                   intrinsic_anchor: dict | None = None) -> dict:
     """Run pure candlestick-driven AI analysis (Mode B)."""
     payload = {
         "ticker": ticker,
@@ -321,6 +359,14 @@ async def run_candlestick_analysis(ticker: str, quote: dict, history: list,
              "high": h.get("high"), "low": h.get("low")} for h in history[-20:]
         ],
     }
+    if isinstance(intrinsic_anchor, dict) and intrinsic_anchor.get("primary_anchor") and intrinsic_anchor.get("primary_anchor") != "none":
+        payload["intrinsic_value_anchor"] = {
+            k: intrinsic_anchor.get(k) for k in (
+                "primary_anchor", "primary_estimate", "primary_applicability",
+                "current_price", "premium_to_anchor_pct", "interpretation",
+                "sector", "market",
+            ) if intrinsic_anchor.get(k) is not None
+        }
     try:
         raw = await _run_chat_in_thread(CANDLESTICK_SYSTEM_PROMPT, f"candlestick-{ticker}",
                               "Analyze this stock using the detected candlestick patterns plus price context. Return ONLY valid JSON.\n\n"

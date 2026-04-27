@@ -15,6 +15,7 @@ import ConfluenceChip from "@/components/ConfluenceChip";
 import AnalysisQueueChip from "@/components/AnalysisQueueChip";
 import AnalysisProgressStepper from "@/components/AnalysisProgressStepper";
 import LLMBudgetBanner from "@/components/LLMBudgetBanner";
+import IntrinsicValueChip from "@/components/IntrinsicValueChip";
 
 // Tiny mirror of the detection logic in LLMBudgetBanner so the parent
 // can hide its generic red string when the friendly banner is taking
@@ -1079,6 +1080,10 @@ export default function AnalysisReportPage() {
                                         <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                                             {analysis.fundamental_analysis}
                                         </p>
+                                        <IntrinsicValueChip
+                                            anchor={analysis.intrinsic_value_anchor}
+                                            currency={quote?.currency || "USD"}
+                                        />
                                     </article>
                                     <article id="peer-comparison" className="module p-6 scroll-mt-24" data-testid="peer-module">
                                         <p className="text-overline">Peer Comparison</p>
