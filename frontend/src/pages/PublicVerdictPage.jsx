@@ -30,6 +30,23 @@ export default function PublicVerdictPage() {
         })();
     }, [shareId]);
 
+    // After the analysis renders, honor any `#section-id` deep-link by
+    // scrolling to the matching anchor — covers per-section share links
+    // arriving from Twitter/Telegram/etc. Defer one tick so the DOM has
+    // mounted; keep `behavior: smooth` for visual polish.
+    useEffect(() => {
+        if (!data?.analysis) return;
+        const hash = (window.location.hash || "").slice(1);
+        if (!hash) return;
+        const t = setTimeout(() => {
+            const el = document.getElementById(hash);
+            if (el && typeof el.scrollIntoView === "function") {
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        }, 250);
+        return () => clearTimeout(t);
+    }, [data]);
+
     const a = data?.analysis;
     const signalColor = a?.recommendation === "BUY"
         ? "hsl(var(--buy))"
@@ -286,7 +303,7 @@ export default function PublicVerdictPage() {
                             </article>
                         </section>
 
-                        <section className="module p-6 md:p-10 mt-1 md:mt-4">
+                        <section id="risks" className="module p-6 md:p-10 mt-1 md:mt-4 scroll-mt-24">
                             <p className="text-overline flex items-center gap-2">
                                 <AlertTriangle size={12} strokeWidth={1.5} /> Risks to the current interpretation
                             </p>
@@ -326,7 +343,8 @@ export default function PublicVerdictPage() {
                             shares without the field. */}
                         {a.alternative_scenarios && (
                             <section
-                                className="module p-6 md:p-10 mt-1 md:mt-4"
+                                id="alt-scenarios"
+                                className="module p-6 md:p-10 mt-1 md:mt-4 scroll-mt-24"
                                 data-testid="public-alt-scenarios"
                             >
                                 <p className="text-overline">Alternative scenarios</p>

@@ -21,6 +21,40 @@ import RisksModule from "@/components/RisksModule";
 import AlternativeScenariosModule from "@/components/AlternativeScenariosModule";
 import WhatCouldChangeViewModule from "@/components/WhatCouldChangeViewModule";
 import HowToReadModule from "@/components/HowToReadModule";
+import ShareSectionButton from "@/components/ShareSectionButton";
+
+// Module-share headline builders. Each returns { title, text } that
+// pre-fills the native share sheet (Twitter/Telegram/WhatsApp). Keep
+// short — most channels truncate at ~280 chars and we want the URL
+// itself to survive intact for click-through.
+function buildIntrinsicShareCopy(ticker, anchor) {
+    const method = anchor?.primary_anchor === "graham" ? "Graham anchor" : "RIM anchor";
+    const est = anchor?.primary_estimate;
+    const pct = anchor?.premium_to_anchor_pct;
+    const sign = typeof pct === "number" && pct >= 0 ? "+" : "";
+    if (typeof est === "number" && typeof pct === "number") {
+        return {
+            title: `${ticker} · ${method} reference`,
+            text: `${ticker} trading at ${sign}${pct.toFixed(1)}% vs the ${method} of ${est.toFixed(2)} — see how Neulab frames it.`,
+        };
+    }
+    return { title: `${ticker} · valuation reference`, text: `${ticker} valuation anchor on Neulab.` };
+}
+
+function buildRisksShareCopy(ticker, risks) {
+    const n = Array.isArray(risks) ? risks.length : 0;
+    return {
+        title: `${ticker} · ${n} risks the model flags`,
+        text: `${n} conditions under which the current Neulab read on ${ticker} would weaken.`,
+    };
+}
+
+function buildAltScenariosShareCopy(ticker) {
+    return {
+        title: `${ticker} · alternative reads`,
+        text: `Bullish, neutral, and bearish framings of the same data on ${ticker}.`,
+    };
+}
 
 // Tiny mirror of the detection logic in LLMBudgetBanner so the parent
 // can hide its generic red string when the friendly banner is taking
@@ -767,6 +801,16 @@ export default function AnalysisReportPage() {
                                         <IntrinsicValueChip
                                             anchor={analysis.intrinsic_value_anchor}
                                             currency={quote?.currency || "USD"}
+                                            shareCta={
+                                                analysis.id && analysis.intrinsic_value_anchor?.primary_anchor &&
+                                                analysis.intrinsic_value_anchor.primary_anchor !== "none" ? (
+                                                    <ShareSectionButton
+                                                        analysisId={analysis.id}
+                                                        sectionId="intrinsic-anchor"
+                                                        {...buildIntrinsicShareCopy(analysis.ticker, analysis.intrinsic_value_anchor)}
+                                                    />
+                                                ) : null
+                                            }
                                         />
                                     </article>
                                     <article id="peer-comparison" className="module p-6 scroll-mt-24" data-testid="peer-module">
@@ -778,9 +822,31 @@ export default function AnalysisReportPage() {
                                     </article>
                                 </section>
 
-                                <RisksModule risks={analysis.risk_factors} />
+                                <RisksModule
+                                    risks={analysis.risk_factors}
+                                    shareCta={
+                                        analysis.id && (analysis.risk_factors || []).length > 0 ? (
+                                            <ShareSectionButton
+                                                analysisId={analysis.id}
+                                                sectionId="risks"
+                                                {...buildRisksShareCopy(analysis.ticker, analysis.risk_factors)}
+                                            />
+                                        ) : null
+                                    }
+                                />
 
-                                <AlternativeScenariosModule scenarios={analysis.alternative_scenarios} />
+                                <AlternativeScenariosModule
+                                    scenarios={analysis.alternative_scenarios}
+                                    shareCta={
+                                        analysis.id && analysis.alternative_scenarios ? (
+                                            <ShareSectionButton
+                                                analysisId={analysis.id}
+                                                sectionId="alt-scenarios"
+                                                {...buildAltScenariosShareCopy(analysis.ticker)}
+                                            />
+                                        ) : null
+                                    }
+                                />
 
                                 <WhatCouldChangeViewModule items={analysis.what_could_change_view} />
 

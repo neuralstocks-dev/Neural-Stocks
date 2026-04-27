@@ -5,14 +5,17 @@ import React from "react";
  * same data. Renders only when the LLM produced the field (older analyses
  * pre-Feb-2026 silently skip, so we don't break their layout).
  */
-export default function AlternativeScenariosModule({ scenarios }) {
+export default function AlternativeScenariosModule({ scenarios, shareCta }) {
     if (!scenarios) return null;
     const { bullish, bearish, neutral } = scenarios;
     if (!bullish && !bearish && !neutral) return null;
 
     return (
-        <section className="module p-6 md:p-10" data-testid="alt-scenarios-module">
-            <p className="text-overline">Alternative scenarios</p>
+        <section id="alt-scenarios" className="module p-6 md:p-10 scroll-mt-24" data-testid="alt-scenarios-module">
+            <div className="flex items-start justify-between gap-3">
+                <p className="text-overline">Alternative scenarios</p>
+                {shareCta}
+            </div>
             <h2
                 className="font-serif mt-2 mb-2"
                 style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", letterSpacing: "-0.015em" }}

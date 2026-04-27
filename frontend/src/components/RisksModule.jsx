@@ -6,14 +6,17 @@ import { AlertTriangle } from "lucide-react";
  * `risk_factors` array as conditions under which the model classification
  * would weaken, NOT as exhaustive holding risks. Educational tone.
  */
-export default function RisksModule({ risks }) {
+export default function RisksModule({ risks, shareCta }) {
     const items = Array.isArray(risks) ? risks : [];
     if (items.length === 0) return null;
     return (
-        <section className="module p-6 md:p-10" data-testid="risks-module">
-            <p className="text-overline flex items-center gap-2">
-                <AlertTriangle size={12} strokeWidth={1.5} /> Risks to the current interpretation
-            </p>
+        <section id="risks" className="module p-6 md:p-10 scroll-mt-24" data-testid="risks-module">
+            <div className="flex items-start justify-between gap-3">
+                <p className="text-overline flex items-center gap-2">
+                    <AlertTriangle size={12} strokeWidth={1.5} /> Risks to the current interpretation
+                </p>
+                {shareCta}
+            </div>
             <h2
                 className="font-serif mt-2 mb-2"
                 style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", letterSpacing: "-0.015em" }}

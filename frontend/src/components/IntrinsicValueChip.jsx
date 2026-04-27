@@ -91,7 +91,7 @@ function MethodCell({ method, data, isPrimary, currency }) {
     );
 }
 
-export default function IntrinsicValueChip({ anchor, currency = "USD" }) {
+export default function IntrinsicValueChip({ anchor, currency = "USD", shareCta }) {
     // Auto-open the compare drawer when the primary method is flagged as a
     // loose fit (intangible-heavy / unrepresentative ROE / value-destroying).
     // The drawer is the cheapest way to surface "why does the anchor read
@@ -115,15 +115,19 @@ export default function IntrinsicValueChip({ anchor, currency = "USD" }) {
 
     return (
         <div
-            className="mt-4 rounded-md border border-[hsl(var(--border))] p-3 text-xs leading-relaxed"
+            id="intrinsic-anchor"
+            className="mt-4 rounded-md border border-[hsl(var(--border))] p-3 text-xs leading-relaxed scroll-mt-24"
             style={{ background: "hsl(var(--surface-2))" }}
             data-testid="intrinsic-value-chip"
         >
-            <div className="flex items-center gap-2 mb-2">
-                <Anchor size={12} strokeWidth={1.5} style={{ color: "hsl(var(--gold))" }} />
-                <span className="font-mono uppercase tracking-wider" style={{ fontSize: "10px", color: "hsl(var(--text-secondary))" }}>
-                    Valuation reference · {METHOD_LABEL[method] || method}
-                </span>
+            <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                    <Anchor size={12} strokeWidth={1.5} style={{ color: "hsl(var(--gold))" }} />
+                    <span className="font-mono uppercase tracking-wider" style={{ fontSize: "10px", color: "hsl(var(--text-secondary))" }}>
+                        Valuation reference · {METHOD_LABEL[method] || method}
+                    </span>
+                </div>
+                {shareCta}
             </div>
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="font-serif" style={{ fontSize: "1.4rem", lineHeight: 1.1, color: "hsl(var(--text-primary))" }} data-testid="intrinsic-value-estimate">
