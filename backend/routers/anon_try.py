@@ -20,7 +20,7 @@ Guardrails to prevent abuse / runaway cost:
 from __future__ import annotations
 
 import asyncio
-
+import os
 import hashlib
 import logging
 import uuid
@@ -257,7 +257,14 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
     or error in `anon_try_jobs`, and updates `anon_try_usage` on success.
     Any failure is caught so the job status flips to 'error' instead of
     leaving the client polling forever. A companion `_stage_ticker` task
-    streams progress labels into the job doc for the UI to show."""
+    streams progress labels into the job doc for the UI to show.
+
+    Wall-clock budget: 180s. Matches `QUICK_PER_TASK_TIMEOUT` on the
+    authenticated `/start` path — env-tunable via `ANON_JOB_TIMEOUT_S`.
+    When Claude has a bad retry storm the upstream socket can hang for
+    several minutes; without this cap the job doc would never flip to
+    'error' and the client would poll forever.
+    """
     synthetic = {
         "id": f"anon:{ip_hash}",
         "email": f"anon+{ip_hash[:8]}@neulab.local",
@@ -265,9 +272,13 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
         "disclaimer_accepted": True,
         "__anon__": True,
     }
+    anon_timeout = float(os.environ.get("ANON_JOB_TIMEOUT_S", "180"))
     ticker_task = asyncio.create_task(_stage_ticker(job_id))
     try:
-        result = await _create_analysis_impl(ticker_up, mode, synthetic)
+        result = await asyncio.wait_for(
+            _create_analysis_impl(ticker_up, mode, synthetic),
+            timeout=anon_timeout,
+        )
         verdict_id = result["id"]
         await db.anon_try_usage.insert_one({
             "ip_hash": ip_hash,
@@ -283,6 +294,16 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
                 "verdict_id": verdict_id,
                 "finished_at": iso(now_utc()),
                 "stage_label": "Ready",
+            }},
+        )
+    except asyncio.TimeoutError:
+        _log.warning("Anon job timed out after %.0fs for %s (job %s)", anon_timeout, ticker_up, job_id)
+        await db.anon_try_jobs.update_one(
+            {"job_id": job_id},
+            {"$set": {
+                "status": "error",
+                "error": "Our AI partner is slow right now. Please try again in a moment.",
+                "finished_at": iso(now_utc()),
             }},
         )
     except Exception as e:

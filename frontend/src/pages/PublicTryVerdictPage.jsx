@@ -49,7 +49,11 @@ export default function PublicTryVerdictPage() {
 
         const pollJob = async (jobId, attempts = 0) => {
             if (cancelled) return;
-            if (attempts > 60) {  // 60 * 2s = 2 min hard ceiling
+            // 95 × 2s ≈ 190s — matches the backend's anon-job wall-clock
+            // budget (180s) with a small buffer. Previously capped at 120s,
+            // which gave up mid-analysis during LiteLLM retry storms where
+            // the backend was still actively working on the verdict.
+            if (attempts > 95) {
                 setError("Analysis is taking longer than expected. Please try again in a moment.");
                 setLoading(false);
                 return;
