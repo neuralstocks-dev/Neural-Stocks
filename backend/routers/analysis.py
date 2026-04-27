@@ -1,5 +1,6 @@
 """Analysis + Alerts + Share Verdict + Public view."""
 import asyncio
+import os
 import uuid
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -23,7 +24,11 @@ router = APIRouter(tags=["analysis"])
 # now run in the background (fire-and-forget), this no longer competes with
 # the ingress 60s budget. We run tickers sequentially inside the job to
 # avoid saturating the single-worker event loop with concurrent LLM calls.
-QUICK_PER_TASK_TIMEOUT = 120.0
+# Bumped from 120 → 180s on Feb-2026 after users reported timeouts during
+# transient upstream LLM retry storms (LiteLLM auto-retries 4x on 5xx,
+# each with up to 30s socket budget, easily blowing 120s on a slow path).
+# Env-tunable so we can dial up/down without a redeploy.
+QUICK_PER_TASK_TIMEOUT = float(os.environ.get("ANALYSIS_TIMEOUT_S", "180"))
 QUICK_BATCH_SIZE = 3
 # Strong references to outstanding bg tasks so the GC doesn't drop them
 _BG_TASKS: set = set()
@@ -36,7 +41,6 @@ _BG_TASKS: set = set()
 # turns the implicit "loop saturation" failure mode into an explicit queue
 # users can see (via /api/analysis/queue/status), which the UI surfaces as a
 # transparent wait chip.
-import os
 ANALYSIS_CONCURRENCY = int(os.environ.get("ANALYSIS_CONCURRENCY", "4"))
 _ANALYSIS_SEMA = asyncio.Semaphore(ANALYSIS_CONCURRENCY)
 # Live counters — read by /queue/status. Updated only from inside

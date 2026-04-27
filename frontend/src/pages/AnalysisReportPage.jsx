@@ -411,7 +411,7 @@ export default function AnalysisReportPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-span-12 md:col-span-4 flex justify-start md:justify-end items-center gap-2">
+                                <div className="col-span-12 md:col-span-4 flex flex-wrap justify-start md:justify-end items-center gap-2">
                                     {analysis && (
                                         <>
                                             <ShareVerdictButton analysisId={analysis.id} />
@@ -439,6 +439,7 @@ export default function AnalysisReportPage() {
                                                 title="One-page shareable trade slip — perfect for screenshots into Discord/Telegram"
                                             >
                                                 <Receipt size={14} strokeWidth={1.5} />
+                                                <span className="md:hidden">Slip</span>
                                                 <span className="hidden md:inline">Trade Slip</span>
                                             </button>
                                             <button
@@ -465,6 +466,7 @@ export default function AnalysisReportPage() {
                                                 title="Download this verdict as PDF"
                                             >
                                                 <FileDown size={14} strokeWidth={1.5} />
+                                                <span className="md:hidden">PDF</span>
                                                 <span className="hidden md:inline">Export PDF</span>
                                             </button>
                                         </>
