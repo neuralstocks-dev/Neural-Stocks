@@ -208,23 +208,29 @@ function FlowSVG({ activeStage }) {
                 aria-label="Eight-stage analysis pipeline data flow"
             >
                 <defs>
+                    {/* Gradients use a higher start-opacity (0.55 vs the
+                        old 0.3) so the dashed pattern stays clearly
+                        animated in BOTH light and dark themes — the old
+                        opacity made the leading edge of each connector
+                        fade into the background, which masked the
+                        flow-dash animation in dark mode. */}
                     <linearGradient id="line-gold" x1="0" x2="1" y1="0" y2="0">
-                        <stop offset="0%" stopColor="hsl(var(--gold))" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="hsl(var(--gold))" stopOpacity="0.85" />
+                        <stop offset="0%" stopColor="hsl(var(--gold))" stopOpacity="0.55" />
+                        <stop offset="100%" stopColor="hsl(var(--gold))" stopOpacity="0.95" />
                     </linearGradient>
                     <linearGradient id="line-violet" x1="0" x2="1" y1="0" y2="0">
                         <stop offset="0%" stopColor="hsl(var(--gold))" stopOpacity="0.85" />
-                        <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.85" />
+                        <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.95" />
                     </linearGradient>
                     <linearGradient id="line-green" x1="0" x2="1" y1="0" y2="0">
                         <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.85" />
-                        <stop offset="100%" stopColor="hsl(var(--buy))" stopOpacity="0.85" />
+                        <stop offset="100%" stopColor="hsl(var(--buy))" stopOpacity="0.95" />
                     </linearGradient>
 
                     {/* Animated stroke-dash for "data flowing" effect on connectors. */}
                     <style>{`
                         @keyframes flow-dash {
-                            from { stroke-dashoffset: 36; }
+                            from { stroke-dashoffset: 56; }
                             to { stroke-dashoffset: 0; }
                         }
                         @keyframes pulse-soft {
@@ -239,11 +245,15 @@ function FlowSVG({ activeStage }) {
                             .flow-anim { animation: none !important; }
                         }
                         .flow-conn {
-                            stroke-dasharray: 4 6;
-                            animation: flow-dash 1.3s linear infinite;
+                            /* Larger dash gap and slightly faster cycle
+                               keeps the "data flowing" perception clear
+                               even in dark mode where ambient contrast
+                               muted the original 4 6 pattern. */
+                            stroke-dasharray: 6 8;
+                            animation: flow-dash 1.0s linear infinite;
                             fill: none;
                         }
-                        .flow-conn-fast { animation-duration: 0.95s; }
+                        .flow-conn-fast { animation-duration: 0.75s; }
                         .flow-pulse { animation: pulse-soft 2.4s ease-in-out infinite; }
                         .flow-node-bg { fill: hsl(var(--surface-elevated)); stroke-width: 1.25; }
                         .flow-node-clickable { cursor: pointer; transition: filter 200ms ease; }
@@ -278,7 +288,7 @@ function FlowSVG({ activeStage }) {
                             className="flow-conn flow-anim"
                             d={`M ${ingestX + 70} ${reasonY} C ${ingestX + 200} ${reasonY}, ${computeX - 200} ${y2}, ${computeX - 70} ${y2}`}
                             stroke="url(#line-gold)"
-                            strokeWidth="1.5"
+                            strokeWidth="2"
                         />
                     );
                 })}
@@ -292,7 +302,7 @@ function FlowSVG({ activeStage }) {
                             className="flow-conn flow-anim flow-conn-fast"
                             d={`M ${computeX + 70} ${y1} C ${computeX + 200} ${y1}, ${reasonX - 200} ${reasonY}, ${reasonX - 70} ${reasonY}`}
                             stroke="url(#line-violet)"
-                            strokeWidth="1.5"
+                            strokeWidth="2"
                         />
                     );
                 })}
@@ -306,7 +316,7 @@ function FlowSVG({ activeStage }) {
                             className="flow-conn flow-anim"
                             d={`M ${reasonX + 70} ${reasonY} C ${reasonX + 130} ${reasonY}, ${outputX - 130} ${y2}, ${outputX - 60} ${y2}`}
                             stroke="url(#line-green)"
-                            strokeWidth="1.5"
+                            strokeWidth="2"
                         />
                     );
                 })}
@@ -507,10 +517,14 @@ function FlowLegend() {
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 justify-center font-mono"
             style={{ fontSize: "10px", color: "hsl(var(--text-muted))" }}
         >
-            <LegendDot color="hsl(184, 75%, 60%)" label="Data ingest" />
-            <LegendDot color="hsl(var(--gold))" label="Deterministic compute" />
-            <LegendDot color="hsl(256, 92%, 76%)" label="AI reasoning (stochastic)" />
-            <LegendDot color="hsl(var(--buy))" label="Output artifact" />
+            <LegendDot color="hsl(184, 75%, 50%)" label="Data ingest" />
+            {/* Use an explicit saturated gold (45° hue, 92% sat, 55%
+                lightness) instead of `hsl(var(--gold))` — the gold CSS
+                token in light mode resolves to a low-contrast goldenrod
+                that disappeared against the page's cream background. */}
+            <LegendDot color="hsl(45, 92%, 55%)" label="Deterministic compute" />
+            <LegendDot color="hsl(256, 92%, 70%)" label="AI reasoning (stochastic)" />
+            <LegendDot color="hsl(140, 50%, 45%)" label="Output artifact" />
             <span className="opacity-70">⏱ ≈ 12–18 s end-to-end</span>
         </div>
     );
@@ -521,7 +535,20 @@ function LegendDot({ color, label }) {
         <span className="inline-flex items-center gap-1.5">
             <span
                 aria-hidden="true"
-                style={{ width: 8, height: 8, borderRadius: 2, background: color, display: "inline-block" }}
+                style={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: 2,
+                    background: color,
+                    display: "inline-block",
+                    // 1px outline so the dot stays visible in both light
+                    // and dark modes — the gold dot used to vanish on the
+                    // light theme's cream background where the gold token
+                    // is a near-match, and pale dots could merge with
+                    // dark surfaces too.
+                    border: "1px solid hsl(var(--border-default))",
+                    boxShadow: `0 0 0 1px ${color}33`,
+                }}
             />
             <span className="uppercase tracking-wider">{label}</span>
         </span>
