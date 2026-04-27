@@ -18,17 +18,21 @@ export default function MethodologyLink({ anchor, label, variant = "icon", class
                 to={to}
                 title={title}
                 aria-label={title}
-                className={`inline-flex items-center gap-1 font-mono hover:opacity-100 transition-opacity ${className}`}
+                // 28×28 minimum touch target on mobile (Apple HIG / Material).
+                // Visually still feels like a 0.54rem chip thanks to the
+                // negative -my-1 trick (visual height ≈12px, hit target ≈28px).
+                className={`inline-flex items-center justify-center gap-1 font-mono hover:opacity-100 transition-opacity px-2 py-1.5 -my-1 ${className}`}
                 style={{
                     color: "hsl(var(--hold))",
                     fontSize: "0.54rem",
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
                     opacity: 0.7,
+                    minHeight: 28,
                 }}
                 data-testid={`method-link-${anchor}`}
             >
-                <HelpCircle size={10} strokeWidth={1.5} /> how?
+                <HelpCircle size={11} strokeWidth={1.5} /> how?
             </Link>
         );
     }
@@ -37,11 +41,18 @@ export default function MethodologyLink({ anchor, label, variant = "icon", class
             to={to}
             title={title}
             aria-label={title}
+            // 28×28 minimum tap target — keeps the icon visually small but
+            // gives the user enough finger room on mobile.
             className={`inline-flex items-center justify-center hover:opacity-100 transition-opacity ${className}`}
-            style={{ color: "hsl(var(--hold))", opacity: 0.55 }}
+            style={{
+                color: "hsl(var(--hold))",
+                opacity: 0.55,
+                minWidth: 28,
+                minHeight: 28,
+            }}
             data-testid={`method-link-${anchor}`}
         >
-            <HelpCircle size={11} strokeWidth={1.5} />
+            <HelpCircle size={12} strokeWidth={1.5} />
         </Link>
     );
 }

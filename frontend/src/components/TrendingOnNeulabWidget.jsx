@@ -216,13 +216,18 @@ function PillGroup({ options, value, onChange, testPrefix }) {
                         key={opt.key}
                         type="button"
                         onClick={() => onChange(opt.key)}
-                        className="text-xs px-2.5 py-1 font-mono transition-colors"
+                        // Bumped from py-1 to py-1.5 + minHeight:32 so the
+                        // chip clears Apple HIG's 28px touch-target floor on
+                        // mobile. Visual height shifts only ~6px, layout
+                        // unchanged on desktop.
+                        className="text-xs px-3 py-1.5 font-mono transition-colors inline-flex items-center justify-center"
                         style={{
                             color: active ? "hsl(var(--text-primary))" : "hsl(var(--text-muted))",
                             background: active ? "hsl(var(--surface-base))" : "transparent",
                             border: active ? "1px solid hsl(var(--border-default))" : "1px solid transparent",
                             borderRadius: 2,
                             letterSpacing: "0.05em",
+                            minHeight: 32,
                         }}
                         data-testid={`${testPrefix}-${opt.key}`}
                     >

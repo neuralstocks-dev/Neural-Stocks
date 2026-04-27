@@ -81,8 +81,16 @@ function PatternRow({ p, analysisCreatedAt }) {
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
                     <Link
                         to={`/technical#pattern-${(p.pattern || "").toLowerCase().replace(/\s+/g, "-")}`}
-                        className="font-serif hover:underline decoration-dotted underline-offset-4"
-                        style={{ fontSize: "1.05rem", letterSpacing: "-0.005em", color: "hsl(var(--text-primary))" }}
+                        // Bumped to inline-flex with minHeight 32 so the
+                        // pattern name reads as a comfortably tappable
+                        // standalone heading on mobile (was 25px tall).
+                        className="font-serif hover:underline decoration-dotted underline-offset-4 inline-flex items-center"
+                        style={{
+                            fontSize: "1.05rem",
+                            letterSpacing: "-0.005em",
+                            color: "hsl(var(--text-primary))",
+                            minHeight: 32,
+                        }}
                         title={`Methodology — ${p.pattern}`}
                         data-testid={`pattern-methodology-${(p.pattern || "").toLowerCase().replace(/\s+/g, "-")}`}
                     >
@@ -389,7 +397,7 @@ function BiasAlignmentLine({ sentence }) {
                         key={d.id}
                         type="button"
                         onClick={() => smoothScrollTo(d.id)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 font-mono transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 font-mono transition-colors"
                         style={{
                             color: "hsl(var(--accent-primary))",
                             background: "transparent",
@@ -398,6 +406,8 @@ function BiasAlignmentLine({ sentence }) {
                             letterSpacing: "0.08em",
                             borderRadius: 2,
                             cursor: "pointer",
+                            // Comfortable mobile tap target — Apple HIG 28px floor.
+                            minHeight: 32,
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = "hsl(var(--accent-primary) / 0.1)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}

@@ -62,8 +62,15 @@ export default function LiveDeskGuide() {
         >
             <button
                 onClick={handleDismiss}
-                className="absolute top-3 right-3 p-1 transition-colors"
-                style={{ color: "hsl(var(--text-muted))" }}
+                // Bump tap target to 28×28 (Apple HIG minimum). Visually
+                // unchanged thanks to flex-center inside p-1.5; still feels
+                // like a small ghost-X button.
+                className="absolute top-2.5 right-2.5 inline-flex items-center justify-center transition-colors"
+                style={{
+                    color: "hsl(var(--text-muted))",
+                    minWidth: 28,
+                    minHeight: 28,
+                }}
                 aria-label="Dismiss guide"
                 data-testid="live-desk-guide-dismiss"
                 title="Hide this guide"
