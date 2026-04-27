@@ -22,6 +22,7 @@ import AlternativeScenariosModule from "@/components/AlternativeScenariosModule"
 import WhatCouldChangeViewModule from "@/components/WhatCouldChangeViewModule";
 import HowToReadModule from "@/components/HowToReadModule";
 import ShareSectionButton from "@/components/ShareSectionButton";
+import ReanalyzeButtonContent from "@/components/ReanalyzeButtonContent";
 
 // Module-share headline builders. Each returns { title, text } that
 // pre-fills the native share sheet (Twitter/Telegram/WhatsApp). Keep
@@ -120,6 +121,15 @@ export default function AnalysisReportPage() {
     // stepper next to the Re-analyze button. Reset to null when not
     // analyzing so the stepper hides automatically.
     const [progress, setProgress] = useState(null);
+    // Live ETA + elapsed-seconds counter. `etaSec` is fetched once from
+    // /analysis/queue/status at the moment we POST /start so the user
+    // sees a *calibrated* expected duration (rolling EMA across recent
+    // jobs + their position in the worker queue), not a hard-coded
+    // guess. `elapsedSec` ticks every 1s while analyzing so the
+    // remaining-seconds figure stays honest if the job runs long. Both
+    // reset to 0 / null when analyzing flips back to false.
+    const [etaSec, setEtaSec] = useState(null);
+    const [elapsedSec, setElapsedSec] = useState(0);
     // All 3 analysis modes are available to all tiers (Feb 2026).
     const canPro = true;
     const [mode, setMode] = useState("hybrid");
@@ -129,6 +139,23 @@ export default function AnalysisReportPage() {
     useEffect(() => {
         setMode("hybrid");
     }, []);
+
+    // Tick the elapsed-seconds counter every 1s while analyzing. Bound to
+    // `analyzing` so the timer auto-stops the moment the job resolves
+    // (or errors). We use Date.now() math instead of incrementing because
+    // setInterval drifts and a job that takes 75s should report 75s, not
+    // 73s due to drift accumulation across browser tabs.
+    useEffect(() => {
+        if (!analyzing) {
+            setElapsedSec(0);
+            return undefined;
+        }
+        const startedAt = Date.now();
+        const id = setInterval(() => {
+            setElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
+        }, 1000);
+        return () => clearInterval(id);
+    }, [analyzing]);
 
     // When viewing an existing verdict, the selector is read-only and locked
     // to the mode the verdict was generated with.
@@ -194,6 +221,22 @@ export default function AnalysisReportPage() {
             setError("");
             setErrorRaw(null);
             setProgress(null);
+            setEtaSec(null);
+            // Fetch the live ETA from the worker pool *before* posting
+            // /start so we can show the user a calibrated "~Ns left"
+            // figure from second-1 instead of a hard-coded guess. Best
+            // effort — if the queue endpoint is slow/erroring we
+            // proceed without an ETA (the button just shows elapsed
+            // seconds). The avg_duration_s from the rolling EMA is
+            // typically 45-65s on US tickers, 60-90s on slow IDX.
+            try {
+                const q = await api.get(`/analysis/queue/status`);
+                const wait = Number(q?.data?.estimated_wait_s) || 0;
+                const avg = Number(q?.data?.avg_duration_s) || 50;
+                setEtaSec(Math.round(wait + avg));
+            } catch {
+                /* non-fatal — proceed without an ETA */
+            }
             try {
                 // Re-analysis preserves the mode of the existing verdict (if any).
                 const effectiveMode = analysis?.mode || mode;
@@ -270,6 +313,7 @@ export default function AnalysisReportPage() {
             } finally {
                 setAnalyzing(false);
                 setProgress(null);
+                setEtaSec(null);
             }
         });
     };
@@ -474,18 +518,14 @@ export default function AnalysisReportPage() {
                                     <button
                                         onClick={runAnalysis}
                                         disabled={analyzing}
-                                        className="btn-primary"
+                                        className="btn-primary relative overflow-hidden"
                                         data-testid="run-analysis-button"
                                     >
-                                        {analyzing ? (
-                                            <>
-                                                <Loader2 size={14} className="animate-spin" /> Thinking…
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Sparkles size={14} strokeWidth={1.5} /> {analysis ? "Re-analyze" : "Analyze now"}
-                                            </>
-                                        )}
+                                        <ReanalyzeButtonContent
+                                            analyzing={analyzing}
+                                            elapsedSec={elapsedSec}
+                                            etaSec={etaSec}
+                                        />
                                     </button>
                                     <AnalysisQueueChip watch />
                                 </div>
@@ -581,13 +621,15 @@ export default function AnalysisReportPage() {
                                 <button
                                     onClick={runAnalysis}
                                     disabled={analyzing}
-                                    className="btn-primary mt-8"
+                                    className="btn-primary mt-8 relative overflow-hidden"
                                     data-testid="empty-analyze-button"
                                 >
                                     {analyzing ? (
-                                        <>
-                                            <Loader2 size={14} className="animate-spin" /> Thinking…
-                                        </>
+                                        <ReanalyzeButtonContent
+                                            analyzing={analyzing}
+                                            elapsedSec={elapsedSec}
+                                            etaSec={etaSec}
+                                        />
                                     ) : (
                                         <>
                                             <Sparkles size={14} strokeWidth={1.5} /> Run Analysis
