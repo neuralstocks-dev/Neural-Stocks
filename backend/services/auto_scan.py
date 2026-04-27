@@ -118,16 +118,23 @@ async def _scan_user(user: dict, market_df: dict) -> int:
         acc = opinion.get("model_info", {}).get("holdout_accuracy")
         acc_line = f" · model hist. accuracy {round((acc or 0)*100)}%" if acc else ""
 
-        title = f"RF watchlist scan · {direction} · {ticker} · {round(prob_up*100)}%"
+        # Educational framing — RF model is a research signal, not a trade
+        # instruction. We keep the BUY/SELL "direction" string for routing
+        # and color but describe it as analytical bias in the user-facing copy.
+        bias_word = {"BUY": "Bullish", "SELL": "Bearish"}.get(direction, "Neutral")
+        title = f"RF watchlist scan · {bias_word} bias · {ticker} · {round(prob_up*100)}% model probability"
         body = (
-            f"Random-Forest model alone flags {ticker}{price_line} as "
-            f"{direction} over a {horizon}-day horizon with probability "
-            f"{round(prob_up*100)}%.\n\n"
-            f"⚠️ This is a lightweight RF-only alert — NOT a full Neulab "
-            f"analysis. No Claude LLM reasoning, no candlestick verification, "
-            f"no price target. Open the app and tap Analyze on {ticker} for "
-            f"the full multi-lens verdict before acting.\n"
-            f"Mode: Auto-scan (RF only){acc_line}"
+            f"The Random-Forest model classifies {ticker}{price_line} with a "
+            f"{bias_word.lower()} analytical bias over a {horizon}-day horizon "
+            f"(model probability {round(prob_up*100)}%).\n\n"
+            f"⚠️ This is a lightweight RF-only scan — NOT a full Neulab research "
+            f"summary. No Claude reasoning, no candlestick verification, no "
+            f"scenario levels. Open the app and tap Analyze on {ticker} for the "
+            f"full multi-lens research view before drawing conclusions.\n"
+            f"Mode: Auto-scan (RF only){acc_line}\n\n"
+            f"<i>Educational research output — model probability is classification "
+            f"strength based on the inputs, not a forecast probability. Not "
+            f"personalized financial advice.</i>"
         )
 
         # Create dashboard alert (type="rf_watchlist_scan" so UI can label clearly)

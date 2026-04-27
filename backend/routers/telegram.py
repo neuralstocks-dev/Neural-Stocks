@@ -42,7 +42,15 @@ async def send_test(user=Depends(get_current_user)):
     ok = await tg.send_alert_to_user(
         user["id"],
         "Neulab · test notification",
-        "If you're reading this, Telegram alerts are working. You'll get pattern and verdict alerts here.",
+        (
+            "If you're reading this, Telegram alerts are working.\n\n"
+            "You'll receive research-summary notifications here when patterns are detected, "
+            "AI analyses complete, or RF watchlist scans flag a shift in analytical bias.\n\n"
+            "<i>All Neulab notifications are educational research output. Confidence and "
+            "model probability values describe the strength of the model's classification "
+            "based on the inputs — they are not forecasts of price movement and not "
+            "personalized financial advice.</i>"
+        ),
     )
     if not ok:
         raise HTTPException(status_code=400, detail="Not linked to Telegram yet, or send failed.")

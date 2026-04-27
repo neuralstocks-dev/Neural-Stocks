@@ -413,10 +413,21 @@ async def _maybe_create_alert(user_id: str, ticker: str, analysis: dict, mode: s
             schedule = _hydrate_schedule(user.get("telegram_alert_schedule")).get("signal", "realtime")
             qh = _hydrate_quiet_hours(user.get("telegram_quiet_hours"))
             target = analysis.get("price_target")
-            target_line = f"\nTarget: ${target}" if target else ""
+            target_line = f"\nScenario level: ${target}" if target else ""
             mode_label = (mode or "standard").capitalize()
-            title = f"{rec} · {ticker} · {conf}%"
-            body = f"{analysis.get('executive_summary', '')}{target_line}\n\nMode: {mode_label}"
+            # Educational tone: BUY/SELL/HOLD remain as the internal codes
+            # (used for color routing) but the message frames them as
+            # analytical bias, not trade instructions. Keeps the platform's
+            # voice consistent with the web report + PDF + share page.
+            bias_label = {"BUY": "Bullish bias", "SELL": "Bearish bias", "HOLD": "Neutral bias"}.get(rec, rec)
+            title = f"{bias_label} · {ticker} · {conf}% classification strength"
+            body = (
+                f"{analysis.get('executive_summary', '')}{target_line}\n\n"
+                f"Mode: {mode_label}\n"
+                f"<i>Educational research output — confidence is the model's classification "
+                f"strength based on the inputs, not a forecast probability. Not personalized "
+                f"financial advice.</i>"
+            )
             # Realtime + inside quiet hours → silently defer to daily digest
             # so the user isn't buzzed at 3am. Anything explicitly digest_*
             # already takes the queue path.
@@ -1432,8 +1443,20 @@ async def scan_watchlist_patterns(user=Depends(get_current_user)):
                 from services.telegram import send_alert_to_user
                 schedule = _hydrate_schedule(user_doc.get("telegram_alert_schedule")).get("pattern", "realtime")
                 qh = _hydrate_quiet_hours(user_doc.get("telegram_quiet_hours"))
-                title = f"{best['pattern']} · {ticker}"
-                body = f"{best['bias'].upper()} on {best['timeframe']} · strength {best['strength']}\n\n{best.get('explanation', '')}"
+                # Educational framing — describe what the pattern detector
+                # observed without imperative trading language.
+                bias_word = {"bullish": "Bullish", "bearish": "Bearish"}.get(
+                    (best.get("bias") or "").lower(), "Neutral"
+                )
+                title = f"{best['pattern']} pattern detected · {ticker}"
+                body = (
+                    f"{bias_word} candlestick pattern observed on the {best['timeframe']} "
+                    f"timeframe (detector strength {best['strength']}).\n\n"
+                    f"{best.get('explanation', '')}\n\n"
+                    f"<i>Educational research output — pattern detection is one signal among "
+                    f"many. Open the full analysis for context before making any decision. "
+                    f"Not personalized financial advice.</i>"
+                )
                 if schedule == "realtime" and not is_in_quiet_hours(qh):
                     asyncio.create_task(send_alert_to_user(user["id"], title, body, ticker=ticker))
                 else:

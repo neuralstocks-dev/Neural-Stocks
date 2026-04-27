@@ -132,7 +132,10 @@ async def poll_and_link() -> int:
         await _send_message(
             chat_id,
             f"✅ Your Neulab account is now linked, {name.split()[0] if isinstance(name, str) else 'there'}.\n\n"
-            "You'll receive pattern alerts and verdict notifications here. Reply /unlink to disconnect."
+            "You'll receive research-summary notifications here when patterns are detected, "
+            "AI analyses complete, or RF watchlist scans flag a shift in analytical bias.\n\n"
+            "All notifications are educational research output — not personalized financial advice.\n\n"
+            "Reply /unlink to disconnect."
         )
     if max_id >= offset:
         await _set_updates_offset(max_id + 1)
