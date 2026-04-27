@@ -152,6 +152,28 @@ async def list_durations(_admin=Depends(admin_required)):
     return {k: v for k, v in UNLOCK_DURATIONS.items()}
 
 
+@router.get("/llm-breaker")
+async def llm_breaker_status(_admin=Depends(admin_required)):
+    """Inspect the LLM circuit breaker state (tripped/cleared, consecutive
+    fail/success counts, last 10 outcomes). Useful for diagnosing whether
+    a recent spate of "AI provider slow" responses was a real outage or
+    a breaker config issue."""
+    from services import llm_circuit_breaker
+    return llm_circuit_breaker.status()
+
+
+@router.post("/llm-breaker/reset")
+async def llm_breaker_reset(_admin=Depends(admin_required)):
+    """Force-clear the breaker. Useful if the auto-clear timeout is too
+    long for a manual rollout decision (e.g. you've independently
+    verified Claude is healthy and want to accept new jobs immediately)."""
+    from services import llm_circuit_breaker
+    # Hard-reset by marking 2 successes which is enough to clear the trip
+    for _ in range(max(1, 2)):
+        llm_circuit_breaker.record_outcome("success")
+    return {"ok": True, "status": llm_circuit_breaker.status()}
+
+
 @router.post("/users/{user_id}/unlock")
 async def unlock_user(user_id: str, req: UnlockReq, admin=Depends(admin_required)):
     seconds = UNLOCK_DURATIONS.get(req.duration)

@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from core.db import db
 from core.security import iso, now_utc
 from routers.analysis import _create_analysis_impl
+from services import llm_circuit_breaker
 
 router = APIRouter(prefix="/try", tags=["anonymous-try"])
 
@@ -202,6 +203,20 @@ async def anon_try_analysis(ticker: str, request: Request, mode: str = Query("hy
     # This dodges ingress timeouts (production ingress caps ~30s but a cold
     # anon analysis runs Claude + yfinance + fundamentals which typically
     # takes 25-45s). Frontend polls /api/try/job/{job_id} every 2s.
+    # ---- Circuit breaker gate ------------------------------------------
+    # If the last N consecutive LLM-backed jobs have timed out, fast-fail
+    # here instead of spawning a doomed 180s job. Applies ONLY to cache
+    # misses — cache hits above still serve because they never touch
+    # Claude. Env-tunable via LLM_BREAKER_TRIP_AFTER / RESET_AFTER.
+    if llm_circuit_breaker.is_tripped():
+        _log.info("Anon try fast-failed by breaker for %s (ip %s)", ticker_up, ip_hash[:8])
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "ai_provider_degraded",
+                "message": llm_circuit_breaker.PUBLIC_MESSAGE,
+            },
+        )
     job_id = uuid.uuid4().hex[:16]
     await db.anon_try_jobs.insert_one({
         "job_id": job_id,
@@ -279,6 +294,7 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
             _create_analysis_impl(ticker_up, mode, synthetic),
             timeout=anon_timeout,
         )
+        llm_circuit_breaker.record_outcome("success")
         verdict_id = result["id"]
         await db.anon_try_usage.insert_one({
             "ip_hash": ip_hash,
@@ -297,6 +313,7 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
             }},
         )
     except asyncio.TimeoutError:
+        llm_circuit_breaker.record_outcome("timeout")
         _log.warning("Anon job timed out after %.0fs for %s (job %s)", anon_timeout, ticker_up, job_id)
         await db.anon_try_jobs.update_one(
             {"job_id": job_id},

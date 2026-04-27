@@ -16,6 +16,7 @@ from services import rf_predictor
 from services.features import feature_row_for_today
 import pandas as pd
 from services.quota import enforce_analysis_quota, plan_for, resolved_plan_for
+from services import llm_circuit_breaker
 from routers.disclaimer import require_accepted
 
 router = APIRouter(tags=["analysis"])
@@ -480,6 +481,16 @@ async def start_analysis(
         from services.quota import enforce_idx_analysis_quota
         await enforce_idx_analysis_quota(user)
 
+    # Circuit breaker — fast-fail when the LLM provider is in an outage.
+    # Placed AFTER quota checks so we don't waste a user's quota on a
+    # job we know is going to time out. The breaker stays tripped until
+    # we observe enough successes OR hits the hard time ceiling.
+    if llm_circuit_breaker.is_tripped():
+        raise HTTPException(
+            status_code=503,
+            detail=llm_circuit_breaker.PUBLIC_MESSAGE,
+        )
+
     job_id = str(uuid.uuid4())
     # Phase plan — the BG worker will mark each off as it advances. Surfaces
     # live progress in the UI so users see WHICH stage is active right now
@@ -549,6 +560,7 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
             _create_analysis_impl(ticker, mode, user, job_id=job_id),
             timeout=QUICK_PER_TASK_TIMEOUT,
         )
+        llm_circuit_breaker.record_outcome("success")
         await db.analysis_jobs.update_one(
             {"id": job_id},
             {"$set": {
@@ -559,6 +571,7 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
             }},
         )
     except asyncio.TimeoutError:
+        llm_circuit_breaker.record_outcome("timeout")
         await db.analysis_jobs.update_one(
             {"id": job_id},
             {"$set": {
