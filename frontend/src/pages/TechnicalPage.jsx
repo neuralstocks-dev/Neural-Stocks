@@ -27,6 +27,8 @@ import {
     Trees,
 } from "lucide-react";
 
+import PipelineFlowDiagram from "@/components/PipelineFlowDiagram";
+
 export default function TechnicalPage() {
     const loc = useLocation();
     const [rfMeta, setRfMeta] = useState(null);
@@ -236,6 +238,8 @@ export default function TechnicalPage() {
                     title="The eight-stage analysis pipeline."
                     subtitle="What happens in the 15 seconds between you clicking Analyze and the verdict appearing."
                 />
+
+                <PipelineFlowDiagram />
 
                 <ol className="mt-8 space-y-1" data-testid="tech-pipeline">
                     <StageRow

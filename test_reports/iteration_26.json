@@ -28,7 +28,7 @@
     "backend": "not retested (16/16 PASS from iter 25 still stands)",
     "frontend": "3/3 PASS (100%) — fresh-device, bogus-token, and already-logged-in flows all green"
   },
-  "test_credentials": "Admin: jolor69@gmail.com / admin1234 (id=58c25b43-3a69-4703-9d0d-dff76de4a745). Used for flow 3 via direct POST /api/auth/login + localStorage seed (login form's primary 'Sign in' button selector ambiguity with the Google sign-in button — both match button:has-text('Sign in') — minor selector hardening opportunity, not a bug).",
+  "test_credentials": "Admin: jolor69@gmail.com / admin1234 (id=p1-builder). Used for flow 3 via direct POST /api/auth/login + localStorage seed (login form's primary 'Sign in' button selector ambiguity with the Google sign-in button — both match button:has-text('Sign in') — minor selector hardening opportunity, not a bug).",
   "seed_data_creation": "Minted 2 fresh magic tokens (ade64e12... for flow 1, 93f2209c... for flow 3); both consumed during the test run. No residual data.",
   "retest_needed": false,
   "should_main_agent_self_test": true,
