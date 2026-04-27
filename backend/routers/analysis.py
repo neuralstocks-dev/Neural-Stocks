@@ -1537,14 +1537,23 @@ def _public_view(analysis: dict) -> dict:
         # owner sees in their web report. Whitelist only the display
         # fields — internal `inputs` (raw EPS / BVPS / ROE / cost-of-equity
         # numbers) stay server-side to avoid leaking competitor signal.
-        "intrinsic_value_anchor": {
-            k: (analysis.get("intrinsic_value_anchor") or {}).get(k)
-            for k in (
+        # `graham` / `rim` sub-objects only expose `estimate` + `applicability`
+        # so the chip's compare-methods popover can show both sides.
+        "intrinsic_value_anchor": (lambda iva: {
+            **{k: iva.get(k) for k in (
                 "primary_anchor", "primary_estimate", "primary_applicability",
                 "current_price", "premium_to_anchor_pct", "interpretation",
                 "sector", "market",
-            )
-        } if (analysis.get("intrinsic_value_anchor") or {}).get("primary_anchor") not in (None, "none") else None,
+            )},
+            "graham": {
+                "estimate": (iva.get("graham") or {}).get("estimate"),
+                "applicability": (iva.get("graham") or {}).get("applicability"),
+            },
+            "rim": {
+                "estimate": (iva.get("rim") or {}).get("estimate"),
+                "applicability": (iva.get("rim") or {}).get("applicability"),
+            },
+        })(analysis.get("intrinsic_value_anchor") or {}) if (analysis.get("intrinsic_value_anchor") or {}).get("primary_anchor") not in (None, "none") else None,
         "quote_snapshot": {k: v for k, v in (analysis.get("quote_snapshot") or {}).items()
                            if k in ("name", "currency", "exchange")},
     }
