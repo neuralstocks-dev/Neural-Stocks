@@ -78,7 +78,7 @@ export default function IdxCatalogCard() {
                         type="button"
                         onClick={loadStats}
                         disabled={loading}
-                        className="btn-ghost !py-1 !px-3 !text-xs flex items-center gap-2"
+                        className="btn-ghost !py-1.5 !px-3 !text-xs flex items-center gap-2 min-h-[32px]"
                         data-testid="catalog-refresh-button"
                     >
                         <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh

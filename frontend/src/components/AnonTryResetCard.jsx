@@ -70,7 +70,7 @@ export default function AnonTryResetCard() {
                     type="button"
                     onClick={load}
                     disabled={loading}
-                    className="btn-ghost !py-1 !px-3 !text-xs flex items-center gap-2"
+                    className="btn-ghost !py-1.5 !px-3 !text-xs flex items-center gap-2 min-h-[32px]"
                     data-testid="anon-try-refresh"
                 >
                     <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh

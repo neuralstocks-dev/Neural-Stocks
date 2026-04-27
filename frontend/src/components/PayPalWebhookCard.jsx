@@ -143,7 +143,7 @@ export default function PayPalWebhookCard() {
                         type="button"
                         onClick={load}
                         disabled={loading}
-                        className="btn-ghost !py-1 !px-3 !text-xs flex items-center gap-2"
+                        className="btn-ghost !py-1.5 !px-3 !text-xs flex items-center gap-2 min-h-[32px]"
                         data-testid="webhook-refresh-button"
                     >
                         <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
@@ -301,7 +301,7 @@ export default function PayPalWebhookCard() {
                                             type="button"
                                             onClick={subscribeCurated}
                                             disabled={subscribing}
-                                            className="btn-ghost !py-1 !px-3 !text-xs"
+                                            className="btn-ghost !py-1.5 !px-3 !text-xs min-h-[32px]"
                                             data-testid="subscribe-curated-events"
                                         >
                                             {subscribing ? "Subscribing…" : `Subscribe curated (${DEFAULT_CURATED.length})`}
@@ -310,7 +310,7 @@ export default function PayPalWebhookCard() {
                                             type="button"
                                             onClick={subscribeAll}
                                             disabled={subscribing}
-                                            className="btn-ghost !py-1 !px-3 !text-xs"
+                                            className="btn-ghost !py-1.5 !px-3 !text-xs min-h-[32px]"
                                             data-testid="subscribe-all-events"
                                         >
                                             {subscribing ? "Subscribing…" : `Subscribe ALL (${data.available_event_types.length})`}

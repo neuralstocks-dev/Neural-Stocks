@@ -322,7 +322,7 @@ export default function AddStockModal({ open, onClose, onAdded }) {
                                                 type="button"
                                                 onClick={() => verifyIdx(s.ticker)}
                                                 disabled={!!adding}
-                                                className="btn-ghost !py-1 !px-2 !text-xs inline-flex items-center gap-1"
+                                                className="btn-ghost !py-1.5 !px-2 !text-xs inline-flex items-center gap-1 min-h-[32px]"
                                                 data-testid={`verify-idx-${s.ticker}`}
                                                 title="Make 1 RapidAPI call to confirm this IDX ticker exists"
                                             >

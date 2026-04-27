@@ -790,7 +790,7 @@ export default function AdminPage() {
                                     <button
                                         onClick={toggleAllUsers}
                                         disabled={deletable.length === 0 || userBulkBusy}
-                                        className="btn-ghost !py-1 !px-3 !text-xs flex items-center gap-2"
+                                        className="btn-ghost !py-1.5 !px-3 !text-xs flex items-center gap-2 min-h-[32px]"
                                         data-testid="users-select-all-button"
                                     >
                                         {selectedUsers.size > 0 && selectedUsers.size >= deletable.length ? (
@@ -805,7 +805,7 @@ export default function AdminPage() {
                                     <button
                                         onClick={deleteSelectedUsers}
                                         disabled={selectedUsers.size === 0 || userBulkBusy}
-                                        className="btn-ghost !py-1 !px-3 !text-xs"
+                                        className="btn-ghost !py-1.5 !px-3 !text-xs min-h-[32px]"
                                         style={{ color: selectedUsers.size > 0 ? "hsl(var(--sell))" : undefined }}
                                         data-testid="users-remove-selected-button"
                                     >
@@ -1042,7 +1042,7 @@ export default function AdminPage() {
                                                                 onClick={() =>
                                                                     unlock(u.id, pendingDuration[u.id] || "1h")
                                                                 }
-                                                                className="btn-ghost !py-1 !px-2 !text-xs"
+                                                                className="btn-ghost !py-1.5 !px-2 !text-xs min-h-[32px]"
                                                                 disabled={busy === u.id}
                                                                 data-testid={`unlock-${u.email}-button`}
                                                             >
@@ -1054,7 +1054,7 @@ export default function AdminPage() {
                                                             </button>
                                                             <button
                                                                 onClick={() => reset(u.id)}
-                                                                className="btn-ghost !py-1 !px-2 !text-xs"
+                                                                className="btn-ghost !py-1.5 !px-2 !text-xs min-h-[32px]"
                                                                 disabled={busy === u.id}
                                                                 title="Reset to Free"
                                                                 data-testid={`reset-${u.email}-button`}
@@ -1063,7 +1063,7 @@ export default function AdminPage() {
                                                             </button>
                                                             <button
                                                                 onClick={() => resetQuota(u.id, u.email)}
-                                                                className="btn-ghost !py-1 !px-2 !text-xs"
+                                                                className="btn-ghost !py-1.5 !px-2 !text-xs min-h-[32px]"
                                                                 disabled={busy === u.id}
                                                                 title="Reset daily + weekly analysis-quota window"
                                                                 data-testid={`reset-quota-${u.email}-button`}
@@ -1072,7 +1072,7 @@ export default function AdminPage() {
                                                             </button>
                                                             <button
                                                                 onClick={() => clearAlerts(u.id, u.email)}
-                                                                className="btn-ghost !py-1 !px-2 !text-xs"
+                                                                className="btn-ghost !py-1.5 !px-2 !text-xs min-h-[32px]"
                                                                 disabled={busy === u.id}
                                                                 title="Remove alert list"
                                                                 data-testid={`clear-alerts-${u.email}-button`}
@@ -1082,7 +1082,7 @@ export default function AdminPage() {
                                                             {!u.is_admin && (
                                                                 <button
                                                                     onClick={() => deleteUser(u.id, u.email)}
-                                                                    className="btn-ghost !py-1 !px-2 !text-xs"
+                                                                    className="btn-ghost !py-1.5 !px-2 !text-xs min-h-[32px]"
                                                                     disabled={busy === u.id}
                                                                     title="Delete user & all data"
                                                                     style={{ color: "hsl(var(--sell))" }}
@@ -1124,7 +1124,7 @@ export default function AdminPage() {
                                     <button
                                         onClick={toggleAllLogins}
                                         disabled={logins.length === 0 || loginBusy}
-                                        className="btn-ghost !py-1 !px-3 !text-xs flex items-center gap-2"
+                                        className="btn-ghost !py-1.5 !px-3 !text-xs flex items-center gap-2 min-h-[32px]"
                                         data-testid="logins-select-all-button"
                                     >
                                         {selectedLogins.size > 0 && selectedLogins.size === logins.length ? (
@@ -1139,7 +1139,7 @@ export default function AdminPage() {
                                     <button
                                         onClick={deleteSelectedLogins}
                                         disabled={selectedLogins.size === 0 || loginBusy}
-                                        className="btn-ghost !py-1 !px-3 !text-xs"
+                                        className="btn-ghost !py-1.5 !px-3 !text-xs min-h-[32px]"
                                         data-testid="logins-delete-selected-button"
                                     >
                                         {loginBusy ? (
@@ -1151,7 +1151,7 @@ export default function AdminPage() {
                                     <button
                                         onClick={clearAllLogins}
                                         disabled={logins.length === 0 || loginBusy}
-                                        className="btn-ghost !py-1 !px-3 !text-xs"
+                                        className="btn-ghost !py-1.5 !px-3 !text-xs min-h-[32px]"
                                         style={{ color: "hsl(var(--sell))" }}
                                         data-testid="logins-clear-all-button"
                                     >

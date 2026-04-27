@@ -62,7 +62,7 @@ export default function ExperimentsCard() {
                         type="button"
                         onClick={load}
                         disabled={loading}
-                        className="btn-ghost !py-1 !px-3 !text-xs flex items-center gap-2"
+                        className="btn-ghost !py-1.5 !px-3 !text-xs flex items-center gap-2 min-h-[32px]"
                         data-testid="experiments-refresh-button"
                     >
                         <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
@@ -216,13 +216,14 @@ function PillGroup({ options, value, onChange }) {
                         key={opt.key}
                         type="button"
                         onClick={() => onChange(opt.key)}
-                        className="text-xs px-2.5 py-1 font-mono"
+                        className="text-xs px-3 py-1.5 font-mono inline-flex items-center justify-center"
                         style={{
                             color: active ? "hsl(var(--text-primary))" : "hsl(var(--text-muted))",
                             background: active ? "hsl(var(--surface-base))" : "transparent",
                             border: active ? "1px solid hsl(var(--border-default))" : "1px solid transparent",
                             borderRadius: 2,
                             letterSpacing: "0.05em",
+                            minHeight: 32,
                         }}
                         data-testid={`experiments-window-${opt.key}`}
                     >
