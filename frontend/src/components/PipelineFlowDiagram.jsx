@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
     Database,
     LineChart,
@@ -61,6 +61,23 @@ const OUTPUTS = [
     { key: "alert", icon: Send, label: "Telegram alerts", sub: "Confidence ≥ 75 BUY/SELL", target: '[data-testid="pipeline-stage-08"]' },
 ];
 
+// All node identities + their scroll target. The IntersectionObserver
+// uses this list to map a visible section back to the matching node so
+// we can render a "you are here" highlight as the user scrolls through
+// the long technical page. Keep keys stable — they're used as
+// observation-element identifiers, ARIA selectors, and CSS class
+// suffixes everywhere downstream.
+const ALL_NODES = [
+    { key: "ingest", target: '[data-testid="pipeline-stage-01"]' },
+    { key: "tech", target: '[data-testid="pipeline-stage-02"]' },
+    { key: "candle", target: '[data-testid="pipeline-stage-03"]' },
+    { key: "ctx", target: '[data-testid="pipeline-stage-04"]' },
+    { key: "sent", target: "#bandarmology" },
+    { key: "anchor", target: "#intrinsic-anchor" },
+    { key: "llm", target: '[data-testid="pipeline-stage-07"]' },
+    { key: "output", target: '[data-testid="pipeline-stage-08"]' },
+];
+
 // Resolve a `target` string (CSS selector OR `#id` fragment) to its DOM
 // element and smooth-scroll. Headers offset via the existing scroll-mt-24
 // utility on each anchor section, so a `block: "start"` scroll lands
@@ -75,7 +92,65 @@ function scrollToTarget(selector) {
     setTimeout(() => el.classList.remove("flow-target-flash"), 900);
 }
 
+// Hook: returns the key of the currently-most-visible pipeline target
+// section. Watches all target sections via a single IntersectionObserver
+// (one observer is cheaper than one per target — same threshold semantics).
+// The "most visible" pick = highest intersectionRatio at update time, which
+// handles cases where multiple sections share viewport space (e.g. small
+// stage rows next to a tall deep-dive section) correctly.
+function useActiveStage() {
+    const [active, setActive] = useState(null);
+    useEffect(() => {
+        if (typeof IntersectionObserver === "undefined") return undefined;
+        // Resolve targets to DOM elements once on mount — `target` selectors
+        // are static. We rebuild only if the React tree mounts/unmounts the
+        // diagram, which is the one moment the targets could be missing.
+        const entries = ALL_NODES
+            .map((n) => ({ key: n.key, el: document.querySelector(n.target) }))
+            .filter((e) => e.el);
+        if (entries.length === 0) return undefined;
+        // Map back from DOM → key so the observer callback can look up
+        // each entry without scanning ALL_NODES on every fire.
+        const elToKey = new Map(entries.map((e) => [e.el, e.key]));
+        // Track the most-recent intersectionRatio per key so we can pick
+        // the winner across observer batches.
+        const ratios = new Map();
+        const obs = new IntersectionObserver(
+            (batch) => {
+                batch.forEach((b) => {
+                    const k = elToKey.get(b.target);
+                    if (!k) return;
+                    ratios.set(k, b.isIntersecting ? b.intersectionRatio : 0);
+                });
+                // Pick the key with the highest live ratio. Falls back to
+                // null when nothing is intersecting (user scrolled above
+                // the pipeline section entirely).
+                let bestKey = null;
+                let bestRatio = 0;
+                ratios.forEach((r, k) => {
+                    if (r > bestRatio) {
+                        bestRatio = r;
+                        bestKey = k;
+                    }
+                });
+                setActive(bestKey);
+            },
+            {
+                // Center 50% of the viewport — a section is "active" when
+                // it occupies the middle band, not when it just touches
+                // the top or bottom edge. This matches reading behavior.
+                rootMargin: "-25% 0px -25% 0px",
+                threshold: [0, 0.25, 0.5, 0.75, 1],
+            },
+        );
+        entries.forEach((e) => obs.observe(e.el));
+        return () => obs.disconnect();
+    }, []);
+    return active;
+}
+
 export default function PipelineFlowDiagram() {
+    const activeStage = useActiveStage();
     return (
         <div className="mt-10" data-testid="pipeline-flow-diagram">
             <p
@@ -87,12 +162,12 @@ export default function PipelineFlowDiagram() {
             </p>
             {/* Desktop / tablet ─ animated SVG flow */}
             <div className="hidden md:block">
-                <FlowSVG />
+                <FlowSVG activeStage={activeStage} />
                 <FlowLegend />
             </div>
             {/* Mobile ─ stacked card flow */}
             <div className="md:hidden">
-                <MobileFlow />
+                <MobileFlow activeStage={activeStage} />
             </div>
         </div>
     );
@@ -100,7 +175,7 @@ export default function PipelineFlowDiagram() {
 
 /* ───────────────────────── desktop SVG flow ───────────────────────── */
 
-function FlowSVG() {
+function FlowSVG({ activeStage }) {
     // Coord system: 1000 wide × 520 tall. Tweak here, viewBox does the rest.
     const W = 1000;
     const H = 520;
@@ -177,6 +252,19 @@ function FlowSVG() {
                         .flow-node-clickable:focus { outline: none; }
                         .flow-node-clickable:focus-visible .flow-node-bg { stroke-width: 2.25; }
                         .flow-target-flash { animation: target-flash 900ms ease-out; }
+                        /* Active "you are here" state — driven by
+                           IntersectionObserver on the target sections. */
+                        @keyframes flow-active-ring {
+                            0%, 100% { stroke-width: 2.4; }
+                            50%      { stroke-width: 3.0; }
+                        }
+                        .flow-node-active .flow-node-bg {
+                            stroke: hsl(var(--gold));
+                            stroke-width: 2.6;
+                            animation: flow-active-ring 1.6s ease-in-out infinite;
+                            filter: drop-shadow(0 0 8px hsla(45, 92%, 65%, 0.55));
+                        }
+                        .flow-node-active { animation: none; opacity: 1 !important; }
                     `}</style>
                 </defs>
 
@@ -235,6 +323,7 @@ function FlowSVG() {
                     Icon={Database}
                     width={140}
                     target='[data-testid="pipeline-stage-01"]'
+                    active={activeStage === "ingest"}
                 />
 
                 {/* Compute lanes */}
@@ -250,6 +339,7 @@ function FlowSVG() {
                         Icon={lane.icon}
                         width={170}
                         target={lane.target}
+                        active={activeStage === lane.key}
                     />
                 ))}
 
@@ -265,6 +355,7 @@ function FlowSVG() {
                     width={170}
                     big
                     target='[data-testid="pipeline-stage-07"]'
+                    active={activeStage === "llm"}
                 />
 
                 {/* Outputs */}
@@ -280,6 +371,7 @@ function FlowSVG() {
                         Icon={o.icon}
                         width={150}
                         target={o.target}
+                        active={activeStage === "output"}
                     />
                 ))}
             </svg>
@@ -296,7 +388,7 @@ const COLOR_VAR = {
     green: "var(--buy)",
 };
 
-function Node({ x, y, color, overline, label, sub, Icon, width, big = false, target }) {
+function Node({ x, y, color, overline, label, sub, Icon, width, big = false, target, active = false }) {
     // CSS HSL values aren't valid inside SVG inline style without `hsl()` wrap.
     // For named CSS vars (gold/buy) we use `hsl(var(--gold))`; for raw hsl
     // tuples we pass them through directly.
@@ -316,7 +408,7 @@ function Node({ x, y, color, overline, label, sub, Icon, width, big = false, tar
     };
     return (
         <g
-            className={`flow-pulse ${interactive ? "flow-node-clickable" : ""}`}
+            className={`flow-pulse ${interactive ? "flow-node-clickable" : ""} ${active ? "flow-node-active" : ""}`}
             onClick={interactive ? onActivate : undefined}
             onKeyDown={
                 interactive
@@ -327,7 +419,8 @@ function Node({ x, y, color, overline, label, sub, Icon, width, big = false, tar
             }
             tabIndex={interactive ? 0 : undefined}
             role={interactive ? "link" : undefined}
-            aria-label={interactive ? `Jump to ${label} details` : undefined}
+            aria-label={interactive ? `Jump to ${label} details${active ? " (you are here)" : ""}` : undefined}
+            aria-current={active ? "location" : undefined}
             data-testid={interactive ? `flow-node-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : undefined}
         >
             <rect
@@ -361,6 +454,28 @@ function Node({ x, y, color, overline, label, sub, Icon, width, big = false, tar
                 >
                     {overline}
                 </text>
+            )}
+            {/* "You are here" indicator — small pulsing gold dot in the
+                top-left corner, only when this node maps to the section
+                currently under the user's reading viewport. The
+                aria-current="location" attribute on the parent <g> makes
+                this discoverable by screen readers; this dot is the
+                visual equivalent for sighted users. */}
+            {active && (
+                <circle
+                    cx={left + 7}
+                    cy={top + 7}
+                    r={3.5}
+                    fill="hsl(var(--gold))"
+                    data-testid="flow-node-here-dot"
+                >
+                    <animate
+                        attributeName="opacity"
+                        values="0.5;1;0.5"
+                        dur="1.4s"
+                        repeatCount="indefinite"
+                    />
+                </circle>
             )}
             <text
                 x={left + 38}
@@ -416,8 +531,9 @@ function LegendDot({ color, label }) {
 /* ───────────────────────── mobile vertical flow ───────────────────── */
 
 const ALL_STAGES_MOBILE = [
-    { color: "cyan", overline: "01", label: "Data ingest", sub: "yfinance · Finnhub · IDX provider", Icon: Database, target: '[data-testid="pipeline-stage-01"]' },
+    { key: "ingest", color: "cyan", overline: "01", label: "Data ingest", sub: "yfinance · Finnhub · IDX provider", Icon: Database, target: '[data-testid="pipeline-stage-01"]' },
     ...COMPUTE_LANES.map((l, i) => ({
+        key: l.key,
         color: "gold",
         overline: String(i + 2).padStart(2, "0"),
         label: l.label,
@@ -425,16 +541,16 @@ const ALL_STAGES_MOBILE = [
         Icon: l.icon,
         target: l.target,
     })),
-    { color: "violet", overline: "07", label: "Claude Sonnet 4.5", sub: "LLM reasoning", Icon: Sparkles, target: '[data-testid="pipeline-stage-07"]' },
-    { color: "green", overline: "08", label: "Verdict + outputs", sub: "Web · PDF · Telegram", Icon: FileText, target: '[data-testid="pipeline-stage-08"]' },
+    { key: "llm", color: "violet", overline: "07", label: "Claude Sonnet 4.5", sub: "LLM reasoning", Icon: Sparkles, target: '[data-testid="pipeline-stage-07"]' },
+    { key: "output", color: "green", overline: "08", label: "Verdict + outputs", sub: "Web · PDF · Telegram", Icon: FileText, target: '[data-testid="pipeline-stage-08"]' },
 ];
 
-function MobileFlow() {
+function MobileFlow({ activeStage }) {
     return (
         <ol className="space-y-2" data-testid="pipeline-flow-mobile">
             {ALL_STAGES_MOBILE.map((s, i) => (
                 <li key={s.overline} className="relative">
-                    <MobileFlowCard {...s} />
+                    <MobileFlowCard {...s} active={activeStage === s.key} />
                     {i < ALL_STAGES_MOBILE.length - 1 && (
                         <div
                             aria-hidden="true"
@@ -455,7 +571,7 @@ function MobileFlow() {
     );
 }
 
-function MobileFlowCard({ color, overline, label, sub, Icon, target }) {
+function MobileFlowCard({ color, overline, label, sub, Icon, target, active = false }) {
     const c = `hsl(${COLOR_VAR[color]})`;
     const onClick = target
         ? (e) => {
@@ -469,12 +585,14 @@ function MobileFlowCard({ color, overline, label, sub, Icon, target }) {
             onClick={onClick}
             className="flex items-center gap-3 p-3 rounded-sm w-full text-left transition-colors"
             style={{
-                border: "1px solid hsl(var(--border-divider))",
+                border: active ? "1px solid hsl(var(--gold))" : "1px solid hsl(var(--border-divider))",
                 borderLeft: `3px solid ${c}`,
-                background: "hsl(var(--surface-elevated))",
+                background: active ? "hsl(45, 92%, 65%, 0.08)" : "hsl(var(--surface-elevated))",
                 minHeight: 56,
                 cursor: target ? "pointer" : "default",
+                boxShadow: active ? "0 0 0 1px hsl(45, 92%, 65%, 0.4)" : undefined,
             }}
+            aria-current={active ? "location" : undefined}
             data-testid={`flow-mobile-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
         >
             <Icon size={18} strokeWidth={1.5} style={{ color: c, flexShrink: 0 }} />
