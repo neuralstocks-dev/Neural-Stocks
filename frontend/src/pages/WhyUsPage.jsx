@@ -109,6 +109,11 @@ const FEATURES = [
         info: "toppicks",
         values: { nsi: "full", moomoo: "partial", tiger: "partial", tradingview: "none", stashaway: "none", tradeideas: "none", dbsvickers: "none" },
     },
+    {
+        label: "Sector-aware intrinsic-value anchor (Graham Number + Residual Income Model)",
+        info: "intrinsic",
+        values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "none", tradeideas: "partial", dbsvickers: "none" },
+    },
     { label: "Explainable AI reasoning (not just signals)", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "none", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
     { label: "Three analyzer modes — Standard AI · Candlestick · Hybrid", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
     { label: "15 candlestick patterns with plain-English explanations", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "none" } },
@@ -224,6 +229,51 @@ const INFO_CONTENT = {
                 </p>
                 <p className="text-sm" style={{ color: "hsl(var(--text-muted))" }}>
                     Tap any pick and the full AI verdict runs automatically — no extra clicks.
+                </p>
+            </>
+        ),
+    },
+    intrinsic: {
+        title: "Intrinsic-value anchor — Graham + RIM",
+        body: (
+            <>
+                <p className="mb-3">
+                    Most retail platforms surface raw P/E and P/B but never put the actual{" "}
+                    <strong>fair-value calculation</strong> in front of you. Neulab does — and
+                    the LLM uses it as one more input when reasoning about the verdict.
+                </p>
+                <p className="mb-3">
+                    Two formulas run in parallel on every analysis:
+                </p>
+                <ul className="list-disc list-inside space-y-1 mb-3">
+                    <li>
+                        <strong>Graham Number</strong> = √(22.5 × EPS × bookValue) — Benjamin
+                        Graham's classic value formula. Best fit for asset-heavy sectors (banks,
+                        utilities, industrials, REITs).
+                    </li>
+                    <li>
+                        <strong>1-year Residual Income Model</strong> = bookValue × ROE /
+                        cost-of-equity (CAPM with market-aware risk-free + equity-risk premium).
+                        Best fit for profitable services / tech / healthcare where book value
+                        undercounts intangibles.
+                    </li>
+                </ul>
+                <p className="mb-3">
+                    A sector-aware selector picks the better-fitting method, the chip on the
+                    verdict page exposes both numbers side-by-side, and an applicability flag
+                    (<code>high_fit</code> / <code>low_fit_intangible_heavy</code> /{" "}
+                    <code>low_fit_unrepresentative_roe</code>) tells you when to caveat the read.
+                </p>
+                <p className="mb-3 text-sm" style={{ color: "hsl(var(--text-muted))" }}>
+                    Honest caveats: anchors are <em>reference</em> numbers, not price targets —
+                    a stock can sit at a deep premium for years and never revert. We deliberately
+                    avoid DCF (multi-year FCF projections aren't free-tier yfinance data and the
+                    5–10y horizon is mismatched with this app's 4–12 week research window).
+                </p>
+                <p>
+                    <Link to="/technical#intrinsic-anchor" className="underline decoration-dotted underline-offset-4">
+                        See the full methodology + formulas →
+                    </Link>
                 </p>
             </>
         ),

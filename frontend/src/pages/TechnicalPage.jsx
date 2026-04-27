@@ -199,6 +199,9 @@ export default function TechnicalPage() {
                             <MythLi positive reason="Hard-coded geometry rules (Hammer, Engulfing, Doji, Morning Star, etc.) with strength scores. No training data, no overfitting — just centuries-old price-action logic.">
                                 Rule-based 15-pattern candlestick detector
                             </MythLi>
+                            <MythLi positive reason="Deterministic, sector-aware fair-value anchors computed from EPS, book value, ROE and beta — Benjamin Graham's classic formula for asset-heavy sectors and a 1-year Residual Income Model for intangible-heavy services. Reference numbers, never price targets.">
+                                Intrinsic-value anchors (Graham Number + Residual Income Model)
+                            </MythLi>
                             <MythLi positive reason="An independent statistical second opinion that catches cases where the LLM's narrative disagrees with what historical data says. Disagreements visibly downgrade confidence — see V2 calibration above.">
                                 Random Forest classifier as <em>secondary</em> probability opinion
                             </MythLi>
@@ -230,7 +233,7 @@ export default function TechnicalPage() {
                 <SectionHeader
                     icon={GitBranch}
                     overline="Pipeline"
-                    title="The seven-stage analysis pipeline."
+                    title="The eight-stage analysis pipeline."
                     subtitle="What happens in the 15 seconds between you clicking Analyze and the verdict appearing."
                 />
 
@@ -271,10 +274,32 @@ export default function TechnicalPage() {
                     />
                     <StageRow
                         n="06"
+                        title="Intrinsic-value anchor (Graham + RIM)"
+                        body={
+                            <>
+                                Two deterministic fair-value formulas run in parallel against the
+                                fundamentals: the <strong>Graham Number</strong>{" "}
+                                (<code>√(22.5 × EPS × bookValue)</code>) and a 1-year{" "}
+                                <strong>Residual Income Model</strong>{" "}
+                                (<code>BVPS × ROE / cost-of-equity</code>, where cost-of-equity is
+                                CAPM with a market-aware risk-free rate and equity-risk premium).
+                                A sector-aware selector picks the better-fitting method
+                                (Graham for banks/utilities/industrials; RIM for
+                                tech/services/healthcare). The result is passed to the LLM as a
+                                neutral <em>valuation reference</em>, never as a price target.
+                                Both numbers, the auto-selection rationale, and the applicability
+                                flag (<code>high_fit</code> / <code>low_fit_intangible_heavy</code> /{" "}
+                                <code>low_fit_unrepresentative_roe</code>) surface in the chip on
+                                the verdict page.
+                            </>
+                        }
+                    />
+                    <StageRow
+                        n="07"
                         title="LLM reasoning (the verdict)"
                         body={
                             <>
-                                A structured prompt is built containing all signals from stages 01-05 plus
+                                A structured prompt is built containing all signals from stages 01-06 plus
                                 plan-specific mode (Standard / Candlestick / Hybrid). Claude Sonnet 4.5
                                 reasons over the bundle and returns a strict JSON response:
                                 recommendation (BUY/SELL/HOLD), confidence_score (0–100),
@@ -285,7 +310,7 @@ export default function TechnicalPage() {
                         }
                     />
                     <StageRow
-                        n="07"
+                        n="08"
                         title="Verdict persistence and alerting"
                         body="Verdict stored in MongoDB with full signal provenance (indicators, patterns, news payload, raw LLM response) for audit. If confidence ≥ 75 and recommendation is BUY/SELL, a Telegram alert is dispatched to users who've linked @neulab_bot."
                     />
@@ -322,7 +347,7 @@ export default function TechnicalPage() {
                         />
                         <FamilyCell
                             label="Fundamentals"
-                            items={["Trailing P/E vs sector norm", "Revenue / earnings growth trend", "Profit margin, ROE, dividend yield"]}
+                            items={["Trailing P/E vs sector norm", "Revenue / earnings growth trend", "Profit margin, ROE, dividend yield", "Intrinsic anchor (Graham / RIM) gap"]}
                         />
                         <FamilyCell
                             label="Context"
@@ -810,6 +835,129 @@ histogram  = MACD_line − signal`}
                     </ul>
                 </div>
 
+                {/* Intrinsic-value anchor (Graham + RIM) deep-dive */}
+                <div
+                    id="intrinsic-anchor"
+                    className="mt-8 module p-6 md:p-10 scroll-mt-24"
+                    data-testid="tech-intrinsic-anchor"
+                >
+                    <p className="text-overline" style={{ color: "hsl(var(--gold))" }}>
+                        Valuation reference · Graham + RIM
+                    </p>
+                    <h3 className="font-serif mt-2" style={{ fontSize: "1.6rem", letterSpacing: "-0.01em" }}>
+                        How we compute the fair-value anchor.
+                    </h3>
+                    <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
+                        Two deterministic valuation formulas run on every analysis. The result is a
+                        single neutral <em>reference number</em> shown alongside fundamentals — not a
+                        price target, not a buy/sell trigger, just a sector-aware yardstick the user
+                        (and the LLM) can compare against the live price.
+                    </p>
+
+                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                        The two formulas
+                    </h4>
+                    <div
+                        className="mt-3 p-4 font-mono text-[11.5px] leading-relaxed"
+                        style={{
+                            background: "hsl(var(--bg))",
+                            border: "1px solid hsl(var(--border-divider))",
+                            color: "hsl(var(--text-secondary))",
+                        }}
+                    >
+                        Graham Number = √(22.5 × EPS × bookValuePerShare)<br />
+                        RIM (1-year) = bookValue × ROE / cost_of_equity<br />
+                        cost_of_equity = risk_free_rate + beta × equity_risk_premium &nbsp;(CAPM)
+                    </div>
+                    <p className="mt-3 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                        The 22.5 constant in Graham's formula is{" "}
+                        <code>P/E (15) × P/B (1.5)</code> — his published "fair-value ceiling" for a
+                        defensive investor. The RIM perpetuity simplification assumes stable-state
+                        ROE; we deliberately avoid multi-year DCF projections because forward FCF
+                        estimates aren't free-tier yfinance data and the 4–12 week research horizon
+                        on this app would be dominated by DCF noise rather than signal.
+                    </p>
+
+                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                        Risk-free rate &amp; equity-risk premium (market-aware)
+                    </h4>
+                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-0" style={{ border: "1px solid hsl(var(--border-default))" }}>
+                        <div className="p-4" style={{ borderRight: "1px solid hsl(var(--border-default))" }}>
+                            <p className="text-overline" style={{ fontSize: "0.58rem", color: "hsl(var(--text-muted))" }}>
+                                US tickers
+                            </p>
+                            <p className="mt-1 font-mono text-xs" style={{ color: "hsl(var(--text-primary))" }}>
+                                rf = 4.2% (≈10Y UST) · ERP = 5.5% (Damodaran)
+                            </p>
+                        </div>
+                        <div className="p-4">
+                            <p className="text-overline" style={{ fontSize: "0.58rem", color: "hsl(var(--text-muted))" }}>
+                                IDX tickers (.JK)
+                            </p>
+                            <p className="mt-1 font-mono text-xs" style={{ color: "hsl(var(--text-primary))" }}>
+                                rf = 6.8% (IDR 10Y govt) · ERP = 7.5% (emerging-market premium)
+                            </p>
+                        </div>
+                    </div>
+
+                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                        Sector-aware auto-selection
+                    </h4>
+                    <ul className="mt-2 space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                        <TLi>
+                            <strong>Graham preferred</strong> for asset-heavy sectors — Financial
+                            Services, Banks, Utilities, Industrials, Materials, Energy, Real Estate,
+                            Consumer Defensive/Cyclical. Book value is a meaningful proxy for fair
+                            value here.
+                        </TLi>
+                        <TLi>
+                            <strong>RIM preferred</strong> for intangible-heavy sectors — Technology,
+                            Communication Services, Healthcare. Book value undercounts goodwill, IP,
+                            brand. RIM uses earnings power instead.
+                        </TLi>
+                        <TLi>
+                            When the sector picks Graham but Graham fails to compute (negative
+                            earnings or negative book value), we fall back to RIM if it produced an
+                            estimate — and vice versa. If neither produces a number, the chip simply
+                            doesn't render. We never publish a fabricated anchor.
+                        </TLi>
+                    </ul>
+
+                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                        Honest caveats
+                    </h4>
+                    <ul className="mt-2 space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                        <TLi>
+                            <strong>Anchors are not forecasts.</strong> A stock can trade at a deep
+                            premium to its anchor for years and never revert. Tech leaders frequently
+                            sit at 5×–20× their Graham anchor — that's the market pricing in
+                            intangible value. The chip flags this with a{" "}
+                            <code>low_fit_intangible_heavy</code> caveat so users know.
+                        </TLi>
+                        <TLi>
+                            <strong>ROE &gt; 100%</strong> almost always means anomalous balance
+                            sheet (negative or near-zero equity from buybacks, e.g. SBUX, MCD, HD
+                            historically). RIM yields a meaningless multiple in that case — we skip
+                            with <code>low_fit_unrepresentative_roe</code> and show a "—" instead of
+                            a fabricated number.
+                        </TLi>
+                        <TLi>
+                            <strong>Why we don't use DCF.</strong> Multi-year FCF projections
+                            require analyst estimates that aren't free-tier yfinance data, the
+                            5-10y horizon is structurally mismatched with the 4-12w research window
+                            this app frames, and WACC sensitivity grows multiplicatively with each
+                            judgment call. RIM is the honest middle ground — earnings-based but
+                            single-period.
+                        </TLi>
+                    </ul>
+
+                    <p className="mt-6 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>
+                        Source: yfinance fundamentals (EPS, bookValue, ROE, beta, sector). Math is
+                        deterministic and replicable in Excel — implementation lives in{" "}
+                        <code>backend/services/intrinsic_value.py</code>.
+                    </p>
+                </div>
+
                 {/* Bandarmology (IDX-only differentiator) */}
                 <div
                     id="bandarmology"
@@ -952,6 +1100,7 @@ histogram  = MACD_line − signal`}
                             <Tr s="Analyst consensus" src="Finnhub.io" cov="US only (free tier)" cache="1-hr cache" />
                             <Tr s="Next earnings" src="Finnhub.io" cov="US only (free tier)" cache="1-hr cache" />
                             <Tr s="Candlestick patterns" src="Neulab in-house engine" cov="Any ticker with OHLC" cache="Computed per analysis" />
+                            <Tr s="Intrinsic-value anchor (Graham + RIM)" src="Neulab in-house · yfinance fundamentals input" cov="Any ticker with EPS + bookValue" cache="Computed per analysis" />
                             <Tr s="Verdict + reasoning" src="Anthropic Claude Sonnet 4.5" cov="All tickers" cache="Persisted in MongoDB" />
                         </tbody>
                     </table>
