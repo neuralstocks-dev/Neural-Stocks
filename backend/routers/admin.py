@@ -174,6 +174,52 @@ async def llm_breaker_reset(_admin=Depends(admin_required)):
     return {"ok": True, "status": llm_circuit_breaker.status()}
 
 
+@router.get("/llm-events")
+async def llm_events(
+    limit: int = 50,
+    hours: int = 24,
+    _admin=Depends(admin_required),
+):
+    """Last N LLM failure events (from the capped `llm_events` collection)
+    plus an aggregate breakdown by reason over the last `hours` window.
+    Used by the admin dashboard's "LLM Health" panel.
+
+    Shape:
+      {
+        "events": [ {ts, reason, ticker, elapsed_s, surface, ...}, ...],
+        "breakdown": { reason: count, ... },
+        "total": <int>,
+        "window_hours": <int>
+      }
+    """
+    import time as _time
+    from core.db import db
+    limit = max(1, min(int(limit), 200))
+    hours = max(1, min(int(hours), 168))
+    since = _time.time() - (hours * 3600)
+    cursor = db.llm_events.find(
+        {"ts": {"$gte": since}},
+        {"_id": 0},
+    ).sort("ts", -1).limit(limit)
+    events = await cursor.to_list(length=limit)
+
+    # Aggregate across the full window (not just the `limit`-capped slice).
+    pipeline = [
+        {"$match": {"ts": {"$gte": since}}},
+        {"$group": {"_id": "$reason", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    breakdown_raw = await db.llm_events.aggregate(pipeline).to_list(length=20)
+    breakdown = {row["_id"] or "unknown": row["count"] for row in breakdown_raw}
+    total = sum(breakdown.values())
+    return {
+        "events": events,
+        "breakdown": breakdown,
+        "total": total,
+        "window_hours": hours,
+    }
+
+
 @router.post("/users/{user_id}/unlock")
 async def unlock_user(user_id: str, req: UnlockReq, admin=Depends(admin_required)):
     seconds = UNLOCK_DURATIONS.get(req.duration)

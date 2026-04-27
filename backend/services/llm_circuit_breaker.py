@@ -24,14 +24,24 @@ Thread/async safety: the underlying deque + int counters are mutated
 from inside asyncio tasks. Python's GIL makes the individual list/int
 ops atomic, and the compound decisions here (check trip-state then
 route) are read-only against the snapshot — so no lock needed.
+
+Failure-reason telemetry: each non-success outcome carries a structured
+`reason` code ("llm_timeout" / "litellm_retry_exhausted" /
+"llm_socket_hang" / "other_exception") persisted to a TTL-capped
+MongoDB collection (7 days). The admin dashboard can query this to
+distinguish one-off Claude hiccups from systemic LiteLLM config issues.
+Persistence is best-effort: a mongo write error NEVER affects the
+breaker's in-memory decision logic — Claude health must stay available
+even when the ops database is degraded.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
 from collections import deque
-from typing import Literal
+from typing import Literal, Optional
 
 _log = logging.getLogger(__name__)
 
@@ -75,15 +85,90 @@ _consec_ok = 0
 _tripped_at: float | None = None
 
 
-def record_outcome(outcome: Literal["success", "timeout"]) -> None:
+# TTL in seconds for the failure-telemetry collection. Default 7 days —
+# long enough to spot weekly patterns, short enough to not balloon
+# storage when incidents cluster.
+_LLM_EVENT_TTL_S = int(os.environ.get("LLM_EVENT_TTL_S", str(7 * 24 * 60 * 60)))
+
+# Closure-captured TTL-index guard so we only issue `create_index` once
+# per process. MongoDB's TTL monitor scans every 60s — the index itself
+# only needs to exist; re-creating it is a cheap no-op but we skip to
+# keep startup logs clean.
+_ttl_index_ensured = False
+
+# Error reason codes. Kept explicit (not freeform strings) so the admin
+# dashboard can render stable colored breakdowns. New codes require a
+# PR review — this is a small reference table users grep for.
+REASON_LLM_TIMEOUT = "llm_timeout"
+REASON_LLM_SOCKET_HANG = "llm_socket_hang"
+REASON_LITELLM_RETRY_EXHAUSTED = "litellm_retry_exhausted"
+REASON_OTHER_EXCEPTION = "other_exception"
+REASON_CACHE_MISS_FALLBACK = "cache_miss_fallback"  # reserved for future use
+
+
+def classify_timeout_reason(elapsed_s: float, timeout_budget_s: float) -> str:
+    """Heuristic: if the job timed out well before the hard wall-clock
+    budget, it's more likely a LiteLLM retry-exhaustion than a pure
+    socket hang. LiteLLM's default retry schedule is 4 × ~30s so jobs
+    that die right at the budget tend to be deep socket hangs, while
+    jobs that die much earlier (the wrapper cancels the future) point
+    to upstream retry rejection. Rough heuristic, not definitive."""
+    if elapsed_s >= timeout_budget_s * 0.95:
+        return REASON_LLM_SOCKET_HANG
+    if elapsed_s >= timeout_budget_s * 0.5:
+        return REASON_LITELLM_RETRY_EXHAUSTED
+    return REASON_LLM_TIMEOUT
+
+
+async def _persist_event(event: dict) -> None:
+    """Best-effort insert into `llm_events`. Imports db lazily to keep
+    this module importable in isolation (unit tests don't need mongo).
+    Swallows ALL exceptions so a mongo issue never cascades into the
+    breaker's decision path."""
+    global _ttl_index_ensured
+    try:
+        from core.db import db  # local import — avoid import cycles
+        if not _ttl_index_ensured:
+            # expireAfterSeconds on `ts` — MongoDB will auto-delete
+            # documents older than _LLM_EVENT_TTL_S. Idempotent.
+            try:
+                await db.llm_events.create_index("ts", expireAfterSeconds=_LLM_EVENT_TTL_S)
+            except Exception:  # noqa: BLE001
+                pass
+            _ttl_index_ensured = True
+        await db.llm_events.insert_one(event)
+    except Exception as e:  # noqa: BLE001
+        _log.debug("llm_events persist skipped: %s", e)
+
+
+def record_outcome(
+    outcome: Literal["success", "timeout"],
+    *,
+    ticker: Optional[str] = None,
+    reason: Optional[str] = None,
+    elapsed_s: Optional[float] = None,
+    surface: Optional[str] = None,
+) -> None:
     """Call this from every analysis job completion path (anon + auth).
 
     `outcome` is deliberately 2-valued: we only care about timeouts —
     validation errors, ticker-not-found, rate-limit 429, user-canceled,
     etc. are NOT LLM-health signals and should NOT be recorded.
+
+    Extra kwargs are telemetry-only — they don't affect trip logic, they
+    get persisted to the capped `llm_events` collection for the admin
+    dashboard's "why did this outage happen" breakdown.
+
+    `surface`: "anon" | "auth" | "quick" (the caller type).
+    `reason`: structured error code (see REASON_* constants above).
+              On "success" outcomes this is ignored.
+    `elapsed_s`: wall-clock seconds the job actually ran. Useful for
+              distinguishing fast-cancel-on-retry-exhaust vs full-budget
+              socket hang in the admin UI.
     """
     global _consec_fail, _consec_ok, _tripped_at
-    _recent.append({"outcome": outcome, "ts": time.time()})
+    ts = time.time()
+    _recent.append({"outcome": outcome, "ts": ts, "reason": reason, "surface": surface})
     if outcome == "success":
         _consec_ok += 1
         _consec_fail = 0
@@ -101,6 +186,28 @@ def record_outcome(outcome: Literal["success", "timeout"]) -> None:
                 _consec_fail,
                 _MAX_TRIP_SECONDS,
             )
+        # Persist failure events only. Successes are implicit (the lack
+        # of a failure over some window = healthy); storing them would
+        # bloat the collection. Schedule as a fire-and-forget task so
+        # the caller isn't blocked on the mongo round-trip.
+        event = {
+            "ts": ts,
+            "outcome": outcome,
+            "reason": reason or REASON_OTHER_EXCEPTION,
+            "ticker": ticker,
+            "elapsed_s": elapsed_s,
+            "surface": surface,
+            "consec_fail_at_event": _consec_fail,
+            "tripped_breaker": _tripped_at is not None,
+        }
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_persist_event(event))
+        except RuntimeError:
+            # Called from a non-async context (e.g. a unit test). Skip
+            # persistence silently — the in-memory trip logic is what
+            # actually guards the request path.
+            pass
 
 
 def is_tripped() -> bool:

@@ -3,6 +3,7 @@ import api from "@/lib/api";
 import RFRetrainCard from "@/components/RFRetrainCard";
 import IdxBudgetCard from "@/components/IdxBudgetCard";
 import IdxCatalogCard from "@/components/IdxCatalogCard";
+import AdminLLMHealthPanel from "@/components/AdminLLMHealthPanel";
 import PayPalWebhookCard from "@/components/PayPalWebhookCard";
 import ExperimentsCard from "@/components/ExperimentsCard";
 import AnonTryResetCard from "@/components/AnonTryResetCard";
@@ -425,6 +426,8 @@ export default function AdminPage() {
                         PayPal smoke test ($1 diagnostic) →
                     </Link>
                 </div>
+
+                <AdminLLMHealthPanel />
 
                 {message && (
                     <div className="signal-buy px-4 py-3 mt-6 font-mono text-sm" data-testid="admin-message">

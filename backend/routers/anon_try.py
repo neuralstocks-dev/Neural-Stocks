@@ -23,6 +23,7 @@ import asyncio
 import os
 import hashlib
 import logging
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -289,12 +290,18 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
     }
     anon_timeout = float(os.environ.get("ANON_JOB_TIMEOUT_S", "180"))
     ticker_task = asyncio.create_task(_stage_ticker(job_id))
+    started = time.monotonic()
     try:
         result = await asyncio.wait_for(
             _create_analysis_impl(ticker_up, mode, synthetic),
             timeout=anon_timeout,
         )
-        llm_circuit_breaker.record_outcome("success")
+        llm_circuit_breaker.record_outcome(
+            "success",
+            ticker=ticker_up,
+            elapsed_s=time.monotonic() - started,
+            surface="anon",
+        )
         verdict_id = result["id"]
         await db.anon_try_usage.insert_one({
             "ip_hash": ip_hash,
@@ -313,8 +320,16 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
             }},
         )
     except asyncio.TimeoutError:
-        llm_circuit_breaker.record_outcome("timeout")
-        _log.warning("Anon job timed out after %.0fs for %s (job %s)", anon_timeout, ticker_up, job_id)
+        elapsed = time.monotonic() - started
+        reason = llm_circuit_breaker.classify_timeout_reason(elapsed, anon_timeout)
+        llm_circuit_breaker.record_outcome(
+            "timeout",
+            ticker=ticker_up,
+            reason=reason,
+            elapsed_s=elapsed,
+            surface="anon",
+        )
+        _log.warning("Anon job timed out after %.0fs (reason=%s) for %s (job %s)", elapsed, reason, ticker_up, job_id)
         await db.anon_try_jobs.update_one(
             {"job_id": job_id},
             {"$set": {
@@ -324,6 +339,13 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
             }},
         )
     except Exception as e:
+        llm_circuit_breaker.record_outcome(
+            "timeout",
+            ticker=ticker_up,
+            reason=llm_circuit_breaker.REASON_OTHER_EXCEPTION,
+            elapsed_s=time.monotonic() - started,
+            surface="anon",
+        )
         _log.exception("Anon job failed for %s (job %s)", ticker_up, job_id)
         await db.anon_try_jobs.update_one(
             {"job_id": job_id},

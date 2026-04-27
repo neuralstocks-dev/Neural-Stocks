@@ -555,12 +555,19 @@ async def _set_job_phase(job_id: str | None, phase: str):
 
 async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: dict):
     """Background worker — writes result (or error) to db.analysis_jobs."""
+    import time as _time
+    started = _time.monotonic()
     try:
         r = await asyncio.wait_for(
             _create_analysis_impl(ticker, mode, user, job_id=job_id),
             timeout=QUICK_PER_TASK_TIMEOUT,
         )
-        llm_circuit_breaker.record_outcome("success")
+        llm_circuit_breaker.record_outcome(
+            "success",
+            ticker=ticker,
+            elapsed_s=_time.monotonic() - started,
+            surface="auth",
+        )
         await db.analysis_jobs.update_one(
             {"id": job_id},
             {"$set": {
@@ -571,7 +578,15 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
             }},
         )
     except asyncio.TimeoutError:
-        llm_circuit_breaker.record_outcome("timeout")
+        elapsed = _time.monotonic() - started
+        reason = llm_circuit_breaker.classify_timeout_reason(elapsed, QUICK_PER_TASK_TIMEOUT)
+        llm_circuit_breaker.record_outcome(
+            "timeout",
+            ticker=ticker,
+            reason=reason,
+            elapsed_s=elapsed,
+            surface="auth",
+        )
         await db.analysis_jobs.update_one(
             {"id": job_id},
             {"$set": {
@@ -592,6 +607,13 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
             }},
         )
     except Exception as e:
+        llm_circuit_breaker.record_outcome(
+            "timeout",
+            ticker=ticker,
+            reason=llm_circuit_breaker.REASON_OTHER_EXCEPTION,
+            elapsed_s=_time.monotonic() - started,
+            surface="auth",
+        )
         await db.analysis_jobs.update_one(
             {"id": job_id},
             {"$set": {
