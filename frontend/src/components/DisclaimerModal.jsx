@@ -49,16 +49,28 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
 
     return (
         <div
-            className="fixed inset-0 z-[60] flex items-start md:items-center justify-center p-4"
+            className="fixed inset-0 z-[60] flex items-center justify-center p-3 md:p-4"
             style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(10px)" }}
             data-testid="disclaimer-modal"
         >
             <div
-                className="module-elevated w-full max-w-2xl mt-8 md:mt-0"
-                style={{ background: "hsl(var(--surface))" }}
+                className="module-elevated w-full max-w-2xl flex flex-col"
+                style={{
+                    background: "hsl(var(--surface))",
+                    // Cap the entire modal to the safe viewport height so the
+                    // accept button is ALWAYS visible regardless of disclaimer
+                    // length. Using svh (small viewport height) on supporting
+                    // browsers correctly accounts for mobile URL/toolbar UI;
+                    // falls back to vh on older WebKit. The previous layout
+                    // capped only the disclaimer text at 52vh and let the
+                    // checkbox + footer rows push out of the bottom of the
+                    // viewport on phones with long disclaimers — making the
+                    // accept button unreachable.
+                    maxHeight: "min(92svh, 92vh)",
+                }}
             >
                 <div
-                    className="p-5 md:p-6 flex items-start justify-between gap-4"
+                    className="p-5 md:p-6 flex items-start justify-between gap-4 flex-shrink-0"
                     style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
                 >
                     <div className="flex items-start gap-3">
@@ -90,7 +102,7 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
                 </div>
 
                 {loading && (
-                    <div className="py-10 text-center">
+                    <div className="py-10 text-center flex-1 min-h-0">
                         <Loader2 className="animate-spin mx-auto" size={22} />
                     </div>
                 )}
@@ -98,7 +110,7 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
                 {data && (
                     <>
                         <div
-                            className="px-5 md:px-6 py-5 max-h-[52vh] overflow-y-auto text-sm leading-relaxed whitespace-pre-line"
+                            className="px-5 md:px-6 py-5 flex-1 min-h-0 overflow-y-auto text-sm leading-relaxed whitespace-pre-line"
                             style={{ color: "hsl(var(--text-secondary))" }}
                             data-testid="disclaimer-text"
                         >
@@ -106,7 +118,7 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
                         </div>
 
                         <div
-                            className="px-5 md:px-6 py-4 space-y-3"
+                            className="px-5 md:px-6 py-4 space-y-3 flex-shrink-0"
                             style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
                         >
                             <label
@@ -148,7 +160,7 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
                         </div>
 
                         <div
-                            className="px-5 md:px-6 py-4 flex items-center justify-between gap-3 flex-wrap"
+                            className="px-5 md:px-6 py-4 flex items-center justify-between gap-3 flex-wrap flex-shrink-0"
                             style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
                         >
                             <span className="text-overline" style={{ fontSize: "0.56rem" }}>
