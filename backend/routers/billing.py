@@ -79,7 +79,7 @@ async def daypass_create_order(user=Depends(get_current_user)):
     try:
         order = await create_order(
             amount=price,
-            description=f"Neulab Day Pass — {days}-day access",
+            description=f"Neural Stock Intelligence™ Day Pass — {days}-day access",
             custom_id=f"neulab:daypass:{user['id']}",
         )
     except PayPalError as e:
@@ -464,7 +464,7 @@ async def smoke_test_activate(req: SmokeActivateReq, user=Depends(get_current_us
         "plan_id": diagnostic["plan_id"],
         "start_time": diagnostic["start_time"],
         "raw": sub,  # full PayPal response surfaced to the UI for inspection
-        "note": "This was a diagnostic only. Your Neulab plan was NOT changed. "
+        "note": "This was a diagnostic only. Your Neural Stock Intelligence™ plan was NOT changed. "
                 "Cancel the $1 recurring subscription in your PayPal account "
                 "(Activity → Manage Subscriptions → Cancel) to avoid next month's charge.",
     }

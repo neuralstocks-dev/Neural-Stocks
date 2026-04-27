@@ -36,17 +36,17 @@ function buildIntrinsicShareCopy(ticker, anchor) {
     if (typeof est === "number" && typeof pct === "number") {
         return {
             title: `${ticker} · ${method} reference`,
-            text: `${ticker} trading at ${sign}${pct.toFixed(1)}% vs the ${method} of ${est.toFixed(2)} — see how Neulab frames it.`,
+            text: `${ticker} trading at ${sign}${pct.toFixed(1)}% vs the ${method} of ${est.toFixed(2)} — see how Neural Stock Intelligence™ frames it.`,
         };
     }
-    return { title: `${ticker} · valuation reference`, text: `${ticker} valuation anchor on Neulab.` };
+    return { title: `${ticker} · valuation reference`, text: `${ticker} valuation anchor on Neural Stock Intelligence™.` };
 }
 
 function buildRisksShareCopy(ticker, risks) {
     const n = Array.isArray(risks) ? risks.length : 0;
     return {
         title: `${ticker} · ${n} risks the model flags`,
-        text: `${n} conditions under which the current Neulab read on ${ticker} would weaken.`,
+        text: `${n} conditions under which the current Neural Stock Intelligence™ read on ${ticker} would weaken.`,
     };
 }
 
@@ -918,16 +918,16 @@ export default function AnalysisReportPage() {
                                                 Market quotes &amp; key stats: <strong>RapidAPI · Indonesia Stock Exchange (IDX)</strong> (primary) + <strong>Yahoo Finance</strong> (<code>yfinance</code>, fallback &amp; OHLC history).
                                                 {" "}Insider / director filings &amp; <strong>Bandarmology</strong> smart-money signals: <strong>RapidAPI IDX</strong> (computed in-house from raw filings).
                                                 {" "}Company news: <strong>CNBC Indonesia</strong> + <strong>Detik Finance</strong> RSS (ticker &amp; Bahasa alias matched).
-                                                {" "}News sentiment: Neulab keyword heuristic (English + Bahasa Indonesia).
-                                                {" "}Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly).
+                                                {" "}News sentiment: NSI keyword heuristic (English + Bahasa Indonesia).
+                                                {" "}Candlestick pattern detection: NSI in-house deterministic engine (15 patterns, daily + weekly).
                                                 {" "}AI reasoning &amp; verdict synthesis: <strong>Anthropic Claude Sonnet 4.5</strong>.
                                             </>
                                         ) : (
                                             <>
                                                 Market quotes &amp; OHLC history: <strong>Finnhub.io</strong> (live) + <strong>Yahoo Finance</strong> (fundamentals &amp; history, via <code>yfinance</code>).
                                                 {" "}Company news, analyst consensus &amp; earnings calendar: <strong>Finnhub.io</strong>.
-                                                {" "}News sentiment: Neulab keyword heuristic over headlines.
-                                                {" "}Candlestick pattern detection: Neulab in-house deterministic engine (15 patterns, daily + weekly).
+                                                {" "}News sentiment: NSI keyword heuristic over headlines.
+                                                {" "}Candlestick pattern detection: NSI in-house deterministic engine (15 patterns, daily + weekly).
                                                 {" "}AI reasoning &amp; verdict synthesis: <strong>Anthropic Claude Sonnet 4.5</strong>.
                                             </>
                                         )}

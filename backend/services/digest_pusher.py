@@ -115,7 +115,7 @@ async def flush_user(user_id: str, schedule: str) -> int:
     body = _format_digest_message(matching, schedule)
     ok = await send_alert_to_user(
         user_id,
-        title="Neulab digest",
+        title="Neural Stock Intelligence™ digest",
         body=body,
     )
     if not ok:

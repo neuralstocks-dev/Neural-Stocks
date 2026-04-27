@@ -199,7 +199,7 @@ function Step1Picks({ picks, setPicks, accepted, setAccepted, onNext, onClose })
             <p className="text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
                 Pick <strong style={{ color: "hsl(var(--text-primary))" }}>up to {MAX_PICKS}</strong>{" "}
                 stocks you'd like to track. We'll add them to your watchlist and run a free AI
-                verdict on the first one — your fastest tour of how Neulab actually works.
+                verdict on the first one — your fastest tour of how Neural Stock Intelligence™ actually works.
             </p>
             <div className="mt-5 space-y-5">
                 <PresetGrid
@@ -230,7 +230,7 @@ function Step1Picks({ picks, setPicks, accepted, setAccepted, onNext, onClose })
                     data-testid="onboarding-disclaimer-checkbox"
                 />
                 <span>
-                    I understand Neulab's AI verdicts are <strong>research and education</strong>,{" "}
+                    I understand Neural Stock Intelligence™'s AI verdicts are <strong>research and education</strong>,{" "}
                     not financial advice. Markets are unpredictable; the AI can be wrong. I'm
                     responsible for my own decisions.
                 </span>
@@ -584,7 +584,7 @@ export default function OnboardingWizard({ open, onClose, onWatchlistChanged }) 
                 </button>
 
                 <DialogTitle className="font-serif text-xl">
-                    {step === 1 && "Welcome to Neulab"}
+                    {step === 1 && "Welcome to Neural Stock Intelligence™"}
                     {step === 2 && "Hold tight…"}
                     {step === 3 && "Your first verdict"}
                 </DialogTitle>

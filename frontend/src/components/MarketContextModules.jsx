@@ -212,7 +212,7 @@ function SentimentBadge({ sentiment, triggers, Icon, label, color, idx }) {
                         borderTop: "1px solid hsl(var(--border-divider))",
                     }}
                 >
-                    Neulab keyword heuristic
+                    NSI keyword heuristic
                 </p>
             </div>
         </div>

@@ -44,7 +44,7 @@ export default function ShareSectionButton({ analysisId, sectionId, title, text 
         try {
             const r = await api.post(`/analysis/${analysisId}/share`);
             const url = `${window.location.origin}${r.data.url_path}#${sectionId}`;
-            const payload = { url, title: title || "Neulab analysis", text: text || "" };
+            const payload = { url, title: title || "Neural Stock Intelligence™ analysis", text: text || "" };
             // Prefer native share sheet on mobile; clipboard fallback elsewhere.
             // Some desktop Chromiums advertise `navigator.share` but require
             // an explicit feature check on the payload — `canShare` returns

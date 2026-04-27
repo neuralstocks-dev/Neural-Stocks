@@ -442,7 +442,7 @@ export default function AlertsPage() {
                     Every verdict, pattern scan, and RF auto-scan alert lands here. Star the ones
                     worth watching, mark the trades you actually took, and we'll compute win-rate
                     and P&amp;L over a 20-day horizon per channel — so you know which part of
-                    Neulab is pulling its weight for <em>your</em> style.
+                    Neural Stock Intelligence™ is pulling its weight for <em>your</em> style.
                 </p>
 
                 {/* KPI row */}

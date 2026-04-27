@@ -1,6 +1,6 @@
 {
-    "name": "Neulab · Neural Stock Intelligence",
-    "short_name": "Neulab",
+    "name": "Neural Stock Intelligence — by NeuLab Inc.",
+    "short_name": "NSI",
     "description": "AI stock intelligence without the noise. Explainable signals, risk-aware analytics, built for disciplined decision-making.",
     "start_url": "/dashboard",
     "scope": "/",

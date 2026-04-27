@@ -218,7 +218,7 @@ export default function PublicTryVerdictPage() {
                             <p className="text-sm flex-1" style={{ color: "hsl(var(--text-primary))" }}>
                                 {isSharedView ? (
                                     <>
-                                        <strong>Shared preview.</strong> Someone ran this verdict on Neulab's free try and shared the preview with you. Run your own for any ticker below.
+                                        <strong>Shared preview.</strong> Someone ran this verdict on Neural Stock Intelligence™'s free try and shared the preview with you. Run your own for any ticker below.
                                         {a._shared?.was_refreshed && (
                                             <span className="ml-2 text-xs italic" style={{ color: "hsl(var(--text-muted))" }}>
                                                 · Verdict auto-refreshed to current market data
@@ -549,8 +549,8 @@ function SharePreviewButton({ verdictId }) {
             if (typeof navigator !== "undefined" && navigator.share) {
                 try {
                     await navigator.share({
-                        title: "Neulab preview verdict",
-                        text: "Check out this free AI verdict I just ran on Neulab",
+                        title: "Neural Stock Intelligence™ preview verdict",
+                        text: "Check out this free AI verdict I just ran on Neural Stock Intelligence™",
                         url: `${window.location.origin}${res.data.url_path}`,
                     });
                     return;

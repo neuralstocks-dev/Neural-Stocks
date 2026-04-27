@@ -24,7 +24,7 @@ from services.telegram import send_alert_to_user, is_configured as _tg_configure
 
 logger = logging.getLogger(__name__)
 
-FROM_NAME = "Neulab Admin"
+FROM_NAME = "NeuLab Inc. Admin"
 LOOP_CHECK_INTERVAL_S = 600  # 10 min
 COOLDOWN_HOURS = 150         # one send per ~6 days, mirrors weekly-digest
 # Telegram alert is more aggressive — real-time push when balance is
@@ -87,7 +87,7 @@ def _render_html(p: dict, recipient: str) -> str:
 <!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fafafa;padding:24px;color:#1a1a1a;">
   <table cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;">
     <tr><td style="padding:24px 28px 8px;">
-      <p style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#888;margin:0;">Neulab · Cost Anchor Reminder</p>
+      <p style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#888;margin:0;">NeuLab Inc. · Cost Anchor Reminder</p>
       <h1 style="font-family:Georgia,serif;font-size:22px;letter-spacing:-0.01em;margin:8px 0 0;">Weekly Universal Key check-in.</h1>
       <p style="color:#555;font-size:14px;line-height:1.5;margin:14px 0 0;">
         You opted in for a passive weekly nudge so the Cost Dashboard projection stays accurate. Here's where things stand right now:
@@ -126,7 +126,7 @@ async def _send_reminder(recipient: str, p: dict) -> tuple[bool, str | None]:
     params = {
         "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
         "to": [recipient],
-        "subject": f"[Neulab] Universal Key check-in · ~{p['verdicts_left']} verdicts left",
+        "subject": f"[NeuLab Inc.] Universal Key check-in · ~{p['verdicts_left']} verdicts left",
         "html": _render_html(p, recipient),
     }
     try:

@@ -252,7 +252,7 @@ export default function UserManualPage() {
                 <Step n={2} title="Read the reasoning">
                     Below the ring, the AI explains its verdict in plain English. It will mention
                     things like recent earnings, technical patterns, momentum, candlestick formations,
-                    and risks. <em>This is the most important part</em> — Neulab is built so you can{" "}
+                    and risks. <em>This is the most important part</em> — Neural Stock Intelligence™ is built so you can{" "}
                     interrogate the reasoning, not just trust a number.
                 </Step>
                 <Step n={3} title="Check the modules below">
@@ -300,7 +300,7 @@ export default function UserManualPage() {
             {/* 5. Alerts */}
             <Section id="alerts" icon={BellRing} kicker="Step 5" title="Alerts & Telegram">
                 <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                    Neulab can push notifications to you the moment a high-conviction verdict fires
+                    Neural Stock Intelligence™ can push notifications to you the moment a high-conviction verdict fires
                     on one of your watchlist stocks — delivered straight to{" "}
                     <strong>@neulab_bot</strong> on Telegram. No phone number, no SMS fees.
                 </p>
@@ -380,11 +380,11 @@ export default function UserManualPage() {
                 </p>
                 <Step n={1} title="Add a position">
                     Tap <strong>+ Add</strong>, enter the ticker, the number of shares you bought,
-                    your average buy price, and the buy date. Neulab fetches today's price and
+                    your average buy price, and the buy date. Neural Stock Intelligence™ fetches today's price and
                     calculates your gain or loss live.
                 </Step>
                 <Step n={2} title="Add multiple lots if you DCA">
-                    Bought the same stock at three different prices? Add three lots — Neulab
+                    Bought the same stock at three different prices? Add three lots — Neural Stock Intelligence™
                     averages them. Each lot keeps its own buy date so cost basis stays accurate.
                 </Step>
                 <Step n={3} title="Tap any row for the AI verdict">
@@ -449,9 +449,9 @@ export default function UserManualPage() {
                 title="Important — Not financial advice"
             >
                 <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                    Neulab is an <strong>AI-powered research and education tool</strong>. The
+                    Neural Stock Intelligence™ is an <strong>AI-powered research and education tool</strong>. The
                     verdicts, scores, alerts, and patterns shown are <strong>not financial advice</strong>{" "}
-                    and Neulab is not a registered investment adviser. Markets are unpredictable; AI
+                    and NeuLab Inc. is not a registered investment adviser. Markets are unpredictable; AI
                     models, including ours, can be wrong.
                 </p>
                 <p className="text-sm leading-relaxed mt-3" style={{ color: "hsl(var(--text-secondary))" }}>
@@ -479,7 +479,7 @@ export default function UserManualPage() {
                     className="mt-4 max-w-xl mx-auto text-sm"
                     style={{ color: "hsl(var(--text-secondary))" }}
                 >
-                    The fastest way to learn Neulab is to type a ticker and watch what happens.
+                    The fastest way to learn Neural Stock Intelligence™ is to type a ticker and watch what happens.
                 </p>
                 <Link
                     to="/dashboard"

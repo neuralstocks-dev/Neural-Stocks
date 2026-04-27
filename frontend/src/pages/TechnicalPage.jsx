@@ -1108,8 +1108,8 @@ histogram  = MACD_line − signal`}
                             <Tr s="Company news (IDX)" src="CNBC Indonesia + Detik Finance RSS" cov="Indonesia · 7-day window" cache="10-min cache" />
                             <Tr s="Analyst consensus" src="Finnhub.io" cov="US only (free tier)" cache="1-hr cache" />
                             <Tr s="Next earnings" src="Finnhub.io" cov="US only (free tier)" cache="1-hr cache" />
-                            <Tr s="Candlestick patterns" src="Neulab in-house engine" cov="Any ticker with OHLC" cache="Computed per analysis" />
-                            <Tr s="Intrinsic-value anchor (Graham + RIM)" src="Neulab in-house · yfinance fundamentals input" cov="Any ticker with EPS + bookValue" cache="Computed per analysis" />
+                            <Tr s="Candlestick patterns" src="NeuLab Inc. in-house engine" cov="Any ticker with OHLC" cache="Computed per analysis" />
+                            <Tr s="Intrinsic-value anchor (Graham + RIM)" src="NeuLab Inc. in-house · yfinance fundamentals input" cov="Any ticker with EPS + bookValue" cache="Computed per analysis" />
                             <Tr s="Verdict + reasoning" src="Anthropic Claude Sonnet 4.5" cov="All tickers" cache="Persisted in MongoDB" />
                         </tbody>
                     </table>
@@ -1193,7 +1193,7 @@ histogram  = MACD_line − signal`}
                         <LimitLi>
                             <strong>Claude is not infallible.</strong> LLM reasoning can still miss context, especially
                             around sector-specific regulatory events or macro shifts that happen faster than news feeds
-                            catch up. Always use Neulab alongside your own judgment, not instead of it.
+                            catch up. Always use Neural Stock Intelligence™ alongside your own judgment, not instead of it.
                         </LimitLi>
                         <LimitLi>
                             <strong>Not financial advice.</strong> The platform is educational and informational.
@@ -1209,7 +1209,7 @@ histogram  = MACD_line − signal`}
                 <SectionHeader
                     icon={Gauge}
                     overline="Capacity"
-                    title="How Neulab handles load."
+                    title="How Neural Stock Intelligence™ handles load."
                     subtitle="Transparent infrastructure — you should know what happens when many people analyze at once."
                 />
 
@@ -1243,7 +1243,7 @@ histogram  = MACD_line − signal`}
                                 for live spend.
                             </>
                         )}
-                        {" "}To keep the system responsive when traffic spikes, Neulab caps in-flight
+                        {" "}To keep the system responsive when traffic spikes, Neural Stock Intelligence™ caps in-flight
                         analyses at <strong style={{ color: "hsl(var(--text-primary))" }}>4 concurrent</strong>{" "}
                         per backend worker via a global asyncio semaphore. Excess requests <em>queue</em> rather than
                         slowing every other endpoint to a crawl. The Claude calls themselves run inside isolated OS

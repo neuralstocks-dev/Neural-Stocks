@@ -257,14 +257,14 @@ export default function BacktestPage() {
                     style={{ fontSize: "clamp(2.2rem, 5vw, 3.6rem)" }}
                 >
                     If you had followed{" "}
-                    <em style={{ color: "hsl(var(--hold))" }}>every Neulab verdict</em>…
+                    <em style={{ color: "hsl(var(--hold))" }}>every Neural Stock Intelligence™ verdict</em>…
                 </h1>
                 <p
                     className="mt-3 max-w-2xl text-base"
                     style={{ color: "hsl(var(--text-secondary))" }}
                 >
                     A walk-through of the hypothetical portfolio that would have
-                    resulted from following every BUY and SELL verdict Neulab
+                    resulted from following every BUY and SELL verdict Neural Stock Intelligence™
                     gave you — measured against a passive{" "}
                     {m.benchmark_ticker === "^JKSE" ? "IDX Composite" : "SPY"}{" "}
                     buy-and-hold over the same window.
@@ -288,7 +288,7 @@ export default function BacktestPage() {
                         className="font-serif mt-3"
                         style={{ fontSize: "1.25rem", letterSpacing: "-0.005em", lineHeight: 1.3 }}
                     >
-                        Imagine you had $10,000 and acted on every Neulab verdict the moment it
+                        Imagine you had $10,000 and acted on every Neural Stock Intelligence™ verdict the moment it
                         landed.
                     </p>
                     <p
@@ -400,7 +400,7 @@ export default function BacktestPage() {
                         taxes, and dividends. Starting capital is a notional
                         $10,000. Past performance (simulated or real) does not
                         guarantee future results. Use this as a sanity check on
-                        Neulab's reasoning, not as a promise of returns.{" "}
+                        Neural Stock Intelligence™'s reasoning, not as a promise of returns.{" "}
                         <Link
                             to="/technical#random-forest"
                             className="link-underline"
@@ -452,7 +452,7 @@ export default function BacktestPage() {
                             className="mt-3 max-w-xl text-base"
                             style={{ color: "hsl(var(--text-secondary))" }}
                         >
-                            Backtesting turns Neulab's verdicts into a hypothetical
+                            Backtesting turns Neural Stock Intelligence™'s verdicts into a hypothetical
                             portfolio so you can see, honestly, whether following the
                             AI would have beaten the market or not. Upgrade to Pro
                             or Elite to unlock this page for your account.
@@ -504,7 +504,7 @@ export default function BacktestPage() {
                         >
                             You have <strong>{data.verdict_count}</strong>{" "}
                             {data.verdict_count === 1 ? "verdict" : "verdicts"} so
-                            far. The longer you use Neulab, the more statistically
+                            far. The longer you use Neural Stock Intelligence™, the more statistically
                             meaningful this backtest becomes — every new verdict
                             extends the simulation window.
                         </p>
@@ -624,7 +624,7 @@ export default function BacktestPage() {
                                     className="text-overline hidden md:block"
                                     style={{ fontSize: "0.58rem" }}
                                 >
-                                    Neulab vs {m.benchmark_ticker || "Benchmark"}
+                                    NSI vs {m.benchmark_ticker || "Benchmark"}
                                 </p>
                             </div>
                             {chartData.length >= 2 ? (
@@ -653,7 +653,7 @@ export default function BacktestPage() {
                                             <Line
                                                 type="monotone"
                                                 dataKey="portfolio_value"
-                                                name="Neulab portfolio"
+                                                name="NSI portfolio"
                                                 stroke="hsl(var(--hold))"
                                                 strokeWidth={2}
                                                 dot={false}
@@ -833,7 +833,7 @@ function MlBacktestSection({ ml }) {
                     className="text-overline flex items-center gap-2"
                     style={{ color: "hsl(var(--hold))" }}
                 >
-                    <FlaskConical size={12} strokeWidth={1.5} /> Neulab-ML ·
+                    <FlaskConical size={12} strokeWidth={1.5} /> NSI-ML ·
                     Walk-forward
                 </p>
                 <h2
@@ -849,7 +849,7 @@ function MlBacktestSection({ ml }) {
                     className="mt-3 max-w-2xl text-base"
                     style={{ color: "hsl(var(--text-secondary))" }}
                 >
-                    A separate backtest of Neulab's Random-Forest layer against
+                    A separate backtest of Neural Stock Intelligence™'s Random-Forest layer against
                     SPY. Monthly rebalance, top-{m.top_k} of {m.universe_size}{" "}
                     mega-cap names ranked by model probability, equal-weight,
                     pure-RF (no LLM). This is the same walk-forward window used
@@ -969,7 +969,7 @@ function MlBacktestSection({ ml }) {
                                     <Line
                                         type="monotone"
                                         dataKey="portfolio_value"
-                                        name={`Neulab-ML top-${m.top_k}`}
+                                        name={`NSI-ML top-${m.top_k}`}
                                         stroke="hsl(var(--buy))"
                                         strokeWidth={2}
                                         dot={false}

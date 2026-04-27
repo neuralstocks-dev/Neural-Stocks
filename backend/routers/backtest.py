@@ -17,7 +17,7 @@ def _gate_pro(user: dict):
             status_code=402,
             detail=(
                 "Backtest is a Pro/Elite feature. Upgrade to see the hypothetical "
-                "portfolio that would have resulted from following every Neulab "
+                "portfolio that would have resulted from following every Neural Stock Intelligence™ "
                 "verdict you've received."
             ),
         )
@@ -37,7 +37,7 @@ async def my_backtest(
 
 @router.get("/ml")
 async def ml_backtest():
-    """Read the cached Neulab-ML walk-forward backtest.
+    """Read the cached NSI-ML walk-forward backtest.
     Public (unauthenticated) so it can be embedded in marketing pages later.
     Returns HTTP 404-shape empty-state dict if never computed."""
     doc = await db.backtest_runs.find_one({"kind": "ml"}, {"_id": 0, "user_id": 0})
@@ -45,7 +45,7 @@ async def ml_backtest():
         return {
             "kind": "ml",
             "empty": True,
-            "message": "Neulab-ML walk-forward has not been computed yet.",
+            "message": "NSI-ML walk-forward has not been computed yet.",
         }
     return doc
 

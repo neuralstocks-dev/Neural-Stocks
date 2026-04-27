@@ -152,7 +152,7 @@ export default function PatternGuideDialog({ open, onOpenChange, highlightNames 
                         className="font-serif mt-2"
                         style={{ fontSize: "1.8rem", letterSpacing: "-0.01em" }}
                     >
-                        The 15 patterns Neulab detects.
+                        The 15 patterns Neural Stock Intelligence™ detects.
                     </DialogTitle>
                     <p
                         className="mt-2 text-sm"

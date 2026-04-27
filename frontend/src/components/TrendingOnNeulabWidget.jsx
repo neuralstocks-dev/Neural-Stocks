@@ -69,7 +69,7 @@ export default function TrendingOnNeulabWidget() {
                 <div>
                     <p className="text-overline flex items-center gap-2">
                         <Flame size={12} strokeWidth={1.5} style={{ color: "hsl(var(--accent-primary))" }} />
-                        Trending on Neulab
+                        Trending on Neural Stock Intelligence™
                     </p>
                     <h2
                         className="font-serif mt-1"

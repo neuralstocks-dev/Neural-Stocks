@@ -126,7 +126,7 @@ export default function LoginPage() {
                         className="text-overline"
                         style={{ color: "rgba(255,255,255,0.4)" }}
                     >
-                        © 2026 Neulab · Neural Stock Intelligence™ · Not financial advice
+                        © 2026 NeuLab Inc. · Neural Stock Intelligence™ · Not financial advice
                     </div>
                 </div>
 

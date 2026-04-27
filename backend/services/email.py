@@ -17,7 +17,7 @@ if RESEND_API_KEY:
 # their inbox "From" column — keeps the Neulab brand visible even while
 # the underlying sender address is `onboarding@resend.dev` pending
 # domain-level DNS verification on neulab.xyz.
-FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Neulab")
+FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "NeuLab Inc.")
 # Where replies land. Resend's verified sender (resend.dev) can't receive
 # replies, so we route "Reply" clicks to a dedicated Gmail monitored by
 # the team. Can be overridden via env.
@@ -28,7 +28,7 @@ DISCLAIMER_FOOTER = """
 <hr style="border:none;border-top:1px solid #2a2a2a;margin:32px 0 16px 0" />
 <p style="font-size:11px;color:#888;font-family:'IBM Plex Mono',monospace;line-height:1.6">
   <strong style="color:#aaa">Educational research output.</strong>
-  Neulab is an AI-assisted research tool. All confidence and model-probability values
+  Neural Stock Intelligence™ is an AI-assisted research tool. All confidence and model-probability values
   describe the strength of the model's classification based on the inputs used —
   <em>not</em> forecasts of price movement or investment success. Content is for
   informational and educational purposes only and is <em>not</em> personalized
@@ -58,7 +58,7 @@ def _receipt_html(full_name: str, plan_name: str, amount: float, subscription_id
           </h1>
           <p style="color:#a8a8a8;font-size:15px;line-height:1.65;margin-top:16px">
             Your <strong style="color:#e6e6e6">{plan_name}</strong> subscription is active.
-            You now have full access to Neulab's AI-powered stock analysis engine.
+            You now have full access to Neural Stock Intelligence™'s AI-powered stock analysis engine.
           </p>
 
           <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:24px;font-size:14px">
@@ -226,7 +226,7 @@ def _weekly_digest_html(full_name: str, signals: list[dict], locked_count: int,
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#131313;border:1px solid #2a2a2a;padding:32px">
         <tr><td>
           <p style="font-size:10px;letter-spacing:0.18em;color:#b8994f;text-transform:uppercase;margin:0">
-            Neulab · Weekly Digest · {plan.upper()}
+            Neural Stock Intelligence™ · Weekly Digest · {plan.upper()}
           </p>
           <h1 style="font-family:'Cormorant Garamond',Georgia,serif;font-size:30px;color:#f5f5f0;margin:8px 0 0;letter-spacing:-0.01em">
             Hi {greeting} — here's your week.
@@ -262,9 +262,9 @@ async def send_weekly_digest_email(to_email: str, full_name: str, signals: list[
         return False
     html = _weekly_digest_html(full_name, signals, locked_count, is_paid, plan)
     subject = (
-        f"Your Neulab weekly digest · {len(signals)} strong directional read"
+        f"Your NSI weekly digest · {len(signals)} strong directional read"
         + ("s" if len(signals) != 1 else "")
-        if signals else "Your Neulab weekly digest · no strong reads this week"
+        if signals else "Your NSI weekly digest · no strong reads this week"
     )
     params = {
         "from": f"{FROM_NAME} <{SENDER_EMAIL}>",

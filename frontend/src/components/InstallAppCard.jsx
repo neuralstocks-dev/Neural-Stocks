@@ -85,10 +85,10 @@ export default function InstallAppCard() {
                         App installed
                     </p>
                     <h3 className="font-serif text-lg mt-1" style={{ letterSpacing: "-0.005em" }}>
-                        Neulab is running as a standalone app.
+                        Neural Stock Intelligence™ is running as a standalone app.
                     </h3>
                     <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
-                        You're already inside the installed Neulab app — no browser chrome, instant launch from your
+                        You're already inside the installed app — no browser chrome, instant launch from your
                         home screen.
                     </p>
                 </div>
@@ -123,7 +123,7 @@ export default function InstallAppCard() {
                             className="font-serif text-lg mt-1"
                             style={{ letterSpacing: "-0.005em" }}
                         >
-                            Add Neulab to your home screen.
+                            Add Neural Stock Intelligence™ to your home screen.
                         </h3>
                         <p
                             className="text-sm mt-2"
@@ -213,8 +213,8 @@ export default function InstallAppCard() {
                                         03
                                     </span>
                                     <span style={{ color: "hsl(var(--text-secondary))" }}>
-                                        Confirm the name <strong>Neulab</strong> and tap <strong>Add</strong>. The
-                                        Neulab icon will appear on your home screen — tap it to launch the app.
+                                        Confirm the name <strong>NSI</strong> and tap <strong>Add</strong>. The
+                                        app icon will appear on your home screen — tap it to launch.
                                     </span>
                                 </li>
                             </ol>
@@ -249,13 +249,13 @@ export default function InstallAppCard() {
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
-                    Install Neulab
+                    Install Neural Stock Intelligence™
                 </p>
                 <h3 className="font-serif text-lg mt-1" style={{ letterSpacing: "-0.005em" }}>
-                    Open Neulab like a native app.
+                    Open Neural Stock Intelligence™ like a native app.
                 </h3>
                 <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
-                    Install the Neulab app on your device for instant launch, its own window without browser tabs,
+                    Install the app on your device for instant launch, its own window without browser tabs,
                     and direct shortcuts to Dashboard, Portfolio, and Scorecard.
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -267,7 +267,7 @@ export default function InstallAppCard() {
                         data-testid="install-app-button"
                         title={
                             deferredPrompt
-                                ? "Install Neulab"
+                                ? "Install Neural Stock Intelligence™"
                                 : "Your browser will offer install once it has enough engagement."
                         }
                     >
@@ -281,7 +281,7 @@ export default function InstallAppCard() {
                             data-testid="install-hint"
                         >
                             Not ready yet — on Chrome / Edge you can also tap the browser's address bar install icon,
-                            or use Menu → Install Neulab.
+                            or use Menu → Install app.
                         </span>
                     )}
                 </div>

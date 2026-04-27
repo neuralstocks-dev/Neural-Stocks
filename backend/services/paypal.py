@@ -314,7 +314,7 @@ async def create_order(amount: float, description: str, custom_id: str = "") -> 
             }
         ],
         "application_context": {
-            "brand_name": "Neulab",
+            "brand_name": "Neural Stock Intelligence",
             "shipping_preference": "NO_SHIPPING",
             "user_action": "PAY_NOW",
         },

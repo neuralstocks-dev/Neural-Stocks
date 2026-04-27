@@ -280,7 +280,7 @@ export default function PortfolioPage() {
                     What you own, <em style={{ color: "hsl(var(--hold))" }}>marked to market</em>.
                 </h1>
                 <p className="mt-4 max-w-2xl text-base" style={{ color: "hsl(var(--text-secondary))" }}>
-                    Enter your holdings once. Neulab computes live market value, unrealized P&L, and allocation
+                    Enter your holdings once. Neural Stock Intelligence™ computes live market value, unrealized P&L, and allocation
                     continuously against the latest prices. This data is private to your account.
                 </p>
 

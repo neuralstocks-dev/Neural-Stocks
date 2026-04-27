@@ -113,7 +113,7 @@ async def poll_and_link() -> int:
         user = await db.users.find_one({"telegram_link_code": candidate}, {"_id": 0})
         if not user:
             # Send an unknown-code reply
-            await _send_message(chat_id, "Sorry, that Neulab link code wasn't found. Please generate a fresh code from the Neulab app.")
+            await _send_message(chat_id, "Sorry, that link code wasn't found. Please generate a fresh code from the Neural Stock Intelligence™ app.")
             continue
         # Link
         await db.users.update_one(
@@ -131,7 +131,7 @@ async def poll_and_link() -> int:
         name = user.get("full_name") or user.get("email", "there")
         await _send_message(
             chat_id,
-            f"✅ Your Neulab account is now linked, {name.split()[0] if isinstance(name, str) else 'there'}.\n\n"
+            f"✅ Your Neural Stock Intelligence™ account is now linked, {name.split()[0] if isinstance(name, str) else 'there'}.\n\n"
             "You'll receive research-summary notifications here when patterns are detected, "
             "AI analyses complete, or RF watchlist scans flag a shift in analytical bias.\n\n"
             "All notifications are educational research output — not personalized financial advice.\n\n"

@@ -317,7 +317,7 @@ export default function SettingsPage() {
                                 ⚙︎ TELEGRAM BOT NOT CONFIGURED
                             </p>
                             <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
-                                The Neulab administrator hasn't set up a Telegram bot yet. Once they do, you'll be
+                                The Neural Stock Intelligence™ administrator hasn't set up a Telegram bot yet. Once they do, you'll be
                                 able to connect your chat here. Email notifications continue to work normally.
                             </p>
                         </div>
@@ -743,7 +743,7 @@ export default function SettingsPage() {
                                 Daily RF pre-filter · Telegram push
                             </h2>
                             <p className="mt-3 text-sm max-w-xl" style={{ color: "hsl(var(--text-secondary))" }}>
-                                Once a day, Neulab runs the Random-Forest model over every ticker on your watchlist.
+                                Once a day, Neural Stock Intelligence™ runs the Random-Forest model over every ticker on your watchlist.
                                 If the model shows <strong>strong conviction</strong> (|P − 50%| &gt; 15pp), you'll get
                                 a push on Telegram. This is an <em>RF-only</em> alert — not a full Claude verdict. Tap
                                 Analyze in the app for the multi-lens report before acting.

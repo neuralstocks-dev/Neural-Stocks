@@ -127,7 +127,7 @@ async def _scan_user(user: dict, market_df: dict) -> int:
             f"The Random-Forest model classifies {ticker}{price_line} with a "
             f"{bias_word.lower()} analytical bias over a {horizon}-day horizon "
             f"(model probability {round(prob_up*100)}%).\n\n"
-            f"⚠️ This is a lightweight RF-only scan — NOT a full Neulab research "
+            f"⚠️ This is a lightweight RF-only scan — NOT a full Neural Stock Intelligence™ research "
             f"summary. No Claude reasoning, no candlestick verification, no "
             f"scenario levels. Open the app and tap Analyze on {ticker} for the "
             f"full multi-lens research view before drawing conclusions.\n"

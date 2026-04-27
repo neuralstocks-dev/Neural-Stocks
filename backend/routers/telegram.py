@@ -41,12 +41,12 @@ async def send_test(user=Depends(get_current_user)):
     """Send a test alert to the linked chat."""
     ok = await tg.send_alert_to_user(
         user["id"],
-        "Neulab · test notification",
+        "Neural Stock Intelligence™ · test notification",
         (
             "If you're reading this, Telegram alerts are working.\n\n"
             "You'll receive research-summary notifications here when patterns are detected, "
             "AI analyses complete, or RF watchlist scans flag a shift in analytical bias.\n\n"
-            "<i>All Neulab notifications are educational research output. Confidence and "
+            "<i>All Neural Stock Intelligence™ notifications are educational research output. Confidence and "
             "model probability values describe the strength of the model's classification "
             "based on the inputs — they are not forecasts of price movement and not "
             "personalized financial advice.</i>"

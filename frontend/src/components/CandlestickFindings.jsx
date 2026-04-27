@@ -307,7 +307,7 @@ export default function CandlestickFindings({ findings, summary, mode, analysisC
             <div className="mt-6 flex items-center justify-between flex-wrap gap-3">
                 <p className="text-xs" style={{ color: "hsl(var(--text-secondary))", maxWidth: "52ch" }}>
                     Not sure what a pattern means? Open the reference guide for shape diagrams, meaning, and how
-                    to read each of the 15 patterns Neulab detects.
+                    to read each of the 15 patterns Neural Stock Intelligence™ detects.
                 </p>
                 <button
                     type="button"

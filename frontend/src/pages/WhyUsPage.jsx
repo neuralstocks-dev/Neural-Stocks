@@ -71,7 +71,7 @@ const MODULES = [
         icon: Smartphone,
         title: "Native Mobile Apps",
         status: "coming",
-        body: "Neulab on iOS and Android — full dashboard, one-tap Analyze, Touch ID / Face ID login, and native push alerts. Background refresh keeps your watchlist scoring even when the app is closed.",
+        body: "Neural Stock Intelligence™ on iOS and Android — full dashboard, one-tap Analyze, Touch ID / Face ID login, and native push alerts. Background refresh keeps your watchlist scoring even when the app is closed.",
     },
     {
         icon: CalendarRange,
@@ -83,7 +83,7 @@ const MODULES = [
 
 // ---------- Competitive matrix ----------
 const COMPETITORS = [
-    { key: "nsi", name: "Neural Stock Intelligence", tag: "By Neulab" },
+    { key: "nsi", name: "Neural Stock Intelligence", tag: "By NeuLab Inc." },
     { key: "moomoo", name: "moomoo", tag: "Retail-heavy broker" },
     { key: "tiger", name: "Tiger Brokers", tag: "Execution-first" },
     { key: "tradingview", name: "TradingView · Finviz", tag: "Technical screeners" },
@@ -239,7 +239,7 @@ const INFO_CONTENT = {
             <>
                 <p className="mb-3">
                     Most retail platforms surface raw P/E and P/B but never put the actual{" "}
-                    <strong>fair-value calculation</strong> in front of you. Neulab does — and
+                    <strong>fair-value calculation</strong> in front of you. Neural Stock Intelligence™ does — and
                     the LLM uses it as one more input when reasoning about the verdict.
                 </p>
                 <p className="mb-3">
@@ -480,7 +480,7 @@ export default function WhyUsPage() {
                         style={{ fontSize: "clamp(2rem, 4vw, 3rem)", letterSpacing: "-0.02em", lineHeight: 1.05 }}
                     >
                         Most platforms execute.<br />
-                        <span style={{ color: "hsl(var(--hold))" }}>Neulab explains.</span>
+                        <span style={{ color: "hsl(var(--hold))" }}>Neural Stock Intelligence™ explains.</span>
                     </h2>
                     <p className="mt-4 max-w-3xl text-base" style={{ color: "hsl(var(--text-secondary))" }}>
                         Brokers execute trades. Screeners filter lists. Robo-advisors rebalance indices.
@@ -632,13 +632,13 @@ export default function WhyUsPage() {
                             className="font-serif mt-2"
                             style={{ fontSize: "clamp(2rem, 3.6vw, 2.8rem)", letterSpacing: "-0.02em", lineHeight: 1.1 }}
                         >
-                            Neulab is an AI research-driven fintech lab.
+                            NeuLab Inc. is an AI research-driven fintech lab.
                         </h2>
                         <p
                             className="mt-5 text-base md:text-lg leading-relaxed max-w-3xl"
                             style={{ color: "hsl(var(--text-primary))" }}
                         >
-                            Neulab builds AI systems that transform complex market data into structured,
+                            NeuLab Inc. builds AI systems that transform complex market data into structured,
                             explainable intelligence — so disciplined investors can move beyond guessing
                             and into reasoned decisions.
                         </p>
@@ -704,7 +704,7 @@ export default function WhyUsPage() {
                                 NEULAB
                             </p>
                             <p className="mt-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                                AI research-driven fintech lab.
+                                AI research-driven fintech lab — NeuLab Inc.
                             </p>
                             <p className="mt-1 font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
                                 neulab.xyz
@@ -722,7 +722,7 @@ export default function WhyUsPage() {
                             <p className="text-overline">Legal</p>
                             <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                                 <strong style={{ color: "hsl(var(--text-primary))" }}>
-                                    Neural Stock Intelligence&trade; by Neulab
+                                    Neural Stock Intelligence&trade; — by NeuLab Inc.
                                 </strong>
                             </p>
                             <p
@@ -742,7 +742,7 @@ export default function WhyUsPage() {
                             letterSpacing: "0.16em",
                         }}
                     >
-                        &copy; 2026 Neulab · All rights reserved
+                        &copy; 2026 NeuLab Inc. · All rights reserved
                     </p>
                 </footer>
             </div>
