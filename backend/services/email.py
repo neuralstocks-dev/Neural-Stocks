@@ -26,6 +26,11 @@ REPLY_TO = os.environ.get("EMAIL_REPLY_TO", "ai.neulab.inc@gmail.com")
 
 DISCLAIMER_FOOTER = """
 <hr style="border:none;border-top:1px solid #2a2a2a;margin:32px 0 16px 0" />
+<p style="font-size:11px;color:#aaa;font-family:'IBM Plex Mono',monospace;line-height:1.6;margin:0 0 12px 0">
+  <strong style="color:#b8994f">Follow Neural Stock Intelligence™</strong> ·
+  <a href="https://www.instagram.com/neuralstockintelligence" style="color:#aaa;text-decoration:none;border-bottom:1px solid #444">Instagram&nbsp;@neuralstockintelligence</a> ·
+  <a href="https://www.tiktok.com/@neuralstockintelligence" style="color:#aaa;text-decoration:none;border-bottom:1px solid #444">TikTok&nbsp;@neuralstockintelligence</a>
+</p>
 <p style="font-size:11px;color:#888;font-family:'IBM Plex Mono',monospace;line-height:1.6">
   <strong style="color:#aaa">Educational research output.</strong>
   Neural Stock Intelligence™ is an AI-assisted research tool. All confidence and model-probability values

@@ -19,6 +19,12 @@ SELL_RED = colors.HexColor("#dc2626")
 HOLD_AMBER = colors.HexColor("#d97706")
 RULE_GREY = colors.HexColor("#d1d5db")
 
+# Social handles surfaced on every PDF artifact for cross-channel brand recall.
+SOCIAL_HANDLE = "@neuralstockintelligence"
+SOCIAL_LINE_HTML = (
+    f"<b>FOLLOW</b> · Instagram &amp; TikTok: <font face='Courier'>{SOCIAL_HANDLE}</font>"
+)
+
 
 def _rec_color(rec: str):
     return {"BUY": BUY_GREEN, "SELL": SELL_RED, "HOLD": HOLD_AMBER}.get(rec, BRAND_INK)
@@ -692,6 +698,8 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
         "Markets involve risk of loss. Always do your own research and consult a licensed financial professional.",
         s["muted"],
     ))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph(SOCIAL_LINE_HTML, s["muted"]))
 
     doc.build(story)
     pdf_bytes = buf.getvalue()
@@ -952,7 +960,7 @@ def generate_trade_slip_pdf(analysis: dict, share_url: str = "") -> bytes:
     ]))
     story.append(footer)
     story.append(Paragraph(
-        "Educational only — not financial advice. Markets involve risk of loss.",
+        "Follow @neuralstockintelligence on Instagram &amp; TikTok · Educational only — not financial advice. Markets involve risk of loss.",
         ParagraphStyle("SlipDisc", parent=s["muted"], fontSize=7, leading=9, textColor=BRAND_MUTED),
     ))
 
