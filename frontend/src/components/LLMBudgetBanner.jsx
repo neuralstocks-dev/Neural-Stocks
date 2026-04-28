@@ -24,7 +24,20 @@ function _looksLikeBudgetError(payload) {
     if (!payload) return false;
     if (typeof payload === "string") {
         const s = payload.toLowerCase();
-        return s.includes("budget exceeded") || s.includes("budget has been exceeded") || s.includes("universal key");
+        // STRICT match — only true when the string actually mentions a
+        // budget/credit-exhaustion event. We previously also matched
+        // `s.includes("universal key")` which false-triggered on every
+        // unrelated upstream error whose message mentions "Universal Key"
+        // (e.g. "check the LLM Health panel..."). The structured
+        // `error_code` is the reliable path; this is the fallback for
+        // legacy stringified errors.
+        return (
+            s.includes("budget exceeded") ||
+            s.includes("budget has been exceeded") ||
+            s.includes("llm budget") ||
+            s.includes("top up your") ||
+            s.includes("insufficient credit")
+        );
     }
     if (typeof payload === "object") {
         if (payload.error_code === "llm_budget_exceeded") return true;

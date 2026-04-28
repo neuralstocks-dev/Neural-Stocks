@@ -18,7 +18,13 @@ function _isBudgetError(payload) {
     if (!payload) return false;
     if (typeof payload === "string") {
         const s = payload.toLowerCase();
-        return s.includes("budget exceeded") || s.includes("budget has been exceeded") || s.includes("universal key");
+        return (
+            s.includes("budget exceeded") ||
+            s.includes("budget has been exceeded") ||
+            s.includes("llm budget") ||
+            s.includes("top up your") ||
+            s.includes("insufficient credit")
+        );
     }
     if (typeof payload === "object") {
         if (payload.error_code === "llm_budget_exceeded") return true;
@@ -53,9 +59,23 @@ import {
     Zap,
 } from "lucide-react";
 
-function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyzing, canTimeline, revealed }) {
-    const q = item.quote || {};
-    const up = (q.change_pct ?? 0) >= 0;
+// Same phase labels used by the Re-analyze stepper. We surface only the
+// CURRENT phase as a single pill on the dashboard row (full stepper would
+// blow out the row width on mobile). Kept in lock-step with the labels in
+// AnalysisProgressStepper.jsx so the user sees consistent phase names
+// across both surfaces.
+const WATCHLIST_PHASE_LABELS = {
+    queued: "Queued",
+    fetching_data: "Fetching data",
+    computing_technicals: "Technicals",
+    scanning_patterns: "Patterns",
+    llm_thinking: "LLM verdict",
+    rf_scoring: "RF score",
+    calibrating: "Calibrating",
+};
+
+function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyzing, analyzingPhase, canTimeline, revealed }) {
+    const q = item.quote || {};    const up = (q.change_pct ?? 0) >= 0;
     return (
         <div
             className={`rise-in grid grid-cols-12 items-center gap-2 py-5 md:py-6 px-4 md:px-6 group${revealed ? " verdict-revealed" : ""}`}
@@ -144,7 +164,7 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                                     }}
                                 >
                                     <Loader2 size={9} strokeWidth={2} className="animate-spin" />
-                                    Refreshing…
+                                    {analyzingPhase || "Refreshing"}…
                                 </span>
                             </div>
                         )}
@@ -156,7 +176,7 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                             style={{ color: "hsl(var(--hold))" }}
                         >
                             <Loader2 size={10} strokeWidth={2} className="animate-spin" />
-                            Analyzing…
+                            {analyzingPhase || "Analyzing"}…
                         </span>
                         <div
                             className="text-overline mt-1"
@@ -180,11 +200,15 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                     disabled={analyzing}
                     data-testid={`analyze-${item.ticker}-button`}
                 >
-                    {analyzing ? (
-                        <Loader2 size={12} className="animate-spin" />
-                    ) : (
-                        <Sparkles size={12} strokeWidth={1.5} />
-                    )}
+                    {/* No spinner here — the row already shows an "Analyzing… · {phase}"
+                        pill in the verdict column. Two synchronised spinners on the same
+                        row was reported as confusing on mobile. The disabled state is
+                        enough visual feedback. */}
+                    <Sparkles
+                        size={12}
+                        strokeWidth={1.5}
+                        style={{ opacity: analyzing ? 0.35 : 1 }}
+                    />
                 </button>
                 <button
                     onClick={() => onTimeline(item.ticker)}
@@ -297,6 +321,13 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [analyzingTicker, setAnalyzingTicker] = useState(null);
+    // Live phase label ("Fetching data" | "Technicals" | "Patterns" | "LLM
+    // verdict" | "RF score" | "Calibrating") for the watchlist row pill.
+    // Updated by pollAnalysisJob's onProgress callback so the user sees
+    // exactly where in the pipeline we are — same text as the Re-analyze
+    // page stepper. Mobile-friendly: just a single label, no full stepper
+    // (saves horizontal space; the underlying flow is identical).
+    const [analyzingPhase, setAnalyzingPhase] = useState(null);
     const [revealedTicker, setRevealedTicker] = useState(null);
     const [quickBusy, setQuickBusy] = useState(null); // 'top' | 'bottom' | null
     // Live job state for the floating QuickAnalyzeProgress panel. Set to
@@ -409,15 +440,24 @@ export default function DashboardPage() {
         disclaimer.ensureAccepted(async () => {
             setActionError("");
             setAnalyzingTicker(ticker);
+            setAnalyzingPhase(null);
             try {
                 // Mobile-resilient poller (lib/analysisPolling.js) — budget 260s,
                 // visibility-aware elapsed tracking so backgrounded tabs don't
                 // incorrectly conclude the job timed out. Falls through to
                 // /latest with freshness validation on exhaustion.
+                // The onProgress callback drives the live phase pill in the
+                // watchlist row so users see "Analyzing… · LLM verdict"
+                // instead of a generic "Analyzing…" — same phase labels as
+                // the AnalysisProgressStepper on the Re-analyze page.
                 const finalResult = await pollAnalysisJob({
                     api,
                     ticker,
                     mode: analyzeMode,
+                    onProgress: (p) => {
+                        const label = WATCHLIST_PHASE_LABELS[p?.phase] || null;
+                        setAnalyzingPhase(label);
+                    },
                 });
 
                 const freshVerdict = finalResult
@@ -492,6 +532,7 @@ export default function DashboardPage() {
                 setActionError(errMessage(msg, "Analysis failed"));
             } finally {
                 setAnalyzingTicker(null);
+                setAnalyzingPhase(null);
             }
         });
     };
@@ -899,6 +940,7 @@ export default function DashboardPage() {
                                         onTimeline={(t) => disclaimer.ensureAccepted(() => setTimelineTicker(t))}
                                         canTimeline={canQuickActions}
                                         analyzing={analyzingTicker === item.ticker}
+                                        analyzingPhase={analyzingTicker === item.ticker ? analyzingPhase : null}
                                         revealed={revealedTicker === item.ticker}
                                     />
                                 ))}

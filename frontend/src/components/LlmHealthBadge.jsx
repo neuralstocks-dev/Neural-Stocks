@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
- * LlmHealthBadge — small status dot + tooltip showing the upstream LLM
- * provider's health. Polls `/api/llm-health/public` every 30s.
+ * LlmHealthBadge — admin-only status dot showing the upstream LLM provider's
+ * health. Polls `/api/llm-health/public` every 30s. Renders nothing for
+ * non-admin users — operational health is an ops concern, not a user UX
+ * surface (would just create anxiety without giving regular users any
+ * actionable information).
  *
  * Visual states:
  *   operational : tiny green dot, no label (calm — only visible on hover)
@@ -33,9 +37,18 @@ function statusToTone(status) {
 }
 
 export default function LlmHealthBadge({ inline = false, showWhenHealthy = false }) {
+    const { user } = useAuth();
     const [health, setHealth] = useState(null);
 
+    // Strict admin gate — non-admin users never see this badge under any
+    // upstream state. The endpoint stays public so we don't have to ship
+    // a separate admin-only route, but the surfacing decision is on the
+    // client. If we ever want a customer-facing "service status" page,
+    // it should be a separate component with its own copy + framing.
+    const isAdmin = !!user?.is_admin;
+
     useEffect(() => {
+        if (!isAdmin) return;   // skip polling entirely for non-admins
         let cancelled = false;
         let timer = null;
 
@@ -56,8 +69,9 @@ export default function LlmHealthBadge({ inline = false, showWhenHealthy = false
             cancelled = true;
             if (timer) clearInterval(timer);
         };
-    }, []);
+    }, [isAdmin]);
 
+    if (!isAdmin) return null;
     if (!health) return null;
     if (!showWhenHealthy && health.status === "operational") return null;
 

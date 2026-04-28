@@ -67,7 +67,13 @@ function _isBudgetError(payload) {
     if (!payload) return false;
     if (typeof payload === "string") {
         const s = payload.toLowerCase();
-        return s.includes("budget exceeded") || s.includes("budget has been exceeded") || s.includes("universal key");
+        return (
+            s.includes("budget exceeded") ||
+            s.includes("budget has been exceeded") ||
+            s.includes("llm budget") ||
+            s.includes("top up your") ||
+            s.includes("insufficient credit")
+        );
     }
     if (typeof payload === "object") {
         if (payload.error_code === "llm_budget_exceeded") return true;
@@ -314,7 +320,20 @@ export default function AnalysisReportPage() {
                             structured copy + Top-up CTA). */}
                         {!_isBudgetError(errorRaw) && (
                             <div className="signal-sell p-4 font-mono text-sm" data-testid="analysis-error">
-                                {error}
+                                <p>{error}</p>
+                                {/* Inline retry CTA — most analysis errors are
+                                    transient (upstream LLM blips). One click is
+                                    materially less friction than searching for
+                                    the Re-analyze button after reading the error. */}
+                                {!analyzing && (
+                                    <button
+                                        onClick={runAnalysis}
+                                        className="btn-primary mt-3 !py-1.5 !px-3 !text-xs"
+                                        data-testid="analysis-error-retry-button"
+                                    >
+                                        Retry analysis
+                                    </button>
+                                )}
                             </div>
                         )}
                     </>
