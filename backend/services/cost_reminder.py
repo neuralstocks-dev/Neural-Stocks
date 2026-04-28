@@ -238,30 +238,58 @@ async def run_tg_low_balance_check_once(force: bool = False) -> dict:
         return {"sent": False, "reason": "no_anchor"}
 
     verdicts_left = p["verdicts_left"]
-    if verdicts_left >= threshold and not force:
-        return {"sent": False, "reason": "above_threshold", "projection": p}
-
-    # Build the Telegram message — short and actionable. <b>...</b> for HTML
-    # parse mode; emoji safe across Telegram clients.
-    title = "⚠️ Universal Key low"
-    body = (
-        f"Projected <b>{verdicts_left} verdict{'s' if verdicts_left != 1 else ''}</b> left\n"
-        f"Remaining: <b>{p['remaining_credits']:.2f} credits</b> (≈ ${p['remaining_usd']:.2f})\n"
-        f"Anchor age: {p['age_days']}d · used since: {p['used_credits']:.1f} cr / {p['verdicts_since']} verdicts\n\n"
-        "Top up at app.emergent.sh → Universal Key, then refresh the anchor in /admin/cost."
-    )
+    # Detect "stale anchor / underwater projection": when used_credits has
+    # met or exceeded the anchored starting balance, the projection bottoms
+    # out at 0 even though the admin may have topped up but forgotten to
+    # refresh the anchor. Sending a confident "0 verdicts left" push in
+    # that state is misleading (false low-balance flood). Switch to a
+    # clearer "anchor needs refresh" nudge so the admin is told to update
+    # the anchor instead of being told they're out of credits.
+    underwater = p["used_credits"] >= p["credits_at_top_up"]
+    if underwater:
+        # Skip unless the firing rule (force OR threshold breach) would
+        # have fired anyway — the threshold rule trivially passes here
+        # because verdicts_left is 0.
+        title = "🔄 Universal Key anchor needs refresh"
+        body = (
+            f"Projection has gone underwater — used <b>{p['used_credits']:.1f} credits</b> "
+            f"({p['verdicts_since']} verdicts) since the anchor was set "
+            f"{p['age_days']}d ago at {p['credits_at_top_up']:.2f} credits.\n\n"
+            "<i>Likely cause:</i> you topped up the Universal Key but didn't refresh the anchor.\n\n"
+            "Refresh it in <b>/admin/cost</b> with the current balance from "
+            "app.emergent.sh → Universal Key. Once refreshed, the projected "
+            "verdicts-left figure will be accurate again."
+        )
+    else:
+        if verdicts_left >= threshold and not force:
+            return {"sent": False, "reason": "above_threshold", "projection": p}
+        # Build the Telegram message — short and actionable. <b>...</b> for HTML
+        # parse mode; emoji safe across Telegram clients.
+        title = "⚠️ Universal Key low"
+        body = (
+            f"Projected <b>{verdicts_left} verdict{'s' if verdicts_left != 1 else ''}</b> left\n"
+            f"Remaining: <b>{p['remaining_credits']:.2f} credits</b> (≈ ${p['remaining_usd']:.2f})\n"
+            f"Anchor age: {p['age_days']}d · used since: {p['used_credits']:.1f} cr / {p['verdicts_since']} verdicts\n\n"
+            "Top up at app.emergent.sh → Universal Key, then refresh the anchor in /admin/cost."
+        )
     ok = await send_alert_to_user(user_id, title, body)
     if ok:
         await db.app_settings.update_one(
             {"_id": "cost_anchor_tg_alert"},
             {"$set": {"last_sent_at": datetime.now(timezone.utc).isoformat()}},
         )
-        return {"sent": True, "verdicts_left": verdicts_left, "user_id": user_id}
+        return {
+            "sent": True,
+            "verdicts_left": verdicts_left,
+            "user_id": user_id,
+            "kind": "anchor_refresh_needed" if underwater else "low_balance",
+        }
     return {
         "sent": False,
         "reason": "telegram_send_failed",
         "verdicts_left": verdicts_left,
         "user_id": user_id,
+        "kind": "anchor_refresh_needed" if underwater else "low_balance",
     }
 
 

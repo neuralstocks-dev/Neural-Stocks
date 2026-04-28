@@ -160,12 +160,13 @@ async def _send_message(chat_id, text: str) -> bool:
 _PUBLIC_APP_URL = os.environ.get("PUBLIC_APP_URL", "").rstrip("/")
 
 # Cross-channel social footer appended to every alert pushed to user chats.
-# Telegram supports HTML link entities, so we wrap the handle in <a> tags so
-# users can tap straight from the alert into Instagram or TikTok.
+# Telegram supports HTML link entities, so we wrap each handle in <a> tags so
+# users can tap straight from the alert into Instagram or TikTok. Each row
+# is on its own line for readability on mobile (per UX request).
 _TG_SOCIAL_FOOTER = (
-    "\n\n<i>Follow Neural Stock Intelligence™</i> · "
-    "<a href=\"https://www.instagram.com/neuralstockintelligence\">IG @neuralstockintelligence</a> · "
-    "<a href=\"https://www.tiktok.com/@neuralstockintelligence\">TikTok @neuralstockintelligence</a>"
+    "\n\n<i>Follow Neural Stock Intelligence™</i>"
+    "\n<a href=\"https://www.instagram.com/neuralstockintelligence\">IG @neuralstockintelligence</a>"
+    "\n<a href=\"https://www.tiktok.com/@neuralstockintelligence\">TikTok @neuralstockintelligence</a>"
 )
 
 

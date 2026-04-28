@@ -85,6 +85,26 @@ def test_telegram_alert_footer_has_both_handles_and_links():
     assert _TG_SOCIAL_FOOTER.count("<a href=") == 2
 
 
+def test_telegram_alert_footer_uses_three_separate_rows():
+    """Per UX spec, the footer renders on three lines, one per row:
+        Row 1: Follow Neural Stock Intelligence
+        Row 2: IG @neuralstockintelligence
+        Row 3: TikTok @neuralstockintelligence
+    Must NOT use the legacy single-line " · " joiner.
+    """
+    # No interpunct/bullet joiners between handles.
+    assert " · " not in _TG_SOCIAL_FOOTER, (
+        "Telegram footer must use newlines, not ' · ' joiners"
+    )
+    # Strip the leading "\n\n" gap between body and footer, then split on
+    # newlines. We expect exactly 3 non-empty rows.
+    rows = [r for r in _TG_SOCIAL_FOOTER.lstrip("\n").split("\n") if r.strip()]
+    assert len(rows) == 3, f"Expected 3 footer rows, got {len(rows)}: {rows}"
+    assert "Follow Neural Stock Intelligence" in rows[0]
+    assert rows[1].startswith("<a href=") and "IG @neuralstockintelligence" in rows[1]
+    assert rows[2].startswith("<a href=") and "TikTok @neuralstockintelligence" in rows[2]
+
+
 def test_email_disclaimer_footer_has_both_handles_and_links():
     assert HANDLE in DISCLAIMER_FOOTER
     assert "instagram.com/neuralstockintelligence" in DISCLAIMER_FOOTER
