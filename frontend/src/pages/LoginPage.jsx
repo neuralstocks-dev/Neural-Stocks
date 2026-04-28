@@ -5,6 +5,7 @@ import { useExperimentVariant } from "@/hooks/useExperimentVariant";
 import { LineChart, Lock, Mail } from "lucide-react";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 import TryNowBox from "@/components/TryNowBox";
+import SocialLinks from "@/components/SocialLinks";
 
 const TAGLINE_FALLBACK = {
     key: "analyst_why",
@@ -123,10 +124,11 @@ export default function LoginPage() {
                     </div>
 
                     <div
-                        className="text-overline"
+                        className="text-overline space-y-3"
                         style={{ color: "rgba(255,255,255,0.4)" }}
                     >
-                        © 2026 NeuLab Inc. · Neural Stock Intelligence™ · Not financial advice
+                        <SocialLinks variant="muted" size="sm" />
+                        <p>© 2026 NeuLab Inc. · Neural Stock Intelligence™ · Not financial advice</p>
                     </div>
                 </div>
 

@@ -5,6 +5,7 @@ import { useExperimentVariant } from "@/hooks/useExperimentVariant";
 import { LineChart, Lock, Mail, User } from "lucide-react";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 import TryNowBox from "@/components/TryNowBox";
+import SocialLinks from "@/components/SocialLinks";
 
 const SIGNUP_TAGLINE_FALLBACK = {
     key: "five_stocks_clarity",
@@ -120,8 +121,12 @@ export default function SignupPage() {
                         </div>
                     </div>
 
-                    <div className="text-overline" style={{ color: "rgba(255,255,255,0.4)" }}>
-                        © 2026 NeuLab Inc. · Neural Stock Intelligence™ · Not financial advice
+                    <div
+                        className="text-overline space-y-3"
+                        style={{ color: "rgba(255,255,255,0.4)" }}
+                    >
+                        <SocialLinks variant="muted" size="sm" />
+                        <p>© 2026 NeuLab Inc. · Neural Stock Intelligence™ · Not financial advice</p>
                     </div>
                 </div>
 

@@ -21,6 +21,7 @@ import {
     CalendarRange,
     Award,
 } from "lucide-react";
+import SocialLinks from "@/components/SocialLinks";
 
 // ---------- Product modules ----------
 const MODULES = [
@@ -744,6 +745,22 @@ export default function WhyUsPage() {
                     >
                         &copy; 2026 NeuLab Inc. · All rights reserved
                     </p>
+                    <div
+                        className="mt-4 pt-4"
+                        style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                    >
+                        <p
+                            className="text-overline mb-3"
+                            style={{
+                                color: "hsl(var(--text-muted))",
+                                fontSize: "0.56rem",
+                                letterSpacing: "0.16em",
+                            }}
+                        >
+                            Follow
+                        </p>
+                        <SocialLinks variant="default" size="sm" />
+                    </div>
                 </footer>
             </div>
 

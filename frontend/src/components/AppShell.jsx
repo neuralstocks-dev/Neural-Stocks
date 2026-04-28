@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { Sun, Moon, LogOut, LineChart, Menu, X } from "lucide-react";
+import SocialLinks from "@/components/SocialLinks";
 
 const NAV_ITEMS = [
     { to: "/dashboard", label: "Dashboard", testid: "nav-dashboard" },
@@ -374,6 +375,27 @@ export default function AppShell({ children }) {
             )}
 
             <main className="relative z-10">{children}</main>
+
+            {/* Global authenticated footer — social handles (Instagram + TikTok) */}
+            <footer
+                className="relative z-10 mt-12"
+                style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                data-testid="app-footer"
+            >
+                <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <p
+                        className="text-overline"
+                        style={{
+                            color: "hsl(var(--text-muted))",
+                            fontSize: "0.56rem",
+                            letterSpacing: "0.16em",
+                        }}
+                    >
+                        &copy; 2026 NeuLab Inc. · Neural Stock Intelligence&trade; · Not financial advice
+                    </p>
+                    <SocialLinks variant="default" size="sm" />
+                </div>
+            </footer>
         </div>
     );
 }
