@@ -1,12 +1,64 @@
 import React, { useState } from "react";
 import api from "@/lib/api";
-import { Share2, Copy, Check, X, Loader2 } from "lucide-react";
+import { Share2, Copy, Check, X, Loader2, Send, MessageCircle } from "lucide-react";
+
+const SOCIAL_HANDLE = "@neuralstockintelligence";
+
+// X (formerly Twitter) glyph — lucide ships a (now-deprecated) Twitter bird;
+// the modern X mark is a clean two-stroke. Keep it small and inheritable.
+function XIcon({ size = 14, strokeWidth = 1.5 }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+        >
+            <path d="M4 4l16 16" />
+            <path d="M20 4L4 20" />
+        </svg>
+    );
+}
+
+// Build a research-framed share blurb (educational language only — never
+// phrase as a price target or prediction).
+function buildShareCopy(analysis, shareUrl) {
+    const ticker = (analysis?.ticker || "").toUpperCase();
+    const verdict = (analysis?.recommendation || "").toUpperCase();
+    // The model field is `confidence_score` (0-100); accept `confidence` as a
+    // fallback for unit-test stubs and external callers.
+    const rawConf = analysis?.confidence_score ?? analysis?.confidence;
+    const conf = Number.isFinite(rawConf) ? Math.round(rawConf) : null;
+
+    // Opening line — ticker + AI read + confidence
+    const verdictLine = ticker
+        ? conf != null && verdict
+            ? `${ticker} · AI read: ${verdict} · ${conf}% confidence`
+            : ticker
+        : "Neural Stock Intelligence";
+
+    const body = `${verdictLine} — full reasoning + risks + scenarios:`;
+    const tail = `Research only. Not financial advice. ${SOCIAL_HANDLE}`;
+
+    return { body, tail, full: `${body} ${shareUrl}\n\n${tail}` };
+}
 
 /**
  * ShareVerdictButton — gated behind Pro/Elite plan.
- * Renders a button in the report page action row; opens a modal with copyable URL.
+ * Renders a button in the report page action row; opens a modal with copyable URL
+ * AND one-tap share-intent buttons for X (Twitter), Telegram, WhatsApp.
+ *
+ * Backwards compatible: if `analysis` isn't passed, falls back to URL-only sharing
+ * (no smart tweet copy). Callers should ideally pass the full analysis object so
+ * the share blurb can include ticker / verdict / confidence.
  */
-export default function ShareVerdictButton({ analysisId }) {
+export default function ShareVerdictButton({ analysisId, analysis }) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -41,6 +93,20 @@ export default function ShareVerdictButton({ analysisId }) {
             console.warn("clipboard copy failed:", err?.message || err);
         }
     };
+
+    const blurb = analysis ? buildShareCopy(analysis, shareUrl) : null;
+
+    // Intent URLs (open in a new tab so the modal stays put for follow-ups).
+    const xText = blurb ? `${blurb.body} ${shareUrl}\n\n${blurb.tail}` : shareUrl;
+    const xIntent = `https://x.com/intent/post?text=${encodeURIComponent(xText)}`;
+
+    const tgText = blurb ? `${blurb.body}\n\n${blurb.tail}` : "";
+    const tgIntent = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}${
+        tgText ? `&text=${encodeURIComponent(tgText)}` : ""
+    }`;
+
+    const waText = blurb ? `${blurb.body} ${shareUrl}\n\n${blurb.tail}` : shareUrl;
+    const waIntent = `https://wa.me/?text=${encodeURIComponent(waText)}`;
 
     return (
         <>
@@ -140,11 +206,77 @@ export default function ShareVerdictButton({ analysisId }) {
                                             )}
                                         </button>
                                     </div>
+
+                                    {/* Smart-share row — one-tap intent buttons */}
+                                    <div
+                                        className="mt-5 pt-5"
+                                        style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                                        data-testid="share-intent-row"
+                                    >
+                                        <p
+                                            className="text-overline mb-3"
+                                            style={{ color: "hsl(var(--text-muted))" }}
+                                        >
+                                            Or post directly to
+                                        </p>
+                                        {blurb && (
+                                            <div
+                                                className="mb-3 p-3 font-mono text-xs leading-relaxed"
+                                                style={{
+                                                    background: "hsl(var(--background))",
+                                                    border: "1px solid hsl(var(--border-divider))",
+                                                    color: "hsl(var(--text-secondary))",
+                                                }}
+                                                data-testid="share-blurb-preview"
+                                            >
+                                                {blurb.body} <span style={{ color: "hsl(var(--text-primary))" }}>{shareUrl}</span>
+                                                <br />
+                                                <br />
+                                                <span style={{ color: "hsl(var(--text-muted))" }}>{blurb.tail}</span>
+                                            </div>
+                                        )}
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <a
+                                                href={xIntent}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="btn-ghost flex items-center justify-center gap-2 !py-2.5"
+                                                data-testid="share-intent-x"
+                                                aria-label="Post on X (Twitter)"
+                                            >
+                                                <XIcon size={14} />
+                                                <span className="text-xs font-medium">Post on X</span>
+                                            </a>
+                                            <a
+                                                href={tgIntent}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="btn-ghost flex items-center justify-center gap-2 !py-2.5"
+                                                data-testid="share-intent-telegram"
+                                                aria-label="Share on Telegram"
+                                            >
+                                                <Send size={14} strokeWidth={1.5} />
+                                                <span className="text-xs font-medium">Telegram</span>
+                                            </a>
+                                            <a
+                                                href={waIntent}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="btn-ghost flex items-center justify-center gap-2 !py-2.5"
+                                                data-testid="share-intent-whatsapp"
+                                                aria-label="Share on WhatsApp"
+                                            >
+                                                <MessageCircle size={14} strokeWidth={1.5} />
+                                                <span className="text-xs font-medium">WhatsApp</span>
+                                            </a>
+                                        </div>
+                                    </div>
+
                                     <a
                                         href={shareUrl}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="text-overline inline-block mt-4 link-underline"
+                                        className="text-overline inline-block mt-5 link-underline"
                                         data-testid="share-open-preview"
                                     >
                                         Open preview →
@@ -158,3 +290,6 @@ export default function ShareVerdictButton({ analysisId }) {
         </>
     );
 }
+
+// Exposed for unit tests + reuse by other share surfaces.
+export { buildShareCopy };

@@ -458,7 +458,7 @@ export default function AnalysisReportPage() {
                                 <div className="col-span-12 md:col-span-4 flex flex-wrap justify-start md:justify-end items-center gap-2">
                                     {analysis && (
                                         <>
-                                            <ShareVerdictButton analysisId={analysis.id} />
+                                            <ShareVerdictButton analysisId={analysis.id} analysis={analysis} />
                                             <button
                                                 onClick={async () => {
                                                     try {
