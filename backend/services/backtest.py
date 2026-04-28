@@ -381,6 +381,161 @@ def _compute_benchmark_curve(
     return out
 
 
+# ─── IDX signal-quality diagnostics ──────────────────────────────────────
+# Segments closed IDX trades by the Phase-1 bandarmology attributes captured
+# at entry-verdict time, so users can see WHICH cohorts actually lifted hit
+# rate and average return. Answers the core question: "Are the new signals
+# helping?" Zero new data needed — we re-read `bandarmology` from the verdicts
+# pulled in the main query and join to trades via `entry_verdict_id`.
+
+def _trade_pnl_stats(pnl_list: list[float]) -> dict:
+    """Compact stats pack for a cohort of trade pnl_pct values."""
+    n = len(pnl_list)
+    if n == 0:
+        return {"n": 0, "avg_pnl_pct": None, "win_rate": None}
+    wins = sum(1 for p in pnl_list if p > 0)
+    return {
+        "n": n,
+        "avg_pnl_pct": round(sum(pnl_list) / n, 2),
+        "win_rate": round(100 * wins / n, 1),
+    }
+
+
+_BULL_PERSISTENCE = {"persistent_accumulation", "mild_accumulation"}
+_BEAR_PERSISTENCE = {"persistent_distribution", "mild_distribution"}
+
+
+def _verdict_aligned_with_persistence(rec: str, persistence_label: str | None) -> bool | None:
+    """True when the LLM verdict agrees with the persistence direction,
+    False when they disagree, None when there's no conviction (HOLD) or
+    no persistence signal to compare against."""
+    r = (rec or "").upper()
+    if r == "HOLD" or not persistence_label or persistence_label in ("balanced", "insufficient_data"):
+        return None
+    if r == "BUY" and persistence_label in _BULL_PERSISTENCE:
+        return True
+    if r == "SELL" and persistence_label in _BEAR_PERSISTENCE:
+        return True
+    return False
+
+
+def compute_idx_signal_quality(verdicts: list[dict], trades: list[dict]) -> dict:
+    """Aggregate closed trades by Phase-1 bandarmology attributes.
+
+    Returns a dict with:
+      eligible : bool                  — True when >= MIN_IDX_TRADES eligible
+      min_required : int
+      all_idx : {n, avg_pnl_pct, win_rate}
+      aligned_high_quality : {...}      — gate clean + consistent + verdict-aligned
+      misaligned : {...}                — verdict disagrees with persistence
+      low_liquidity : {...}             — volume_gate_tripped=true at entry
+      by_impact_tier : {material, notable, cosmetic}
+      note : str                        — one-liner explanation for UX
+
+    We only count BUY-entry trades (verdict=BUY → we opened a long).
+    SELL-entry rows in the trades[] list are exits, not new positions.
+    """
+    # Build lookup: verdict_id → bandarmology dict + recommendation
+    verdict_map: dict[str, dict] = {}
+    for v in verdicts:
+        vid = v.get("id")
+        if not vid:
+            continue
+        if not _is_idx(v.get("ticker", "")):
+            continue
+        verdict_map[vid] = {
+            "bandarmology": v.get("bandarmology") or {},
+            "recommendation": (v.get("recommendation") or "").upper(),
+        }
+
+    # Filter trades to IDX + have a source verdict in the map
+    idx_trades: list[dict] = []
+    for t in trades:
+        if not _is_idx(t.get("ticker", "")):
+            continue
+        vid = t.get("entry_verdict_id")
+        if not vid or vid not in verdict_map:
+            continue
+        idx_trades.append({**t, "_v": verdict_map[vid]})
+
+    MIN_IDX_TRADES = 3
+    if len(idx_trades) < MIN_IDX_TRADES:
+        return {
+            "eligible": False,
+            "min_required": MIN_IDX_TRADES,
+            "n_idx_trades": len(idx_trades),
+            "note": (
+                f"Need at least {MIN_IDX_TRADES} closed IDX trades to measure signal quality "
+                f"(you have {len(idx_trades)}). Keep adding analyses."
+            ),
+        }
+
+    all_pnl = [t["pnl_pct"] for t in idx_trades]
+
+    aligned_hq_pnl: list[float] = []
+    misaligned_pnl: list[float] = []
+    low_liq_pnl: list[float] = []
+    by_tier: dict[str, list[float]] = {"material": [], "notable": [], "cosmetic": []}
+
+    for t in idx_trades:
+        v = t["_v"]
+        b = v["bandarmology"] or {}
+        rec = v["recommendation"]
+        pl = t["pnl_pct"]
+
+        if b.get("volume_gate_tripped"):
+            low_liq_pnl.append(pl)
+
+        aligned = _verdict_aligned_with_persistence(rec, b.get("persistence_label"))
+        consistent = bool(b.get("persistence_consistent"))
+        gate_clean = not b.get("volume_gate_tripped")
+
+        if aligned is True and consistent and gate_clean:
+            aligned_hq_pnl.append(pl)
+        elif aligned is False:
+            misaligned_pnl.append(pl)
+
+        tier = b.get("impact_tier")
+        if tier in by_tier:
+            by_tier[tier].append(pl)
+
+    all_stats = _trade_pnl_stats(all_pnl)
+    aligned_stats = _trade_pnl_stats(aligned_hq_pnl)
+    misaligned_stats = _trade_pnl_stats(misaligned_pnl)
+    low_liq_stats = _trade_pnl_stats(low_liq_pnl)
+
+    # One-line narrative for the UI header
+    note_parts: list[str] = []
+    if aligned_stats["n"] >= 2 and aligned_stats["avg_pnl_pct"] is not None:
+        delta = aligned_stats["avg_pnl_pct"] - (all_stats["avg_pnl_pct"] or 0)
+        direction = "+" if delta >= 0 else ""
+        note_parts.append(
+            f"Aligned high-quality setups (persistence consistent, liquid) averaged "
+            f"{direction}{round(delta, 2)}% vs IDX baseline."
+        )
+    if misaligned_stats["n"] >= 2:
+        note_parts.append(
+            f"{misaligned_stats['n']} misaligned trade(s) averaged {misaligned_stats['avg_pnl_pct']}% — "
+            "consider waiting for signal alignment."
+        )
+
+    return {
+        "eligible": True,
+        "min_required": MIN_IDX_TRADES,
+        "n_idx_trades": len(idx_trades),
+        "all_idx": all_stats,
+        "aligned_high_quality": aligned_stats,
+        "misaligned": misaligned_stats,
+        "low_liquidity": low_liq_stats,
+        "by_impact_tier": {
+            k: _trade_pnl_stats(v) for k, v in by_tier.items()
+        },
+        "note": " ".join(note_parts) if note_parts else "Phase-1 signal-quality breakdown over your closed IDX trades.",
+    }
+
+
+
+
 # ─── Public API: entry point ─────────────────────────────────────────────
 
 async def build_live_backtest(user_id: str, *, force: bool = False) -> dict:
@@ -403,7 +558,8 @@ async def build_live_backtest(user_id: str, *, force: bool = False) -> dict:
     # ─ Fresh compute path
     verdicts = await db.analyses.find(
         {"user_id": user_id},
-        {"_id": 0, "id": 1, "ticker": 1, "recommendation": 1, "confidence_score": 1, "created_at": 1},
+        {"_id": 0, "id": 1, "ticker": 1, "recommendation": 1, "confidence_score": 1,
+         "created_at": 1, "bandarmology": 1},
     ).sort("created_at", 1).to_list(2000)
 
     # Filter to valid BUY/SELL/HOLD with ticker + timestamp
@@ -468,6 +624,10 @@ async def build_live_backtest(user_id: str, *, force: bool = False) -> dict:
     sim["metrics"]["window_end"] = equity_dates[-1] if equity_dates else None
     sim["metrics"]["window_days"] = span_days
 
+    # IDX signal-quality diagnostics — segments closed IDX trades by Phase-1
+    # bandarmology attributes so users can see WHICH cohorts lifted returns.
+    idx_signal_quality = compute_idx_signal_quality(verdicts, sim["trades"])
+
     result = {
         "kind": "live",
         "user_id": user_id,
@@ -480,6 +640,7 @@ async def build_live_backtest(user_id: str, *, force: bool = False) -> dict:
         "benchmark_ticker": benchmark,
         "metrics": sim["metrics"],
         "strategy_note": sim["strategy_note"],
+        "idx_signal_quality": idx_signal_quality,
     }
 
     await db.backtest_runs.update_one(

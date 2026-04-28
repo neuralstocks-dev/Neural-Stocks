@@ -691,6 +691,11 @@ export default function BacktestPage() {
                             )}
                         </section>
 
+                        {/* IDX signal-quality diagnostic — only surfaces on portfolios with IDX trades */}
+                        {data.idx_signal_quality && (
+                            <IdxSignalQualityPanel sq={data.idx_signal_quality} />
+                        )}
+
                         {/* Trade log */}
                         <section
                             className="module mt-6 p-0 overflow-hidden"
@@ -1025,3 +1030,224 @@ function MlBacktestSection({ ml }) {
         </section>
     );
 }
+
+/**
+ * IdxSignalQualityPanel — Phase-1 bandarmology cohort diagnostics
+ * Shown below the live-backtest strategy note when the user has IDX trades.
+ * Answers: "Are the new signals actually lifting accuracy?"
+ */
+function IdxSignalQualityPanel({ sq }) {
+    if (!sq) return null;
+
+    // Ineligible state — not enough IDX trades to measure yet.
+    if (!sq.eligible) {
+        return (
+            <section
+                className="module mt-6 p-5 md:p-6"
+                data-testid="idx-signal-quality-ineligible"
+                style={{ background: "hsl(var(--surface))" }}
+            >
+                <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
+                    IDX signal quality · Phase-1 bandarmology
+                </p>
+                <h3 className="font-serif text-xl mt-1" style={{ letterSpacing: "-0.01em" }}>
+                    Not enough IDX trades to measure yet
+                </h3>
+                <p className="mt-3 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                    {sq.note}
+                </p>
+            </section>
+        );
+    }
+
+    const fmtPct = (v) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`);
+    const fmtWin = (v) => (v == null ? "—" : `${v.toFixed(1)}%`);
+    const baseline = sq.all_idx || {};
+    const hq = sq.aligned_high_quality || {};
+    const mis = sq.misaligned || {};
+    const low = sq.low_liquidity || {};
+    const tier = sq.by_impact_tier || {};
+
+    const hqDelta =
+        hq.avg_pnl_pct != null && baseline.avg_pnl_pct != null
+            ? hq.avg_pnl_pct - baseline.avg_pnl_pct
+            : null;
+
+    return (
+        <section
+            className="module mt-6 p-5 md:p-6"
+            data-testid="idx-signal-quality-panel"
+            style={{ background: "hsl(var(--surface))" }}
+        >
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                    <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
+                        IDX signal quality · Phase-1 bandarmology
+                    </p>
+                    <h3 className="font-serif text-xl mt-1" style={{ letterSpacing: "-0.01em" }}>
+                        Does persistence-aligned on liquid tape actually lift returns?
+                    </h3>
+                </div>
+                <span
+                    className="text-overline self-start px-2 py-1"
+                    style={{
+                        fontSize: "0.56rem",
+                        border: "1px solid hsl(var(--border-default))",
+                        color: "hsl(var(--text-muted))",
+                    }}
+                    data-testid="idx-signal-quality-n-trades"
+                >
+                    {sq.n_idx_trades} IDX trades
+                </span>
+            </div>
+
+            <p
+                className="mt-3 text-sm leading-relaxed"
+                style={{ color: "hsl(var(--text-secondary))" }}
+                data-testid="idx-signal-quality-note"
+            >
+                {sq.note}
+            </p>
+
+            {/* Core comparison grid — baseline vs aligned-HQ vs misaligned */}
+            <div
+                className="mt-5 grid grid-cols-1 md:grid-cols-3"
+                style={{ border: "1px solid hsl(var(--border-default))" }}
+            >
+                <SqCohortCell
+                    label="IDX baseline"
+                    sub="All your closed IDX trades"
+                    n={baseline.n}
+                    avg={baseline.avg_pnl_pct}
+                    win={baseline.win_rate}
+                    tone="neutral"
+                    testid="sq-cell-baseline"
+                />
+                <SqCohortCell
+                    label="Aligned · high quality"
+                    sub="Persistence consistent · gate clean · verdict aligned"
+                    n={hq.n}
+                    avg={hq.avg_pnl_pct}
+                    win={hq.win_rate}
+                    delta={hqDelta}
+                    tone={hqDelta != null && hqDelta > 0 ? "buy" : hqDelta != null && hqDelta < 0 ? "sell" : "neutral"}
+                    testid="sq-cell-aligned-hq"
+                    border="left"
+                />
+                <SqCohortCell
+                    label="Misaligned"
+                    sub="Verdict disagrees with persistence direction"
+                    n={mis.n}
+                    avg={mis.avg_pnl_pct}
+                    win={mis.win_rate}
+                    tone={mis.avg_pnl_pct != null && mis.avg_pnl_pct < 0 ? "sell" : "warn"}
+                    testid="sq-cell-misaligned"
+                    border="left"
+                />
+            </div>
+
+            {/* Secondary breakdown — low-liquidity + impact tiers */}
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-0" style={{ border: "1px solid hsl(var(--border-default))" }}>
+                <SqCohortCell
+                    label="Low-liquidity"
+                    sub="Volume gate tripped at entry"
+                    n={low.n}
+                    avg={low.avg_pnl_pct}
+                    win={low.win_rate}
+                    tone="muted"
+                    testid="sq-cell-low-liq"
+                />
+                <SqCohortCell
+                    label="Material impact"
+                    sub="≥1% of market cap"
+                    n={tier.material?.n}
+                    avg={tier.material?.avg_pnl_pct}
+                    win={tier.material?.win_rate}
+                    tone="neutral"
+                    testid="sq-cell-tier-material"
+                    border="left"
+                />
+                <SqCohortCell
+                    label="Notable impact"
+                    sub="0.25% – 1% of market cap"
+                    n={tier.notable?.n}
+                    avg={tier.notable?.avg_pnl_pct}
+                    win={tier.notable?.win_rate}
+                    tone="muted"
+                    testid="sq-cell-tier-notable"
+                    border="left"
+                />
+                <SqCohortCell
+                    label="Cosmetic impact"
+                    sub="<0.25% of market cap"
+                    n={tier.cosmetic?.n}
+                    avg={tier.cosmetic?.avg_pnl_pct}
+                    win={tier.cosmetic?.win_rate}
+                    tone="muted"
+                    testid="sq-cell-tier-cosmetic"
+                    border="left"
+                />
+            </div>
+
+            <p
+                className="mt-4 text-[11px] font-mono leading-relaxed"
+                style={{ color: "hsl(var(--text-muted))" }}
+            >
+                Positive delta on "Aligned · high quality" vs baseline = the Phase-1 signals are
+                lifting your IDX returns. Small samples are noisy — watch the number grow as you
+                add more analyses. See <a href="/technical#idx-broker-flow-methodology" className="link-underline">the methodology on /technical</a> for how
+                each cohort is defined.
+            </p>
+        </section>
+    );
+
+    function fmtDelta(d) {
+        if (d == null) return null;
+        const sign = d > 0 ? "+" : "";
+        return `${sign}${d.toFixed(2)}% vs baseline`;
+    }
+
+    function SqCohortCell({ label, sub, n, avg, win, delta, tone, testid, border }) {
+        const toneColor = {
+            buy: "hsl(var(--buy))",
+            sell: "hsl(var(--sell))",
+            warn: "hsl(var(--hold))",
+            neutral: "hsl(var(--text-primary))",
+            muted: "hsl(var(--text-muted))",
+        }[tone] || "hsl(var(--text-primary))";
+        return (
+            <div
+                className="p-4"
+                style={{
+                    borderLeft: border === "left" ? "1px solid hsl(var(--border-divider))" : undefined,
+                }}
+                data-testid={testid}
+            >
+                <p className="text-overline" style={{ fontSize: "0.56rem" }}>{label}</p>
+                <p
+                    className="mt-2 font-mono text-2xl"
+                    style={{ color: toneColor, letterSpacing: "-0.02em" }}
+                >
+                    {n != null ? fmtPct(avg) : "—"}
+                </p>
+                <p className="text-[11px] mt-1" style={{ color: "hsl(var(--text-muted))" }}>
+                    {n != null ? `${n} trade${n === 1 ? "" : "s"} · win ${fmtWin(win)}` : "No trades in cohort"}
+                </p>
+                {delta != null && (
+                    <p
+                        className="text-[11px] mt-1.5 font-mono"
+                        style={{
+                            color: delta > 0 ? "hsl(var(--buy))" : delta < 0 ? "hsl(var(--sell))" : "hsl(var(--text-muted))",
+                        }}
+                    >
+                        {fmtDelta(delta)}
+                    </p>
+                )}
+                <p className="text-[10px] mt-2 leading-snug" style={{ color: "hsl(var(--text-muted))" }}>
+                    {sub}
+                </p>
+            </div>
+        );
+    }
+}
+
