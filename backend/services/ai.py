@@ -2,9 +2,12 @@
 import json
 import re
 import uuid
+import logging
 from fastapi import HTTPException
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 from core.config import EMERGENT_LLM_KEY
+
+logger = logging.getLogger(__name__)
 
 # ---------- Mode A: Standard ------------------------------------------------
 STANDARD_SYSTEM_PROMPT = """You are an institutional-grade equity analyst AI generating EDUCATIONAL RESEARCH — not investment advice. Given quantitative data for a single stock (price action, technical indicators, fundamental ratios), produce a disciplined, evidence-backed research summary intended to help a user review the data.
@@ -203,18 +206,68 @@ async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text
     """Run the entire Claude round-trip in an OS thread so the main asyncio
     loop stays responsive. Each thread spins up a fresh asyncio loop just
     for that one call; LiteLLM's internal httpx + streaming work happens
-    there instead of on the API process's main loop."""
+    there instead of on the API process's main loop.
+
+    Transient upstream gateway errors (502 BadGateway, 503 ServiceUnavailable,
+    504 Gateway Timeout) from LiteLLM/Anthropic are retried up to
+    `_LLM_MAX_RETRIES` times with exponential backoff. These errors typically
+    resolve within 5-15 seconds when Anthropic's side has a brief blip; our
+    own 240s analysis budget can absorb 2-3 retry attempts comfortably. The
+    LLM circuit breaker (services/llm_circuit_breaker.py) sits one level up
+    and trips the global gate after several consecutive total failures so
+    the user gets a fast-fail 503 instead of waiting through repeated
+    retries when the upstream is genuinely down."""
     import asyncio as _asyncio
 
     def _sync_run():
-        try:
-            return _asyncio.run(_run_chat(system_prompt, session_prefix, user_text))
-        except Exception as e:
-            # Re-raise the original exception so callers see the same
-            # error class they would have seen on the main loop.
-            raise e
+        last_exc = None
+        for attempt in range(_LLM_MAX_RETRIES + 1):
+            try:
+                return _asyncio.run(_run_chat(system_prompt, session_prefix, user_text))
+            except Exception as e:
+                last_exc = e
+                if not _is_transient_gateway_error(e) or attempt >= _LLM_MAX_RETRIES:
+                    raise
+                # Exponential backoff: 2s, 4s. Total worst-case = 6s of waiting
+                # added to the analysis budget.
+                wait = _LLM_RETRY_BACKOFF_S * (2 ** attempt)
+                logger.warning(
+                    "LLM transient %s on %s (attempt %d/%d) — retrying in %ds",
+                    type(e).__name__, session_prefix, attempt + 1, _LLM_MAX_RETRIES, wait,
+                )
+                _t.sleep(wait)
+        # Defensive — should never reach here because the loop either returns
+        # or re-raises on the final attempt.
+        raise last_exc  # noqa: F821
 
     return await _asyncio.to_thread(_sync_run)
+
+
+_LLM_MAX_RETRIES = 2
+_LLM_RETRY_BACKOFF_S = 2.0
+_TRANSIENT_GATEWAY_MARKERS = (
+    "BadGatewayError",       # litellm.BadGatewayError on Anthropic 502
+    "ServiceUnavailableError",  # 503
+    "GatewayTimeoutError",   # 504
+    "InternalServerError",   # generic 500 — usually transient on the upstream
+    "Error code: 502",
+    "Error code: 503",
+    "Error code: 504",
+    "Error code: 500",
+)
+
+
+def _is_transient_gateway_error(e: Exception) -> bool:
+    """Recognise LiteLLM/OpenAI/Anthropic gateway hiccups that warrant a
+    retry. We pattern-match on the exception class name AND the str repr
+    because LiteLLM doesn't always re-raise as its own typed class — it
+    sometimes wraps the upstream OpenAI client error verbatim."""
+    name = type(e).__name__
+    msg = str(e)
+    return any(marker in name or marker in msg for marker in _TRANSIENT_GATEWAY_MARKERS)
+
+
+import time as _t  # used by the retry sleep above; aliased to avoid shadowing
 
 
 def _parse_ai_json(raw) -> dict:
@@ -251,6 +304,20 @@ def _handle_llm_error(e: Exception):
             detail={
                 "error_code": "llm_budget_exceeded",
                 "message": "AI analysis temporarily unavailable — LLM budget exceeded. Please top up your Emergent Universal Key (Profile → Universal Key → Add Balance).",
+            },
+        )
+    # Transient upstream gateway errors (502/503/504) — surface a clean,
+    # user-actionable message instead of the verbose `litellm.BadGatewayError:
+    # BadGatewayError: OpenAIException - Error code: 502` stack the SDK gives
+    # us. These have already been retried `_LLM_MAX_RETRIES` times by
+    # `_run_chat_in_thread`, so reaching here means the upstream is down for
+    # at least 6+ seconds — worth fast-failing so the user can retry.
+    if _is_transient_gateway_error(e):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error_code": "llm_upstream_unavailable",
+                "message": "The AI provider is temporarily unavailable (upstream gateway error). Please try again in a minute — if it persists, check the LLM Health panel in Admin.",
             },
         )
     raise HTTPException(status_code=502, detail=f"AI provider error: {err_msg[:200]}")

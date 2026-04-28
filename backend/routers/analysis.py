@@ -603,13 +603,39 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
             }},
         )
     except HTTPException as e:
-        detail = e.detail if isinstance(e.detail, str) else str(e.detail)
+        # Pull the user-facing message: when detail is a structured dict
+        # (e.g. {'error_code': 'llm_upstream_unavailable', 'message': '...'})
+        # we surface JUST the message, otherwise the dict-repr leaks into
+        # the UI as "{'error_code': '...', 'message': '...'}". The full
+        # detail dict is preserved on `error_detail` for telemetry.
+        detail_dict = e.detail if isinstance(e.detail, dict) else None
+        if detail_dict and isinstance(detail_dict.get("message"), str):
+            user_msg = detail_dict["message"]
+        elif isinstance(e.detail, str):
+            user_msg = e.detail
+        else:
+            user_msg = str(e.detail)
+        # Upstream LLM gateway failures should also count toward the
+        # circuit breaker so consecutive 502/503/504s trip the global gate
+        # and subsequent users get a fast-fail instead of waiting through
+        # 240s of inevitable failure.
+        if e.status_code == 503 and detail_dict and detail_dict.get("error_code") in (
+            "llm_upstream_unavailable", "llm_budget_exceeded"
+        ):
+            llm_circuit_breaker.record_outcome(
+                "timeout",
+                ticker=ticker,
+                reason=llm_circuit_breaker.REASON_OTHER_EXCEPTION,
+                elapsed_s=_time.monotonic() - started,
+                surface="auth",
+            )
         await db.analysis_jobs.update_one(
             {"id": job_id},
             {"$set": {
                 "status": "failed",
                 "finished_at": iso(now_utc()),
-                "error": detail,
+                "error": user_msg,
+                "error_detail": detail_dict,
                 "status_code": e.status_code,
             }},
         )
