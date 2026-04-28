@@ -86,6 +86,7 @@ import {
 } from "recharts";
 import { ArrowLeft, Sparkles, Loader2, AlertTriangle, Target, Shield, FileDown, Receipt } from "lucide-react";
 import { formatPrice, formatPct, formatCompact, timeAgo } from "@/lib/format";
+import { pollAnalysisJob, formatAnalysisTimestamp } from "@/lib/analysisPolling";
 import { errMessage } from "@/lib/errors";
 
 // Hoisted chart config objects — prevent new reference identity on every render,
@@ -242,69 +243,16 @@ export default function AnalysisReportPage() {
             try {
                 // Re-analysis preserves the mode of the existing verdict (if any).
                 const effectiveMode = analysis?.mode || mode;
-                // Start-and-poll so long-running IDX/LLM pipelines don't hit
-                // the 30s production ingress cap.
-                const start = await api.post(
-                    `/analysis/${t}/start?mode=${effectiveMode}`
-                );
-                const jobId = start.data.job_id;
-                const started = Date.now();
-                let finalResult = null;
-                // Tolerate transient 5xx / network blips during polling —
-                // the background job keeps running on the server even if
-                // a single poll request gets nuked by an ingress hiccup.
-                // Only abort after several consecutive failures.
-                let consecutiveErrors = 0;
-                const MAX_CONSECUTIVE_POLL_ERRORS = 5;
-                while (Date.now() - started < 180_000) {
-                    await new Promise((r) => setTimeout(r, 2500));
-                    let j;
-                    try {
-                        const poll = await api.get(`/analysis/jobs/${jobId}`);
-                        j = poll.data;
-                        consecutiveErrors = 0;
-                    } catch (pollErr) {
-                        const status = pollErr?.response?.status;
-                        // Auth / not-found problems are real — bail out.
-                        if (status === 401 || status === 403 || status === 404) {
-                            throw pollErr;
-                        }
-                        consecutiveErrors += 1;
-                        if (consecutiveErrors >= MAX_CONSECUTIVE_POLL_ERRORS) {
-                            throw pollErr;
-                        }
-                        continue;
-                    }
-                    // Surface live phase to the stepper UI.
-                    if (j.progress) setProgress(j.progress);
-                    if (j.status === "done") {
-                        finalResult = j.result;
-                        break;
-                    }
-                    if (j.status === "failed") {
-                        throw new Error(
-                            j.error || "Analysis failed. Please try again."
-                        );
-                    }
-                }
-                // Fallback: the BG job sometimes finishes after our polling
-                // window closes (slow IDX tickers, ingress hiccups). Hit
-                // /latest directly — that's the authoritative source.
-                if (!finalResult) {
-                    try {
-                        const latest = await api.get(`/analysis/${t}/latest`);
-                        if (latest?.data?.recommendation) {
-                            finalResult = latest.data;
-                        }
-                    } catch {
-                        /* fall through to error below */
-                    }
-                }
-                if (!finalResult) {
-                    throw new Error(
-                        "Analysis timed out after 3 minutes. Please try again."
-                    );
-                }
+                // Mobile-resilient poller — see lib/analysisPolling.js.
+                // Budget is 260s (backend hard-cap is 240s) with visibility-
+                // aware elapsed tracking so backgrounded tabs don't incorrectly
+                // conclude the job timed out.
+                const finalResult = await pollAnalysisJob({
+                    api,
+                    ticker: t,
+                    mode: effectiveMode,
+                    onProgress: (p) => setProgress(p),
+                });
                 setAnalysis(finalResult);
             } catch (err) {
                 if (disclaimer.promptFromError(err)) return;
@@ -719,8 +667,12 @@ export default function AnalysisReportPage() {
                                             >
                                                 {analysis.executive_summary}
                                             </p>
-                                            <p className="text-overline mt-4" style={{ fontSize: "0.56rem" }}>
-                                                Last updated {timeAgo(analysis.created_at)} · Horizon {analysis.time_horizon_weeks || 12}w
+                                            <p
+                                                className="text-overline mt-4"
+                                                style={{ fontSize: "0.56rem" }}
+                                                data-testid="analysis-generated-at"
+                                            >
+                                                Generated {formatAnalysisTimestamp(analysis.created_at)} · Horizon {analysis.time_horizon_weeks || 12}w
                                             </p>
 
                                             <ConfidenceCalibrationBreadcrumbs analysis={analysis} />

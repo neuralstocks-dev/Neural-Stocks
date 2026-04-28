@@ -29,7 +29,14 @@ router = APIRouter(tags=["analysis"])
 # transient upstream LLM retry storms (LiteLLM auto-retries 4x on 5xx,
 # each with up to 30s socket budget, easily blowing 120s on a slow path).
 # Env-tunable so we can dial up/down without a redeploy.
-QUICK_PER_TASK_TIMEOUT = float(os.environ.get("ANALYSIS_TIMEOUT_S", "180"))
+# Backend wall-clock cap on a single /analysis/{ticker}/start job. Needs to
+# be generous enough to cover: yfinance history fetch (slow on IDX), IDX
+# bandarmology + news fetch, candlestick detection, and the Claude LLM call
+# (30-60s steady-state, up to 90s under upstream load). 240s gives ~40%
+# headroom over the worst steady-state case so mobile users don't trip on
+# the occasional slow-LLM minute. Client-side polling must be kept >= this
+# value — see AnalysisReportPage.jsx + DashboardPage.jsx.
+QUICK_PER_TASK_TIMEOUT = float(os.environ.get("ANALYSIS_TIMEOUT_S", "240"))
 QUICK_BATCH_SIZE = 3
 # Strong references to outstanding bg tasks so the GC doesn't drop them
 _BG_TASKS: set = set()

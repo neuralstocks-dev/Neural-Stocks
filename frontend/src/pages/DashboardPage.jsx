@@ -35,6 +35,7 @@ import IdxTopPicksDialog from "@/components/IdxTopPicksDialog";
 import TrendingOnNeulabWidget from "@/components/TrendingOnNeulabWidget";
 import { useAuth } from "@/hooks/useAuth";
 import { formatPrice, formatPct, timeAgo } from "@/lib/format";
+import { pollAnalysisJob, formatAnalysisTimestamp } from "@/lib/analysisPolling";
 import { errMessage } from "@/lib/errors";
 import {
     ArrowUpRight,
@@ -118,7 +119,11 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                             }}
                         >
                             <SignalBadge signal={item.latest_analysis.recommendation} />
-                            <div className="text-overline mt-1" style={{ fontSize: "0.56rem" }}>
+                            <div
+                                className="text-overline mt-1"
+                                style={{ fontSize: "0.56rem" }}
+                                title={formatAnalysisTimestamp(item.latest_analysis.created_at, { noRelative: true })}
+                            >
                                 {item.latest_analysis.confidence_score}% conf · {timeAgo(item.latest_analysis.created_at)}
                             </div>
                         </div>
@@ -404,81 +409,23 @@ export default function DashboardPage() {
             setActionError("");
             setAnalyzingTicker(ticker);
             try {
-                // Start-and-poll to avoid 30s production ingress timeout on
-                // slow tickers (esp. IDX .JK where RapidAPI enrichment adds
-                // latency). Pattern mirrors /analysis/quick/{kind}.
-                const start = await api.post(
-                    `/analysis/${ticker}/start?mode=${analyzeMode}`
-                );
-                const jobId = start.data.job_id;
-                const started = Date.now();
-                let finalJob = null;
-                // Tolerate transient 5xx / network blips during polling —
-                // the background job keeps running on the server even if
-                // a single poll request gets nuked by an ingress hiccup.
-                // Only abort after several consecutive failures.
-                let consecutiveErrors = 0;
-                const MAX_CONSECUTIVE_POLL_ERRORS = 5;
-                // Poll up to 3 minutes. Production ingress caps sync responses
-                // at 30s; background job has its own 120s budget on the server.
-                while (Date.now() - started < 180_000) {
-                    await new Promise((r) => setTimeout(r, 2500));
-                    let j;
-                    try {
-                        const poll = await api.get(`/analysis/jobs/${jobId}`);
-                        j = poll.data;
-                        consecutiveErrors = 0;
-                    } catch (pollErr) {
-                        const status = pollErr?.response?.status;
-                        if (status === 401 || status === 403 || status === 404) {
-                            throw pollErr;
-                        }
-                        consecutiveErrors += 1;
-                        if (consecutiveErrors >= MAX_CONSECUTIVE_POLL_ERRORS) {
-                            throw pollErr;
-                        }
-                        continue;
-                    }
-                    finalJob = j;
-                    if (j.status === "done") break;
-                    if (j.status === "failed") {
-                        throw new Error(
-                            j.error || "Analysis failed. Please try again."
-                        );
-                    }
-                }
+                // Mobile-resilient poller (lib/analysisPolling.js) — budget 260s,
+                // visibility-aware elapsed tracking so backgrounded tabs don't
+                // incorrectly conclude the job timed out. Falls through to
+                // /latest with freshness validation on exhaustion.
+                const finalResult = await pollAnalysisJob({
+                    api,
+                    ticker,
+                    mode: analyzeMode,
+                });
 
-                // Resolve the fresh verdict. Prefer polling result when "done";
-                // otherwise the BG job may have finished writing to db.analyses
-                // even if our polling window lapsed — hit /latest directly which
-                // is the authoritative per-ticker source.
-                let freshVerdict = null;
-                if (finalJob?.status === "done" && finalJob.result) {
-                    freshVerdict = {
-                        recommendation: finalJob.result.recommendation,
-                        confidence_score: finalJob.result.confidence_score,
-                        created_at: finalJob.result.created_at,
-                    };
-                } else {
-                    try {
-                        const latest = await api.get(`/analysis/${ticker}/latest`);
-                        if (latest?.data?.recommendation) {
-                            freshVerdict = {
-                                recommendation: latest.data.recommendation,
-                                confidence_score: latest.data.confidence_score,
-                                created_at: latest.data.created_at,
-                            };
-                        }
-                    } catch (latestErr) {
-                        // 404 = no analysis exists yet (expected when polling
-                        // legitimately timed out without the BG job finishing).
-                        // Anything else (5xx, network down) is real and worth
-                        // surfacing so the user knows to retry.
-                        if (latestErr?.response?.status !== 404) {
-                            throw latestErr;
-                        }
-                    }
-                }
+                const freshVerdict = finalResult
+                    ? {
+                          recommendation: finalResult.recommendation,
+                          confidence_score: finalResult.confidence_score,
+                          created_at: finalResult.created_at,
+                      }
+                    : null;
 
                 if (freshVerdict) {
                     setItems((prev) =>
