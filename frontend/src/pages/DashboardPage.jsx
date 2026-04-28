@@ -74,7 +74,7 @@ const WATCHLIST_PHASE_LABELS = {
     calibrating: "Calibrating",
 };
 
-function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyzing, analyzingPhase, canTimeline, revealed }) {
+function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyzing, analyzingPhase, failed, failedMsg, canTimeline, revealed }) {
     const q = item.quote || {};    const up = (q.change_pct ?? 0) >= 0;
     return (
         <div
@@ -168,6 +168,28 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                                 </span>
                             </div>
                         )}
+                        {!analyzing && failed && (
+                            // Re-analyse failed but the row already has a previous
+                            // verdict — overlay an unmissable red failure pill so
+                            // users don't think the request silently succeeded.
+                            <div
+                                className="absolute inset-0 flex items-center justify-start pointer-events-none"
+                                data-testid={`failed-overlay-${item.ticker}`}
+                            >
+                                <span
+                                    className="font-mono text-[10px] inline-flex items-center gap-1.5 px-2 py-1"
+                                    style={{
+                                        background: "hsl(var(--surface-elevated))",
+                                        color: "hsl(var(--sell))",
+                                        border: "1px solid hsl(var(--sell))",
+                                        letterSpacing: "0.12em",
+                                        textTransform: "uppercase",
+                                    }}
+                                >
+                                    ⚠ Re-analyse failed
+                                </span>
+                            </div>
+                        )}
                     </div>
                 ) : analyzing ? (
                     <div data-testid={`analyzing-label-${item.ticker}`}>
@@ -183,6 +205,26 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                             style={{ fontSize: "0.52rem", color: "hsl(var(--text-muted))" }}
                         >
                             20–60 seconds · please wait
+                        </div>
+                    </div>
+                ) : failed ? (
+                    // Row-level failure pill — surfaces the failure on the row
+                    // itself instead of relying on the page-top error banner
+                    // which is off-screen for users on long watchlists.
+                    <div data-testid={`failed-label-${item.ticker}`}>
+                        <span
+                            className="text-overline inline-flex items-center gap-1.5"
+                            style={{ color: "hsl(var(--sell))" }}
+                        >
+                            ⚠ Analysis failed
+                        </span>
+                        <div
+                            className="text-[10px] mt-1 leading-snug"
+                            style={{ color: "hsl(var(--text-secondary))" }}
+                        >
+                            {failedMsg && failedMsg.length > 90
+                                ? failedMsg.slice(0, 87) + "…"
+                                : failedMsg || "Tap retry below"}
                         </div>
                     </div>
                 ) : (
@@ -328,6 +370,15 @@ export default function DashboardPage() {
     // page stepper. Mobile-friendly: just a single label, no full stepper
     // (saves horizontal space; the underlying flow is identical).
     const [analyzingPhase, setAnalyzingPhase] = useState(null);
+    // Per-row last-attempt error. Critical UX: the global `actionError`
+    // banner sits at the top of the page; on a long watchlist scrolled
+    // down to the row the user just clicked, that banner is off-screen
+    // and the failure looks silent — the row just reverts to its prior
+    // verdict. We hold the error per-ticker here so the row itself can
+    // surface a red pill with one-tap retry. Auto-clears on next attempt
+    // OR after 12 seconds (whichever comes first).
+    const [failedTicker, setFailedTicker] = useState(null);
+    const [failedTickerMsg, setFailedTickerMsg] = useState("");
     const [revealedTicker, setRevealedTicker] = useState(null);
     const [quickBusy, setQuickBusy] = useState(null); // 'top' | 'bottom' | null
     // Live job state for the floating QuickAnalyzeProgress panel. Set to
@@ -441,6 +492,9 @@ export default function DashboardPage() {
             setActionError("");
             setAnalyzingTicker(ticker);
             setAnalyzingPhase(null);
+            // Clear any previous row-level error for this ticker so the
+            // user doesn't see a stale red pill while we're re-attempting.
+            setFailedTicker((prev) => (prev === ticker ? null : prev));
             try {
                 // Mobile-resilient poller (lib/analysisPolling.js) — budget 260s,
                 // visibility-aware elapsed tracking so backgrounded tabs don't
@@ -528,8 +582,17 @@ export default function DashboardPage() {
                 if (disclaimer.promptFromError(err)) return;
                 const detail = err?.response?.data?.detail;
                 const msg = detail || err?.message || "Analysis failed";
+                const friendly = errMessage(msg, "Analysis failed");
                 setActionErrorRaw(detail || err?.message || null);
-                setActionError(errMessage(msg, "Analysis failed"));
+                setActionError(friendly);
+                // Surface the failure ON the row itself so the user
+                // (likely scrolled past the page-top banner) actually
+                // sees what happened. Auto-clears after 12s.
+                setFailedTicker(ticker);
+                setFailedTickerMsg(friendly);
+                setTimeout(() => {
+                    setFailedTicker((cur) => (cur === ticker ? null : cur));
+                }, 12000);
             } finally {
                 setAnalyzingTicker(null);
                 setAnalyzingPhase(null);
@@ -941,6 +1004,8 @@ export default function DashboardPage() {
                                         canTimeline={canQuickActions}
                                         analyzing={analyzingTicker === item.ticker}
                                         analyzingPhase={analyzingTicker === item.ticker ? analyzingPhase : null}
+                                        failed={failedTicker === item.ticker}
+                                        failedMsg={failedTicker === item.ticker ? failedTickerMsg : ""}
                                         revealed={revealedTicker === item.ticker}
                                     />
                                 ))}

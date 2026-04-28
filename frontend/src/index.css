@@ -441,9 +441,14 @@ body {
 
 /* Refreshing pill — subtle pulse so users see the row is actively
    being re-analyzed, even while the old verdict remains on screen. */
+/* Refreshing-pill pulse — opacity-only (no transform). The previous
+   `transform: scale(1.03)` caused the pill's left vertical border to
+   visually disappear when it scaled past the parent row's clipping
+   edge on dashboards. Pure opacity breathing keeps the rectangle
+   geometry stable while still drawing the eye. */
 @keyframes refreshingPulse {
-    0%, 100% { opacity: 0.85; transform: scale(1); }
-    50%      { opacity: 1;    transform: scale(1.03); }
+    0%, 100% { opacity: 0.78; }
+    50%      { opacity: 1; }
 }
 .refreshing-pill {
     animation: refreshingPulse 1.4s ease-in-out infinite;
