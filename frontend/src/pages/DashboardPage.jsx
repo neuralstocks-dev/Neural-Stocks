@@ -170,24 +170,35 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                         )}
                         {!analyzing && failed && (
                             // Re-analyse failed but the row already has a previous
-                            // verdict — overlay an unmissable red failure pill so
-                            // users don't think the request silently succeeded.
+                            // verdict. The pill itself is now a button — clicks
+                            // anywhere on it kick a fresh analyze. Larger tap
+                            // target than hunting for the small icon button on
+                            // the right edge of the row (especially on mobile).
                             <div
-                                className="absolute inset-0 flex items-center justify-start pointer-events-none"
+                                className="absolute inset-0 flex items-center justify-start"
                                 data-testid={`failed-overlay-${item.ticker}`}
+                                style={{ zIndex: 10 }}
                             >
-                                <span
-                                    className="font-mono text-[10px] inline-flex items-center gap-1.5 px-2 py-1"
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onAnalyze(item.ticker);
+                                    }}
+                                    className="font-mono text-[10px] inline-flex items-center gap-1.5 px-2 py-1 transition-colors hover:!brightness-110 focus:outline-none focus:ring-1"
                                     style={{
                                         background: "hsl(var(--surface-elevated))",
                                         color: "hsl(var(--sell))",
                                         border: "1px solid hsl(var(--sell))",
                                         letterSpacing: "0.12em",
                                         textTransform: "uppercase",
+                                        cursor: "pointer",
                                     }}
+                                    data-testid={`failed-retry-overlay-${item.ticker}`}
+                                    title="Tap to retry analysis"
                                 >
-                                    ⚠ Re-analyse failed
-                                </span>
+                                    ⚠ Failed · Tap to retry
+                                </button>
                             </div>
                         )}
                     </div>
@@ -211,12 +222,24 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                     // Row-level failure pill — surfaces the failure on the row
                     // itself instead of relying on the page-top error banner
                     // which is off-screen for users on long watchlists.
-                    <div data-testid={`failed-label-${item.ticker}`}>
+                    // The whole pill is a button — bigger tap target than the
+                    // small icon-button at the right edge of the row.
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onAnalyze(item.ticker);
+                        }}
+                        className="text-left transition-colors hover:!brightness-110"
+                        style={{ cursor: "pointer", background: "transparent", border: 0, padding: 0 }}
+                        data-testid={`failed-label-${item.ticker}`}
+                        title="Tap to retry analysis"
+                    >
                         <span
                             className="text-overline inline-flex items-center gap-1.5"
                             style={{ color: "hsl(var(--sell))" }}
                         >
-                            ⚠ Analysis failed
+                            ⚠ Analysis failed · Tap to retry
                         </span>
                         <div
                             className="text-[10px] mt-1 leading-snug"
@@ -224,9 +247,9 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                         >
                             {failedMsg && failedMsg.length > 90
                                 ? failedMsg.slice(0, 87) + "…"
-                                : failedMsg || "Tap retry below"}
+                                : failedMsg || ""}
                         </div>
-                    </div>
+                    </button>
                 ) : (
                     <span className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
                         No analysis
