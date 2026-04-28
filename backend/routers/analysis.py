@@ -1699,3 +1699,49 @@ async def get_shared_verdict(share_id: str):
         "shared_by_name": owner.get("full_name") if owner else "A Neural user",
         "analysis": _public_view(analysis),
     }
+
+
+
+# ─── Public LLM health badge ─────────────────────────────────────────────
+# Strip-down of the admin /llm-breaker endpoint for client-facing health
+# checks. Returns ONLY status + a coarse healthy bool — never the recent
+# failure list, ticker names, or surface counts. Used by the in-app
+# `<LlmHealthBadge />` to proactively warn users about upstream outages
+# BEFORE they click Re-analyze, so they don't burn a quota slot only to
+# hit a known-down provider.
+
+_LLM_HEALTH_DEGRADED_THRESHOLD = 1   # any consec_fail > 0 → degraded
+_LLM_HEALTH_DOWN_THRESHOLD = 3       # tripped breaker → down
+
+
+@router.get("/llm-health/public")
+async def llm_health_public():
+    """Coarse upstream-LLM status for client badges. Public — no auth needed.
+
+    Returns:
+        {
+          "status":    "operational" | "degraded" | "down",
+          "healthy":   bool,
+          "consec_fail": int,   # for client-side animation finesse only
+        }
+
+    Cached at the client for 30s. Aggressive caching is safe because the
+    breaker state only flips on a ~3-failure / ~2-success boundary; the
+    badge doesn't need second-level fidelity.
+    """
+    snap = llm_circuit_breaker.status()
+    consec_fail = int(snap.get("consec_fail") or 0)
+    tripped = bool(snap.get("tripped"))
+
+    if tripped:
+        status = "down"
+    elif consec_fail >= _LLM_HEALTH_DEGRADED_THRESHOLD:
+        status = "degraded"
+    else:
+        status = "operational"
+
+    return {
+        "status": status,
+        "healthy": status == "operational",
+        "consec_fail": consec_fail,
+    }

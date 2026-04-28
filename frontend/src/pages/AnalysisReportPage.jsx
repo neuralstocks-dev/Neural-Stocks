@@ -25,6 +25,7 @@ import WhatCouldChangeViewModule from "@/components/WhatCouldChangeViewModule";
 import HowToReadModule from "@/components/HowToReadModule";
 import ShareSectionButton from "@/components/ShareSectionButton";
 import ReanalyzeButtonContent from "@/components/ReanalyzeButtonContent";
+import LlmHealthBadge from "@/components/LlmHealthBadge";
 
 // Module-share headline builders. Each returns { title, text } that
 // pre-fills the native share sheet (Twitter/Telegram/WhatsApp). Keep
@@ -477,6 +478,7 @@ export default function AnalysisReportPage() {
                                             etaSec={etaSec}
                                         />
                                     </button>
+                                    <LlmHealthBadge />
                                     <AnalysisQueueChip watch />
                                 </div>
                                 {/* Per-stage stepper — visible only while a

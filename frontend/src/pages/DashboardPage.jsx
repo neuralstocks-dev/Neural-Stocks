@@ -7,6 +7,7 @@ import Sparkline from "@/components/Sparkline";
 import SignalBadge from "@/components/SignalBadge";
 import QuickAnalyzeProgress from "@/components/QuickAnalyzeProgress";
 import AnalysisQueueChip from "@/components/AnalysisQueueChip";
+import LlmHealthBadge from "@/components/LlmHealthBadge";
 import LLMBudgetBanner from "@/components/LLMBudgetBanner";
 import TopConfluencesModule from "@/components/TopConfluencesModule";
 
@@ -750,6 +751,7 @@ export default function DashboardPage() {
                             testIdPrefix="dashboard-mode"
                         />
                         <AnalysisQueueChip watch />
+                        <LlmHealthBadge />
                     </div>
                 </section>
 

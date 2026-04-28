@@ -469,3 +469,15 @@ body {
     from { opacity: 0; transform: translateY(-2px); }
     to   { opacity: 1; transform: translateY(0); }
 }
+
+
+/* LLM health badge — gentle ring pulse on the status dot when the upstream
+   is degraded or down. Pure CSS, no JS, runs at GPU layer for cheap. */
+@keyframes llmHealthPulse {
+    0%   { box-shadow: 0 0 0 0   currentColor; }
+    70%  { box-shadow: 0 0 0 6px transparent; }
+    100% { box-shadow: 0 0 0 0   transparent; }
+}
+.llm-health-pulse {
+    animation: llmHealthPulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
