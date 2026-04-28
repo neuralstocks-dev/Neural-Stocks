@@ -1077,6 +1077,153 @@ histogram  = MACD_line − signal`}
                     </p>
                 </div>
 
+                {/* Phase-1 IDX signal upgrade (Feb 2026) — what we now compute beyond raw filings */}
+                <div
+                    id="idx-broker-flow-methodology"
+                    className="mt-8 module p-6 md:p-10 scroll-mt-24"
+                    data-testid="tech-idx-broker-flow-methodology"
+                >
+                    <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
+                        IDX accuracy upgrade · Feb 2026
+                    </p>
+                    <h3 className="font-serif mt-2" style={{ fontSize: "1.6rem", letterSpacing: "-0.01em" }}>
+                        Four new bandarmology signals — zero new data source.
+                    </h3>
+                    <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
+                        Raw insider filings are useful but noisy — a single large director sale can skew the
+                        accumulation ratio, and a clean signal on illiquid tape isn't actually tradeable.
+                        We now layer four derived signals on top of the raw filings, computed locally from
+                        data we already fetch (OHLC history + market cap + dated movements). No new API,
+                        no new cost, no extra latency.
+                    </p>
+
+                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-0" style={{ border: "1px solid hsl(var(--border-default))" }}>
+                        {[
+                            {
+                                title: "Volume gate (rel_volume_20d)",
+                                desc: "Today's volume divided by the 20-day average. When below 0.3 we trip the volume_gate and visually soften the regime label — a directionally-correct signal on 0.2× normal volume is not actionable.",
+                                formula: "rel_vol = vol_today / mean(vol[-21:-1])",
+                            },
+                            {
+                                title: "Multi-day persistence (30d + 90d)",
+                                desc: "The single biggest accuracy lift. We split the filings into a tight 30-day window and a wider 90-day window, compute accumulation ratio in each, and flag persistence_consistent when both windows agree.",
+                                formula: "ratio_Nd = Σ BUY_shares[age ≤ Nd] / (Σ BUY + Σ SELL)[age ≤ Nd]",
+                            },
+                            {
+                                title: "Normalised impact (vs market cap)",
+                                desc: "Distinguishes 'material' flow from 'cosmetic' vesting. Same 50B IDR netval is a rounding error on BBCA (≈700T cap) but a big deal on a small cap. Banded into material (≥1%) / notable (0.25-1%) / cosmetic (<0.25%).",
+                                formula: "impact_pct = (net_shares × price) / market_cap × 100",
+                            },
+                            {
+                                title: "Regime softening",
+                                desc: "When the volume gate trips, we append '· low-liquidity caveat' to the regime label on the verdict card AND instruct the LLM to discount the bandarmology in its fundamental-analysis prose. Same signal, honest framing.",
+                                formula: "label += ' · low-liquidity caveat' if gate_tripped",
+                            },
+                        ].map((s, i, arr) => (
+                            <div key={s.title} className="p-4" style={{
+                                borderRight: i % 2 === 0 && i !== arr.length - 1 ? "1px solid hsl(var(--border-default))" : undefined,
+                                borderBottom: i < arr.length - 2 ? "1px solid hsl(var(--border-divider))" : undefined,
+                            }}>
+                                <p className="font-serif text-base" style={{ letterSpacing: "-0.01em" }}>{s.title}</p>
+                                <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>{s.desc}</p>
+                                <p className="mt-2 font-mono text-[10px]" style={{ color: "hsl(var(--text-muted))" }}>{s.formula}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* What we chose NOT to ship in v1 — transparency on user-requested signals */}
+                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                        What we considered but didn't ship (yet)
+                    </h4>
+                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                        Two signals that were on the short-list for this upgrade but consciously deferred —
+                        with the reasoning so you can calibrate your expectations:
+                    </p>
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div
+                            className="p-4"
+                            style={{ border: "1px solid hsl(var(--border-default))", borderLeft: "3px solid hsl(var(--hold))" }}
+                            data-testid="tech-deferred-ltp-bavg"
+                        >
+                            <p className="font-serif text-base">LTP vs bavg spread</p>
+                            <p className="text-[11px] mt-1 font-mono" style={{ color: "hsl(var(--text-muted))" }}>
+                                {"(last_price − buy_avg) / buy_avg"}
+                            </p>
+                            <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                <strong>Why considered:</strong> tells you if accumulators are still in profit (holding pressure)
+                                or underwater (capitulation risk).
+                                <br /><br />
+                                <strong>Why deferred from v1:</strong> (a) bavg is broker-summary data which we don't yet ingest;
+                                (b) on the tape, <code>(LTP-bavg)/bavg</code> is heavily dominated by the day's price action
+                                and is highly correlated with the 3d/5d rolling netval signal — marginal additional information;
+                                (c) a cleaner version of the same idea is 20d-VWAP vs LTP, which is a different feature entirely
+                                and deserves its own design pass.
+                                <br /><br />
+                                <strong>When we'll ship it:</strong> Phase 2 — once a broker-summary provider is integrated
+                                (see tools below). We'll revisit whether 20d-VWAP-vs-LTP is the better formulation at that time.
+                            </p>
+                        </div>
+                        <div
+                            className="p-4"
+                            style={{ border: "1px solid hsl(var(--border-default))", borderLeft: "3px solid hsl(var(--hold))" }}
+                            data-testid="tech-deferred-broker-concentration"
+                        >
+                            <p className="font-serif text-base">Broker concentration (HHI / top-1)</p>
+                            <p className="text-[11px] mt-1 font-mono" style={{ color: "hsl(var(--text-muted))" }}>
+                                top_1_net_value / Σ all_broker_net_value
+                            </p>
+                            <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                <strong>Why considered:</strong> if one broker accounts for 80%+ of net buy, it's usually
+                                a block trade / crossing (tuslah), not genuine accumulation.
+                                <br /><br />
+                                <strong>Why deferred from v1:</strong> requires broker-summary data (per-broker net values),
+                                which the current RapidAPI IDX provider doesn't expose. Marginal once the volume gate and
+                                rolling persistence are in place — most crossing trades also register as unusual volume spikes
+                                that the existing gate can catch.
+                                <br /><br />
+                                <strong>When we'll ship it:</strong> Phase 2 — natural companion to foreign-vs-domestic split
+                                and rolling netval.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Companion broker-flow tools — acknowledgement of what we don't yet compute */}
+                    <h4 className="font-serif mt-10 mb-3" style={{ fontSize: "1.3rem" }}>
+                        Companion tools for intraday broker flow
+                    </h4>
+                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                        Until we integrate a broker-summary data source (see Phase 2 above), the single highest-leverage
+                        thing an IDX trader can do is pair Neural's verdict with a dedicated broker-flow tool.
+                        <strong style={{ color: "hsl(var(--text-primary))" }}> A Neural BUY with 3-day persistent foreign net-buy
+                        confirmed on Stockbit or RTI is a materially stronger setup than either signal alone.</strong>
+                        <br /><br />
+                        These are third-party tools. Neural has no affiliation and gets no referral revenue — we list
+                        them because they actually help, not because anyone is paying us. In rough order of depth:
+                    </p>
+
+                    <ul className="mt-4 space-y-2.5 text-[13px]" style={{ color: "hsl(var(--text-secondary))" }}>
+                        {[
+                            ["Stockbit", "Best-in-class retail platform with broker summary, foreign/domestic split, and community cashflow view. Free tier is generous."],
+                            ["RTI Business", "Industry-standard intraday terminal. Real-time broker summary, crossing flags, top-N concentration. Used by most Indonesian day-traders."],
+                            ["IPOT (IndoPremier)", "Broker app — free when you hold a brokerage account. Has built-in bandarmology-style flow visualisations."],
+                            ["Ajaib", "Mobile-first, simpler UI. Shows top-5 broker net-buy/sell per ticker."],
+                            ["Mirae HOTS", "Pro desktop terminal. Order-flow level detail + queue depth. Steep learning curve."],
+                            ["Phillip POEMS", "Pro terminal with custom date-range broker summary (1d/5d/20d rolling)."],
+                            ["Bions (BNI Sekuritas)", "Broker app. Daily broker ranking + foreign vs domestic split."],
+                            ["IDN Financials", "Paid data service. CSV broker-summary exports — useful if you want to backtest."],
+                        ].map(([name, blurb]) => (
+                            <li key={name}>
+                                <strong style={{ color: "hsl(var(--text-primary))" }}>{name}</strong> — {blurb}
+                            </li>
+                        ))}
+                    </ul>
+
+                    <p className="mt-5 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>
+                        The same list appears as a companion card directly on every IDX analysis page, so you don't
+                        have to remember which tool does what when you're reading a verdict.
+                    </p>
+                </div>
+
                 {/* Data sources */}
                 <SectionHeader
                     icon={Database}
@@ -1103,6 +1250,7 @@ histogram  = MACD_line − signal`}
                             <Tr s="Fundamentals — US" src="Yahoo Finance" cov="Global baseline" cache="Per request" />
                             <Tr s="Fundamentals — IDX (P/E, P/B, ROE, EPS)" src="RapidAPI · IDX keystats" cov="Indonesia · IDR denominated" cache="24-hr cache" />
                             <Tr s="Bandarmology · insider filings" src="RapidAPI · IDX /emiten/{sym}/insider" cov="Indonesia · director + commissioner + major holder" cache="1-hr cache" />
+                            <Tr s="Bandarmology · Phase-1 signals (rel-vol, persistence 30d/90d, normalised impact)" src="Computed in-house from OHLC + market cap + dated filings" cov="Indonesia · all .JK tickers" cache="Computed per analysis" />
                             <Tr s="Top IDX Picks scanner" src="RapidAPI · IDX /main/trending" cov="Indonesia · ranked by multi-factor score" cache="30-min cache" />
                             <Tr s="Company news (US)" src="Finnhub.io" cov="US · 7-day window" cache="5-min cache" />
                             <Tr s="Company news (IDX)" src="CNBC Indonesia + Detik Finance RSS" cov="Indonesia · 7-day window" cache="10-min cache" />

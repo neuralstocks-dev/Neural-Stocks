@@ -692,9 +692,202 @@ async def get_bandarmology(ticker: str) -> dict | None:
         "total_movements": len(movements),
         "recent": recent_samples,
         "source": "rapidapi.idx",
+        # raw_movements is NOT persisted on the final analysis doc — it's
+        # only used transiently by enrich_bandarmology() below to compute
+        # multi-day persistence windows. We pop it there before returning.
+        "_raw_movements": movements,
     }
     _bandarmology_cache[symbol] = (time.time(), result)
     return result
+
+
+# -------- Phase-1 signal enrichment -----------------------------------------
+# We augment the raw filings-based bandarmology with four signals that we can
+# compute WITHOUT a broker-summary data feed, using data we already fetch
+# (OHLC history + quote + fundamentals):
+#
+#   (a) rel_volume_20d    — today's volume / 20d average volume
+#   (b) persistence_30d   — accumulation ratio over only the last 30d of filings
+#   (c) persistence_90d   — accumulation ratio over only the last 90d of filings
+#   (d) normalized_impact — net-buy shares * avg price / market cap  (material%)
+#
+# The volume gate downgrades the regime label when rel_vol < 0.3 because
+# directionally-correct signals on illiquid tape are not tradeable. The
+# persistence block catches the "one big filing" vs "sustained accumulation"
+# distinction. The normalization bucket tells the reader whether the flow
+# is material in the context of the company's size.
+#
+# All math is local — zero extra upstream API calls. See PRD Feb 2026 for
+# the Phase-2 broker-summary plan that would layer on top of this.
+
+_PERSISTENCE_WINDOWS = [30, 90]
+
+_MONTH_ABBR = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+
+def _parse_filing_date(date_str: str | None):
+    """Upstream returns dates as 'DD MMM YY' (e.g. '25 Mar 26'). Return a
+    timezone-aware UTC datetime or None on failure. Matches the frontend
+    parser in BandarmologyCard for consistency."""
+    if not date_str or not isinstance(date_str, str):
+        return None
+    import re
+    m = re.match(r"^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2,4})$", date_str.strip())
+    if not m:
+        return None
+    day = int(m.group(1))
+    mon = _MONTH_ABBR.get(m.group(2).lower())
+    if mon is None:
+        return None
+    year = int(m.group(3))
+    if year < 100:
+        year += 2000
+    try:
+        return datetime(year, mon, day, tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _rolling_accumulation(movements: list, window_days: int) -> dict | None:
+    """Accumulation ratio computed from filings dated within the last
+    `window_days` from now. Returns None when fewer than 2 movements
+    fall in the window (insufficient data for a persistence signal)."""
+    now = datetime.now(timezone.utc)
+    buy = 0.0
+    sell = 0.0
+    count_in_window = 0
+    for m in movements:
+        parsed = _parse_filing_date(m.get("date"))
+        if parsed is None:
+            continue
+        age = (now - parsed).days
+        if age < 0 or age > window_days:
+            continue
+        count_in_window += 1
+        action = (m.get("action_type") or "").upper()
+        abs_shares = abs(_parse_shares((m.get("changes") or {}).get("value")))
+        if "BUY" in action:
+            buy += abs_shares
+        elif "SELL" in action:
+            sell += abs_shares
+    total = buy + sell
+    if count_in_window < 2 or total == 0:
+        return None
+    return {
+        "window_days": window_days,
+        "ratio": round(buy / total, 4),
+        "filings": count_in_window,
+        "buy_shares": int(buy),
+        "sell_shares": int(sell),
+    }
+
+
+def _label_persistence(ratio: float | None) -> str:
+    """Map a ratio to a persistence label. None → 'insufficient_data'."""
+    if ratio is None:
+        return "insufficient_data"
+    if ratio >= 0.65:
+        return "persistent_accumulation"
+    if ratio >= 0.55:
+        return "mild_accumulation"
+    if ratio <= 0.35:
+        return "persistent_distribution"
+    if ratio <= 0.45:
+        return "mild_distribution"
+    return "balanced"
+
+
+def _impact_tier(pct: float) -> str:
+    """Classify normalized_impact_pct into brand-spending-style buckets.
+    Thresholds tuned to IDX blue-chip vs mid-cap typical filing sizes."""
+    if pct >= 1.0:
+        return "material"     # ≥1% of market cap is a big stake shift
+    if pct >= 0.25:
+        return "notable"      # 25bps → noticeable but not cap-moving
+    return "cosmetic"         # <25bps → mostly vesting / cosmetic grants
+
+
+def enrich_bandarmology(
+    bandar: dict | None,
+    history: list | None = None,
+    quote: dict | None = None,
+) -> dict | None:
+    """Layer Phase-1 signals onto the raw bandarmology dict produced by
+    `get_bandarmology()`. Returns a shallow copy with enrichment applied — the
+    original (cached) dict is NOT mutated, so repeated calls within the cache
+    TTL still produce the same persistence windows.
+
+    Safe to call with None / missing inputs — falls back gracefully.
+
+    Adds keys:
+      rel_volume_20d           : float | None  (latest vol / 20d avg)
+      volume_gate_tripped      : bool  (True if rel_vol < 0.3)
+      persistence_30d          : {window_days, ratio, filings, ...} | None
+      persistence_90d          : {window_days, ratio, filings, ...} | None
+      persistence_label        : str  ('persistent_accumulation' | ... )
+      persistence_consistent   : bool  (30d & 90d both >=0.55 or both <=0.45)
+      normalized_impact_pct    : float | None  (net-buy * avg-price / mcap)
+      impact_tier              : 'material' | 'notable' | 'cosmetic' | None
+      confidence_adjusted_label: str  (regime label, softened if gate tripped)
+    """
+    if not isinstance(bandar, dict):
+        return bandar
+
+    # Shallow copy so the cache keeps its _raw_movements intact.
+    out = {k: v for k, v in bandar.items() if k != "_raw_movements"}
+    raw_movements = bandar.get("_raw_movements") or []
+
+    # (a) rel_volume_20d — last row vs mean of previous 20 (excluding today)
+    rel_vol = None
+    if isinstance(history, list) and len(history) >= 21:
+        try:
+            recent_vol = float(history[-1].get("volume") or 0)
+            prior = [float((h.get("volume") or 0)) for h in history[-21:-1]]
+            avg_vol = sum(prior) / len(prior) if prior else 0
+            if avg_vol > 0:
+                rel_vol = round(recent_vol / avg_vol, 3)
+        except (TypeError, ValueError):
+            rel_vol = None
+    out["rel_volume_20d"] = rel_vol
+    out["volume_gate_tripped"] = bool(rel_vol is not None and rel_vol < 0.3)
+
+    # (b, c) multi-day persistence
+    windows: dict = {}
+    for days in _PERSISTENCE_WINDOWS:
+        windows[f"persistence_{days}d"] = _rolling_accumulation(raw_movements, days)
+        out[f"persistence_{days}d"] = windows[f"persistence_{days}d"]
+
+    w30 = windows.get("persistence_30d")
+    w90 = windows.get("persistence_90d")
+    persistence_label = _label_persistence((w30 or w90 or {}).get("ratio"))
+    out["persistence_label"] = persistence_label
+    out["persistence_consistent"] = bool(
+        w30 and w90 and (
+            (w30["ratio"] >= 0.55 and w90["ratio"] >= 0.55)
+            or (w30["ratio"] <= 0.45 and w90["ratio"] <= 0.45)
+        )
+    )
+
+    # (d) normalized impact — net-buy shares * avg price / market cap
+    impact_pct = None
+    try:
+        net_shares = max(0.0, float(out.get("buy_shares") or 0) - float(out.get("sell_shares") or 0))
+        price = float((quote or {}).get("price") or 0)
+        mcap = float((quote or {}).get("market_cap") or 0)
+        if net_shares > 0 and price > 0 and mcap > 0:
+            impact_pct = round((net_shares * price / mcap) * 100.0, 3)
+    except (TypeError, ValueError):
+        impact_pct = None
+    out["normalized_impact_pct"] = impact_pct
+    out["impact_tier"] = _impact_tier(impact_pct) if impact_pct is not None else None
+
+    gate_suffix = " · low-liquidity caveat" if out["volume_gate_tripped"] else ""
+    out["confidence_adjusted_label"] = (out.get("label") or "") + gate_suffix
+
+    return out
 
 
 # ---- Multibagger — built from /api/main/trending -----------------------

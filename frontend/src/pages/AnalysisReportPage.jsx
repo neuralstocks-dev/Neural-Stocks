@@ -11,6 +11,7 @@ import MarketContextModules from "@/components/MarketContextModules";
 import MethodologyLink from "@/components/MethodologyLink";
 import RandomForestOpinion from "@/components/RandomForestOpinion";
 import BandarmologyCard from "@/components/BandarmologyCard";
+import BrokerFlowCompanionCard from "@/components/BrokerFlowCompanionCard";
 import ConfluenceChip from "@/components/ConfluenceChip";
 import AnalysisQueueChip from "@/components/AnalysisQueueChip";
 import AnalysisProgressStepper from "@/components/AnalysisProgressStepper";
@@ -825,6 +826,7 @@ export default function AnalysisReportPage() {
                                 {/* Random Forest secondary opinion (renders only when model loaded) */}
                                 <RandomForestOpinion opinion={analysis.rf_opinion} />
                                 <BandarmologyCard bandarmology={analysis.bandarmology} />
+                                {analysis.bandarmology && <BrokerFlowCompanionCard />}
                                 <ConfluenceChip confluence={analysis.confluence} />
 
                                 {/* Technical / Fundamental / Peer */}

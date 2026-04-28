@@ -821,10 +821,18 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
     # fits, in which case the LLM ignores it. See services/intrinsic_value.py.
     from services.intrinsic_value import compute_intrinsic_anchor
     intrinsic_anchor = compute_intrinsic_anchor(fundamentals, ticker, quote.get("price"))
+
+    # Enrich bandarmology with Phase-1 signals BEFORE the LLM call so Claude
+    # can reference volume-gate / persistence / normalised-impact in its prose.
+    if is_idx and idx_bandar is not None:
+        from services.idx_rapidapi import enrich_bandarmology
+        idx_bandar = enrich_bandarmology(idx_bandar, history, quote)
+
     if mode == "candlestick":
         analysis = await run_candlestick_analysis(
             ticker, quote, history, fundamentals, technicals, candlestick_findings,
             intrinsic_anchor=intrinsic_anchor,
+            bandarmology=idx_bandar if is_idx else None,
         )
     elif mode == "hybrid":
         analysis = await run_ai_analysis(
@@ -833,6 +841,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
             market_context=market_ctx,
             weekly_history=weekly_history,
             intrinsic_anchor=intrinsic_anchor,
+            bandarmology=idx_bandar if is_idx else None,
         )
     else:
         analysis = await run_ai_analysis(
@@ -840,6 +849,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
             market_context=market_ctx,
             weekly_history=weekly_history,
             intrinsic_anchor=intrinsic_anchor,
+            bandarmology=idx_bandar if is_idx else None,
         )
 
     doc = {

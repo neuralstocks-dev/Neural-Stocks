@@ -8,7 +8,7 @@
  * nothing otherwise (caller passes undefined).
  */
 import React from "react";
-import { TrendingUp, TrendingDown, Users, Building2, Globe, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, Users, Building2, Globe, AlertTriangle, Activity, Layers, Scale } from "lucide-react";
 
 const REGIME_STYLE = {
     strong_accumulation: { color: "hsl(var(--buy))", icon: TrendingUp, label: "Strong accumulation" },
@@ -73,6 +73,11 @@ export default function BandarmologyCard({ bandarmology }) {
         buy_shares, sell_shares, buy_count, sell_count,
         smart_money_buy_shares, smart_money_sell_shares,
         foreign_net_shares, total_movements, recent = [],
+        // Phase-1 enrichment signals (added Feb 2026)
+        rel_volume_20d, volume_gate_tripped,
+        persistence_30d, persistence_90d, persistence_label, persistence_consistent,
+        normalized_impact_pct, impact_tier,
+        confidence_adjusted_label,
     } = bandarmology;
 
     const style = REGIME_STYLE[regime] || REGIME_STYLE.balanced;
@@ -119,7 +124,7 @@ export default function BandarmologyCard({ bandarmology }) {
                         <Building2 size={12} strokeWidth={1.5} /> Bandarmology · Smart money flow
                     </p>
                     <h2 className="font-serif text-3xl mt-1" style={{ letterSpacing: "-0.02em" }}>
-                        {label || style.label}
+                        {confidence_adjusted_label || label || style.label}
                     </h2>
                     {isStale && (
                         <div
@@ -201,6 +206,90 @@ export default function BandarmologyCard({ bandarmology }) {
                     </span>
                 </div>
             </div>
+
+            {/* Phase-1 signal strip (Feb 2026) — volume gate / persistence / normalized impact.
+                Rendered only when the enriched bandarmology is present (new analyses).
+                Older cached analyses keep the original 3-col layout below. */}
+            {(rel_volume_20d != null || persistence_label || impact_tier) && (
+                <div
+                    className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3"
+                    style={{ opacity: isStale ? 0.55 : 1 }}
+                    data-testid="bandarmology-phase1-row"
+                >
+                    <SignalChip
+                        icon={Activity}
+                        label="Volume vs 20d avg"
+                        value={
+                            rel_volume_20d != null
+                                ? `${rel_volume_20d.toFixed(2)}×`
+                                : "—"
+                        }
+                        detail={
+                            volume_gate_tripped
+                                ? "Low liquidity — discount the signal"
+                                : rel_volume_20d != null && rel_volume_20d >= 1.3
+                                ? "Elevated participation"
+                                : rel_volume_20d != null
+                                ? "Normal participation"
+                                : "History unavailable"
+                        }
+                        tone={
+                            volume_gate_tripped
+                                ? "warn"
+                                : rel_volume_20d != null && rel_volume_20d >= 1.3
+                                ? "buy"
+                                : "neutral"
+                        }
+                        testid="bandarmology-rel-volume"
+                    />
+                    <SignalChip
+                        icon={Layers}
+                        label="Persistence · 30d / 90d"
+                        value={
+                            persistence_label && persistence_label !== "insufficient_data"
+                                ? `${Math.round((persistence_30d?.ratio ?? persistence_90d?.ratio ?? 0) * 100)}% / ${Math.round((persistence_90d?.ratio ?? 0) * 100)}%`
+                                : "—"
+                        }
+                        detail={
+                            persistence_label === "persistent_accumulation"
+                                ? (persistence_consistent ? "Consistent across both windows" : "30d only")
+                                : persistence_label === "persistent_distribution"
+                                ? "Persistent distribution"
+                                : persistence_label === "balanced" || persistence_label === "mild_accumulation" || persistence_label === "mild_distribution"
+                                ? persistence_label.replace(/_/g, " ")
+                                : "Not enough recent filings"
+                        }
+                        tone={
+                            persistence_label === "persistent_accumulation"
+                                ? "buy"
+                                : persistence_label === "persistent_distribution"
+                                ? "sell"
+                                : "neutral"
+                        }
+                        testid="bandarmology-persistence"
+                    />
+                    <SignalChip
+                        icon={Scale}
+                        label="Impact vs market cap"
+                        value={
+                            normalized_impact_pct != null
+                                ? `${normalized_impact_pct.toFixed(2)}%`
+                                : "—"
+                        }
+                        detail={
+                            impact_tier === "material"
+                                ? "Material size — worth weighting"
+                                : impact_tier === "notable"
+                                ? "Notable but not cap-moving"
+                                : impact_tier === "cosmetic"
+                                ? "Cosmetic (likely vesting / grants)"
+                                : "Insufficient data"
+                        }
+                        tone={impact_tier === "material" ? "buy" : impact_tier === "notable" ? "neutral" : "muted"}
+                        testid="bandarmology-normalized-impact"
+                    />
+                </div>
+            )}
 
             {/* Secondary stats */}
             <div
@@ -318,3 +407,39 @@ function Cell({ label, value, detail, icon: Icon, color, last }) {
         </div>
     );
 }
+
+function SignalChip({ icon: Icon, label, value, detail, tone, testid }) {
+    const toneMap = {
+        buy: "hsl(var(--buy))",
+        sell: "hsl(var(--sell))",
+        warn: "hsl(var(--hold))",
+        neutral: "hsl(var(--text-primary))",
+        muted: "hsl(var(--text-muted))",
+    };
+    const accent = toneMap[tone] || toneMap.neutral;
+    return (
+        <div
+            className="p-3"
+            style={{
+                border: `1px solid ${tone === "buy" || tone === "sell" || tone === "warn" ? accent : "hsl(var(--border-default))"}`,
+                borderLeft: `3px solid ${accent}`,
+                background: "hsl(var(--bg) / 0.4)",
+            }}
+            data-testid={testid}
+        >
+            <p className="text-overline flex items-center gap-1.5" style={{ fontSize: "0.56rem" }}>
+                {Icon ? <Icon size={10} strokeWidth={1.5} /> : null}
+                {label}
+            </p>
+            <p className="mt-1 font-mono text-sm" style={{ color: accent, letterSpacing: "-0.01em" }}>
+                {value}
+            </p>
+            {detail ? (
+                <p className="mt-0.5 text-[10px] leading-snug" style={{ color: "hsl(var(--text-muted))" }}>
+                    {detail}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+

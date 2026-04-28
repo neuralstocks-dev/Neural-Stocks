@@ -256,11 +256,57 @@ def _handle_llm_error(e: Exception):
     raise HTTPException(status_code=502, detail=f"AI provider error: {err_msg[:200]}")
 
 
+def _slim_bandarmology_for_prompt(bandar: dict | None) -> dict | None:
+    """Produce a compact 8-field projection of the enriched bandarmology dict
+    to send to the LLM. We send ONLY the decision-relevant fields (not raw
+    filings) to keep prompt tokens minimal (~120-180 tokens vs ~2000 raw).
+
+    IMPORTANT educational framing passed to Claude via the prompt block is
+    in `_BANDARMOLOGY_PROMPT_BLOCK` below — the model must understand this
+    is insider-filing lag data (T+5 to T+30 reporting), NOT real-time broker
+    flow, and must NOT treat it as a price predictor.
+    """
+    if not isinstance(bandar, dict):
+        return None
+    return {
+        "regime": bandar.get("regime"),
+        "label": bandar.get("confidence_adjusted_label") or bandar.get("label"),
+        "accumulation_ratio_all_time": bandar.get("accumulation_ratio"),
+        "smart_money_accumulation": bandar.get("smart_money_accumulation"),
+        "foreign_net_shares": bandar.get("foreign_net_shares"),
+        "rel_volume_20d": bandar.get("rel_volume_20d"),
+        "volume_gate_tripped": bandar.get("volume_gate_tripped"),
+        "persistence_30d_ratio": (bandar.get("persistence_30d") or {}).get("ratio"),
+        "persistence_90d_ratio": (bandar.get("persistence_90d") or {}).get("ratio"),
+        "persistence_label": bandar.get("persistence_label"),
+        "persistence_consistent": bandar.get("persistence_consistent"),
+        "normalized_impact_pct": bandar.get("normalized_impact_pct"),
+        "impact_tier": bandar.get("impact_tier"),
+        "total_filings": bandar.get("total_movements"),
+    }
+
+
+_BANDARMOLOGY_PROMPT_BLOCK = """
+
+IDX SMART-MONEY FLOW (Bandarmology) — insider filings only:
+- The `bandarmology` field summarises corporate insider / director / commissioner / major-shareholder FILINGS from the IDX/KSEI feed. It is NOT real-time broker-summary flow (e.g. foreign broker code NG net-buy).
+- Filings typically lag the actual transaction by 5-30 days, so this is CONFIRMATORY background context — NOT a timing signal. Do not treat it as a price predictor.
+- Use this hierarchy when interpreting:
+  1. `volume_gate_tripped=true` → ignore or heavily discount the signal. Illiquid tape makes directional flow not actionable.
+  2. `persistence_consistent=true` with `persistence_label` in {'persistent_accumulation','persistent_distribution'} → highest-quality signal. Multi-window agreement is rare and meaningful.
+  3. `impact_tier='material'` (≥1% of market cap) → the filing size is large enough to shift the base rate. `notable` (0.25-1%) is moderately interesting. `cosmetic` (<0.25%) is mostly vesting/grant noise — do not cite.
+  4. `foreign_net_shares` hits harder on LQ45 / blue-chip IDX names than mid/small caps (custodian-leg noise on small caps).
+- When you DO cite bandarmology in `fundamental_analysis` prose, phrase it as background (e.g. "Recent insider filings show persistent accumulation over 90 days (material impact, 1.4% of mcap) — consistent with the technical setup.") — NOT as a forecast.
+- When `regime='no_signal'` or all the persistence windows are None, omit bandarmology language entirely.
+"""
+
+
 async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals: dict,
                           technicals: dict, candlestick_findings: dict | None = None,
                           mode: str = "standard", market_context: dict | None = None,
                           weekly_history: list | None = None,
-                          intrinsic_anchor: dict | None = None) -> dict:
+                          intrinsic_anchor: dict | None = None,
+                          bandarmology: dict | None = None) -> dict:
     """Run AI analysis. If candlestick_findings is provided AND mode == 'hybrid',
     the hybrid prompt is used. Otherwise the standard prompt is used.
 
@@ -327,8 +373,15 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
         if mc_slim:
             payload["market_context"] = mc_slim
 
+    # IDX bandarmology (insider filings) — only for .JK tickers when available.
+    # Slim projection keeps prompt small; educational framing appended below.
+    slim_bandar = _slim_bandarmology_for_prompt(bandarmology)
+    if slim_bandar and slim_bandar.get("regime") and slim_bandar.get("regime") != "no_signal":
+        payload["bandarmology"] = slim_bandar
+
     try:
-        raw = await _run_chat_in_thread(system_prompt, f"{prefix}-{ticker}",
+        system_to_use = system_prompt + (_BANDARMOLOGY_PROMPT_BLOCK if "bandarmology" in payload else "")
+        raw = await _run_chat_in_thread(system_to_use, f"{prefix}-{ticker}",
                               "Analyze this stock using the data below. Return ONLY valid JSON.\n\n"
                               + json.dumps(payload, default=str))
     except HTTPException:
@@ -344,7 +397,8 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
 async def run_candlestick_analysis(ticker: str, quote: dict, history: list,
                                    fundamentals: dict, technicals: dict,
                                    candlestick_findings: dict,
-                                   intrinsic_anchor: dict | None = None) -> dict:
+                                   intrinsic_anchor: dict | None = None,
+                                   bandarmology: dict | None = None) -> dict:
     """Run pure candlestick-driven AI analysis (Mode B)."""
     payload = {
         "ticker": ticker,
@@ -367,8 +421,12 @@ async def run_candlestick_analysis(ticker: str, quote: dict, history: list,
                 "sector", "market",
             ) if intrinsic_anchor.get(k) is not None
         }
+    slim_bandar = _slim_bandarmology_for_prompt(bandarmology)
+    if slim_bandar and slim_bandar.get("regime") and slim_bandar.get("regime") != "no_signal":
+        payload["bandarmology"] = slim_bandar
     try:
-        raw = await _run_chat_in_thread(CANDLESTICK_SYSTEM_PROMPT, f"candlestick-{ticker}",
+        system_to_use = CANDLESTICK_SYSTEM_PROMPT + (_BANDARMOLOGY_PROMPT_BLOCK if "bandarmology" in payload else "")
+        raw = await _run_chat_in_thread(system_to_use, f"candlestick-{ticker}",
                               "Analyze this stock using the detected candlestick patterns plus price context. Return ONLY valid JSON.\n\n"
                               + json.dumps(payload, default=str))
     except HTTPException:
