@@ -1,9 +1,16 @@
 import React from "react";
-import { Instagram } from "lucide-react";
+import { Mail } from "lucide-react";
 
 /**
  * SocialLinks
- * Renders TikTok and Instagram links for @neuralstockintelligence.
+ * Renders a Support & Admin email line alongside the TikTok handle for
+ * @neuralstockintelligence.
+ *
+ * NOTE (Feb 2026): Instagram was removed from the platform. The former
+ * `INSTAGRAM_URL` export is gone; any legacy imports of it should be
+ * treated as compile-time errors pointing at a stale reference. Support
+ * contact is now a plain `mailto:` — first-class, search-indexable, and
+ * works even if the user has no Instagram account.
  *
  * Props:
  *   - variant: "default" | "muted"
@@ -11,12 +18,14 @@ import { Instagram } from "lucide-react";
  *       - "muted":   forced white-on-dark (for login/signup hero footers).
  *   - size: "sm" | "md"  (icon + text size)
  *   - className: extra wrapper classes
- *   - showHandle: boolean  (default true — shows "@neuralstockintelligence" text)
+ *   - showHandle: boolean  (default true — shows the email / @handle text)
+ *   - layout: "row" | "column"
  */
 
 const TIKTOK_URL = "https://www.tiktok.com/@neuralstockintelligence";
-const INSTAGRAM_URL = "https://www.instagram.com/neuralstockintelligence";
 const HANDLE = "@neuralstockintelligence";
+const SUPPORT_EMAIL = "ai.neulab.inc@gmail.com";
+const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`;
 
 // TikTok glyph (lucide-react does not ship a TikTok icon).
 function TikTokIcon({ size = 14, strokeWidth = 1.5 }) {
@@ -76,15 +85,17 @@ export default function SocialLinks({
             data-testid="social-links"
         >
             <a
-                href={INSTAGRAM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={SUPPORT_MAILTO}
                 className={itemBase}
-                aria-label="Follow Neural Stock Intelligence on Instagram"
-                data-testid="social-link-instagram"
+                aria-label={`Contact Neural Stock Intelligence Support & Admin at ${SUPPORT_EMAIL}`}
+                data-testid="social-link-support-email"
             >
-                <Instagram size={iconSize} strokeWidth={1.5} />
-                {showHandle && <span className="font-mono">{HANDLE}</span>}
+                <Mail size={iconSize} strokeWidth={1.5} />
+                {showHandle && (
+                    <span className="font-mono">
+                        Support &amp; Admin: {SUPPORT_EMAIL}
+                    </span>
+                )}
             </a>
             <a
                 href={TIKTOK_URL}
@@ -101,4 +112,4 @@ export default function SocialLinks({
     );
 }
 
-export { TIKTOK_URL, INSTAGRAM_URL, HANDLE };
+export { TIKTOK_URL, HANDLE, SUPPORT_EMAIL, SUPPORT_MAILTO };

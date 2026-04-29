@@ -77,18 +77,25 @@ def test_trade_slip_pdf_contains_social_handle():
     assert HANDLE in text, "Trade Slip PDF must surface @neuralstockintelligence"
 
 
-def test_telegram_alert_footer_has_both_handles_and_links():
+def test_telegram_alert_footer_has_support_email_and_tiktok():
+    # Instagram was removed Feb 2026 — replaced with a Support & Admin
+    # mailto so every alert carries a real contact path.
     assert HANDLE in _TG_SOCIAL_FOOTER
-    assert "https://www.instagram.com/neuralstockintelligence" in _TG_SOCIAL_FOOTER
-    assert "https://www.tiktok.com/@neuralstockintelligence" in _TG_SOCIAL_FOOTER
-    # Must use proper HTML link entities so Telegram renders them tappable.
+    assert "tiktok.com/@neuralstockintelligence" in _TG_SOCIAL_FOOTER
+    assert "ai.neulab.inc@gmail.com" in _TG_SOCIAL_FOOTER
+    assert "mailto:ai.neulab.inc@gmail.com" in _TG_SOCIAL_FOOTER
+    # Instagram must be fully removed from the alert footer.
+    assert "instagram.com" not in _TG_SOCIAL_FOOTER.lower()
+    assert "IG @" not in _TG_SOCIAL_FOOTER
+    # Must use proper HTML link entities so Telegram renders them tappable —
+    # one for the mailto, one for the TikTok URL.
     assert _TG_SOCIAL_FOOTER.count("<a href=") == 2
 
 
 def test_telegram_alert_footer_uses_three_separate_rows():
     """Per UX spec, the footer renders on three lines, one per row:
         Row 1: Follow Neural Stock Intelligence
-        Row 2: IG @neuralstockintelligence
+        Row 2: Support & Admin: ai.neulab.inc@gmail.com
         Row 3: TikTok @neuralstockintelligence
     Must NOT use the legacy single-line " · " joiner.
     """
@@ -101,14 +108,16 @@ def test_telegram_alert_footer_uses_three_separate_rows():
     rows = [r for r in _TG_SOCIAL_FOOTER.lstrip("\n").split("\n") if r.strip()]
     assert len(rows) == 3, f"Expected 3 footer rows, got {len(rows)}: {rows}"
     assert "Follow Neural Stock Intelligence" in rows[0]
-    assert rows[1].startswith("<a href=") and "IG @neuralstockintelligence" in rows[1]
+    assert "Support" in rows[1] and "ai.neulab.inc@gmail.com" in rows[1]
     assert rows[2].startswith("<a href=") and "TikTok @neuralstockintelligence" in rows[2]
 
 
-def test_email_disclaimer_footer_has_both_handles_and_links():
+def test_email_disclaimer_footer_has_support_email_and_tiktok():
     assert HANDLE in DISCLAIMER_FOOTER
-    assert "instagram.com/neuralstockintelligence" in DISCLAIMER_FOOTER
     assert "tiktok.com/@neuralstockintelligence" in DISCLAIMER_FOOTER
+    assert "ai.neulab.inc@gmail.com" in DISCLAIMER_FOOTER
+    # Instagram must be fully removed from the email footer.
+    assert "instagram.com" not in DISCLAIMER_FOOTER.lower()
 
 
 def test_send_alert_to_user_appends_social_footer(monkeypatch):

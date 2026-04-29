@@ -376,7 +376,7 @@ export default function AppShell({ children }) {
 
             <main className="relative z-10">{children}</main>
 
-            {/* Global authenticated footer — social handles (Instagram + TikTok) */}
+            {/* Global authenticated footer — Support & Admin email + TikTok handle */}
             <footer
                 className="relative z-10 mt-12"
                 style={{ borderTop: "1px solid hsl(var(--border-divider))" }}

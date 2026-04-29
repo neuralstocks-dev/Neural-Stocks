@@ -159,13 +159,15 @@ async def _send_message(chat_id, text: str) -> bool:
 
 _PUBLIC_APP_URL = os.environ.get("PUBLIC_APP_URL", "").rstrip("/")
 
-# Cross-channel social footer appended to every alert pushed to user chats.
-# Telegram supports HTML link entities, so we wrap each handle in <a> tags so
-# users can tap straight from the alert into Instagram or TikTok. Each row
-# is on its own line for readability on mobile (per UX request).
+# Cross-channel footer appended to every alert pushed to user chats.
+# Telegram supports HTML link entities, so we wrap the TikTok handle in
+# <a> tags so users can tap straight into TikTok. Each row is on its own
+# line for readability on mobile (per UX request). Instagram was removed
+# Feb 2026 and replaced with a Support & Admin email line — this keeps
+# a real contact path for support tickets and credit-recoup escalation.
 _TG_SOCIAL_FOOTER = (
     "\n\n<i>Follow Neural Stock Intelligence™</i>"
-    "\n<a href=\"https://www.instagram.com/neuralstockintelligence\">IG @neuralstockintelligence</a>"
+    "\nSupport &amp; Admin: <a href=\"mailto:ai.neulab.inc@gmail.com\">ai.neulab.inc@gmail.com</a>"
     "\n<a href=\"https://www.tiktok.com/@neuralstockintelligence\">TikTok @neuralstockintelligence</a>"
 )
 

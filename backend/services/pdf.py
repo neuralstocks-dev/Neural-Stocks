@@ -20,9 +20,13 @@ HOLD_AMBER = colors.HexColor("#d97706")
 RULE_GREY = colors.HexColor("#d1d5db")
 
 # Social handles surfaced on every PDF artifact for cross-channel brand recall.
+# Instagram removed Feb 2026 — replaced with the Support & Admin email so
+# every printed/shared PDF carries a real contact path for the reader.
 SOCIAL_HANDLE = "@neuralstockintelligence"
+SUPPORT_EMAIL = "ai.neulab.inc@gmail.com"
 SOCIAL_LINE_HTML = (
-    f"<b>FOLLOW</b> · Instagram &amp; TikTok: <font face='Courier'>{SOCIAL_HANDLE}</font>"
+    f"<b>FOLLOW</b> · TikTok: <font face='Courier'>{SOCIAL_HANDLE}</font> · "
+    f"<b>SUPPORT &amp; ADMIN</b>: <font face='Courier'>{SUPPORT_EMAIL}</font>"
 )
 
 
@@ -960,7 +964,7 @@ def generate_trade_slip_pdf(analysis: dict, share_url: str = "") -> bytes:
     ]))
     story.append(footer)
     story.append(Paragraph(
-        "Follow @neuralstockintelligence on Instagram &amp; TikTok · Educational only — not financial advice. Markets involve risk of loss.",
+        "Follow @neuralstockintelligence on TikTok · Support &amp; Admin: ai.neulab.inc@gmail.com · Educational only — not financial advice. Markets involve risk of loss.",
         ParagraphStyle("SlipDisc", parent=s["muted"], fontSize=7, leading=9, textColor=BRAND_MUTED),
     ))
 
