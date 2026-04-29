@@ -173,11 +173,13 @@ function PartDivider({ n, title, subtitle, readMins }) {
     );
 }
 
-function GlossaryRow({ term, plain }) {
+function GlossaryRow({ term, plain, techAnchor, anchorId }) {
     return (
         <div
-            className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2 sm:gap-4 py-3"
+            id={anchorId}
+            className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2 sm:gap-4 py-3 scroll-mt-24"
             style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+            data-testid={`manual-glossary-row-${anchorId?.replace(/^glossary-/, "") || ""}`}
         >
             <p
                 className="font-mono text-[12px]"
@@ -185,9 +187,21 @@ function GlossaryRow({ term, plain }) {
             >
                 {term}
             </p>
-            <p className="text-sm" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.6 }}>
-                {plain}
-            </p>
+            <div>
+                <p className="text-sm" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.6 }}>
+                    {plain}
+                </p>
+                {techAnchor && (
+                    <Link
+                        to={`/technical#${techAnchor}`}
+                        className="inline-flex items-center gap-1 mt-1.5 font-mono text-[11px] link-underline"
+                        style={{ color: "hsl(var(--hold))" }}
+                        data-testid={`manual-glossary-deepdive-${anchorId?.replace(/^glossary-/, "") || ""}`}
+                    >
+                        Deep dive — methodology <span aria-hidden>→</span>
+                    </Link>
+                )}
+            </div>
         </div>
     );
 }
@@ -462,53 +476,78 @@ export default function UserManualPage() {
 
                 <Section id="glossary" icon={BookOpen} kicker="1.3" title="Glossary — speak the language">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Throughout the verdict pages and elsewhere, you'll see these terms. Bookmark
-                        this section — every one of them is hyperlinked from the relevant module so
-                        you can jump back here whenever you forget.
+                        Throughout the verdict pages and elsewhere, you'll see these terms. This
+                        glossary is the quick plain-English reference. Each row links forward to{" "}
+                        <Link to="/technical" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>the Technical page</Link>{" "}
+                        where the full methodology lives. Bookmark this section if you want a
+                        cheat-sheet, click <strong>Deep dive →</strong> on any row when you want
+                        the maths.
                     </p>
                     <div className="mt-5" data-testid="manual-glossary">
                         <GlossaryRow
+                            anchorId="glossary-rsi"
                             term="RSI"
+                            techAnchor="tech-pipeline-section"
                             plain="Relative Strength Index. A 0–100 momentum gauge. Above 70 = stock is overheated, below 30 = stock is oversold. Useful for timing reversals."
                         />
                         <GlossaryRow
+                            anchorId="glossary-macd"
                             term="MACD"
+                            techAnchor="tech-pipeline-section"
                             plain="Moving Average Convergence Divergence. A trend-and-momentum indicator built from two moving averages. Positive crossovers = bullish, negative = bearish."
                         />
                         <GlossaryRow
+                            anchorId="glossary-sma-ema"
                             term="SMA / EMA"
+                            techAnchor="tech-pipeline-section"
                             plain="Simple / Exponential Moving Average. The smoothed price trend over N days (we use 20 and 50). Stock above its SMA-50 is broadly in an uptrend; below = downtrend."
                         />
                         <GlossaryRow
+                            anchorId="glossary-candlestick"
                             term="Candlestick"
+                            techAnchor="tech-pipeline-section"
                             plain="A daily price candle showing open, high, low, close. Patterns of consecutive candles (Hammer, Engulfing, Morning Star, Doji) signal potential reversals or continuations."
                         />
                         <GlossaryRow
+                            anchorId="glossary-confluence"
                             term="Confluence"
+                            techAnchor="confidence"
                             plain="When multiple independent signals point the same direction. A bullish candlestick on top of strong RSI on top of insider accumulation = high-confluence BUY setup."
                         />
                         <GlossaryRow
+                            anchorId="glossary-random-forest"
                             term="Random Forest (RF)"
+                            techAnchor="random-forest"
                             plain="A statistical classifier we run as a second opinion alongside Claude. RF says BUY/SELL with its own probability — disagreements with the AI calibrate the displayed confidence downward."
                         />
                         <GlossaryRow
+                            anchorId="glossary-intrinsic-value"
                             term="Intrinsic value"
+                            techAnchor="intrinsic-anchor"
                             plain="What a stock is worth based on fundamentals (earnings, book value, return on equity), regardless of today's price. We compute Graham Number for asset-heavy sectors and Residual Income Model for service / intangible-heavy ones."
                         />
                         <GlossaryRow
+                            anchorId="glossary-bandarmology"
                             term="Bandarmology"
+                            techAnchor="bandarmology"
                             plain="Indonesian-market term for tracking insider flow. We surface director / commissioner / major-shareholder buying and selling on every .JK ticker, with 30-day and 90-day persistence windows."
                         />
                         <GlossaryRow
+                            anchorId="glossary-verdict-ring"
                             term="Verdict ring"
+                            techAnchor="confidence"
                             plain="The big colour-coded circle on the analysis page. Green = BUY, amber = HOLD, red = SELL. The percentage inside is the model's confidence in its own call."
                         />
                         <GlossaryRow
+                            anchorId="glossary-confidence-calibration"
                             term="Confidence calibration"
+                            techAnchor="confidence"
                             plain="The displayed confidence is post-processed by two rules: capped at 65 within 7 days of earnings, and reduced when RF disagrees with Claude's direction. Both adjustments are shown transparently."
                         />
                         <GlossaryRow
+                            anchorId="glossary-pattern-scan"
                             term="Pattern Scan"
+                            techAnchor="tech-pipeline-section"
                             plain="A batch sweep of your watchlist that detects 15 candlestick patterns on daily and weekly timeframes. Returns confidence-scored alerts when reversal/continuation patterns fire."
                         />
                     </div>
