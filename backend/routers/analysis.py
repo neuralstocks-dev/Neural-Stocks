@@ -593,6 +593,12 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
             reason=reason,
             elapsed_s=elapsed,
             surface="auth",
+            error_detail=(
+                f"asyncio.TimeoutError after {elapsed:.1f}s "
+                f"(budget={QUICK_PER_TASK_TIMEOUT:.0f}s, reason={reason}). "
+                f"Upstream LLM call did not return — likely Universal-Key "
+                f"proxy / Anthropic socket hang."
+            ),
         )
         await db.analysis_jobs.update_one(
             {"id": job_id},
@@ -628,6 +634,12 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
                 reason=llm_circuit_breaker.REASON_OTHER_EXCEPTION,
                 elapsed_s=_time.monotonic() - started,
                 surface="auth",
+                error_detail=(
+                    f"HTTP {e.status_code} from upstream — "
+                    f"error_code={detail_dict.get('error_code')!r}, "
+                    f"message={user_msg!r}. "
+                    f"Universal-Key proxy reported upstream unavailable."
+                ),
             )
         await db.analysis_jobs.update_one(
             {"id": job_id},
@@ -646,6 +658,7 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
             reason=llm_circuit_breaker.REASON_OTHER_EXCEPTION,
             elapsed_s=_time.monotonic() - started,
             surface="auth",
+            error_detail=llm_circuit_breaker._format_error_detail(e),
         )
         await db.analysis_jobs.update_one(
             {"id": job_id},

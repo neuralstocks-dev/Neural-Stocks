@@ -220,6 +220,114 @@ async def llm_events(
     }
 
 
+@router.get("/llm-events/recoup-summary")
+async def llm_events_recoup_summary(
+    days: int = 30,
+    credit_per_verdict: float = 0.027,
+    _admin=Depends(admin_required),
+):
+    """Compose a "credit-recoup" report for failed LLM jobs over the last
+    `days` window — used by the admin dashboard's recoup tracker and the
+    "Copy escalation summary" button. The output is structured so the
+    frontend can render it as both a table and a ready-to-paste support
+    email body.
+
+    Shape:
+      {
+        "window_days": 30,
+        "total_failures": <int>,
+        "estimated_credits_wasted": <float>,
+        "estimated_usd_wasted": <float>,        # credits / 100 (Universal Key parity)
+        "by_reason": {reason_code: count, ...},
+        "by_ticker": [{ticker, count}, ...],     # top 15
+        "by_surface": {surface_label: count},
+        "first_failure_ts": <iso8601 or None>,
+        "last_failure_ts":  <iso8601 or None>,
+        "sample_events": [ {ts, ticker, reason, elapsed_s, error_detail}, ... ],
+        "credit_per_verdict_assumption": <float>,
+      }
+    """
+    import time as _time
+    from core.db import db
+    days = max(1, min(int(days), 90))
+    since = _time.time() - (days * 86400)
+    pipeline = [
+        {"$match": {"ts": {"$gte": since}}},
+        {
+            "$facet": {
+                "total": [{"$count": "n"}],
+                "by_reason": [
+                    {"$group": {"_id": "$reason", "n": {"$sum": 1}}},
+                    {"$sort": {"n": -1}},
+                ],
+                "by_ticker": [
+                    {"$match": {"ticker": {"$ne": None}}},
+                    {"$group": {"_id": "$ticker", "n": {"$sum": 1}}},
+                    {"$sort": {"n": -1}},
+                    {"$limit": 15},
+                ],
+                "by_surface": [
+                    {"$group": {"_id": "$surface", "n": {"$sum": 1}}},
+                    {"$sort": {"n": -1}},
+                ],
+                "ts_range": [
+                    {"$group": {
+                        "_id": None,
+                        "first": {"$min": "$ts"},
+                        "last": {"$max": "$ts"},
+                    }},
+                ],
+                # 8 most-recent events with the full error_detail intact —
+                # these are the rows the admin will paste into a complaint
+                # to prove the failure surface is upstream.
+                "sample_events": [
+                    {"$sort": {"ts": -1}},
+                    {"$limit": 8},
+                    {"$project": {
+                        "_id": 0,
+                        "ts": 1,
+                        "ticker": 1,
+                        "reason": 1,
+                        "elapsed_s": 1,
+                        "surface": 1,
+                        "error_detail": 1,
+                    }},
+                ],
+            }
+        },
+    ]
+    result = await db.llm_events.aggregate(pipeline).to_list(length=1)
+    facet = result[0] if result else {}
+    total = (facet.get("total") or [{"n": 0}])[0].get("n", 0)
+    by_reason = {row["_id"] or "unknown": row["n"] for row in facet.get("by_reason", [])}
+    by_ticker = [{"ticker": row["_id"], "count": row["n"]} for row in facet.get("by_ticker", [])]
+    by_surface = {row["_id"] or "unknown": row["n"] for row in facet.get("by_surface", [])}
+    ts_row = (facet.get("ts_range") or [{}])[0] if facet.get("ts_range") else {}
+    first_ts = ts_row.get("first")
+    last_ts = ts_row.get("last")
+
+    def _iso_or_none(epoch):
+        if not epoch:
+            return None
+        from datetime import datetime as _dt, timezone as _tz
+        return _dt.fromtimestamp(epoch, tz=_tz.utc).isoformat()
+
+    estimated_credits = round(total * credit_per_verdict, 4)
+    return {
+        "window_days": days,
+        "total_failures": total,
+        "estimated_credits_wasted": estimated_credits,
+        "estimated_usd_wasted": round(estimated_credits / 100, 4),
+        "by_reason": by_reason,
+        "by_ticker": by_ticker,
+        "by_surface": by_surface,
+        "first_failure_ts": _iso_or_none(first_ts),
+        "last_failure_ts": _iso_or_none(last_ts),
+        "sample_events": facet.get("sample_events", []),
+        "credit_per_verdict_assumption": credit_per_verdict,
+    }
+
+
 @router.post("/users/{user_id}/unlock")
 async def unlock_user(user_id: str, req: UnlockReq, admin=Depends(admin_required)):
     seconds = UNLOCK_DURATIONS.get(req.duration)

@@ -322,12 +322,22 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
     except asyncio.TimeoutError:
         elapsed = time.monotonic() - started
         reason = llm_circuit_breaker.classify_timeout_reason(elapsed, anon_timeout)
+        # asyncio.TimeoutError carries no useful message of its own — but
+        # we still want to capture the elapsed-vs-budget signal so the
+        # admin recoup tracker can prove this was an upstream socket hang
+        # (elapsed ≈ budget) vs an early cancel (elapsed << budget).
         llm_circuit_breaker.record_outcome(
             "timeout",
             ticker=ticker_up,
             reason=reason,
             elapsed_s=elapsed,
             surface="anon",
+            error_detail=(
+                f"asyncio.TimeoutError after {elapsed:.1f}s "
+                f"(budget={anon_timeout:.0f}s, reason={reason}). "
+                f"Upstream LLM call did not return — likely Universal-Key "
+                f"proxy / Anthropic socket hang."
+            ),
         )
         _log.warning("Anon job timed out after %.0fs (reason=%s) for %s (job %s)", elapsed, reason, ticker_up, job_id)
         await db.anon_try_jobs.update_one(
@@ -345,6 +355,7 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
             reason=llm_circuit_breaker.REASON_OTHER_EXCEPTION,
             elapsed_s=time.monotonic() - started,
             surface="anon",
+            error_detail=llm_circuit_breaker._format_error_detail(e),
         )
         _log.exception("Anon job failed for %s (job %s)", ticker_up, job_id)
         await db.anon_try_jobs.update_one(

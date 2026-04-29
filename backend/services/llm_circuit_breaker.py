@@ -141,6 +141,29 @@ async def _persist_event(event: dict) -> None:
         _log.debug("llm_events persist skipped: %s", e)
 
 
+def _format_error_detail(exc: BaseException, *, with_traceback: bool = True) -> str:
+    """Compose a diagnostic string for `record_outcome(error_detail=...)`.
+
+    The goal is to capture enough upstream signal to prove (when escalating
+    socket-hang complaints to support@emergent.sh) that the failure is
+    upstream of the application — typically: the HTTP status code from
+    Anthropic / liteLLM, the exception class, the first line of the error
+    message, and the first few traceback frames showing the call stops at
+    a network-IO boundary. We deliberately cap at 1500 chars at insert
+    time so giant pydantic validators don't bloat the collection.
+    """
+    parts = [f"{type(exc).__module__}.{type(exc).__name__}: {exc}"]
+    if with_traceback:
+        import traceback as _tb
+        # Last 6 frames are where the actual failure happened — earlier
+        # frames are mostly the FastAPI / asyncio task plumbing.
+        tb_lines = _tb.format_tb(exc.__traceback__)[-6:]
+        if tb_lines:
+            parts.append("--- traceback (tail) ---")
+            parts.extend(line.strip("\n") for line in tb_lines)
+    return "\n".join(parts)
+
+
 def record_outcome(
     outcome: Literal["success", "timeout"],
     *,
@@ -148,6 +171,7 @@ def record_outcome(
     reason: Optional[str] = None,
     elapsed_s: Optional[float] = None,
     surface: Optional[str] = None,
+    error_detail: Optional[str] = None,
 ) -> None:
     """Call this from every analysis job completion path (anon + auth).
 
@@ -165,6 +189,12 @@ def record_outcome(
     `elapsed_s`: wall-clock seconds the job actually ran. Useful for
               distinguishing fast-cancel-on-retry-exhaust vs full-budget
               socket hang in the admin UI.
+    `error_detail`: free-form diagnostic string from the actual exception
+              (truncated to 1500 chars). Surfaces upstream HTTP codes,
+              litellm error tags, and the first few traceback frames so
+              the admin can prove socket hangs are upstream — not the
+              app's code — when escalating credit-recoup requests to
+              support@emergent.sh. Persisted only on timeout outcomes.
     """
     global _consec_fail, _consec_ok, _tripped_at
     ts = time.time()
@@ -199,6 +229,13 @@ def record_outcome(
             "surface": surface,
             "consec_fail_at_event": _consec_fail,
             "tripped_breaker": _tripped_at is not None,
+            # Truncate to 1500 chars so the document stays small even on
+            # giant tracebacks — it's still plenty to identify the
+            # upstream HTTP code, litellm error class, and the first few
+            # frames where the failure originated. None when caller
+            # didn't have an exception object handy (e.g. asyncio.TimeoutError
+            # which has no message of its own).
+            "error_detail": (error_detail or "")[:1500] or None,
         }
         try:
             loop = asyncio.get_running_loop()

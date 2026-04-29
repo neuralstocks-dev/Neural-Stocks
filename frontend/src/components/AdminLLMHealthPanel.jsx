@@ -28,8 +28,16 @@ const SURFACE_LABEL = { anon: "guest", auth: "auth", quick: "quick-batch" };
 export default function AdminLLMHealthPanel() {
     const [status, setStatus] = useState(null);
     const [events, setEvents] = useState(null);
+    const [recoup, setRecoup] = useState(null);
     const [err, setErr] = useState("");
     const [busy, setBusy] = useState(false);
+    // Track which row in the "Last 10 failures" table has its detail
+    // panel expanded (only one at a time to avoid the table jumping
+    // around when you open multiple). null = none expanded.
+    const [expandedRow, setExpandedRow] = useState(null);
+    // Visual feedback for the "Copy escalation summary" button — flips to
+    // "Copied ✓" for 2s after a successful clipboard write.
+    const [copyState, setCopyState] = useState("idle");
     // Track whether a manual refresh is in flight so the button can show
     // a spinning icon and disable itself for the duration. Without this,
     // tapping Refresh feels unresponsive — the inline icon doesn't change
@@ -40,12 +48,14 @@ export default function AdminLLMHealthPanel() {
     const refresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            const [s, e] = await Promise.all([
+            const [s, e, r] = await Promise.all([
                 api.get("/admin/llm-breaker"),
                 api.get("/admin/llm-events?limit=10&hours=24"),
+                api.get("/admin/llm-events/recoup-summary?days=30"),
             ]);
             setStatus(s.data);
             setEvents(e.data);
+            setRecoup(r.data);
             setErr("");
         } catch (ex) {
             setErr(ex?.response?.data?.detail || "Failed to load LLM health");
@@ -191,7 +201,7 @@ export default function AdminLLMHealthPanel() {
                         })}
                     </div>
 
-                    {events.events.length > 0 && (
+            {events.events.length > 0 && (
                         <details className="mt-3" data-testid="admin-llm-health-details">
                             <summary
                                 className="cursor-pointer text-xs"
@@ -207,6 +217,7 @@ export default function AdminLLMHealthPanel() {
                                         <th className="text-left py-1" style={{ fontSize: "10px" }}>Surface</th>
                                         <th className="text-right py-1" style={{ fontSize: "10px" }}>Elapsed</th>
                                         <th className="text-right py-1" style={{ fontSize: "10px" }}>When</th>
+                                        <th className="text-right py-1" style={{ fontSize: "10px" }}>Detail</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -214,14 +225,63 @@ export default function AdminLLMHealthPanel() {
                                         const s = REASON_STYLE[ev.reason] || REASON_STYLE.unknown;
                                         const whenSec = Math.round((Date.now() / 1000) - ev.ts);
                                         const whenLabel = whenSec < 60 ? `${whenSec}s ago` : whenSec < 3600 ? `${Math.round(whenSec / 60)}m ago` : `${Math.round(whenSec / 3600)}h ago`;
+                                        const hasDetail = !!ev.error_detail;
                                         return (
-                                            <tr key={i} style={{ borderTop: "1px solid hsl(var(--border-divider))" }}>
+                                            <React.Fragment key={i}>
+                                            <tr style={{ borderTop: "1px solid hsl(var(--border-divider))" }}>
                                                 <td className="py-1" style={{ color: "hsl(var(--text-primary))" }}>{ev.ticker || "—"}</td>
                                                 <td className="py-1" style={{ color: s.color }}>{s.label}</td>
                                                 <td className="py-1" style={{ color: "hsl(var(--text-secondary))" }}>{SURFACE_LABEL[ev.surface] || ev.surface || "—"}</td>
                                                 <td className="py-1 text-right" style={{ color: "hsl(var(--text-secondary))" }}>{typeof ev.elapsed_s === "number" ? `${ev.elapsed_s.toFixed(1)}s` : "—"}</td>
                                                 <td className="py-1 text-right" style={{ color: "hsl(var(--text-muted))" }}>{whenLabel}</td>
+                                                <td className="py-1 text-right">
+                                                    {hasDetail ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setExpandedRow((cur) => (cur === i ? null : i))
+                                                            }
+                                                            className="text-[10px] underline"
+                                                            style={{
+                                                                color: "hsl(var(--text-secondary))",
+                                                                cursor: "pointer",
+                                                            }}
+                                                            data-testid={`admin-llm-event-detail-toggle-${i}`}
+                                                            aria-expanded={expandedRow === i}
+                                                        >
+                                                            {expandedRow === i ? "hide" : "show"}
+                                                        </button>
+                                                    ) : (
+                                                        <span style={{ color: "hsl(var(--text-muted))", fontSize: "10px" }}>—</span>
+                                                    )}
+                                                </td>
                                             </tr>
+                                            {hasDetail && expandedRow === i && (
+                                                <tr>
+                                                    <td colSpan={6} style={{ padding: 0 }}>
+                                                        <pre
+                                                            data-testid={`admin-llm-event-detail-${i}`}
+                                                            style={{
+                                                                background: "hsl(var(--surface-elevated))",
+                                                                border: "1px solid hsl(var(--border-divider))",
+                                                                color: "hsl(var(--text-secondary))",
+                                                                fontSize: "10.5px",
+                                                                lineHeight: 1.45,
+                                                                padding: "10px 12px",
+                                                                margin: "4px 0 6px 0",
+                                                                whiteSpace: "pre-wrap",
+                                                                wordBreak: "break-word",
+                                                                maxHeight: 220,
+                                                                overflow: "auto",
+                                                                borderRadius: 2,
+                                                            }}
+                                                        >
+                                                            {ev.error_detail}
+                                                        </pre>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            </React.Fragment>
                                         );
                                     })}
                                 </tbody>
@@ -235,6 +295,30 @@ export default function AdminLLMHealthPanel() {
                 </p>
             )}
 
+            {/* Credit-recoup tracker · last 30 days. Quantifies the cost of
+                upstream Universal-Key socket hangs and offers a one-tap
+                "Copy escalation summary" that drops a ready-to-paste support
+                email body into the clipboard. The whole point: turn every
+                future complaint to support@emergent.sh from a screenshot
+                hunt into a 30-second task with verifiable per-failure detail. */}
+            {recoup && recoup.total_failures > 0 && (
+                <RecoupTracker
+                    recoup={recoup}
+                    onCopy={async () => {
+                        try {
+                            const body = buildEscalationEmail(recoup);
+                            await navigator.clipboard.writeText(body);
+                            setCopyState("copied");
+                            setTimeout(() => setCopyState("idle"), 2000);
+                        } catch {
+                            setCopyState("error");
+                            setTimeout(() => setCopyState("idle"), 2500);
+                        }
+                    }}
+                    copyState={copyState}
+                />
+            )}
+
             {err && (
                 <p className="mt-2 text-xs" style={{ color: "hsl(var(--sell))" }}>
                     {err}
@@ -243,3 +327,207 @@ export default function AdminLLMHealthPanel() {
         </div>
     );
 }
+
+// ---------- Recoup tracker sub-component & email builder ----------
+
+/**
+ * Renders the 30-day credit-recoup summary inside the LLM Health panel.
+ * Pure-presentational — receives the API payload + a copy callback from
+ * the parent so clipboard logic stays in one place.
+ */
+function RecoupTracker({ recoup, onCopy, copyState }) {
+    const reasons = Object.entries(recoup.by_reason || {}).sort((a, b) => b[1] - a[1]);
+    const tickers = recoup.by_ticker || [];
+    return (
+        <div
+            className="mt-5 p-4"
+            data-testid="admin-llm-health-recoup"
+            style={{
+                border: "1px solid hsl(var(--sell))",
+                borderLeftWidth: 4,
+                background: "hsla(0,55%,55%,0.04)",
+                borderRadius: 2,
+            }}
+        >
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-overline" style={{ color: "hsl(var(--sell))", fontSize: "10px" }}>
+                    Credit-recoup tracker · last {recoup.window_days}d
+                </p>
+                <button
+                    type="button"
+                    onClick={onCopy}
+                    disabled={copyState === "copied"}
+                    className="text-xs inline-flex items-center gap-1.5 px-3 py-1 rounded transition-colors"
+                    style={{
+                        cursor: copyState === "copied" ? "default" : "pointer",
+                        border: "1px solid hsl(var(--sell))",
+                        color:
+                            copyState === "copied"
+                                ? "hsl(var(--buy))"
+                                : copyState === "error"
+                                ? "hsl(var(--gold))"
+                                : "hsl(var(--sell))",
+                        position: "relative",
+                        zIndex: 1,
+                    }}
+                    data-testid="admin-llm-health-copy-escalation"
+                    aria-label="Copy escalation summary"
+                >
+                    {copyState === "copied" ? "✓ Copied — paste into email" :
+                     copyState === "error"  ? "Copy failed (clipboard blocked)" :
+                                              "Copy escalation summary"}
+                </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Metric
+                    label="Failures"
+                    value={recoup.total_failures}
+                    valueColor="hsl(var(--sell))"
+                />
+                <Metric
+                    label="Est. credits wasted"
+                    value={`${recoup.estimated_credits_wasted.toFixed(3)} cr`}
+                    valueColor="hsl(var(--sell))"
+                />
+                <Metric
+                    label="≈ USD"
+                    value={`$${recoup.estimated_usd_wasted.toFixed(4)}`}
+                    valueColor="hsl(var(--text-muted))"
+                />
+                <Metric
+                    label="Per-verdict cost"
+                    value={`${recoup.credit_per_verdict_assumption.toFixed(3)} cr`}
+                    valueColor="hsl(var(--text-muted))"
+                />
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p className="font-mono uppercase tracking-wider mb-1.5" style={{ fontSize: "9px", color: "hsl(var(--text-muted))" }}>
+                        By reason
+                    </p>
+                    <ul className="space-y-1">
+                        {reasons.map(([reason, count]) => {
+                            const s = REASON_STYLE[reason] || REASON_STYLE.unknown;
+                            return (
+                                <li key={reason} className="flex items-center justify-between gap-3">
+                                    <span className="text-xs" style={{ color: s.color }}>{s.label}</span>
+                                    <span className="font-mono text-xs" style={{ color: "hsl(var(--text-secondary))" }}>{count}</span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+                <div>
+                    <p className="font-mono uppercase tracking-wider mb-1.5" style={{ fontSize: "9px", color: "hsl(var(--text-muted))" }}>
+                        By ticker (top {Math.min(tickers.length, 8)})
+                    </p>
+                    <ul className="space-y-1">
+                        {tickers.slice(0, 8).map((row) => (
+                            <li key={row.ticker} className="flex items-center justify-between gap-3">
+                                <span className="font-mono text-xs" style={{ color: "hsl(var(--text-primary))" }}>{row.ticker}</span>
+                                <span className="font-mono text-xs" style={{ color: "hsl(var(--text-secondary))" }}>{row.count}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+
+            <p className="mt-4 text-[10.5px] leading-relaxed" style={{ color: "hsl(var(--text-muted))" }}>
+                Click <strong>Copy escalation summary</strong> → paste straight into an email to{" "}
+                <code style={{ color: "hsl(var(--text-secondary))" }}>support@emergent.sh</code>. Body contains:
+                aggregate counts · per-reason breakdown · per-ticker breakdown · last 8 raw failure rows
+                with full error_detail (proof the failures are upstream of your application code).
+            </p>
+        </div>
+    );
+}
+
+function Metric({ label, value, valueColor }) {
+    return (
+        <div>
+            <p className="font-mono uppercase tracking-wider" style={{ fontSize: "9px", color: "hsl(var(--text-muted))" }}>
+                {label}
+            </p>
+            <p className="font-mono mt-0.5" style={{ fontSize: "16px", color: valueColor }}>
+                {value}
+            </p>
+        </div>
+    );
+}
+
+/**
+ * Compose a ready-to-paste support email body summarising the recoup
+ * data. Keep formatting plain-text + markdown-light so it reads well
+ * inside Gmail/Outlook even without rendering.
+ *
+ * NOTE: this is a *template* — the user will still need to add their
+ * Job ID (one-tap from the Emergent chat ℹ️ button) and edit any
+ * personalised context before sending. We put a clear "FILL IN" marker
+ * at the top so they can't miss it.
+ */
+export function buildEscalationEmail(r) {
+    const lines = [];
+    lines.push("Subject: Credit recoup — Universal Key socket hangs (Neural Stock Intelligence™)");
+    lines.push("");
+    lines.push("Hi Emergent Support,");
+    lines.push("");
+    lines.push("My Universal LLM Key (Claude Sonnet 4.5) has been intermittently socket-hanging");
+    lines.push("at the upstream proxy layer. My application correctly applies a 240s timeout +");
+    lines.push("tenacity retries; the failures classify as `llm_socket_hang` with elapsed_s ≈ budget,");
+    lines.push("indicating the issue is upstream of my code (Universal-Key proxy / Anthropic).");
+    lines.push("");
+    lines.push("[FILL IN]");
+    lines.push("- My Emergent Job ID: <click ℹ️ in chat top-right and paste it here>");
+    lines.push("- App URL: <your *.preview.emergentagent.com or production URL>");
+    lines.push("");
+    lines.push(`=== Failure summary · last ${r.window_days} days ===`);
+    lines.push(`Total failures:                ${r.total_failures}`);
+    lines.push(`Estimated credits wasted:      ${r.estimated_credits_wasted.toFixed(3)} cr (≈ $${r.estimated_usd_wasted.toFixed(4)})`);
+    lines.push(`Per-verdict cost assumption:   ${r.credit_per_verdict_assumption} cr`);
+    if (r.first_failure_ts) lines.push(`First failure (UTC):           ${r.first_failure_ts}`);
+    if (r.last_failure_ts)  lines.push(`Last failure (UTC):            ${r.last_failure_ts}`);
+    lines.push("");
+    lines.push("=== By reason ===");
+    Object.entries(r.by_reason || {}).forEach(([reason, count]) => {
+        lines.push(`  ${reason.padEnd(28)} ${count}`);
+    });
+    lines.push("");
+    lines.push("=== By ticker (top 15) ===");
+    (r.by_ticker || []).forEach((row) => {
+        lines.push(`  ${(row.ticker || "—").padEnd(12)} ${row.count}`);
+    });
+    lines.push("");
+    lines.push("=== By surface ===");
+    Object.entries(r.by_surface || {}).forEach(([surface, count]) => {
+        lines.push(`  ${surface.padEnd(12)} ${count}`);
+    });
+    lines.push("");
+    lines.push("=== Sample raw failure events (last 8) — proof these are upstream ===");
+    (r.sample_events || []).forEach((ev, i) => {
+        const tsIso = ev.ts ? new Date(ev.ts * 1000).toISOString() : "—";
+        lines.push(`--- Event ${i + 1} ---`);
+        lines.push(`  ts (UTC):     ${tsIso}`);
+        lines.push(`  ticker:       ${ev.ticker || "—"}`);
+        lines.push(`  reason:       ${ev.reason || "—"}`);
+        lines.push(`  surface:      ${ev.surface || "—"}`);
+        lines.push(`  elapsed_s:    ${typeof ev.elapsed_s === "number" ? ev.elapsed_s.toFixed(2) : "—"}`);
+        if (ev.error_detail) {
+            lines.push(`  error_detail:`);
+            ev.error_detail.split("\n").forEach((dl) => lines.push(`    ${dl}`));
+        }
+        lines.push("");
+    });
+    lines.push("Could you please:");
+    lines.push("  1) Investigate the Universal-Key proxy / Anthropic upstream reliability for these timestamps");
+    lines.push("  2) Confirm whether these failed completions were billable, and");
+    lines.push("  3) Recoup the wasted credits if they were.");
+    lines.push("");
+    lines.push("Happy to provide the full LLM-events log dump if helpful.");
+    lines.push("");
+    lines.push("Thanks,");
+    lines.push("");
+    return lines.join("\n");
+}
+
