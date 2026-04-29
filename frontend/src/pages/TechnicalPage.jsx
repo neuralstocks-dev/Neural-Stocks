@@ -25,6 +25,7 @@ import {
     X,
     Braces,
     Trees,
+    Target,
 } from "lucide-react";
 
 import PipelineFlowDiagram from "@/components/PipelineFlowDiagram";
@@ -1235,6 +1236,91 @@ histogram  = MACD_line − signal`}
                     <p className="mt-5 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>
                         The same list appears as a companion card directly on every IDX analysis page, so you don't
                         have to remember which tool does what when you're reading a verdict.
+                    </p>
+                </div>
+
+                {/* Best-fit IDX use cases — closes the loop on "what is this app
+                    actually FOR?" The previous Intraday-tip section directs
+                    intraday traders to third-party tools; this callout explains
+                    where Neural's T+5 insider data + daily-candle stack genuinely
+                    out-performs those intraday tools. Tonally green/buy-coloured
+                    to mirror the red Honest Limits below — "use it for these,
+                    not for those". */}
+                <div
+                    id="idx-best-fit"
+                    className="mt-8 module p-6 md:p-10 scroll-mt-24"
+                    data-testid="tech-idx-best-fit"
+                    style={{
+                        background: "hsla(150,55%,40%,0.04)",
+                        borderLeft: "3px solid hsl(var(--buy))",
+                    }}
+                >
+                    <p className="text-overline" style={{ color: "hsl(var(--buy))" }}>
+                        <Target size={11} strokeWidth={1.5} className="inline mr-1" />
+                        Best fit for Neural — IDX
+                    </p>
+                    <h3 className="font-serif mt-2" style={{ fontSize: "1.6rem", letterSpacing: "-0.01em" }}>
+                        Where Neural beats an intraday broker-flow tool.
+                    </h3>
+                    <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
+                        We just told you Neural Stock Intelligence™ is a swing/position tool, not an intraday
+                        platform — so when <em>should</em> an IDX trader pull up a Neural verdict?
+                        Three concrete scenarios where our T+5 insider data + daily-candle technicals + Graham/RIM
+                        anchor genuinely out-performs the live broker-flow terminals listed above:
+                    </p>
+
+                    <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-0" style={{ border: "1px solid hsl(var(--border-default))" }}>
+                        {[
+                            {
+                                num: "01",
+                                title: "Multi-week conviction setups",
+                                desc: "You've found a name on Stockbit's flow scanner and want to know whether the technical, fundamental, and insider story all line up before you commit to a 2–8 week position. Neural answers \"is this fundamentally and technically a good name to own?\" in 45 seconds — exactly the question intraday tape doesn't answer.",
+                                signal: "RSI/MACD + Graham anchor + 30d/90d persistence aligned",
+                            },
+                            {
+                                num: "02",
+                                title: "Watchlist triage at scale",
+                                desc: "You track 30+ IDX names across LQ45, IDX30, sector watchlists. Auto-Scan + RF scoring tells you which 2–3 currently warrant a deep-dive read TODAY without you having to open Stockbit on each one. Pattern-Scan flags double-bottoms and engulfing patterns the RF model has front-tested for hit-rate.",
+                                signal: "RF score ≥ 0.6 + bullish pattern detected + IDX top-picks rank",
+                            },
+                            {
+                                num: "03",
+                                title: "Earnings & event prep",
+                                desc: "1–2 days before an earnings release or major macro event, Neural reads the analyst consensus + bandarmology persistence + insider impact tier and surfaces the risks worth sizing for. Day-traders don't care about earnings windows; swing-position holders do — this is exactly where Neural's daily-cadence stack earns its keep.",
+                                signal: "Earnings date < 7d + bandarmology shift + analyst consensus delta",
+                            },
+                        ].map((s, i, arr) => (
+                            <div
+                                key={s.num}
+                                className="p-4 md:p-5"
+                                data-testid={`tech-best-fit-card-${s.num}`}
+                                style={{
+                                    borderRight: i < arr.length - 1 ? "1px solid hsl(var(--border-default))" : undefined,
+                                    borderBottom: i < arr.length - 1 ? "1px solid hsl(var(--border-divider))" : undefined,
+                                }}
+                            >
+                                <p className="text-overline" style={{ fontSize: "0.62rem", color: "hsl(var(--buy))" }}>
+                                    {s.num}
+                                </p>
+                                <p className="font-serif text-base mt-1.5" style={{ letterSpacing: "-0.01em" }}>
+                                    {s.title}
+                                </p>
+                                <p className="mt-2.5 text-[13px] leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                    {s.desc}
+                                </p>
+                                <p className="mt-3 font-mono text-[10px]" style={{ color: "hsl(var(--text-muted))" }}>
+                                    Signal stack — {s.signal}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+
+                    <p className="mt-5 text-[12px] leading-relaxed" style={{ color: "hsl(var(--text-muted))" }}>
+                        <strong style={{ color: "hsl(var(--text-secondary))" }}>Rule of thumb:</strong>{" "}
+                        if your decision horizon is hours or you need to react to today's tape, use a
+                        broker-flow tool. If your decision horizon is weeks-to-months and you want a
+                        defensible "why" before you size a position, use Neural — and pair it with
+                        broker-flow at entry confirmation.
                     </p>
                 </div>
 
