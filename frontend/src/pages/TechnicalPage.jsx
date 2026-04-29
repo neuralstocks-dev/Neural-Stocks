@@ -1416,37 +1416,73 @@ histogram  = MACD_line − signal`}
                 >
                     <ul className="space-y-4 text-sm leading-relaxed">
                         <LimitLi>
-                            <strong>Not a price predictor.</strong> The LLM reasons about direction bias, not specific future prices.
-                            The price_target is an anchor based on technical levels (support / resistance / SMA
-                            confluence), not a forecast.
+                            <strong>Not a price predictor.</strong> The LLM reasons about <em>direction bias</em>,
+                            not specific future prices. The displayed price target is a technical-confluence anchor
+                            (support / resistance / SMA / Graham Number / Residual Income Model), not a forecast.
+                            We additionally surface <em>Bullish / Bearish / Neutral alternative scenarios</em> on every
+                            verdict so you can pressure-test the thesis from multiple angles instead of treating any
+                            single number as the call.
                         </LimitLi>
                         <LimitLi>
-                            <strong>Sentiment is heuristic.</strong> The keyword classifier catches obvious
-                            bullish / bearish language but misses sarcasm, negation ("not bad"), and nuanced
-                            forward guidance. The "Why this sentiment?" tooltip shows every trigger word so you
-                            can judge reliability per article.
+                            <strong>Sentiment is heuristic, not LLM.</strong> News sentiment uses a transparent keyword
+                            classifier (English + Bahasa Indonesia lists) — it catches obvious bullish / bearish language
+                            but misses sarcasm, negation ("not bad"), and nuanced forward guidance. The "Why this
+                            sentiment?" tooltip surfaces every trigger word so you can judge reliability per article.
+                            For IDX tickers, <em>Bandarmology</em> insider flow acts as an independent counterweight signal
+                            in case the news cycle is misleading.
                         </LimitLi>
                         <LimitLi>
-                            <strong>IDX has no analyst or earnings data.</strong> Finnhub's free tier doesn't
-                            cover Indonesia, so the US analyst-consensus and earnings-calendar panels hide
-                            gracefully on .JK verdicts. In exchange, IDX tickers get two things US tickers
-                            don't: live <em>Bandarmology</em> insider-flow signals and a <em>Top IDX Picks</em>
-                            scanner — both sourced from the RapidAPI IDX provider with yfinance fundamentals
-                            + local RSS news as the baseline layer.
+                            <strong>IDX has no analyst-consensus or earnings-calendar coverage.</strong> Finnhub's free
+                            tier doesn't extend to Indonesia, so the US-style analyst targets and earnings-date panels
+                            hide gracefully on <code>.JK</code> verdicts. In exchange, IDX gets a richer signal stack
+                            US tickers don't: live <em>Bandarmology</em> insider flow with our Phase-1 derived signals
+                            (volume gate, 30d/90d persistence, normalised impact tier), a <em>Top IDX Picks</em>
+                            multi-factor scanner, RapidAPI key-stats fundamentals (P/E · P/B · ROE · EPS) in IDR, and
+                            local CNBC + Detik Finance RSS for news. Coverage is bound by the RapidAPI IDX free-tier quota
+                            (1,000 req/month, 950 soft cap) — heavy use can hit the cap and force fallbacks.
                         </LimitLi>
                         <LimitLi>
-                            <strong>No intraday.</strong> Daily candles only. This is a swing / position tool,
-                            not day trading. Verdicts don't re-run automatically — you click Re-analyze to refresh.
+                            <strong>Bandarmology has a reporting lag.</strong> IDX/KSEI insider filings typically arrive
+                            T+5 to T+30 trading days after the actual transaction, so very recent intraday flow won't
+                            yet be reflected. Our 30d / 90d persistence windows + the volume-gate softening are designed
+                            to make this lag visible and discounted in the regime label, not hidden.
                         </LimitLi>
                         <LimitLi>
-                            <strong>Claude is not infallible.</strong> LLM reasoning can still miss context, especially
-                            around sector-specific regulatory events or macro shifts that happen faster than news feeds
-                            catch up. Always use Neural Stock Intelligence™ alongside your own judgment, not instead of it.
+                            <strong>No intraday.</strong> Daily candles only. This is a swing / position tool, not
+                            day trading. Verdicts don't re-run automatically — you click Re-analyze to refresh, and
+                            Pattern Scan / Top IDX Picks / Auto-Scan run on daily cadence.
                         </LimitLi>
                         <LimitLi>
-                            <strong>Not financial advice.</strong> The platform is educational and informational.
-                            Trade at your own risk, size positions responsibly, never deploy capital you can't
-                            afford to lose.
+                            <strong>Equities only — no options, futures, forex, or crypto.</strong> Today the pipeline
+                            is single-asset-class by design (US + IDX equities). Multi-asset support via Polygon.io
+                            is on the long-term roadmap but not an active build — if you trade derivatives or crypto,
+                            this isn't the right tool for those positions yet.
+                        </LimitLi>
+                        <LimitLi>
+                            <strong>Per-ticker analysis — no portfolio-level risk modelling.</strong> Every verdict
+                            scores a single name in isolation. We don't currently model correlation between holdings,
+                            sector concentration, or aggregate VaR across your watchlist. Position sizing and
+                            portfolio-level risk are <em>your</em> calls — Neural Stock Intelligence™ surfaces the
+                            per-ticker thesis that informs them.
+                        </LimitLi>
+                        <LimitLi>
+                            <strong>Claude is not infallible — but it has guardrails.</strong> LLM reasoning can still
+                            miss context, especially around sector-specific regulatory events or macro shifts that move
+                            faster than news feeds. We mitigate via three disciplined layers: (1) the <em>Earnings-Proximity
+                            Gate</em> caps confidence at 65 within 7 days of earnings; (2) the <em>Random-Forest disagreement
+                            penalty</em> reduces displayed confidence when our independent statistical model disagrees with
+                            Claude's direction; (3) an <em>LLM circuit breaker</em> fast-fails new analyses when the
+                            upstream is degraded so you don't burn your turn on a doomed call. Use Neural alongside your
+                            own judgment, not instead of it.
+                        </LimitLi>
+                        <LimitLi>
+                            <strong>Educational research output — not financial advice.</strong> Every artifact this
+                            platform produces (verdict pages, PDF reports, Trade Slips, Telegram alerts, Email digests)
+                            is research output for your own decision-making, not a recommendation to transact.
+                            Confidence and model-probability values describe the strength of the model's classification
+                            given the inputs — they are not forecasts of price movement and not personalised financial
+                            advice. Trade at your own risk, size responsibly, and never deploy capital you can't afford
+                            to lose.
                         </LimitLi>
                     </ul>
                 </div>
