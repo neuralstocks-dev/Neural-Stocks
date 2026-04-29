@@ -20,6 +20,7 @@ import {
     Smartphone,
     CalendarRange,
     Award,
+    History,
 } from "lucide-react";
 import SocialLinks from "@/components/SocialLinks";
 
@@ -63,6 +64,13 @@ const MODULES = [
         body: "Track up to 25 tickers (5 on Free, 25 on Pro, unlimited on Elite), run one-click Analyze or full Pattern Scan across the list, and get push notifications the moment a high-conviction BUY/SELL verdict or candlestick reversal triggers — delivered straight to our Telegram bot (@neulab_bot). No phone number, no SMS fees.",
     },
     {
+        icon: History,
+        title: "Backtesting Lab",
+        status: "available",
+        link: "/backtest",
+        body: "Replay any verdict against the last 12 months of price action — cumulative P&L, hit-rate, average hold-time, drawdown, and an IDX-only \"signal-quality\" panel that scores how often our bandarmology persistence + verdict alignment actually outperforms the baseline. Compare RF-Top-N vs. naive buy-and-hold side-by-side, on real fills with realistic slippage assumptions.",
+    },
+    {
         icon: Bot,
         title: "Autonomous AI Trading",
         status: "coming",
@@ -76,9 +84,9 @@ const MODULES = [
     },
     {
         icon: CalendarRange,
-        title: "SMS · CSV · Backtesting",
+        title: "SMS alerts · Watchlist CSV",
         status: "coming",
-        body: "Three power-user workflows in one drop — SMS alerts for regions where Telegram isn't practical, CSV import/export so you can move your entire watchlist in a single click, and a Backtesting lab that replays any verdict against the last 12 months of price action.",
+        body: "Two power-user workflows queued for the next drop — SMS alerts for regions where Telegram isn't practical, and CSV import/export so you can move your entire watchlist in a single click.",
     },
 ];
 
