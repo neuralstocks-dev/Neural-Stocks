@@ -119,6 +119,7 @@ export default function TechnicalPage() {
 
     return (
         <>
+            <TechTOC isAdmin={isAdmin} />
             <div className="max-w-[1200px] mx-auto px-5 md:px-8 pt-10 pb-20" data-testid="technical-page">
                 {/* Hero */}
                 <section>
@@ -239,6 +240,7 @@ export default function TechnicalPage() {
 
                 {/* The pipeline */}
                 <SectionHeader
+                    id="tech-pipeline-section"
                     icon={GitBranch}
                     overline="Pipeline"
                     title="The eight-stage analysis pipeline."
@@ -1349,6 +1351,7 @@ histogram  = MACD_line − signal`}
 
                 {/* Data sources */}
                 <SectionHeader
+                    id="data-sources"
                     icon={Database}
                     overline="Data sources"
                     title="Where every number comes from."
@@ -1541,6 +1544,7 @@ histogram  = MACD_line − signal`}
                 {isAdmin && (
                 <>
                 <SectionHeader
+                    id="capacity"
                     icon={Gauge}
                     overline="Capacity"
                     title="How Neural Stock Intelligence™ handles load."
@@ -1756,6 +1760,7 @@ histogram  = MACD_line − signal`}
 
                 {/* Stack footer */}
                 <SectionHeader
+                    id="stack"
                     icon={BookOpen}
                     overline="Stack"
                     title="The full technical stack."
@@ -1798,9 +1803,143 @@ Observability    Structured logs to /var/log/supervisor · per-request correlati
 
 /* ---------- Building blocks ---------- */
 
-function SectionHeader({ icon: Icon, overline, title, subtitle }) {
+/**
+ * TechTOC — floating right-rail mini table of contents for the long
+ * `/technical` page. Sticky on the right side at xl+ viewports (≥1280px),
+ * hidden on smaller screens where it would compete with content. Highlights
+ * the section currently in the viewport via IntersectionObserver, with the
+ * same colour-coded language used inline (green for Best-fit, red for
+ * Honest limits) so the reader's mental model stays consistent.
+ *
+ * Anchor targets must be kept in sync with the ids set on each section.
+ */
+function TechTOC({ isAdmin }) {
+    const [activeId, setActiveId] = useState(null);
+
+    // Section list — order = scroll order on the page. `tone` drives the
+    // highlight colour so Best-fit feels positive and Honest limits feels
+    // cautionary even at-a-glance from the rail.
+    const SECTIONS = React.useMemo(() => {
+        const base = [
+            { id: "tech-pipeline-section", label: "Pipeline" },
+            { id: "confidence", label: "Confidence" },
+            { id: "random-forest", label: "Random Forest" },
+            { id: "intrinsic-anchor", label: "Intrinsic anchor" },
+            { id: "bandarmology", label: "Bandarmology — IDX" },
+            { id: "idx-best-fit", label: "Best-fit · IDX", tone: "buy" },
+            { id: "data-sources", label: "Data sources" },
+            { id: "honest-limits", label: "Honest limits", tone: "sell" },
+        ];
+        if (isAdmin) base.push({ id: "capacity", label: "Capacity" });
+        base.push({ id: "stack", label: "Stack" });
+        return base;
+    }, [isAdmin]);
+
+    useEffect(() => {
+        // IntersectionObserver tracks which section's heading is currently
+        // closest to the top-of-viewport reading band. rootMargin pulls the
+        // detection band into the upper-third of the viewport so the active
+        // entry matches what the reader is actually looking at.
+        const observer = new IntersectionObserver(
+            (entries) => {
+                // Pick the first entry near the top — the one that just
+                // crossed into the active band — using its boundingClientRect.
+                const visible = entries
+                    .filter((e) => e.isIntersecting)
+                    .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+                if (visible.length) setActiveId(visible[0].target.id);
+            },
+            // top -10% margin = activate when section is ~10% from top of viewport.
+            // bottom -65% = stop being active once it's past the upper-third.
+            { rootMargin: "-10% 0px -65% 0px", threshold: 0 }
+        );
+        SECTIONS.forEach(({ id }) => {
+            const el = document.getElementById(id);
+            if (el) observer.observe(el);
+        });
+        return () => observer.disconnect();
+    }, [SECTIONS]);
+
+    const handleClick = (e, id) => {
+        e.preventDefault();
+        const el = document.getElementById(id);
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+            // Optimistic highlight so the click feels instant; observer
+            // catches up on next scroll tick anyway.
+            setActiveId(id);
+        }
+    };
+
     return (
-        <div className="mt-16">
+        <nav
+            className="hidden xl:block fixed right-6 top-32 z-30 w-[180px]"
+            aria-label="Technical page sections"
+            data-testid="tech-toc"
+            style={{
+                fontFamily: "'SFMono-Regular', Menlo, monospace",
+            }}
+        >
+            <p
+                className="text-overline mb-3 pb-2"
+                style={{
+                    fontSize: "0.58rem",
+                    color: "hsl(var(--text-muted))",
+                    borderBottom: "1px solid hsl(var(--border-divider))",
+                }}
+            >
+                On this page
+            </p>
+            <ul className="space-y-1.5">
+                {SECTIONS.map(({ id, label, tone }) => {
+                    const isActive = activeId === id;
+                    let activeColor = "hsl(var(--text-primary))";
+                    let activeBorder = "hsl(var(--text-primary))";
+                    if (tone === "buy") {
+                        activeColor = "hsl(var(--buy))";
+                        activeBorder = "hsl(var(--buy))";
+                    } else if (tone === "sell") {
+                        activeColor = "hsl(var(--sell))";
+                        activeBorder = "hsl(var(--sell))";
+                    }
+                    return (
+                        <li key={id}>
+                            <a
+                                href={`#${id}`}
+                                onClick={(e) => handleClick(e, id)}
+                                data-testid={`tech-toc-${id}`}
+                                aria-current={isActive ? "location" : undefined}
+                                className="block transition-colors"
+                                style={{
+                                    fontSize: "0.7rem",
+                                    letterSpacing: "0.02em",
+                                    color: isActive ? activeColor : "hsl(var(--text-muted))",
+                                    paddingLeft: "10px",
+                                    borderLeft: `2px solid ${isActive ? activeBorder : "transparent"}`,
+                                    paddingTop: "3px",
+                                    paddingBottom: "3px",
+                                    fontWeight: isActive ? 500 : 400,
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActive) e.currentTarget.style.color = "hsl(var(--text-secondary))";
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActive) e.currentTarget.style.color = "hsl(var(--text-muted))";
+                                }}
+                            >
+                                {label}
+                            </a>
+                        </li>
+                    );
+                })}
+            </ul>
+        </nav>
+    );
+}
+
+function SectionHeader({ id, icon: Icon, overline, title, subtitle }) {
+    return (
+        <div id={id} className="mt-16 scroll-mt-24">
             <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
                 <Icon size={12} className="inline mr-2" strokeWidth={1.5} />
                 {overline}
