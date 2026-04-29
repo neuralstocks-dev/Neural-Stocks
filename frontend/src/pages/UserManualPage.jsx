@@ -12,6 +12,7 @@
  */
 import React from "react";
 import { Link } from "react-router-dom";
+import RightRailTOC from "@/components/RightRailTOC";
 import {
     LineChart,
     Sparkles,
@@ -286,11 +287,33 @@ const TOC = [
 // Flat list of all section ids in scroll order — used by the TOC search & breadcrumb logic.
 const ALL_SECTION_IDS = TOC.flatMap((p) => p.sections.map(([id]) => id));
 
+// Build the right-rail TOC config from the same TOC source-of-truth, so the
+// inline TOC and the floating rail TOC can never drift out of sync. Strips
+// the leading "1.1 · " numbering from rail labels (the numbering is already
+// implicit from the group header) so the rail stays compact.
+const RAIL_SECTIONS = TOC.map((p) => ({
+    group: `Part ${p.part} · ${p.title}`,
+    items: p.sections.map(([id, label]) => ({
+        id,
+        // Strip "1.1 · " or similar number prefix; also decode the few HTML entities
+        // (&amp;) used in the inline TOC labels.
+        label: label
+            .replace(/^\d+\.\d+\s+·\s+/, "")
+            .replace(/&amp;/g, "&"),
+    })),
+}));
+
 // ---------- Page ----------
 
 export default function UserManualPage() {
     return (
         <>
+            <RightRailTOC
+                sections={RAIL_SECTIONS}
+                label="On this page"
+                testid="manual-rail-toc"
+                width={220}
+            />
             <div className="max-w-4xl mx-auto px-4 md:px-8 py-12 md:py-16">
                 {/* Hero */}
                 <header className="mb-10" data-testid="manual-hero">

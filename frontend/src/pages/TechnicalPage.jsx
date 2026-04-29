@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import PipelineFlowDiagram from "@/components/PipelineFlowDiagram";
+import RightRailTOC from "@/components/RightRailTOC";
 
 export default function TechnicalPage() {
     const loc = useLocation();
@@ -1804,22 +1805,13 @@ Observability    Structured logs to /var/log/supervisor · per-request correlati
 /* ---------- Building blocks ---------- */
 
 /**
- * TechTOC — floating right-rail mini table of contents for the long
- * `/technical` page. Sticky on the right side at xl+ viewports (≥1280px),
- * hidden on smaller screens where it would compete with content. Highlights
- * the section currently in the viewport via IntersectionObserver, with the
- * same colour-coded language used inline (green for Best-fit, red for
- * Honest limits) so the reader's mental model stays consistent.
- *
- * Anchor targets must be kept in sync with the ids set on each section.
+ * TechTOC — thin wrapper that delegates to the shared <RightRailTOC />
+ * component. We keep this as a named local wrapper because the section
+ * list depends on `isAdmin` (Capacity is admin-only), and isolating that
+ * here keeps the page render call site clean.
  */
 function TechTOC({ isAdmin }) {
-    const [activeId, setActiveId] = useState(null);
-
-    // Section list — order = scroll order on the page. `tone` drives the
-    // highlight colour so Best-fit feels positive and Honest limits feels
-    // cautionary even at-a-glance from the rail.
-    const SECTIONS = React.useMemo(() => {
+    const sections = React.useMemo(() => {
         const base = [
             { id: "tech-pipeline-section", label: "Pipeline" },
             { id: "confidence", label: "Confidence" },
@@ -1835,105 +1827,12 @@ function TechTOC({ isAdmin }) {
         return base;
     }, [isAdmin]);
 
-    useEffect(() => {
-        // IntersectionObserver tracks which section's heading is currently
-        // closest to the top-of-viewport reading band. rootMargin pulls the
-        // detection band into the upper-third of the viewport so the active
-        // entry matches what the reader is actually looking at.
-        const observer = new IntersectionObserver(
-            (entries) => {
-                // Pick the first entry near the top — the one that just
-                // crossed into the active band — using its boundingClientRect.
-                const visible = entries
-                    .filter((e) => e.isIntersecting)
-                    .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-                if (visible.length) setActiveId(visible[0].target.id);
-            },
-            // top -10% margin = activate when section is ~10% from top of viewport.
-            // bottom -65% = stop being active once it's past the upper-third.
-            { rootMargin: "-10% 0px -65% 0px", threshold: 0 }
-        );
-        SECTIONS.forEach(({ id }) => {
-            const el = document.getElementById(id);
-            if (el) observer.observe(el);
-        });
-        return () => observer.disconnect();
-    }, [SECTIONS]);
-
-    const handleClick = (e, id) => {
-        e.preventDefault();
-        const el = document.getElementById(id);
-        if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "start" });
-            // Optimistic highlight so the click feels instant; observer
-            // catches up on next scroll tick anyway.
-            setActiveId(id);
-        }
-    };
-
     return (
-        <nav
-            className="hidden xl:block fixed right-6 top-32 z-30 w-[180px]"
-            aria-label="Technical page sections"
-            data-testid="tech-toc"
-            style={{
-                fontFamily: "'SFMono-Regular', Menlo, monospace",
-            }}
-        >
-            <p
-                className="text-overline mb-3 pb-2"
-                style={{
-                    fontSize: "0.58rem",
-                    color: "hsl(var(--text-muted))",
-                    borderBottom: "1px solid hsl(var(--border-divider))",
-                }}
-            >
-                On this page
-            </p>
-            <ul className="space-y-1.5">
-                {SECTIONS.map(({ id, label, tone }) => {
-                    const isActive = activeId === id;
-                    let activeColor = "hsl(var(--text-primary))";
-                    let activeBorder = "hsl(var(--text-primary))";
-                    if (tone === "buy") {
-                        activeColor = "hsl(var(--buy))";
-                        activeBorder = "hsl(var(--buy))";
-                    } else if (tone === "sell") {
-                        activeColor = "hsl(var(--sell))";
-                        activeBorder = "hsl(var(--sell))";
-                    }
-                    return (
-                        <li key={id}>
-                            <a
-                                href={`#${id}`}
-                                onClick={(e) => handleClick(e, id)}
-                                data-testid={`tech-toc-${id}`}
-                                aria-current={isActive ? "location" : undefined}
-                                className="block transition-colors"
-                                style={{
-                                    fontSize: "0.7rem",
-                                    letterSpacing: "0.02em",
-                                    color: isActive ? activeColor : "hsl(var(--text-muted))",
-                                    paddingLeft: "10px",
-                                    borderLeft: `2px solid ${isActive ? activeBorder : "transparent"}`,
-                                    paddingTop: "3px",
-                                    paddingBottom: "3px",
-                                    fontWeight: isActive ? 500 : 400,
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isActive) e.currentTarget.style.color = "hsl(var(--text-secondary))";
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isActive) e.currentTarget.style.color = "hsl(var(--text-muted))";
-                                }}
-                            >
-                                {label}
-                            </a>
-                        </li>
-                    );
-                })}
-            </ul>
-        </nav>
+        <RightRailTOC
+            sections={sections}
+            label="On this page"
+            testid="tech-toc"
+        />
     );
 }
 
