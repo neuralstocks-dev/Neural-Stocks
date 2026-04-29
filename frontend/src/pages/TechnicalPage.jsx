@@ -1322,6 +1322,29 @@ histogram  = MACD_line − signal`}
                         defensible "why" before you size a position, use Neural — and pair it with
                         broker-flow at entry confirmation.
                     </p>
+
+                    {/* Reciprocal cross-link to the red-bordered Honest Limits
+                        section below — gives readers the "but here are the
+                        limits we don't hide" perspective so they get the full
+                        what-it's-for / what-it's-not-for picture either way. */}
+                    <p
+                        className="mt-5 text-[12px] inline-block"
+                        style={{
+                            color: "hsl(var(--text-muted))",
+                            borderLeft: "2px solid hsl(var(--sell))",
+                            paddingLeft: "10px",
+                        }}
+                        data-testid="tech-bestfit-limits-link"
+                    >
+                        ↳ See the limits we don't hide —{" "}
+                        <a
+                            href="#honest-limits"
+                            className="link-underline"
+                            style={{ color: "hsl(var(--sell))" }}
+                        >
+                            jump to Honest limits
+                        </a>
+                    </p>
                 </div>
 
                 {/* Data sources */}
@@ -1407,13 +1430,36 @@ histogram  = MACD_line − signal`}
                 />
 
                 <div
-                    className="mt-8 module p-6 md:p-8"
+                    id="honest-limits"
+                    className="mt-8 module p-6 md:p-8 scroll-mt-24"
                     data-testid="tech-limits"
                     style={{
                         background: "hsla(0,55%,55%,0.04)",
                         borderColor: "hsl(var(--sell))",
                     }}
                 >
+                    {/* Reciprocal cross-link to the green-bordered Best-fit
+                        callout above — gives readers the "but here's what Neural
+                        IS good for" perspective without making them scroll back
+                        blindly. Subtle inline pill, not a full callout. */}
+                    <p
+                        className="mb-5 text-[12px] inline-block"
+                        style={{
+                            color: "hsl(var(--text-muted))",
+                            borderLeft: "2px solid hsl(var(--buy))",
+                            paddingLeft: "10px",
+                        }}
+                        data-testid="tech-limits-bestfit-link"
+                    >
+                        ↳ See what Neural <em>can</em> do well —{" "}
+                        <a
+                            href="#idx-best-fit"
+                            className="link-underline"
+                            style={{ color: "hsl(var(--buy))" }}
+                        >
+                            jump to Best-fit scenarios
+                        </a>
+                    </p>
                     <ul className="space-y-4 text-sm leading-relaxed">
                         <LimitLi>
                             <strong>Not a price predictor.</strong> The LLM reasons about <em>direction bias</em>,
