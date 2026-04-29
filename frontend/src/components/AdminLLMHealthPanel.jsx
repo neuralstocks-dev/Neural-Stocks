@@ -30,8 +30,15 @@ export default function AdminLLMHealthPanel() {
     const [events, setEvents] = useState(null);
     const [err, setErr] = useState("");
     const [busy, setBusy] = useState(false);
+    // Track whether a manual refresh is in flight so the button can show
+    // a spinning icon and disable itself for the duration. Without this,
+    // tapping Refresh feels unresponsive — the inline icon doesn't change
+    // and the button text doesn't update, so users (correctly) think the
+    // click did nothing.
+    const [refreshing, setRefreshing] = useState(false);
 
     const refresh = useCallback(async () => {
+        setRefreshing(true);
         try {
             const [s, e] = await Promise.all([
                 api.get("/admin/llm-breaker"),
@@ -42,6 +49,8 @@ export default function AdminLLMHealthPanel() {
             setErr("");
         } catch (ex) {
             setErr(ex?.response?.data?.detail || "Failed to load LLM health");
+        } finally {
+            setRefreshing(false);
         }
     }, []);
 
@@ -103,12 +112,33 @@ export default function AdminLLMHealthPanel() {
                 <button
                     type="button"
                     onClick={refresh}
-                    className="text-xs inline-flex items-center gap-1"
-                    style={{ color: "hsl(var(--text-muted))", minHeight: 28 }}
+                    disabled={refreshing}
+                    className="text-xs inline-flex items-center gap-1.5 transition-colors px-2 py-1 -mr-2 rounded hover:bg-[hsl(var(--surface-hover))]"
+                    style={{
+                        color: refreshing ? "hsl(var(--text-secondary))" : "hsl(var(--text-secondary))",
+                        minHeight: 28,
+                        cursor: refreshing ? "wait" : "pointer",
+                        // High z-index defends against any sibling overlay (e.g.
+                        // sticky banners) accidentally swallowing the click.
+                        position: "relative",
+                        zIndex: 1,
+                    }}
+                    onMouseEnter={(e) => {
+                        if (!refreshing) e.currentTarget.style.color = "hsl(var(--text-primary))";
+                    }}
+                    onMouseLeave={(e) => {
+                        if (!refreshing) e.currentTarget.style.color = "hsl(var(--text-secondary))";
+                    }}
                     data-testid="admin-llm-health-refresh"
-                    aria-label="Refresh"
+                    aria-label="Refresh LLM health"
+                    aria-busy={refreshing}
                 >
-                    <RefreshCcw size={11} strokeWidth={1.5} /> Refresh
+                    <RefreshCcw
+                        size={11}
+                        strokeWidth={1.5}
+                        className={refreshing ? "animate-spin" : ""}
+                    />{" "}
+                    {refreshing ? "Refreshing…" : "Refresh"}
                 </button>
             </div>
 
