@@ -103,7 +103,15 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "ss01", "ss02", "cv01", "cv02";
-    overflow-x: hidden; /* prevent accidental horizontal scroll from nested tables/grids on mobile */
+    /* Use `clip` (not `hidden`) on the x-axis: prevents accidental horizontal
+       scroll from nested tables/grids on mobile WITHOUT turning body into a
+       scroll container. `overflow-x: hidden` forces the browser to compute
+       `overflow-y: auto` on body, which promotes body to the scroll parent
+       and silently breaks `position: sticky` on descendants like the
+       AppShell <header>. `overflow-x: clip` (widely supported since 2022)
+       prevents horizontal overflow without that side-effect, so sticky
+       elements continue to stick against the viewport as expected. */
+    overflow-x: clip;
 }
 
 ::selection {
