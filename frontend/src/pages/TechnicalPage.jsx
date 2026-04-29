@@ -1071,33 +1071,27 @@ histogram  = MACD_line − signal`}
                         </TLi>
                     </ul>
 
-                    <p className="mt-6 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>
-                        Source: IDX / KSEI disclosures via the <code>indonesia-stock-exchange-idx</code>{" "}
-                        RapidAPI provider. Computed client-side from raw filings — our math is auditable.
-                    </p>
-                </div>
-
-                {/* Phase-1 IDX signal upgrade (Feb 2026) — what we now compute beyond raw filings */}
-                <div
-                    id="idx-broker-flow-methodology"
-                    className="mt-8 module p-6 md:p-10 scroll-mt-24"
-                    data-testid="tech-idx-broker-flow-methodology"
-                >
-                    <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
-                        IDX accuracy upgrade · Feb 2026
-                    </p>
-                    <h3 className="font-serif mt-2" style={{ fontSize: "1.6rem", letterSpacing: "-0.01em" }}>
-                        Four new bandarmology signals — zero new data source.
-                    </h3>
-                    <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
+                    {/* Derived signals layered on raw filings — merged from the
+                        former "IDX accuracy upgrade" section so the bandarmology
+                        methodology reads as one coherent story, not two separate
+                        feature drops. */}
+                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
+                        Derived signals layered on top of the raw filings
+                    </h4>
+                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                         Raw insider filings are useful but noisy — a single large director sale can skew the
                         accumulation ratio, and a clean signal on illiquid tape isn't actually tradeable.
-                        We now layer four derived signals on top of the raw filings, computed locally from
-                        data we already fetch (OHLC history + market cap + dated movements). No new API,
-                        no new cost, no extra latency.
+                        On top of the raw filings we layer four <em>derived</em> signals, computed locally
+                        from data we already fetch (OHLC history + market cap + dated movements). No new API,
+                        no new cost, no extra latency — they sharpen the same underlying signal.
                     </p>
 
-                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-0" style={{ border: "1px solid hsl(var(--border-default))" }}>
+                    <div
+                        id="idx-broker-flow-methodology"
+                        className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-0 scroll-mt-24"
+                        style={{ border: "1px solid hsl(var(--border-default))" }}
+                        data-testid="tech-idx-broker-flow-methodology"
+                    >
                         {[
                             {
                                 title: "Volume gate (rel_volume_20d)",
@@ -1131,7 +1125,11 @@ histogram  = MACD_line − signal`}
                         ))}
                     </div>
 
-                    {/* What we chose NOT to ship in v1 — transparency on user-requested signals */}
+                    {/* What we chose NOT to ship in v1 — transparency on user-requested signals.
+                        Admin-only: this is internal product reasoning that distracts public readers
+                        from the actual methodology. */}
+                    {isAdmin && (
+                    <>
                     <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
                         What we considered but didn't ship (yet)
                     </h4>
@@ -1186,19 +1184,35 @@ histogram  = MACD_line − signal`}
                             </p>
                         </div>
                     </div>
+                    </>
+                    )}
 
-                    {/* Companion broker-flow tools — acknowledgement of what we don't yet compute */}
+                    {/* Intraday tip — reframed from "Phase 2 companion tools" to a clear,
+                        on-brand intraday-trading tip. We do NOT plan to compete with intraday
+                        broker-flow tools; per the Honest Limits section above, Neural Stock
+                        Intelligence™ is a swing/position tool on daily candles. If you trade
+                        intraday, these third-party tools are the right fit. */}
                     <h4 className="font-serif mt-10 mb-3" style={{ fontSize: "1.3rem" }}>
-                        Companion tools for intraday broker flow
+                        Intraday trading tip — pair Neural with a dedicated broker-flow tool
                     </h4>
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Until we integrate a broker-summary data source (see Phase 2 above), the single highest-leverage
-                        thing an IDX trader can do is pair Neural's verdict with a dedicated broker-flow tool.
-                        <strong style={{ color: "hsl(var(--text-primary))" }}> A Neural BUY with 3-day persistent foreign net-buy
-                        confirmed on Stockbit or RTI is a materially stronger setup than either signal alone.</strong>
+                        <strong style={{ color: "hsl(var(--text-primary))" }}>Neural Stock Intelligence™ is a
+                        swing/position research tool on daily candles — not an intraday platform.</strong>{" "}
+                        See <em>Honest Limits → "No intraday"</em> below: verdicts don't re-run automatically,
+                        and our IDX bandarmology is built on dated insider filings (T+1 / T+5 reporting lag),
+                        not live broker-summary tape. If your decision horizon is hours rather than weeks,
+                        the right call is to pair Neural's verdict with a dedicated broker-flow tool that
+                        was purpose-built for intraday tape.
                         <br /><br />
-                        These are third-party tools. Neural has no affiliation and gets no referral revenue — we list
-                        them because they actually help, not because anyone is paying us. In rough order of depth:
+                        <strong style={{ color: "hsl(var(--text-primary))" }}>A Neural BUY confirmed on a
+                        live broker-flow terminal showing 3-day persistent foreign net-buy is a materially
+                        stronger setup than either signal alone.</strong> The two views are complementary
+                        — Neural answers <em>"is this fundamentally and technically a good name to own?"</em>,
+                        the broker-flow tool answers <em>"is the tape moving in your direction right now?"</em>.
+                        <br /><br />
+                        These are third-party tools. Neural has no affiliation and gets no referral revenue —
+                        we list them because they actually help, not because anyone is paying us. In rough
+                        order of depth:
                     </p>
 
                     <ul className="mt-4 space-y-2.5 text-[13px]" style={{ color: "hsl(var(--text-secondary))" }}>
@@ -1353,7 +1367,11 @@ histogram  = MACD_line − signal`}
 
                 {/* How Neulab handles load — capacity transparency for the
                     informed user. Pairs with the AnalysisQueueChip on the
-                    dashboard so they see the same numbers in real time. */}
+                    dashboard so they see the same numbers in real time.
+                    Admin-only: capacity / cost details are operational
+                    transparency for the operator, not consumer-facing copy. */}
+                {isAdmin && (
+                <>
                 <SectionHeader
                     icon={Gauge}
                     overline="Capacity"
@@ -1565,6 +1583,8 @@ histogram  = MACD_line − signal`}
                         the trigger metrics here when we get there.
                     </p>
                 </div>
+                </>
+                )}
 
                 {/* Stack footer */}
                 <SectionHeader
