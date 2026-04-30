@@ -499,7 +499,40 @@ async def _parse_ai_json_async(raw) -> dict:
 
 def _handle_llm_error(e: Exception):
     err_msg = str(e)
-    if "Budget has been exceeded" in err_msg or "budget" in err_msg.lower():
+    err_lower = err_msg.lower()
+
+    # CRITICAL: distinguish TWO different "Budget has been exceeded" errors:
+    #
+    #   (a) OpenAI proxy FALLBACK cap — Emergent's LiteLLM proxy gates the
+    #       OpenAI provider with a sub-cent `Max budget: 0.001` per call
+    #       (well below the ~$0.024 cost of a single analysis). So any time
+    #       our fallback chain rotates to OpenAI, the call ALWAYS raises
+    #       `BadRequestError: Budget has been exceeded! ... Max budget:
+    #       0.001`. The user's Universal Key is FINE — this is just the
+    #       fallback tier being capped at the platform level. Must NOT
+    #       fire the "Top up Universal Key" banner.
+    #
+    #   (b) REAL Universal Key exhaustion — when the user's actual Universal
+    #       Key balance hits 0, Anthropic/Gemini paths surface "Budget has
+    #       been exceeded" WITHOUT the sub-cent metadata. Surface as
+    #       `llm_budget_exceeded` so the Top-Up CTA banner fires.
+    #
+    # Discriminator: presence of "Max budget: 0.001" (OpenAI proxy cap
+    # signature) vs absence (real platform-level exhaustion). The previous
+    # check `"budget" in err_msg.lower()` was too lax and matched (a),
+    # showing users with healthy 99+ credit balances a misleading
+    # "Universal Key needs top up" banner.
+    is_openai_proxy_cap = (
+        "max budget: 0.001" in err_lower
+        or "'type': 'budget_exceeded'" in err_lower
+        and "max budget" in err_lower
+        and ("0.001" in err_lower or "0.0001" in err_lower)
+    )
+    is_real_budget_exhaustion = (
+        "budget has been exceeded" in err_lower or "budgetexceedederror" in err_lower
+    )
+
+    if is_real_budget_exhaustion and not is_openai_proxy_cap:
         # 503 + structured detail. The `error_code` lets the frontend
         # render a richer banner (Top-up CTA + cost-economics popover)
         # instead of a generic red string. detail.message is kept as a
@@ -509,6 +542,20 @@ def _handle_llm_error(e: Exception):
             detail={
                 "error_code": "llm_budget_exceeded",
                 "message": "AI analysis temporarily unavailable — LLM budget exceeded. Please top up your Emergent Universal Key (Profile → Universal Key → Add Balance).",
+            },
+        )
+
+    if is_openai_proxy_cap:
+        # OpenAI fallback is wedged at the platform proxy budget cap. By
+        # the time we reach here the upstream chain (Anthropic + Gemini)
+        # has ALREADY exhausted, so this means all 3 providers are
+        # currently unable to serve the request. Tell the user honestly —
+        # do NOT misdirect them to top up their Universal Key.
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error_code": "llm_upstream_unavailable",
+                "message": "All AI providers are temporarily unavailable (transient upstream issue — your Universal Key balance is unaffected). Please try again in a few minutes; if it persists, check the LLM Health panel in Admin.",
             },
         )
     # Transient upstream gateway errors (502/503/504) — surface a clean,

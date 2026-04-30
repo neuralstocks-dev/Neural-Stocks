@@ -104,6 +104,48 @@ def test_handle_llm_error_keeps_budget_exceeded_path():
     assert exc_info.value.detail["error_code"] == "llm_budget_exceeded"
 
 
+def test_handle_llm_error_openai_proxy_cap_does_not_misclassify_as_universal_key_exhaustion():
+    """REGRESSION: Emergent's LiteLLM proxy gates the OpenAI fallback
+    provider with a sub-cent `Max budget: 0.001` per call. When our chain
+    rotates to OpenAI it ALWAYS raises a BadRequestError whose message
+    contains 'Budget has been exceeded! ... Max budget: 0.001' — which
+    the old `"budget" in err_msg.lower()` heuristic classified as
+    `llm_budget_exceeded` and triggered a misleading 'Top up Universal
+    Key' banner for users with healthy 99+ credit balances.
+
+    Now this specific signature MUST be classified as transient
+    `llm_upstream_unavailable` so the user is told the truth (fallback
+    tier capped, balance unaffected) instead of being misdirected to top
+    up a Universal Key that has plenty of credit."""
+    openai_proxy_cap_msg = (
+        "litellm.BadRequestError: OpenAIException - Budget has been exceeded! "
+        "Current cost: 0.023937, Max budget: 0.001"
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        _handle_llm_error(Exception(openai_proxy_cap_msg))
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail["error_code"] == "llm_upstream_unavailable"
+    # The message must NOT direct the user to top up their Universal Key.
+    assert "top up" not in exc_info.value.detail["message"].lower()
+    assert "your Universal Key balance is unaffected" in exc_info.value.detail["message"]
+
+
+def test_handle_llm_error_chat_error_wrapping_openai_proxy_cap():
+    """ChatError is the outermost wrapper from emergentintegrations — its
+    `str(...)` contains 'Failed to generate chat completion: ...' followed
+    by the inner litellm message. Verify the proxy-cap discriminator
+    survives the wrapping (the inner 'Max budget: 0.001' substring is
+    still present)."""
+    chat_err_msg = (
+        "Failed to generate chat completion: litellm.BadRequestError: "
+        "OpenAIException - Budget has been exceeded! Current cost: 0.023937, "
+        "Max budget: 0.001"
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        _handle_llm_error(Exception(chat_err_msg))
+    assert exc_info.value.detail["error_code"] == "llm_upstream_unavailable"
+
+
 def test_handle_llm_error_falls_through_to_502_on_unknown():
     """Genuinely unknown errors still surface as a 502 so we don't hide
     novel issues behind a generic friendly message."""
