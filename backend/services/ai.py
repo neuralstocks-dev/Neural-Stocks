@@ -235,13 +235,19 @@ def _run_chat(system_prompt: str, session_prefix: str, user_text: str, *, provid
 #     calibrated reasoning, JSON output, and the published Score Card on.
 #   - Gemini gemini-2.5-pro — playbook-recommended Google model, strong
 #     JSON-mode adherence, independent of Anthropic infra.
-#   - OpenAI gpt-5.1 — playbook-recommended OpenAI model, fully different
-#     control plane so a Universal-Key-wide outage is unlikely to take all
-#     three down simultaneously.
+#
+# OpenAI INTENTIONALLY EXCLUDED (Feb 2026): Emergent's LiteLLM proxy
+# currently caps the OpenAI route at `Max budget: 0.001` per call, well
+# below the ~$0.024 cost of one analysis. Every rotation that reached
+# OpenAI raised `BadRequestError: Budget has been exceeded! ... Max
+# budget: 0.001` — a guaranteed-fail leg that wasted one attempt and
+# polluted telemetry. Re-add `("openai", "gpt-5.1", "gpt-5.1")` once
+# Emergent lifts that cap. The classifier in `_handle_llm_error` still
+# guards against the proxy-cap signature in case OpenAI re-enters via
+# misconfiguration.
 _LLM_FALLBACK_CHAIN = [
     ("anthropic", "claude-sonnet-4-5-20250929", "claude-sonnet-4-5"),
     ("gemini",    "gemini-2.5-pro",             "gemini-2.5-pro"),
-    ("openai",    "gpt-5.1",                    "gpt-5.1"),
 ]
 _LLM_PER_ATTEMPT_TIMEOUT_S = 75.0
 # Adaptive re-ranking thresholds for the fallback chain. A provider must

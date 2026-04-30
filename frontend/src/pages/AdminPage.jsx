@@ -4,6 +4,7 @@ import RFRetrainCard from "@/components/RFRetrainCard";
 import IdxBudgetCard from "@/components/IdxBudgetCard";
 import IdxCatalogCard from "@/components/IdxCatalogCard";
 import AdminLLMHealthPanel from "@/components/AdminLLMHealthPanel";
+import AdminWizardFunnelPanel from "@/components/AdminWizardFunnelPanel";
 import PayPalWebhookCard from "@/components/PayPalWebhookCard";
 import ExperimentsCard from "@/components/ExperimentsCard";
 import AnonTryResetCard from "@/components/AnonTryResetCard";
@@ -428,6 +429,8 @@ export default function AdminPage() {
                 </div>
 
                 <AdminLLMHealthPanel />
+
+                <AdminWizardFunnelPanel />
 
                 {message && (
                     <div className="signal-buy px-4 py-3 mt-6 font-mono text-sm" data-testid="admin-message">

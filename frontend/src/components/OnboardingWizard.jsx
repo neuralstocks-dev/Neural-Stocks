@@ -15,6 +15,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
+import { track, newSessionId } from "@/lib/telemetry";
 import {
     Dialog,
     DialogContent,
@@ -425,7 +426,7 @@ function VerdictRingMini({ signal, confidence }) {
     );
 }
 
-function Step3Reveal({ ticker, result, onClose, navigate }) {
+function Step3Reveal({ ticker, result, onClose, onExplore }) {
     const signal = (result?.recommendation || "HOLD").toUpperCase();
     // Backend returns confidence_score in the 0-100 range (or 0-1 in some
     // schemas). Normalise to a 0-1 fraction the ring component expects.
@@ -456,7 +457,7 @@ function Step3Reveal({ ticker, result, onClose, navigate }) {
 
     const goToReport = () => {
         markCompleted();
-        navigate(`/analysis/${encodeURIComponent(ticker)}`);
+        onExplore?.();
     };
 
     return (
@@ -530,11 +531,40 @@ export default function OnboardingWizard({ open, onClose, onWatchlistChanged }) 
     const [accepted, setAccepted] = useState(false);
     const [verdict, setVerdict] = useState(null);
     const [error, setError] = useState("");
+    // Per-mount funnel session — one wizard mount = one session_id, so
+    // every event from this open→close pass groups together server-side
+    // for the funnel aggregation.
+    const [sessionId] = useState(newSessionId);
+    // Wall-clock at first mount — the 30-second goal is measured from
+    // here to wizard_step2_complete. Stored in a ref-like state for
+    // cheap reads inside event handlers (state value is immutable so
+    // closures stay correct).
+    const [openedAtMs] = useState(() => Date.now());
+
+    // Fire `wizard_opened` exactly once, the first time the modal is
+    // mounted with `open=true`. Subsequent toggles in the same mount
+    // (rare — dashboard does mount→unmount, not toggle) don't re-fire.
+    useEffect(() => {
+        if (open) {
+            track("wizard_opened", {}, sessionId);
+        }
+        // sessionId is stable per mount, intentionally only depend on open.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
 
     const handleClose = () => {
         // Clicking close at any step counts as "completed" — we don't want to
         // re-pop the modal forever just because they didn't pick stocks.
         markCompleted();
+        // Step 3 closures are tracked separately by Step3Reveal so we can
+        // distinguish "explored" vs "closed at verdict". Earlier-stage
+        // closures are funnel drop-offs.
+        if (step !== 3) {
+            track("wizard_dismissed_early", {
+                step,
+                elapsed_ms: Date.now() - openedAtMs,
+            }, sessionId);
+        }
         onClose?.();
     };
 
@@ -549,11 +579,21 @@ export default function OnboardingWizard({ open, onClose, onWatchlistChanged }) 
             setError(e?.response?.data?.detail || "Couldn't save your acknowledgment. Please try again.");
             return;
         }
+        track("wizard_step1_next", {
+            picks_count: picks.length,
+            has_idx: picks.some((t) => t.endsWith(".JK")),
+            has_us: picks.some((t) => !t.endsWith(".JK")),
+            elapsed_ms: Date.now() - openedAtMs,
+        }, sessionId);
         setStep(2);
     };
 
     const handleStep2Complete = (payload) => {
         setVerdict(payload);
+        track("wizard_step2_complete", {
+            ticker: payload?.ticker,
+            elapsed_ms: Date.now() - openedAtMs,
+        }, sessionId);
         // The watchlist + first analysis already landed on the server. Tell
         // the parent so it can refetch its watchlist + quota counters.
         onWatchlistChanged?.();
@@ -562,7 +602,30 @@ export default function OnboardingWizard({ open, onClose, onWatchlistChanged }) 
 
     const handleStep2Error = (msg) => {
         setError(msg);
+        track("wizard_step2_error", {
+            error: typeof msg === "string" ? msg.slice(0, 180) : "unknown",
+            elapsed_ms: Date.now() - openedAtMs,
+        }, sessionId);
         // Soft-fail: keep modal open so user sees the error and can retry/skip.
+    };
+
+    const handleStep3Explore = () => {
+        track("wizard_step3_explore", {
+            elapsed_ms: Date.now() - openedAtMs,
+            ticker: verdict?.ticker,
+        }, sessionId);
+        markCompleted();
+        const t = verdict?.ticker;
+        onClose?.();
+        if (t) navigate(`/analysis/${encodeURIComponent(t)}`);
+    };
+
+    const handleStep3Close = () => {
+        track("wizard_step3_close", {
+            elapsed_ms: Date.now() - openedAtMs,
+        }, sessionId);
+        markCompleted();
+        onClose?.();
     };
 
     return (
@@ -625,8 +688,8 @@ export default function OnboardingWizard({ open, onClose, onWatchlistChanged }) 
                     <Step3Reveal
                         ticker={verdict.ticker}
                         result={verdict.result}
-                        onClose={handleClose}
-                        navigate={navigate}
+                        onClose={handleStep3Close}
+                        onExplore={handleStep3Explore}
                     />
                 )}
             </DialogContent>

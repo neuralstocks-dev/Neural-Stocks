@@ -5,7 +5,7 @@ from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 
 from core.db import client
-from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts
+from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +40,7 @@ api_router.include_router(anon_try.router)
 api_router.include_router(experiments.router)
 api_router.include_router(backtest.router)
 api_router.include_router(alerts.router)
+api_router.include_router(telemetry.router)
 
 app.include_router(api_router)
 
@@ -100,6 +101,13 @@ async def start_background_tasks():
         await _ensure_analysis_indexes()
     except Exception as e:
         logger.warning("Failed to ensure analysis_jobs TTL index: %s", e)
+    # Telemetry collection — secondary indexes for the wizard funnel
+    # aggregation. Idempotent.
+    try:
+        from routers.telemetry import ensure_telemetry_indexes
+        await ensure_telemetry_indexes()
+    except Exception as e:
+        logger.warning("Failed to ensure telemetry indexes: %s", e)
     # Start the queue-snapshot refresher so /api/analysis/queue/status
     # reads from cache (responsive even under loop saturation).
     try:
