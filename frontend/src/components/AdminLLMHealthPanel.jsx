@@ -8,9 +8,23 @@ const REASON_STYLE = {
     llm_socket_hang: { label: "Socket hang", color: "hsl(var(--sell))" },
     litellm_retry_exhausted: { label: "Retry exhausted", color: "hsl(var(--hold))" },
     llm_timeout: { label: "Timeout (cancel)", color: "hsl(var(--gold))" },
+    "transient:ChatError": { label: "ChatError", color: "hsl(256, 50%, 70%)" },
     other_exception: { label: "Other exception", color: "hsl(256, 50%, 70%)" },
     unknown: { label: "Unknown", color: "hsl(var(--text-muted))" },
 };
+
+// When a failure-reason code is not in REASON_STYLE we still want a
+// distinguishable badge instead of collapsing every unmapped code to
+// "Unknown" (which loses signal — ops can't tell `transient:ChatError`
+// apart from a real `unknown`). Render the raw code, lightly humanized
+// and capped at 22 chars so the strip doesn't wrap awkwardly.
+function styleForReason(reason) {
+    if (REASON_STYLE[reason]) return REASON_STYLE[reason];
+    if (!reason || reason === "unknown") return REASON_STYLE.unknown;
+    const label = String(reason).replace(/^transient:/, "").replace(/_/g, " ");
+    const trimmed = label.length > 22 ? label.slice(0, 21) + "…" : label;
+    return { label: trimmed, color: REASON_STYLE.unknown.color };
+}
 
 const SURFACE_LABEL = { anon: "guest", auth: "auth", quick: "quick-batch" };
 
@@ -192,14 +206,14 @@ export default function AdminLLMHealthPanel() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                         {Object.entries(events.breakdown).map(([reason, count]) => {
-                            const s = REASON_STYLE[reason] || REASON_STYLE.unknown;
+                            const s = styleForReason(reason);
                             const pct = Math.round((count / totalFailures) * 100);
                             return (
                                 <span
                                     key={reason}
                                     className="font-mono text-xs px-2 py-0.5 rounded-sm"
                                     style={{ color: s.color, border: `1px solid ${s.color}`, fontSize: "11px" }}
-                                    title={`${count} / ${totalFailures}`}
+                                    title={`${reason} · ${count} / ${totalFailures}`}
                                 >
                                     {s.label} · {count} ({pct}%)
                                 </span>
@@ -228,7 +242,7 @@ export default function AdminLLMHealthPanel() {
                                 </thead>
                                 <tbody>
                                     {events.events.map((ev, i) => {
-                                        const s = REASON_STYLE[ev.reason] || REASON_STYLE.unknown;
+                                        const s = styleForReason(ev.reason);
                                         const whenSec = Math.round((Date.now() / 1000) - ev.ts);
                                         const whenLabel = whenSec < 60 ? `${whenSec}s ago` : whenSec < 3600 ? `${Math.round(whenSec / 60)}m ago` : `${Math.round(whenSec / 3600)}h ago`;
                                         const hasDetail = !!ev.error_detail;
@@ -433,10 +447,10 @@ function RecoupTracker({ recoup, onCopy, copyState }) {
                     </p>
                     <ul className="space-y-1">
                         {reasons.map(([reason, count]) => {
-                            const s = REASON_STYLE[reason] || REASON_STYLE.unknown;
+                            const s = styleForReason(reason);
                             return (
                                 <li key={reason} className="flex items-center justify-between gap-3">
-                                    <span className="text-xs" style={{ color: s.color }}>{s.label}</span>
+                                    <span className="text-xs" style={{ color: s.color }} title={reason}>{s.label}</span>
                                     <span className="font-mono text-xs" style={{ color: "hsl(var(--text-secondary))" }}>{count}</span>
                                 </li>
                             );
