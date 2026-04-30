@@ -29,6 +29,7 @@ export default function AdminLLMHealthPanel() {
     const [status, setStatus] = useState(null);
     const [events, setEvents] = useState(null);
     const [recoup, setRecoup] = useState(null);
+    const [providers, setProviders] = useState(null);
     const [err, setErr] = useState("");
     const [busy, setBusy] = useState(false);
     // Track which row in the "Last 10 failures" table has its detail
@@ -48,14 +49,16 @@ export default function AdminLLMHealthPanel() {
     const refresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            const [s, e, r] = await Promise.all([
+            const [s, e, r, p] = await Promise.all([
                 api.get("/admin/llm-breaker"),
                 api.get("/admin/llm-events?limit=10&hours=24"),
                 api.get("/admin/llm-events/recoup-summary?days=30"),
+                api.get("/admin/llm-events/by-provider?hours=24"),
             ]);
             setStatus(s.data);
             setEvents(e.data);
             setRecoup(r.data);
+            setProviders(p.data);
             setErr("");
         } catch (ex) {
             setErr(ex?.response?.data?.detail || "Failed to load LLM health");
@@ -295,6 +298,14 @@ export default function AdminLLMHealthPanel() {
                 </p>
             )}
 
+            {/* Per-provider success-rate strip · last 24h. Drives operational
+                triage: at-a-glance see which provider in the fallback chain
+                is currently degraded. Renders as one row per provider with
+                a chip-style success-rate readout colour-coded by health. */}
+            {providers && providers.providers && providers.providers.length > 0 && (
+                <ProviderHealthStrip data={providers} />
+            )}
+
             {/* Credit-recoup tracker · last 30 days. Quantifies the cost of
                 upstream Universal-Key socket hangs and offers a one-tap
                 "Copy escalation summary" that drops a ready-to-paste support
@@ -452,6 +463,87 @@ function Metric({ label, value, valueColor }) {
             </p>
             <p className="font-mono mt-0.5" style={{ fontSize: "16px", color: valueColor }}>
                 {value}
+            </p>
+        </div>
+    );
+}
+
+/**
+ * Per-provider success-rate strip · last 24h. Renders one row per provider
+ * with success/failure totals + a chip-style success-rate readout. Colour
+ * is health-driven (green ≥85% / amber 50-84% / red <50%) so degraded
+ * providers jump out at a glance — no need to read the raw event log.
+ *
+ * Reads `data.providers` (already pre-aggregated by the backend).
+ */
+function ProviderHealthStrip({ data }) {
+    if (!data || !data.providers) return null;
+    const providerLabel = {
+        anthropic: "Anthropic",
+        gemini: "Gemini",
+        openai: "OpenAI",
+    };
+    function rateColor(rate, total) {
+        if (total === 0) return "hsl(var(--text-muted))";
+        if (rate >= 85) return "hsl(var(--buy))";
+        if (rate >= 50) return "hsl(var(--hold))";
+        return "hsl(var(--sell))";
+    }
+    return (
+        <div
+            className="mt-4 p-3"
+            data-testid="admin-llm-health-provider-strip"
+            style={{
+                border: "1px solid hsl(var(--border-default))",
+                background: "hsl(var(--surface-elevated))",
+                borderRadius: 2,
+            }}
+        >
+            <div className="flex items-baseline justify-between gap-3 mb-2.5">
+                <p className="text-overline" style={{ color: "hsl(var(--text-muted))", fontSize: "10px" }}>
+                    Provider success-rate · last {data.window_hours}h · fallback chain
+                </p>
+                <p className="font-mono" style={{ fontSize: "10.5px", color: "hsl(var(--text-secondary))" }}>
+                    {data.total_attempts} attempts · overall <span style={{ color: rateColor(data.overall_success_rate, data.total_attempts) }}>{data.overall_success_rate}%</span>
+                </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                {data.providers.map((p) => {
+                    const color = rateColor(p.success_rate, p.total);
+                    return (
+                        <div
+                            key={p.provider}
+                            className="flex items-center justify-between gap-3 px-3 py-2"
+                            data-testid={`admin-llm-provider-${p.provider}`}
+                            style={{
+                                border: `1px solid ${color}`,
+                                borderLeftWidth: 3,
+                                background: "hsl(var(--surface-base))",
+                                borderRadius: 2,
+                            }}
+                        >
+                            <div className="min-w-0">
+                                <p className="font-mono" style={{ fontSize: "12px", color: "hsl(var(--text-primary))" }}>
+                                    {providerLabel[p.provider] || p.provider}
+                                </p>
+                                <p className="font-mono mt-0.5" style={{ fontSize: "9.5px", color: "hsl(var(--text-muted))" }}>
+                                    {p.success}✓ / {p.failure}✗ · {p.total} attempts
+                                </p>
+                            </div>
+                            <p
+                                className="font-mono"
+                                style={{ fontSize: "20px", color, fontWeight: 500 }}
+                                aria-label={`${providerLabel[p.provider] || p.provider} success rate ${p.success_rate}%`}
+                            >
+                                {p.success_rate}%
+                            </p>
+                        </div>
+                    );
+                })}
+            </div>
+            <p className="mt-2 text-[10.5px]" style={{ color: "hsl(var(--text-muted))" }}>
+                Order = fallback-chain priority. Green ≥85% · amber 50-84% · red &lt;50%.
+                When the top provider drops below 50%, expect rotations to the next provider.
             </p>
         </div>
     );

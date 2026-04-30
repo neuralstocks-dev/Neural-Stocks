@@ -328,6 +328,93 @@ async def llm_events_recoup_summary(
     }
 
 
+@router.get("/llm-events/by-provider")
+async def llm_events_by_provider(hours: int = 24, _admin=Depends(admin_required)):
+    """Aggregate per-provider success-rate stats over the last `hours` window.
+
+    Driven by the `kind: "provider_attempt"` rows that `services/ai.py`
+    emits for every provider attempt (success OR failure). Rows from before
+    the multi-provider fallback chain shipped will be missing from the
+    counts — that's expected; old rows pre-date the telemetry.
+
+    Returns a list of provider rows so the admin panel can render a
+    per-provider success-rate strip ("Anthropic 47% · Gemini 91% · OpenAI
+    100%") at a glance — without having to read raw logs.
+
+    Shape:
+      {
+        "window_hours": 24,
+        "providers": [
+          {"provider": "anthropic", "success": 12, "failure": 8, "total": 20,
+           "success_rate": 60.0, "model": "claude-sonnet-4-5-20250929",
+           "avg_elapsed_s_success": 41.2, "avg_elapsed_s_failure": 73.8},
+          ...
+        ],
+        "total_attempts": 47,
+        "overall_success_rate": 87.2,
+      }
+    """
+    import time as _time
+    from core.db import db
+    hours = max(1, min(int(hours), 24 * 30))  # cap at 30 days
+    since = _time.time() - (hours * 3600)
+    pipeline = [
+        {"$match": {"ts": {"$gte": since}, "kind": "provider_attempt"}},
+        {
+            "$group": {
+                "_id": {"provider": "$provider", "outcome": "$outcome"},
+                "n": {"$sum": 1},
+                "model": {"$last": "$model"},
+                "avg_elapsed_s": {"$avg": "$elapsed_s"},
+            }
+        },
+    ]
+    rows = await db.llm_events.aggregate(pipeline).to_list(length=200)
+
+    # Pivot rows[(provider, outcome)] -> {provider: {success, failure, ...}}
+    bucket: dict[str, dict] = {}
+    for r in rows:
+        p = r["_id"].get("provider") or "unknown"
+        o = r["_id"].get("outcome") or "unknown"
+        b = bucket.setdefault(
+            p,
+            {
+                "provider": p,
+                "model": None,
+                "success": 0,
+                "failure": 0,
+                "avg_elapsed_s_success": None,
+                "avg_elapsed_s_failure": None,
+            },
+        )
+        if o == "success":
+            b["success"] = r["n"]
+            b["avg_elapsed_s_success"] = round(r["avg_elapsed_s"] or 0, 2)
+        elif o == "failure":
+            b["failure"] = r["n"]
+            b["avg_elapsed_s_failure"] = round(r["avg_elapsed_s"] or 0, 2)
+        if r.get("model") and not b["model"]:
+            b["model"] = r["model"]
+
+    providers = []
+    for p, b in bucket.items():
+        total = b["success"] + b["failure"]
+        b["total"] = total
+        b["success_rate"] = round(100 * b["success"] / total, 1) if total else 0.0
+        providers.append(b)
+    # Sort: highest-attempt providers first (signal richness), tie-break alpha.
+    providers.sort(key=lambda x: (-x["total"], x["provider"]))
+
+    total_attempts = sum(p["total"] for p in providers)
+    total_success = sum(p["success"] for p in providers)
+    return {
+        "window_hours": hours,
+        "providers": providers,
+        "total_attempts": total_attempts,
+        "overall_success_rate": round(100 * total_success / total_attempts, 1) if total_attempts else 0.0,
+    }
+
+
 @router.post("/users/{user_id}/unlock")
 async def unlock_user(user_id: str, req: UnlockReq, admin=Depends(admin_required)):
     seconds = UNLOCK_DURATIONS.get(req.duration)

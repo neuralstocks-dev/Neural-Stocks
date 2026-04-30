@@ -267,6 +267,35 @@ async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text
          so the user gets a fast-fail 503 rather than waiting through
          repeated retries when the upstream is genuinely down."""
     import asyncio as _asyncio
+    import time as _t2
+    from core.db import db as _db
+
+    def _record_provider_attempt(provider: str, model: str, outcome: str, elapsed_s: float, reason: str | None = None):
+        """Fire-and-forget insert into `llm_events` capturing every
+        provider attempt's outcome — success OR failure. Powers the
+        admin LLM-health panel's per-provider success-rate strip so we
+        can spot in real time which Universal Key provider is currently
+        degraded WITHOUT having to read raw event logs.
+
+        We use the existing `llm_events` collection (not a new one) and
+        tag rows with `kind: "provider_attempt"` to distinguish them
+        from the breaker-level `record_outcome` rows that lack provider
+        info. The aggregation endpoint groups by `provider` filtered to
+        these rows only.
+
+        Best-effort + sync — Mongo failure must NEVER break analysis."""
+        try:
+            _db.llm_events.insert_one({
+                "ts": _t2.time(),
+                "kind": "provider_attempt",
+                "provider": provider,
+                "model": model,
+                "outcome": outcome,        # "success" | "failure"
+                "elapsed_s": round(elapsed_s, 3),
+                "reason": reason,           # only set on failure
+            })
+        except Exception:
+            pass  # telemetry must never break analysis
 
     def _sync_run():
         last_exc: Exception | None = None
@@ -274,8 +303,9 @@ async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text
         for provider, model, label in _LLM_FALLBACK_CHAIN:
             attempted_labels.append(label)
             for attempt in range(_LLM_MAX_RETRIES + 1):
+                attempt_started = _t2.monotonic()
                 try:
-                    return _asyncio.run(
+                    result = _asyncio.run(
                         _asyncio.wait_for(
                             _run_chat(
                                 system_prompt,
@@ -287,11 +317,19 @@ async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text
                             timeout=_LLM_PER_ATTEMPT_TIMEOUT_S,
                         )
                     )
+                    _record_provider_attempt(
+                        provider, model, "success", _t2.monotonic() - attempt_started,
+                    )
+                    return result
                 except _asyncio.TimeoutError as te:
                     # Per-attempt budget blew. Don't keep retrying THIS
                     # provider — rotate to the next one. Socket hangs
                     # almost never resolve on a same-provider retry.
                     last_exc = te
+                    _record_provider_attempt(
+                        provider, model, "failure", _t2.monotonic() - attempt_started,
+                        reason="per_attempt_timeout",
+                    )
                     logger.warning(
                         "LLM per-attempt timeout (%ss) on provider=%s model=%s for %s — rotating to next provider",
                         int(_LLM_PER_ATTEMPT_TIMEOUT_S), provider, model, session_prefix,
@@ -299,12 +337,21 @@ async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text
                     break
                 except Exception as e:
                     last_exc = e
+                    elapsed = _t2.monotonic() - attempt_started
                     if not _is_transient_gateway_error(e):
                         # Hard error (auth, billing, model-not-found,
                         # validation): don't retry, don't fall back —
                         # bubble immediately so the caller can render a
                         # specific user message via _handle_llm_error.
+                        _record_provider_attempt(
+                            provider, model, "failure", elapsed,
+                            reason=f"hard_error:{type(e).__name__}",
+                        )
                         raise
+                    _record_provider_attempt(
+                        provider, model, "failure", elapsed,
+                        reason=f"transient:{type(e).__name__}",
+                    )
                     if attempt >= _LLM_MAX_RETRIES:
                         # This provider is wedged on transient errors —
                         # rotate to the next one instead of giving up.
