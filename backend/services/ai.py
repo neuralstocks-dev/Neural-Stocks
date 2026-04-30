@@ -411,11 +411,21 @@ async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text
                 except Exception as e:
                     last_exc = e
                     elapsed = _t2.monotonic() - attempt_started
-                    if not _is_transient_gateway_error(e):
-                        # Hard error (auth, billing, model-not-found,
-                        # validation): don't retry, don't fall back —
+                    if _is_hard_error(e):
+                        # Hard error (bad API key, validation, model
+                        # not found): don't retry, don't fall back —
                         # bubble immediately so the caller can render a
                         # specific user message via _handle_llm_error.
+                        # NOTE: we INVERT the previous "if not transient
+                        # → hard" check. Generic wrappers like
+                        # `emergentintegrations.ChatError` whose inner
+                        # message doesn't literally contain "Error code:
+                        # 502/503/504" used to be classified as hard
+                        # errors here, breaking fallback completely
+                        # (the chain refused to rotate to Gemini).
+                        # `_is_hard_error` defaults to FALSE for unknown
+                        # error types so we rotate by default — much
+                        # safer for resilience.
                         _record_provider_attempt(
                             provider, model, "failure", elapsed,
                             reason=f"hard_error:{type(e).__name__}",
@@ -467,15 +477,75 @@ _TRANSIENT_GATEWAY_MARKERS = (
     "Error code: 500",
 )
 
+# HARD-error class/string markers — errors that indicate a permanent
+# failure where retrying or rotating to a different provider WILL NOT
+# help. We bail immediately on these so the user gets a fast, accurate
+# failure instead of waiting through a useless retry-and-rotate cycle.
+#
+# IMPORTANT: keep this list SHORT and SPECIFIC. Anything not listed
+# falls through to the "transient" path → in-provider retry, then chain
+# rotation. This is the safer default because most LLM SDK errors come
+# wrapped in a generic class (e.g. emergentintegrations' `ChatError`)
+# whose inner message doesn't always match a known marker — historically
+# we mis-classified those as hard errors and the chain refused to
+# rotate, stranding users on a single failed provider.
+_HARD_ERROR_MARKERS = (
+    "AuthenticationError",       # bad/missing API key
+    "PermissionDeniedError",     # auth scope / org access
+    "InvalidAPIKeyError",        # explicit invalid-key class
+    "InvalidRequestError",       # legacy litellm/openai validation class
+    "BadRequestError",           # litellm/openai 400 class (validation, malformed prompt)
+    "NotFoundError",             # model name typo, etc.
+    "Error code: 400",
+    "Error code: 401",
+    "Error code: 403",
+    "Error code: 404",
+)
+
 
 def _is_transient_gateway_error(e: Exception) -> bool:
-    """Recognise LiteLLM/OpenAI/Anthropic gateway hiccups that warrant a
-    retry. We pattern-match on the exception class name AND the str repr
-    because LiteLLM doesn't always re-raise as its own typed class — it
-    sometimes wraps the upstream OpenAI client error verbatim."""
+    """Recognise LiteLLM/OpenAI/Anthropic gateway hiccups (502/503/504/
+    500) by class name OR string marker. Used by `_handle_llm_error`
+    when classifying the FINAL exception after the chain exhausts.
+
+    Note: this is a stricter check than `_is_hard_error`. The chain-
+    rotation logic in `_run_chat_in_thread` uses the inverse hard-error
+    check (everything not hard = transient → rotate) so that generic
+    wrappers like `ChatError` whose inner message doesn't literally
+    contain "Error code: 502" still trigger fallback to the next
+    provider instead of bubbling immediately."""
     name = type(e).__name__
     msg = str(e)
     return any(marker in name or marker in msg for marker in _TRANSIENT_GATEWAY_MARKERS)
+
+
+def _is_hard_error(e: Exception) -> bool:
+    """Return True ONLY if the error is a permanent failure (bad key,
+    validation, model-not-found, sub-cent budget cap on a fallback
+    provider, etc.) where retrying or rotating WILL NOT help. Used by
+    the chain-rotation logic to decide whether to bubble immediately or
+    rotate to the next provider.
+
+    Defaults to FALSE for unknown errors so the chain rotates by default
+    — the previous behaviour (default to "hard" if not in a transient
+    whitelist) silently broke fallback for any error class the whitelist
+    didn't anticipate (e.g. `emergentintegrations.ChatError` wrapping a
+    socket-hang). Ops would see "0% Anthropic, no Gemini attempts" with
+    no fallback ever happening."""
+    name = type(e).__name__
+    msg = str(e)
+    # Explicit hard-error class/marker hit → don't rotate.
+    if any(marker in name or marker in msg for marker in _HARD_ERROR_MARKERS):
+        # Special-case: BadRequestError with a sub-cent "Max budget"
+        # signature is the OpenAI fallback proxy cap. That's a hard
+        # error in terms of "this provider can't serve this request",
+        # but the chain SHOULD rotate to a different provider. Treat
+        # as transient so rotation happens.
+        msg_lower = msg.lower()
+        if "max budget: 0.001" in msg_lower or "max budget: 0.0001" in msg_lower:
+            return False
+        return True
+    return False
 
 
 import time as _t  # used by the retry sleep above; aliased to avoid shadowing

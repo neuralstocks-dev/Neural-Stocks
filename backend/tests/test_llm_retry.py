@@ -20,6 +20,7 @@ from services import ai as ai_module
 from services.ai import (
     _LLM_MAX_RETRIES,
     _handle_llm_error,
+    _is_hard_error,
     _is_transient_gateway_error,
 )
 
@@ -146,6 +147,78 @@ def test_handle_llm_error_chat_error_wrapping_openai_proxy_cap():
     assert exc_info.value.detail["error_code"] == "llm_upstream_unavailable"
 
 
+# ---------------------------------------------------------------------------
+# _is_hard_error — chain-rotation classifier
+# ---------------------------------------------------------------------------
+
+class FakeChatError(Exception):
+    """Mirrors `emergentintegrations.llm.chat.ChatError` — the generic
+    wrapper around any underlying LLM failure. Its message format is
+    `Failed to generate chat completion: <inner>`."""
+
+
+class FakeAuthenticationError(Exception):
+    pass
+
+
+class FakeBadRequestError(Exception):
+    pass
+
+
+def test_is_hard_error_chat_error_with_unknown_inner_is_NOT_hard():
+    """REGRESSION: the previous classifier (`not _is_transient_gateway_error`)
+    treated a `ChatError` whose inner message didn't literally contain
+    'Error code: 502/503/504/500' as a HARD error → chain refused to
+    rotate to Gemini. Production logs showed `hard error:ChatError` and
+    only Anthropic attempts in the provider strip — Gemini never got a
+    shot. The fix is to default to `transient` for unknown error types
+    so the chain rotates by default."""
+    e = FakeChatError("Failed to generate chat completion: some weird upstream blip")
+    assert _is_hard_error(e) is False
+
+
+def test_is_hard_error_authentication_error_is_hard():
+    e = FakeAuthenticationError("AuthenticationError: invalid api key")
+    assert _is_hard_error(e) is True
+
+
+def test_is_hard_error_400_validation_is_hard():
+    e = FakeBadRequestError("BadRequestError: Error code: 400 - invalid model parameter")
+    assert _is_hard_error(e) is True
+
+
+def test_is_hard_error_404_model_not_found_is_hard():
+    e = Exception("Error code: 404 - model 'gpt-foo' not found")
+    assert _is_hard_error(e) is True
+
+
+def test_is_hard_error_openai_proxy_cap_is_NOT_hard_so_chain_rotates():
+    """Even though the OpenAI proxy cap surfaces as a `BadRequestError`
+    (which would normally be hard), the sub-cent budget signature is a
+    fallback-tier limitation that should trigger chain rotation, NOT
+    bubble immediately. Verify the special-case keeps that path open."""
+    e = FakeBadRequestError(
+        "litellm.BadRequestError: OpenAIException - Budget has been exceeded! "
+        "Current cost: 0.023937, Max budget: 0.001"
+    )
+    assert _is_hard_error(e) is False
+
+
+def test_is_hard_error_socket_hang_is_NOT_hard():
+    """Socket hangs surface as plain `Exception` or `TimeoutError` —
+    must rotate to next provider, not bubble."""
+    e = Exception("Anthropic socket hang detected after 75s")
+    assert _is_hard_error(e) is False
+    e2 = TimeoutError("read timeout")
+    assert _is_hard_error(e2) is False
+
+
+def test_is_hard_error_bad_gateway_is_NOT_hard():
+    """Gateway errors are textbook transient — must rotate."""
+    e = FakeBadGatewayError("BadGatewayError: Error code: 502")
+    assert _is_hard_error(e) is False
+
+
 def test_handle_llm_error_falls_through_to_502_on_unknown():
     """Genuinely unknown errors still surface as a 502 so we don't hide
     novel issues behind a generic friendly message."""
@@ -184,9 +257,12 @@ def test_run_chat_retries_on_transient_then_succeeds():
     assert call_count["n"] == 3  # 2 failures + 1 success
 
 
-def test_run_chat_re_raises_after_max_retries():
-    """All N+1 attempts fail with transient → final exception is raised
-    (not retried infinitely). Caller's _handle_llm_error then maps it."""
+def test_run_chat_re_raises_after_max_retries_across_full_chain():
+    """All retries fail with transient errors across EVERY provider in
+    the fallback chain → final exception is raised (not retried
+    infinitely). With the chain at 2 providers (Anthropic, Gemini) and
+    `_LLM_MAX_RETRIES + 1 = 3` attempts each, total attempts = 6."""
+    from services.ai import _LLM_FALLBACK_CHAIN
     call_count = {"n": 0}
 
     def fake_run_chat(*_args, **_kwargs):
@@ -198,20 +274,70 @@ def test_run_chat_re_raises_after_max_retries():
         with pytest.raises(FakeBadGatewayError):
             asyncio.run(ai_module._run_chat_in_thread("sys", "test", "msg"))
 
-    assert call_count["n"] == _LLM_MAX_RETRIES + 1
+    expected = (_LLM_MAX_RETRIES + 1) * len(_LLM_FALLBACK_CHAIN)
+    assert call_count["n"] == expected
 
 
-def test_run_chat_does_not_retry_on_non_transient():
-    """A 4xx-style error (e.g. validation) should NOT be retried — fail fast."""
+class FakeAuthErrorForRetryTest(Exception):
+    """Class name contains 'AuthenticationError' marker — the chain
+    classifier MUST treat this as a hard error and bail immediately."""
+    def __init__(self):
+        super().__init__("AuthenticationError: invalid api key")
+
+
+def test_run_chat_does_not_retry_on_hard_error():
+    """A hard error (auth, validation, model-not-found) should NOT be
+    retried OR rotated — bubble immediately so the caller can render a
+    targeted user message. We use an AuthenticationError signature
+    because that's a textbook hard error that CANNOT be fixed by either
+    retrying the same provider or trying a different one."""
+    call_count = {"n": 0}
+
+    class _AuthErr(Exception):
+        pass
+    _AuthErr.__name__ = "AuthenticationError"
+
+    def fake_run_chat(*_args, **_kwargs):
+        call_count["n"] += 1
+        raise _AuthErr("invalid api key")
+
+    with patch.object(ai_module, "_run_chat", fake_run_chat), \
+         patch.object(ai_module._t, "sleep", lambda _s: None):
+        with pytest.raises(_AuthErr):
+            asyncio.run(ai_module._run_chat_in_thread("sys", "test", "msg"))
+
+    assert call_count["n"] == 1  # exactly one attempt, no retry, no rotation
+
+
+def test_run_chat_chat_error_with_unknown_inner_rotates_through_chain():
+    """REGRESSION: this is the exact production failure mode the user
+    saw — the provider strip showed only Anthropic attempts because
+    `ChatError` with an inner message that didn't match transient
+    markers fell through the OLD `not _is_transient_gateway_error` check
+    and bubbled immediately as a hard error. After the fix, the chain
+    MUST rotate through both providers and only bubble after the LAST
+    provider exhausts."""
+    from services.ai import _LLM_FALLBACK_CHAIN
+
+    class _ChatError(Exception):
+        pass
+    _ChatError.__name__ = "ChatError"  # mimic emergentintegrations
+
     call_count = {"n": 0}
 
     def fake_run_chat(*_args, **_kwargs):
         call_count["n"] += 1
-        raise ValueError("bad request payload")
+        raise _ChatError(
+            "Failed to generate chat completion: weird upstream blip"
+        )
 
     with patch.object(ai_module, "_run_chat", fake_run_chat), \
          patch.object(ai_module._t, "sleep", lambda _s: None):
-        with pytest.raises(ValueError):
+        with pytest.raises(_ChatError):
             asyncio.run(ai_module._run_chat_in_thread("sys", "test", "msg"))
 
-    assert call_count["n"] == 1  # exactly one attempt, no retry
+    expected = (_LLM_MAX_RETRIES + 1) * len(_LLM_FALLBACK_CHAIN)
+    assert call_count["n"] == expected, (
+        f"ChatError must rotate across all providers; got {call_count['n']} "
+        f"attempts, expected {expected}"
+    )
