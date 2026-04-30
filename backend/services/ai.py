@@ -181,7 +181,7 @@ INTRINSIC-VALUE ANCHOR — when the payload includes `intrinsic_value_anchor` an
 """
 
 
-def _run_chat(system_prompt: str, session_prefix: str, user_text: str):
+def _run_chat(system_prompt: str, session_prefix: str, user_text: str, *, provider: str, model: str):
     """Returns the coroutine for the LLM response.
 
     Note: `chat.send_message()` is technically async, but in practice the
@@ -193,51 +193,142 @@ def _run_chat(system_prompt: str, session_prefix: str, user_text: str):
     /queue/status. The trade-off is one OS thread per concurrent
     analysis, capped by the global ANALYSIS_CONCURRENCY semaphore (=4)
     so we never run more than 4 threads at once.
+
+    `provider` / `model` come from `_LLM_FALLBACK_CHAIN` so the same call
+    site can rotate to a different provider when the primary upstream
+    socket-hangs on us.
+
+    `with_params(timeout=...,  num_retries=0)` is critical:
+      - `timeout` is forwarded to LiteLLM's underlying httpx client and
+        forces an HTTP-layer deadline on the call. Without it, a socket
+        hang against Anthropic ties up the call indefinitely (we observed
+        184 s spent inside ONE attempt before the upstream gave up).
+      - `num_retries=0` disables LiteLLM's INTERNAL retry loop. We need
+        that off because (a) LiteLLM hammers the same provider on every
+        retry, blowing our wall-clock budget on a known-bad upstream
+        instead of letting us rotate, and (b) we run our own structured
+        retry-then-rotate logic in `_run_chat_in_thread` which is the
+        right level for cross-provider fallback decisions.
     """
     session_id = f"{session_prefix}-{uuid.uuid4().hex[:8]}"
     chat = (
         LlmChat(api_key=EMERGENT_LLM_KEY, session_id=session_id, system_message=system_prompt)
-        .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        .with_model(provider, model)
+        .with_params(timeout=_LLM_PER_ATTEMPT_TIMEOUT_S, num_retries=0)
     )
     return chat.send_message(UserMessage(text=user_text))
 
 
+# Multi-provider fallback chain. Order matters: we try entries left-to-right.
+# Each tuple is (provider, model, label_for_logs).
+#
+# Why fall back at all: the Universal Key proxy fronts Anthropic, Google,
+# and OpenAI. When Anthropic socket-hangs (request stays open with no bytes
+# until our budget expires), our previous "retry-on-502/503/504" loop did
+# nothing — there was no error to catch, just silence. The fix: cap each
+# attempt at `_LLM_PER_ATTEMPT_TIMEOUT_S`, then rotate to the next provider.
+# Three providers × ~75 s/attempt = ~225 s worst-case, which fits inside
+# the 240 s job budget with a small buffer.
+#
+# Why these specific models:
+#   - Anthropic claude-sonnet-4-5 — primary; matches everything we've
+#     calibrated reasoning, JSON output, and the published Score Card on.
+#   - Gemini gemini-2.5-pro — playbook-recommended Google model, strong
+#     JSON-mode adherence, independent of Anthropic infra.
+#   - OpenAI gpt-5.1 — playbook-recommended OpenAI model, fully different
+#     control plane so a Universal-Key-wide outage is unlikely to take all
+#     three down simultaneously.
+_LLM_FALLBACK_CHAIN = [
+    ("anthropic", "claude-sonnet-4-5-20250929", "claude-sonnet-4-5"),
+    ("gemini",    "gemini-2.5-pro",             "gemini-2.5-pro"),
+    ("openai",    "gpt-5.1",                    "gpt-5.1"),
+]
+_LLM_PER_ATTEMPT_TIMEOUT_S = 75.0
+
+
 async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text: str):
-    """Run the entire Claude round-trip in an OS thread so the main asyncio
+    """Run the entire LLM round-trip in an OS thread so the main asyncio
     loop stays responsive. Each thread spins up a fresh asyncio loop just
     for that one call; LiteLLM's internal httpx + streaming work happens
     there instead of on the API process's main loop.
 
-    Transient upstream gateway errors (502 BadGateway, 503 ServiceUnavailable,
-    504 Gateway Timeout) from LiteLLM/Anthropic are retried up to
-    `_LLM_MAX_RETRIES` times with exponential backoff. These errors typically
-    resolve within 5-15 seconds when Anthropic's side has a brief blip; our
-    own 240s analysis budget can absorb 2-3 retry attempts comfortably. The
-    LLM circuit breaker (services/llm_circuit_breaker.py) sits one level up
-    and trips the global gate after several consecutive total failures so
-    the user gets a fast-fail 503 instead of waiting through repeated
-    retries when the upstream is genuinely down."""
+    Resilience layers, applied left-to-right:
+      1. Inside-provider transient retry: 502 / 503 / 504 from
+         LiteLLM/upstream → exponential backoff (2 s, 4 s) up to
+         `_LLM_MAX_RETRIES` retries.
+      2. Per-attempt timeout: each provider attempt is hard-capped at
+         `_LLM_PER_ATTEMPT_TIMEOUT_S` seconds. If the upstream socket-hangs,
+         we abort the attempt and rotate to the next provider — instead
+         of consuming the entire 240 s job budget on a single dead call.
+      3. Provider fallback chain (`_LLM_FALLBACK_CHAIN`): when one
+         provider exhausts its retries OR times out, we try the next.
+      4. Circuit breaker (services/llm_circuit_breaker.py): one level up,
+         trips the global gate after several consecutive total failures
+         so the user gets a fast-fail 503 rather than waiting through
+         repeated retries when the upstream is genuinely down."""
     import asyncio as _asyncio
 
     def _sync_run():
-        last_exc = None
-        for attempt in range(_LLM_MAX_RETRIES + 1):
-            try:
-                return _asyncio.run(_run_chat(system_prompt, session_prefix, user_text))
-            except Exception as e:
-                last_exc = e
-                if not _is_transient_gateway_error(e) or attempt >= _LLM_MAX_RETRIES:
-                    raise
-                # Exponential backoff: 2s, 4s. Total worst-case = 6s of waiting
-                # added to the analysis budget.
-                wait = _LLM_RETRY_BACKOFF_S * (2 ** attempt)
-                logger.warning(
-                    "LLM transient %s on %s (attempt %d/%d) — retrying in %ds",
-                    type(e).__name__, session_prefix, attempt + 1, _LLM_MAX_RETRIES, wait,
-                )
-                _t.sleep(wait)
-        # Defensive — should never reach here because the loop either returns
-        # or re-raises on the final attempt.
+        last_exc: Exception | None = None
+        attempted_labels: list[str] = []
+        for provider, model, label in _LLM_FALLBACK_CHAIN:
+            attempted_labels.append(label)
+            for attempt in range(_LLM_MAX_RETRIES + 1):
+                try:
+                    return _asyncio.run(
+                        _asyncio.wait_for(
+                            _run_chat(
+                                system_prompt,
+                                f"{session_prefix}-{label}",
+                                user_text,
+                                provider=provider,
+                                model=model,
+                            ),
+                            timeout=_LLM_PER_ATTEMPT_TIMEOUT_S,
+                        )
+                    )
+                except _asyncio.TimeoutError as te:
+                    # Per-attempt budget blew. Don't keep retrying THIS
+                    # provider — rotate to the next one. Socket hangs
+                    # almost never resolve on a same-provider retry.
+                    last_exc = te
+                    logger.warning(
+                        "LLM per-attempt timeout (%ss) on provider=%s model=%s for %s — rotating to next provider",
+                        int(_LLM_PER_ATTEMPT_TIMEOUT_S), provider, model, session_prefix,
+                    )
+                    break
+                except Exception as e:
+                    last_exc = e
+                    if not _is_transient_gateway_error(e):
+                        # Hard error (auth, billing, model-not-found,
+                        # validation): don't retry, don't fall back —
+                        # bubble immediately so the caller can render a
+                        # specific user message via _handle_llm_error.
+                        raise
+                    if attempt >= _LLM_MAX_RETRIES:
+                        # This provider is wedged on transient errors —
+                        # rotate to the next one instead of giving up.
+                        logger.warning(
+                            "LLM transient retries exhausted on provider=%s for %s — rotating to next provider",
+                            provider, session_prefix,
+                        )
+                        break
+                    # Exponential backoff: 2s, 4s. Total worst-case = 6s
+                    # of waiting added to this provider's per-attempt window.
+                    wait = _LLM_RETRY_BACKOFF_S * (2 ** attempt)
+                    logger.warning(
+                        "LLM transient %s on provider=%s for %s (attempt %d/%d) — retrying in %ds",
+                        type(e).__name__, provider, session_prefix, attempt + 1, _LLM_MAX_RETRIES, wait,
+                    )
+                    _t.sleep(wait)
+        # Every provider in the chain either timed out or exhausted its
+        # retries. Surface the LAST exception we saw — the upstream layer
+        # (record_outcome + _handle_llm_error) needs the original error
+        # type so it can classify (timeout vs gateway vs other) correctly.
+        logger.error(
+            "LLM fallback chain exhausted for %s after trying %s — last_exc=%r",
+            session_prefix, attempted_labels, last_exc,
+        )
         raise last_exc  # noqa: F821
 
     return await _asyncio.to_thread(_sync_run)
