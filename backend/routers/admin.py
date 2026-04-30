@@ -415,6 +415,73 @@ async def llm_events_by_provider(hours: int = 24, _admin=Depends(admin_required)
     }
 
 
+@router.get("/source-health")
+async def source_health(hours: int = 24, _admin=Depends(admin_required)):
+    """Aggregate per-source success-rate stats for upstream data vendors
+    (yfinance, Finnhub, RapidAPI IDX, IDX news RSS) over the last `hours`
+    window. Same shape as `/llm-events/by-provider` so the frontend can
+    render an identical strip — different data, same UX.
+
+    Driven by the `source_events` collection populated by the
+    `services.source_health.track(...)` decorator wired around every
+    fetch entry point in services/yfinance_svc, services/finnhub,
+    services/idx_rapidapi, services/idx_news.
+    """
+    import time as _time
+    from core.db import db
+    hours = max(1, min(int(hours), 24 * 30))
+    since = _time.time() - (hours * 3600)
+    pipeline = [
+        {"$match": {"ts": {"$gte": since}}},
+        {
+            "$group": {
+                "_id": {"source": "$source", "outcome": "$outcome"},
+                "n": {"$sum": 1},
+                "avg_elapsed_s": {"$avg": "$elapsed_s"},
+            }
+        },
+    ]
+    rows = await db.source_events.aggregate(pipeline).to_list(length=500)
+
+    bucket: dict[str, dict] = {}
+    for r in rows:
+        s = r["_id"].get("source") or "unknown"
+        o = r["_id"].get("outcome") or "unknown"
+        b = bucket.setdefault(
+            s,
+            {"source": s, "success": 0, "empty": 0, "failure": 0,
+             "avg_elapsed_s_success": None, "avg_elapsed_s_failure": None},
+        )
+        if o == "success":
+            b["success"] = r["n"]
+            b["avg_elapsed_s_success"] = round(r["avg_elapsed_s"] or 0, 2)
+        elif o == "empty":
+            b["empty"] = r["n"]
+        elif o == "failure":
+            b["failure"] = r["n"]
+            b["avg_elapsed_s_failure"] = round(r["avg_elapsed_s"] or 0, 2)
+
+    sources = []
+    for s_key, b in bucket.items():
+        # "empty" is NOT a failure — vendor responded healthy, just had
+        # no data for that ticker. Health rate = success / (success +
+        # failure), excluding empties from the denominator.
+        denom = b["success"] + b["failure"]
+        b["total"] = b["success"] + b["failure"] + b["empty"]
+        b["success_rate"] = round(100 * b["success"] / denom, 1) if denom else 100.0
+        sources.append(b)
+    sources.sort(key=lambda x: (-x["total"], x["source"]))
+
+    total = sum(s["total"] for s in sources)
+    total_succ = sum(s["success"] for s in sources)
+    return {
+        "window_hours": hours,
+        "sources": sources,
+        "total_calls": total,
+        "overall_success_rate": round(100 * total_succ / total, 1) if total else 0.0,
+    }
+
+
 @router.post("/users/{user_id}/unlock")
 async def unlock_user(user_id: str, req: UnlockReq, admin=Depends(admin_required)):
     seconds = UNLOCK_DURATIONS.get(req.duration)

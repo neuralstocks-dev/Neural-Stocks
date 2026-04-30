@@ -30,6 +30,7 @@ export default function AdminLLMHealthPanel() {
     const [events, setEvents] = useState(null);
     const [recoup, setRecoup] = useState(null);
     const [providers, setProviders] = useState(null);
+    const [sources, setSources] = useState(null);
     const [err, setErr] = useState("");
     const [busy, setBusy] = useState(false);
     // Track which row in the "Last 10 failures" table has its detail
@@ -49,16 +50,18 @@ export default function AdminLLMHealthPanel() {
     const refresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            const [s, e, r, p] = await Promise.all([
+            const [s, e, r, p, srcRes] = await Promise.all([
                 api.get("/admin/llm-breaker"),
                 api.get("/admin/llm-events?limit=10&hours=24"),
                 api.get("/admin/llm-events/recoup-summary?days=30"),
                 api.get("/admin/llm-events/by-provider?hours=24"),
+                api.get("/admin/source-health?hours=24"),
             ]);
             setStatus(s.data);
             setEvents(e.data);
             setRecoup(r.data);
             setProviders(p.data);
+            setSources(srcRes.data);
             setErr("");
         } catch (ex) {
             setErr(ex?.response?.data?.detail || "Failed to load LLM health");
@@ -306,6 +309,16 @@ export default function AdminLLMHealthPanel() {
                 <ProviderHealthStrip data={providers} />
             )}
 
+            {/* Upstream-data-source health strip · last 24h. Same chip
+                pattern as the LLM provider strip — different signal,
+                same UX. Captures yfinance, Finnhub, RapidAPI IDX, IDX
+                news RSS health. Hidden until at least one source has
+                been called in the window so the panel doesn't show an
+                empty placeholder before any analysis has run. */}
+            {sources && sources.sources && sources.sources.length > 0 && (
+                <SourceHealthStrip data={sources} />
+            )}
+
             {/* Credit-recoup tracker · last 30 days. Quantifies the cost of
                 upstream Universal-Key socket hangs and offers a one-tap
                 "Copy escalation summary" that drops a ready-to-paste support
@@ -544,6 +557,83 @@ function ProviderHealthStrip({ data }) {
             <p className="mt-2 text-[10.5px]" style={{ color: "hsl(var(--text-muted))" }}>
                 Order = fallback-chain priority. Green ≥85% · amber 50-84% · red &lt;50%.
                 When the top provider drops below 50%, expect rotations to the next provider.
+            </p>
+        </div>
+    );
+}
+
+/**
+ * Per-data-source success-rate strip · last 24h. Mirrors the LLM provider
+ * strip but for upstream data vendors (yfinance, Finnhub, RapidAPI IDX,
+ * IDX news RSS). Each chip surfaces successes / empties / failures so the
+ * admin can spot a degraded vendor at a glance. "Empty" responses (vendor
+ * replied healthy but had no data for that ticker) are rendered separately
+ * from outright failures and do NOT count against the success rate.
+ */
+function SourceHealthStrip({ data }) {
+    if (!data || !data.sources) return null;
+    function rateColor(rate, denom) {
+        if (denom === 0) return "hsl(var(--text-muted))";
+        if (rate >= 85) return "hsl(var(--buy))";
+        if (rate >= 50) return "hsl(var(--hold))";
+        return "hsl(var(--sell))";
+    }
+    return (
+        <div
+            className="mt-4 p-3"
+            data-testid="admin-source-health-strip"
+            style={{
+                border: "1px solid hsl(var(--border-default))",
+                background: "hsl(var(--surface-elevated))",
+                borderRadius: 2,
+            }}
+        >
+            <div className="flex items-baseline justify-between gap-3 mb-2.5">
+                <p className="text-overline" style={{ color: "hsl(var(--text-muted))", fontSize: "10px" }}>
+                    Upstream data sources · last {data.window_hours}h
+                </p>
+                <p className="font-mono" style={{ fontSize: "10.5px", color: "hsl(var(--text-secondary))" }}>
+                    {data.total_calls} calls · overall <span style={{ color: rateColor(data.overall_success_rate, data.total_calls) }}>{data.overall_success_rate}%</span>
+                </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {data.sources.map((s) => {
+                    const denom = s.success + s.failure;
+                    const color = rateColor(s.success_rate, denom);
+                    return (
+                        <div
+                            key={s.source}
+                            className="flex items-center justify-between gap-3 px-3 py-2"
+                            data-testid={`admin-source-${s.source.replace(/\./g, "-")}`}
+                            style={{
+                                border: `1px solid ${color}`,
+                                borderLeftWidth: 3,
+                                background: "hsl(var(--surface-base))",
+                                borderRadius: 2,
+                            }}
+                        >
+                            <div className="min-w-0">
+                                <p className="font-mono" style={{ fontSize: "11.5px", color: "hsl(var(--text-primary))" }}>
+                                    {s.source}
+                                </p>
+                                <p className="font-mono mt-0.5" style={{ fontSize: "9.5px", color: "hsl(var(--text-muted))" }}>
+                                    {s.success}✓ / {s.failure}✗{s.empty ? ` / ${s.empty}∅` : ""} · {s.total} calls
+                                </p>
+                            </div>
+                            <p
+                                className="font-mono"
+                                style={{ fontSize: "18px", color, fontWeight: 500 }}
+                                aria-label={`${s.source} success rate ${s.success_rate}%`}
+                            >
+                                {s.success_rate}%
+                            </p>
+                        </div>
+                    );
+                })}
+            </div>
+            <p className="mt-2 text-[10.5px]" style={{ color: "hsl(var(--text-muted))" }}>
+                Success-rate ignores ∅ "empty" responses (vendor healthy, no data for that ticker).
+                Green ≥85% · amber 50-84% · red &lt;50%.
             </p>
         </div>
     );

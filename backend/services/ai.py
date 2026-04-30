@@ -244,6 +244,70 @@ _LLM_FALLBACK_CHAIN = [
     ("openai",    "gpt-5.1",                    "gpt-5.1"),
 ]
 _LLM_PER_ATTEMPT_TIMEOUT_S = 75.0
+# Adaptive re-ranking thresholds for the fallback chain. A provider must
+# have AT LEAST `_ADAPTIVE_MIN_SAMPLE` recent attempts before we'll
+# consider re-ranking it (avoids penalising a provider on a single
+# unlucky failure). Below `_ADAPTIVE_DEMOTE_RATE` success rate, that
+# provider gets demoted to the back of the chain so users don't pay the
+# 60-90s per-attempt timeout for a known-degraded upstream.
+_ADAPTIVE_WINDOW_SECONDS = 3600   # last 1 hour
+_ADAPTIVE_MIN_SAMPLE     = 3
+_ADAPTIVE_DEMOTE_RATE    = 0.30
+
+
+def _ordered_fallback_chain():
+    """Return `_LLM_FALLBACK_CHAIN` re-ranked by recent provider health.
+
+    Default order is preserved for healthy providers. A provider whose
+    last-1h success rate falls below 30% (with at least 3 attempts) gets
+    demoted to the back of the chain, so we try the next-healthiest
+    provider FIRST and skip the timeout penalty.
+
+    This runs on every analysis kickoff, synchronously, inside the
+    LLM-thread (via `_sync_run`). Mongo lookup is a tiny indexed query
+    (~few ms) and any failure falls back to the default chain order —
+    the adaptive logic must NEVER break analysis on its own.
+    """
+    try:
+        since = _t.time() - _ADAPTIVE_WINDOW_SECONDS
+        # Sync read via PyMongo (the motor `db` doesn't expose a sync
+        # cursor; we get the raw client from the motor instance).
+        from core.db import db as _async_db  # noqa: WPS433 (intentional local import)
+        sync_coll = _async_db.delegate.llm_events  # type: ignore[attr-defined]
+        rows = list(sync_coll.find(
+            {"ts": {"$gte": since}, "kind": "provider_attempt"},
+            {"_id": 0, "provider": 1, "outcome": 1},
+        ))
+        stats: dict[str, dict] = {}
+        for r in rows:
+            p = r.get("provider")
+            if not p:
+                continue
+            s = stats.setdefault(p, {"success": 0, "total": 0})
+            s["total"] += 1
+            if r.get("outcome") == "success":
+                s["success"] += 1
+        healthy: list = []
+        degraded: list = []
+        for entry in _LLM_FALLBACK_CHAIN:
+            provider = entry[0]
+            s = stats.get(provider, {"success": 0, "total": 0})
+            if (
+                s["total"] >= _ADAPTIVE_MIN_SAMPLE
+                and (s["success"] / s["total"]) < _ADAPTIVE_DEMOTE_RATE
+            ):
+                degraded.append(entry)
+            else:
+                healthy.append(entry)
+        if degraded:
+            logger.info(
+                "Adaptive LLM chain re-ranked: demoting %s (last-1h success<%d%%)",
+                [e[2] for e in degraded], int(_ADAPTIVE_DEMOTE_RATE * 100),
+            )
+        return healthy + degraded
+    except Exception as e:
+        logger.warning("Adaptive chain re-rank failed (%s) — using default order", e)
+        return list(_LLM_FALLBACK_CHAIN)
 
 
 async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text: str):
@@ -300,7 +364,10 @@ async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text
     def _sync_run():
         last_exc: Exception | None = None
         attempted_labels: list[str] = []
-        for provider, model, label in _LLM_FALLBACK_CHAIN:
+        # Re-rank on every call so a provider that recovers gets promoted
+        # back without a service restart.
+        chain = _ordered_fallback_chain()
+        for provider, model, label in chain:
             attempted_labels.append(label)
             for attempt in range(_LLM_MAX_RETRIES + 1):
                 attempt_started = _t2.monotonic()

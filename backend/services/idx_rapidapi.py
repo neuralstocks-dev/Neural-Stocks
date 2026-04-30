@@ -15,6 +15,8 @@ Design:
 """
 from __future__ import annotations
 
+from services.source_health import track
+
 import asyncio
 import logging
 import os
@@ -403,6 +405,7 @@ async def _call(path: str, ticker: str) -> dict | None:
 
 # ------------------------------- Public API -------------------------------
 
+@track("idx_rapidapi.get_quote")
 async def get_quote(ticker: str) -> dict | None:
     """Return current quote snapshot (price, volume, market cap, change %).
     Uses `/api/emiten/{symbol}/info`. None on any failure."""
@@ -460,6 +463,7 @@ async def get_quote(ticker: str) -> dict | None:
     return normalised
 
 
+@track("idx_rapidapi.get_key_stats")
 async def get_key_stats(ticker: str) -> dict | None:
     """Valuation + profitability ratios via `/api/emiten/{symbol}/keystats`.
 
@@ -591,6 +595,7 @@ def _parse_shares(s) -> float:
         return 0.0
 
 
+@track("idx_rapidapi.get_bandarmology")
 async def get_bandarmology(ticker: str) -> dict | None:
     """Compute Accumulation / Distribution / Smart-Money signals from the
     insider-flow feed. Single upstream call, computed locally."""

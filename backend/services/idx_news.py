@@ -27,6 +27,7 @@ from email.utils import parsedate_to_datetime
 import httpx
 
 from services.sentiment import classify_sentiment_detailed
+from services.source_health import track
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,7 @@ def _build_matcher(symbol: str) -> re.Pattern:
     return re.compile(pattern, re.IGNORECASE)
 
 
+@track("idx_news.get_company_news")
 async def get_company_news_idx(symbol: str, limit: int = 6) -> dict | None:
     """Fetch IDX news for a .JK ticker. Returns the same shape as
     `finnhub.get_company_news()` so consumers don't need to branch."""

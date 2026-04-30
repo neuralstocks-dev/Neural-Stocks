@@ -2,6 +2,7 @@
 import asyncio
 import math
 import yfinance as yf
+from services.source_health import track
 
 
 def _isnan(x) -> bool:
@@ -74,6 +75,7 @@ def _yf_quote_sync(ticker: str) -> dict:
     }
 
 
+@track("yfinance.get_quote")
 async def get_quote(ticker: str) -> dict:
     """Returns a merged quote dict.
 

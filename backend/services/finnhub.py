@@ -18,6 +18,8 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
+from services.source_health import track
+
 from core.config import FINNHUB_API_KEY
 from services.sentiment import classify_sentiment_detailed
 
@@ -65,6 +67,7 @@ async def _get(path: str, params: dict, cache_key: str, ttl: int):
         return hit["v"] if hit else None
 
 
+@track("finnhub.get_quote")
 async def get_quote(symbol: str) -> dict | None:
     """Returns {price, previous_close, day_high, day_low, open} or None.
     Finnhub returns: c=current, d=change, dp=change%, h=high, l=low, o=open, pc=prev_close."""
@@ -95,6 +98,7 @@ def _classify_sentiment_detailed(headline: str) -> dict:
     return classify_sentiment_detailed(headline)
 
 
+@track("finnhub.get_company_news")
 async def get_company_news(symbol: str, limit: int = 6) -> list[dict]:
     """Returns latest {limit} news items with heuristic sentiment + a 7-day
     daily sentiment sparkline computed from the full window (not just the
@@ -181,6 +185,7 @@ async def get_company_news(symbol: str, limit: int = 6) -> list[dict]:
     }
 
 
+@track("finnhub.get_analyst_consensus")
 async def get_analyst_consensus(symbol: str) -> dict | None:
     """Returns {strong_buy, buy, hold, sell, strong_sell, total, recommendation_label, period}."""
     data = await _get("/stock/recommendation", {"symbol": symbol.upper()},
@@ -222,6 +227,7 @@ async def get_analyst_consensus(symbol: str) -> dict | None:
     }
 
 
+@track("finnhub.get_next_earnings")
 async def get_next_earnings(symbol: str) -> dict | None:
     today = datetime.now(timezone.utc).date()
     end = today + timedelta(days=120)
