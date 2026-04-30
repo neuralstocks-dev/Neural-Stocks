@@ -45,7 +45,14 @@ app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    # Bearer JWT only (no cookies) — `allow_credentials=True` is INVALID
+    # alongside a wildcard `allow_origins=["*"]` per the CORS spec, and
+    # browsers silently reject the response for cross-origin calls
+    # (e.g. neulab.xyz → p1-builder.preview.emergentagent.com), killing
+    # POSTs to /api/auth/google/session before they reach the backend.
+    # We carry the auth token in the `Authorization` header which works
+    # cleanly with wildcard CORS.
+    allow_credentials=False,
     allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
     allow_methods=["*"],
     allow_headers=["*"],

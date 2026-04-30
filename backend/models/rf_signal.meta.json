@@ -1,6 +1,6 @@
 {
-  "trained_at": "2026-04-23T06:21:49.164565+00:00",
-  "universe_size": 346,
+  "trained_at": "2026-04-30T11:10:30.024064+00:00",
+  "universe_size": 322,
   "universe": [
     "A",
     "AAPL",
@@ -10,7 +10,6 @@
     "ACN",
     "ADBE",
     "ADI",
-    "ADSK",
     "AEE",
     "AEP",
     "AFL",
@@ -25,18 +24,13 @@
     "AMT",
     "AMZN",
     "ANET",
-    "AON",
     "APD",
     "APH",
     "ARE",
-    "ASML",
     "ATO",
-    "AVB",
-    "AVGO",
     "AVY",
     "AWK",
     "AXP",
-    "AZO",
     "BA",
     "BABA",
     "BAC",
@@ -46,7 +40,6 @@
     "BIIB",
     "BILL",
     "BK",
-    "BKNG",
     "BKR",
     "BLK",
     "BMY",
@@ -54,7 +47,6 @@
     "BRK-B",
     "BSX",
     "BXP",
-    "C",
     "CAG",
     "CAH",
     "CARR",
@@ -62,7 +54,6 @@
     "CB",
     "CCI",
     "CCL",
-    "CDNS",
     "CE",
     "CHD",
     "CHTR",
@@ -84,14 +75,12 @@
     "CRWD",
     "CSCO",
     "CSX",
-    "CTVA",
     "CVS",
     "CVX",
     "DASH",
     "DBX",
     "DD",
     "DDOG",
-    "DE",
     "DELL",
     "DEO",
     "DG",
@@ -139,12 +128,10 @@
     "GLW",
     "GOOG",
     "GOOGL",
-    "GPN",
     "GS",
     "GWW",
     "HAL",
     "HD",
-    "HIG",
     "HLT",
     "HOLX",
     "HON",
@@ -181,7 +168,6 @@
     "LMT",
     "LNC",
     "LOW",
-    "LRCX",
     "LULU",
     "LVS",
     "LYB",
@@ -223,7 +209,6 @@
     "NTAP",
     "NTRS",
     "NUE",
-    "NVDA",
     "NVO",
     "NXPI",
     "O",
@@ -260,31 +245,23 @@
     "PYPL",
     "QCOM",
     "QSR",
-    "RBLX",
     "RCL",
     "REGN",
     "RIO",
     "RJF",
-    "RMD",
     "ROK",
     "ROKU",
     "ROP",
-    "ROST",
     "RSG",
     "RTX",
     "SAP",
-    "SBUX",
     "SCHW",
     "SHEL",
-    "SHOP",
     "SHW",
     "SLB",
     "SNA",
-    "SNAP",
-    "SNOW",
     "SNPS",
     "SO",
-    "SONY",
     "SPG",
     "SPGI",
     "SPOT",
@@ -315,7 +292,6 @@
     "TWLO",
     "TXN",
     "U",
-    "UBER",
     "UDR",
     "UL",
     "UNH",
@@ -376,140 +352,140 @@
     "spy_ret_20d",
     "vix_level_rel"
   ],
-  "train_rows": 314167,
-  "test_rows": 78875,
-  "cutoff_date": "2025-05-27",
-  "training_start_date": "2021-10-12",
-  "training_end_date": "2026-04-22",
-  "holdout_accuracy": 0.4781,
-  "holdout_auc": 0.4683,
-  "oob_score": 0.6354,
-  "baseline_accuracy": 0.5042,
+  "train_rows": 292375,
+  "test_rows": 73398,
+  "cutoff_date": "2025-06-03",
+  "training_start_date": "2021-10-19",
+  "training_end_date": "2026-04-29",
+  "holdout_accuracy": 0.4897,
+  "holdout_auc": 0.4839,
+  "oob_score": 0.6332,
+  "baseline_accuracy": 0.5051,
   "calibration_method": "isotonic_frozen",
-  "calibration_rows": 62834,
-  "calibrated_brier": 0.2749,
-  "uncalibrated_brier": 0.2559,
-  "uncalibrated_accuracy": 0.4779,
-  "uncalibrated_auc": 0.4682,
+  "calibration_rows": 58475,
+  "calibrated_brier": 0.2699,
+  "uncalibrated_brier": 0.2539,
+  "uncalibrated_accuracy": 0.4844,
+  "uncalibrated_auc": 0.4839,
   "classification_report": {
     "DOWN": {
-      "precision": 0.46747864599810185,
-      "recall": 0.37787040351864165,
-      "f1-score": 0.41792522201481985,
-      "support": 39106.0
+      "precision": 0.48151064737342913,
+      "recall": 0.4039806199416396,
+      "f1-score": 0.4393515261290661,
+      "support": 36326.0
     },
     "UP": {
-      "precision": 0.4852639373743785,
-      "recall": 0.5767306193266112,
-      "f1-score": 0.5270583909736425,
-      "support": 39769.0
+      "precision": 0.49556161319633746,
+      "recall": 0.5737483815278377,
+      "f1-score": 0.5317965321965672,
+      "support": 37072.0
     },
-    "accuracy": 0.4781362916006339,
+    "accuracy": 0.489727240524265,
     "macro avg": {
-      "precision": 0.47637129168624015,
-      "recall": 0.4773005114226264,
-      "f1-score": 0.47249180649423117,
-      "support": 78875.0
+      "precision": 0.4885361302848833,
+      "recall": 0.48886450073473864,
+      "f1-score": 0.48557402916281667,
+      "support": 73398.0
     },
     "weighted avg": {
-      "precision": 0.47644604064460766,
-      "recall": 0.4781362916006339,
-      "f1-score": 0.4729504771187617,
-      "support": 78875.0
+      "precision": 0.4886075356399604,
+      "recall": 0.489727240524265,
+      "f1-score": 0.4860438238065832,
+      "support": 73398.0
     }
   },
   "feature_importance": [
     {
       "name": "vix_level_rel",
-      "importance": 0.284035
+      "importance": 0.284844
     },
     {
       "name": "spy_ret_20d",
-      "importance": 0.145746
+      "importance": 0.14376
     },
     {
       "name": "sma20_over_sma50",
-      "importance": 0.066001
+      "importance": 0.06626
     },
     {
       "name": "atr_14_over_close",
-      "importance": 0.051535
+      "importance": 0.049705
     },
     {
       "name": "dist_52w_low",
-      "importance": 0.046725
+      "importance": 0.048622
     },
     {
       "name": "realized_vol_20d",
-      "importance": 0.044413
+      "importance": 0.044676
     },
     {
       "name": "dist_52w_high",
-      "importance": 0.032453
+      "importance": 0.032522
     },
     {
       "name": "macd_hist",
-      "importance": 0.032257
-    },
-    {
-      "name": "range_pos_52w",
-      "importance": 0.029555
+      "importance": 0.031183
     },
     {
       "name": "close_over_sma50",
-      "importance": 0.028959
+      "importance": 0.030505
+    },
+    {
+      "name": "range_pos_52w",
+      "importance": 0.029076
     },
     {
       "name": "ret_20d",
-      "importance": 0.026624
+      "importance": 0.02602
     },
     {
       "name": "vol_trend_5d",
-      "importance": 0.025003
+      "importance": 0.025547
     },
     {
       "name": "rsi_14",
-      "importance": 0.022373
+      "importance": 0.021927
     },
     {
       "name": "macd_hist_delta",
-      "importance": 0.021758
+      "importance": 0.021056
     },
     {
       "name": "close_over_sma20",
-      "importance": 0.020438
+      "importance": 0.020709
     },
     {
       "name": "overnight_gap",
-      "importance": 0.019811
-    },
-    {
-      "name": "rsi_change_3d",
-      "importance": 0.019222
+      "importance": 0.020651
     },
     {
       "name": "ret_5d",
-      "importance": 0.018968
+      "importance": 0.018703
+    },
+    {
+      "name": "rsi_change_3d",
+      "importance": 0.018658
     },
     {
       "name": "vol_ratio_20d",
-      "importance": 0.018123
+      "importance": 0.018159
     },
     {
       "name": "ret_1d",
-      "importance": 0.013385
+      "importance": 0.013864
     },
     {
       "name": "lower_shadow_ratio",
-      "importance": 0.011956
+      "importance": 0.012886
     },
     {
       "name": "upper_shadow_ratio",
-      "importance": 0.010778
+      "importance": 0.01071
     },
     {
       "name": "candle_body_ratio",
-      "importance": 0.00988
+      "importance": 0.009958
     }
   ]
 }
