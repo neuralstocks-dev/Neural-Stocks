@@ -475,6 +475,19 @@ async def llm_events_fallback_rate(hours: int = 24, _admin=Depends(admin_require
     }
 
 
+@router.post("/ops-digest/send-now")
+async def trigger_admin_ops_digest(_admin=Depends(admin_required)):
+    """Manual trigger for the admin ops nightly digest. Fires immediately
+    and bypasses the cooldown — used to preview the digest content (or
+    run a live smoke test of the Telegram path) without waiting for the
+    01:00 UTC cron tick. Sends ONLY to admins listed in `ADMIN_EMAILS`
+    who have already linked Telegram (same gating as the scheduled
+    loop). Returns the metrics dict + send count so the caller can
+    confirm receipt without checking Telegram itself."""
+    from services.admin_digest import run_admin_digest_once
+    return await run_admin_digest_once(force=True)
+
+
 @router.get("/source-health")
 async def source_health(hours: int = 24, _admin=Depends(admin_required)):
     """Aggregate per-source success-rate stats for upstream data vendors

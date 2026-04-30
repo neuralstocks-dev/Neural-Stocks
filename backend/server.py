@@ -71,6 +71,7 @@ async def start_background_tasks():
     from services.weekly_digest import weekly_digest_loop
     from services.digest_pusher import digest_pusher_loop
     from services.cost_reminder import cost_reminder_loop, tg_low_balance_loop
+    from services.admin_digest import admin_digest_loop
     t1 = asyncio.create_task(weekly_retrain_loop())
     _BG_TASKS.add(t1)
     t1.add_done_callback(_BG_TASKS.discard)
@@ -95,6 +96,10 @@ async def start_background_tasks():
     _BG_TASKS.add(t6)
     t6.add_done_callback(_BG_TASKS.discard)
     logger.info("Started Telegram low-balance alert scheduler")
+    t7 = asyncio.create_task(admin_digest_loop())
+    _BG_TASKS.add(t7)
+    t7.add_done_callback(_BG_TASKS.discard)
+    logger.info("Started admin ops nightly digest scheduler")
     # Ensure TTL indexes (idempotent — no-op if already created).
     try:
         from routers.analysis import _ensure_analysis_indexes
