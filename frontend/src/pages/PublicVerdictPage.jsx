@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import VerdictRing from "@/components/VerdictRing";
+import LLMProvenanceBadge from "@/components/LLMProvenanceBadge";
 import SignalBadge from "@/components/SignalBadge";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 import IntrinsicValueChip from "@/components/IntrinsicValueChip";
@@ -203,6 +204,7 @@ export default function PublicVerdictPage() {
                                     <p className="text-overline mt-4" style={{ fontSize: "0.56rem" }}>
                                         Issued {timeAgo(a.created_at)} · Horizon {a.time_horizon_weeks || 12}w · Price at analysis {formatPrice(a.price_at_analysis, currency)}
                                     </p>
+                                    <LLMProvenanceBadge analysis={a} />
                                 </div>
                             </div>
 

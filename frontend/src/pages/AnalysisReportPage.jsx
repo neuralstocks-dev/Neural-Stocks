@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import VerdictRing from "@/components/VerdictRing";
+import LLMProvenanceBadge from "@/components/LLMProvenanceBadge";
 import SignalBadge from "@/components/SignalBadge";
 import ShareVerdictButton from "@/components/ShareVerdictButton";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
@@ -695,6 +696,7 @@ export default function AnalysisReportPage() {
                                             >
                                                 Generated {formatAnalysisTimestamp(analysis.created_at)} · Horizon {analysis.time_horizon_weeks || 12}w
                                             </p>
+                                            <LLMProvenanceBadge analysis={analysis} />
 
                                             <ConfidenceCalibrationBreadcrumbs analysis={analysis} />
                                         </div>

@@ -237,7 +237,7 @@ import asyncio
 
 def test_run_chat_retries_on_transient_then_succeeds():
     """First two calls raise BadGatewayError, third returns clean. Should
-    return the third result without raising."""
+    return the third result tupled with provider metadata, no raise."""
     call_count = {"n": 0}
 
     def fake_run_chat(*_args, **_kwargs):
@@ -253,8 +253,13 @@ def test_run_chat_retries_on_transient_then_succeeds():
          patch.object(ai_module._t, "sleep", lambda _s: None):
         result = asyncio.run(ai_module._run_chat_in_thread("sys", "test", "msg"))
 
-    assert result == "ok"
+    # New tuple-return contract: (raw_text, meta)
+    assert isinstance(result, tuple) and len(result) == 2
+    raw, meta = result
+    assert raw == "ok"
     assert call_count["n"] == 3  # 2 failures + 1 success
+    assert meta["provider"] in ("anthropic", "gemini")
+    assert "model" in meta and "label" in meta
 
 
 def test_run_chat_re_raises_after_max_retries_across_full_chain():

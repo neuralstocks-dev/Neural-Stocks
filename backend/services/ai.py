@@ -331,6 +331,15 @@ async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text
     for that one call; LiteLLM's internal httpx + streaming work happens
     there instead of on the API process's main loop.
 
+    Returns: tuple `(raw_response_text, meta)` where `meta` is
+    `{"provider": "...", "model": "...", "label": "..."}` describing
+    which provider in the fallback chain ultimately produced the
+    response. Callers that persist analysis docs MUST surface this so
+    the frontend can show a "Powered by <fallback model>" footnote when
+    the primary (Anthropic) was demoted/skipped — transparency builds
+    trust and lets users distinguish reasoning style differences across
+    providers.
+
     Resilience layers, applied left-to-right:
       1. Inside-provider transient retry: 502 / 503 / 504 from
          LiteLLM/upstream → exponential backoff (2 s, 4 s) up to
@@ -402,7 +411,7 @@ async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text
                     _record_provider_attempt(
                         provider, model, "success", _t2.monotonic() - attempt_started,
                     )
-                    return result
+                    return result, {"provider": provider, "model": model, "label": label}
                 except _asyncio.TimeoutError as te:
                     # Per-attempt budget blew. Don't keep retrying THIS
                     # provider — rotate to the next one. Socket hangs
@@ -785,7 +794,7 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
 
     try:
         system_to_use = system_prompt + (_BANDARMOLOGY_PROMPT_BLOCK if "bandarmology" in payload else "")
-        raw = await _run_chat_in_thread(system_to_use, f"{prefix}-{ticker}",
+        raw, llm_meta = await _run_chat_in_thread(system_to_use, f"{prefix}-{ticker}",
                               "Analyze this stock using the data below. Return ONLY valid JSON.\n\n"
                               + json.dumps(payload, default=str))
     except HTTPException:
@@ -795,6 +804,10 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
     parsed = await _parse_ai_json_async(raw)
     if parsed.get("recommendation") not in ("BUY", "SELL", "HOLD"):
         raise HTTPException(status_code=502, detail="AI returned invalid recommendation")
+    # Surface provenance so the verdict page can show a "Powered by <model>"
+    # footnote when the primary provider (Anthropic) was demoted/skipped.
+    parsed["llm_provider"] = llm_meta["provider"]
+    parsed["llm_model"] = llm_meta["model"]
     return parsed
 
 
@@ -830,7 +843,7 @@ async def run_candlestick_analysis(ticker: str, quote: dict, history: list,
         payload["bandarmology"] = slim_bandar
     try:
         system_to_use = CANDLESTICK_SYSTEM_PROMPT + (_BANDARMOLOGY_PROMPT_BLOCK if "bandarmology" in payload else "")
-        raw = await _run_chat_in_thread(system_to_use, f"candlestick-{ticker}",
+        raw, llm_meta = await _run_chat_in_thread(system_to_use, f"candlestick-{ticker}",
                               "Analyze this stock using the detected candlestick patterns plus price context. Return ONLY valid JSON.\n\n"
                               + json.dumps(payload, default=str))
     except HTTPException:
@@ -840,6 +853,9 @@ async def run_candlestick_analysis(ticker: str, quote: dict, history: list,
     parsed = await _parse_ai_json_async(raw)
     if parsed.get("recommendation") not in ("BUY", "SELL", "HOLD"):
         raise HTTPException(status_code=502, detail="AI returned invalid recommendation")
+    # See run_ai_analysis — surface provider provenance for the footnote.
+    parsed["llm_provider"] = llm_meta["provider"]
+    parsed["llm_model"] = llm_meta["model"]
     return parsed
 
 
@@ -888,7 +904,7 @@ async def run_timeline_analysis(ticker: str, quote: dict, history: list, fundame
         ],
     }
     try:
-        raw = await _run_chat_in_thread(TIMELINE_SYSTEM_PROMPT, f"timeline-{ticker}",
+        raw, _llm_meta = await _run_chat_in_thread(TIMELINE_SYSTEM_PROMPT, f"timeline-{ticker}",
                               "Evaluate this stock's fit across short-, medium-, and long-term horizons. Return ONLY valid JSON.\n\n"
                               + json.dumps(payload, default=str))
     except HTTPException:
