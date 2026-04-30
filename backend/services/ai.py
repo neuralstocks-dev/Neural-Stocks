@@ -256,16 +256,25 @@ _LLM_PER_ATTEMPT_TIMEOUT_S = 75.0
 # unlucky failure). Below `_ADAPTIVE_DEMOTE_RATE` success rate, that
 # provider gets demoted to the back of the chain so users don't pay the
 # 60-90s per-attempt timeout for a known-degraded upstream.
+#
+# Tuning rationale (Feb 2026 production data): Anthropic Universal-Key
+# success calls run at 56-60s wall-clock (right at the upstream's
+# server-side queue/timeout), failures error out at exactly 60s. Gemini
+# returns in 27-34s with 100% success in the same window. So when
+# Anthropic is degraded, every attempt costs us ~60s and Gemini would
+# have answered ~2x faster. We aggressively demote Anthropic at
+# success<50% (was 30%) so a slow Anthropic burst rotates Gemini to
+# the front of the chain after just 2 failed attempts.
 _ADAPTIVE_WINDOW_SECONDS = 3600   # last 1 hour
 _ADAPTIVE_MIN_SAMPLE     = 3
-_ADAPTIVE_DEMOTE_RATE    = 0.30
+_ADAPTIVE_DEMOTE_RATE    = 0.50
 
 
 def _ordered_fallback_chain():
     """Return `_LLM_FALLBACK_CHAIN` re-ranked by recent provider health.
 
     Default order is preserved for healthy providers. A provider whose
-    last-1h success rate falls below 30% (with at least 3 attempts) gets
+    last-1h success rate falls below 50% (with at least 3 attempts) gets
     demoted to the back of the chain, so we try the next-healthiest
     provider FIRST and skip the timeout penalty.
 
@@ -464,7 +473,7 @@ async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text
     return await _asyncio.to_thread(_sync_run)
 
 
-_LLM_MAX_RETRIES = 2
+_LLM_MAX_RETRIES = 1
 _LLM_RETRY_BACKOFF_S = 2.0
 _TRANSIENT_GATEWAY_MARKERS = (
     "BadGatewayError",       # litellm.BadGatewayError on Anthropic 502
