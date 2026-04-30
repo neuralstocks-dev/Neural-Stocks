@@ -213,7 +213,17 @@ function FlowSVG({ activeStage }) {
                         animated in BOTH light and dark themes — the old
                         opacity made the leading edge of each connector
                         fade into the background, which masked the
-                        flow-dash animation in dark mode. */}
+                        flow-dash animation in dark mode.
+                        Note: the ingest→compute leg uses CYAN (matching
+                        the Data-ingest node outline) so the eye reads
+                        the connector colour as a continuation of the
+                        block it leaves. Compute→reason stays violet
+                        (Claude Sonnet box), reason→outputs stays green
+                        (output artifacts). */}
+                    <linearGradient id="line-cyan" x1="0" x2="1" y1="0" y2="0">
+                        <stop offset="0%" stopColor="hsl(184, 75%, 60%)" stopOpacity="0.55" />
+                        <stop offset="100%" stopColor="hsl(184, 75%, 60%)" stopOpacity="0.95" />
+                    </linearGradient>
                     <linearGradient id="line-gold" x1="0" x2="1" y1="0" y2="0">
                         <stop offset="0%" stopColor="hsl(var(--gold))" stopOpacity="0.55" />
                         <stop offset="100%" stopColor="hsl(var(--gold))" stopOpacity="0.95" />
@@ -279,7 +289,7 @@ function FlowSVG({ activeStage }) {
                 </defs>
 
                 {/* ───── connector layer ─────────────────────────────────── */}
-                {/* INGEST → 5 compute lanes (gold) */}
+                {/* INGEST → 5 compute lanes (cyan — matches the ingest node outline) */}
                 {COMPUTE_LANES.map((_, i) => {
                     const y2 = computeYStart + i * laneStep;
                     return (
@@ -287,7 +297,7 @@ function FlowSVG({ activeStage }) {
                             key={`in-${i}`}
                             className="flow-conn flow-anim"
                             d={`M ${ingestX + 70} ${reasonY} C ${ingestX + 200} ${reasonY}, ${computeX - 200} ${y2}, ${computeX - 70} ${y2}`}
-                            stroke="url(#line-gold)"
+                            stroke="url(#line-cyan)"
                             strokeWidth="2"
                         />
                     );
