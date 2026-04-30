@@ -415,6 +415,66 @@ async def llm_events_by_provider(hours: int = 24, _admin=Depends(admin_required)
     }
 
 
+@router.get("/llm-events/fallback-rate")
+async def llm_events_fallback_rate(hours: int = 24, _admin=Depends(admin_required)):
+    """Aggregate fallback-provider VERDICT rate over the last `hours`.
+
+    Distinct from `/llm-events/by-provider` (which counts raw provider
+    ATTEMPTS — including retries within a single verdict): this endpoint
+    counts FINAL verdicts persisted to the `analyses` collection and
+    reports what % of those came from a non-primary provider (i.e.
+    Anthropic was demoted/skipped and Gemini ended up answering).
+
+    Used by the Admin LLM-Health panel "Fallback rate · 24h" tile so ops
+    can spot at a glance how often fallback fired in the most recent
+    window. Pairs with the user-facing `<LLMProvenanceBadge>` — same
+    underlying signal, different audience.
+
+    Pre-Feb-2026 analyses won't have `llm_provider` set (the field was
+    added when we wired provenance through). Those rows are excluded
+    from the denominator so the rate isn't artificially diluted.
+
+    Shape:
+      {
+        "window_hours": 24,
+        "total_verdicts": 47,                # only verdicts WITH llm_provider
+        "by_provider": {"anthropic": 41, "gemini": 6},
+        "fallback_count": 6,                 # not anthropic
+        "fallback_rate_pct": 12.8,
+        "primary_provider": "anthropic",
+      }
+    """
+    import time as _time
+    from core.db import db
+    hours = max(1, min(int(hours), 24 * 30))
+    # `created_at` on analyses is an ISO-8601 string; compare against the
+    # string version of `since` so Mongo's lex-sort matches chronological
+    # order (ISO-8601 has this nice property by design).
+    from datetime import datetime, timezone, timedelta
+    since_dt = datetime.now(timezone.utc) - timedelta(hours=hours)
+    since_iso = since_dt.isoformat().replace("+00:00", "Z")
+    pipeline = [
+        {"$match": {
+            "created_at": {"$gte": since_iso},
+            "llm_provider": {"$exists": True, "$ne": None},
+        }},
+        {"$group": {"_id": "$llm_provider", "n": {"$sum": 1}}},
+    ]
+    rows = await db.analyses.aggregate(pipeline).to_list(length=200)
+    by_provider = {r["_id"] or "unknown": r["n"] for r in rows}
+    total = sum(by_provider.values())
+    primary = "anthropic"
+    fallback_count = sum(n for p, n in by_provider.items() if p != primary)
+    return {
+        "window_hours": hours,
+        "total_verdicts": total,
+        "by_provider": by_provider,
+        "fallback_count": fallback_count,
+        "fallback_rate_pct": round(100 * fallback_count / total, 1) if total else 0.0,
+        "primary_provider": primary,
+    }
+
+
 @router.get("/source-health")
 async def source_health(hours: int = 24, _admin=Depends(admin_required)):
     """Aggregate per-source success-rate stats for upstream data vendors

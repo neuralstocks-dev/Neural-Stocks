@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Activity, RefreshCcw, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Activity, RefreshCcw, AlertTriangle, CheckCircle2, Shuffle } from "lucide-react";
 import api from "@/lib/api";
 
 // Colored label palette for each failure-reason bucket. Keep in sync
@@ -45,6 +45,7 @@ export default function AdminLLMHealthPanel() {
     const [recoup, setRecoup] = useState(null);
     const [providers, setProviders] = useState(null);
     const [sources, setSources] = useState(null);
+    const [fallbackRate, setFallbackRate] = useState(null);
     const [err, setErr] = useState("");
     const [busy, setBusy] = useState(false);
     // Track which row in the "Last 10 failures" table has its detail
@@ -64,18 +65,20 @@ export default function AdminLLMHealthPanel() {
     const refresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            const [s, e, r, p, srcRes] = await Promise.all([
+            const [s, e, r, p, srcRes, fbRes] = await Promise.all([
                 api.get("/admin/llm-breaker"),
                 api.get("/admin/llm-events?limit=10&hours=24"),
                 api.get("/admin/llm-events/recoup-summary?days=30"),
                 api.get("/admin/llm-events/by-provider?hours=24"),
                 api.get("/admin/source-health?hours=24"),
+                api.get("/admin/llm-events/fallback-rate?hours=24"),
             ]);
             setStatus(s.data);
             setEvents(e.data);
             setRecoup(r.data);
             setProviders(p.data);
             setSources(srcRes.data);
+            setFallbackRate(fbRes.data);
             setErr("");
         } catch (ex) {
             setErr(ex?.response?.data?.detail || "Failed to load LLM health");
@@ -323,6 +326,18 @@ export default function AdminLLMHealthPanel() {
                 <ProviderHealthStrip data={providers} />
             )}
 
+            {/* Fallback-verdict-rate tile · last 24h. Counts FINAL verdicts
+                persisted to the analyses collection that came from a
+                non-primary provider (i.e. Anthropic was demoted/skipped
+                and Gemini ended up answering). Pairs with the user-facing
+                <LLMProvenanceBadge> — same signal, different audience.
+                Distinct from the provider strip above (which counts raw
+                attempts including retries). Colour: green if 0%, amber
+                ≤30%, red >30%. */}
+            {fallbackRate && fallbackRate.total_verdicts > 0 && (
+                <FallbackRateTile data={fallbackRate} />
+            )}
+
             {/* Upstream-data-source health strip · last 24h. Same chip
                 pattern as the LLM provider strip — different signal,
                 same UX. Captures yfinance, Finnhub, RapidAPI IDX, IDX
@@ -503,6 +518,84 @@ function Metric({ label, value, valueColor }) {
  *
  * Reads `data.providers` (already pre-aggregated by the backend).
  */
+function FallbackRateTile({ data }) {
+    // Colour the fallback-rate readout by health: 0% green (chain
+    // healthy, primary serving everything), ≤30% amber (intermittent
+    // degradation, fallback firing as designed), >30% red (sustained
+    // primary degradation, escalation likely needed).
+    const rate = data?.fallback_rate_pct ?? 0;
+    const total = data?.total_verdicts ?? 0;
+    const fb = data?.fallback_count ?? 0;
+    const color =
+        rate === 0
+            ? "hsl(var(--buy))"
+            : rate <= 30
+            ? "hsl(var(--gold))"
+            : "hsl(var(--sell))";
+    // Compose a per-provider breakdown line so admins see which
+    // fallback provider absorbed the load (gemini=N) and the primary's
+    // share. Sorted desc by count.
+    const breakdown = Object.entries(data?.by_provider || {}).sort(
+        (a, b) => b[1] - a[1],
+    );
+    return (
+        <div
+            className="module mt-3 p-4"
+            style={{
+                borderColor: "hsl(var(--border-divider))",
+                borderLeft: `3px solid ${color}`,
+            }}
+            data-testid="admin-fallback-rate-tile"
+            title="Counts FINAL verdicts in the analyses collection that came from a non-primary provider (Gemini after Anthropic was demoted/skipped). Distinct from the provider-attempt strip above which counts raw attempts including retries."
+        >
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                    <Shuffle size={12} strokeWidth={1.7} style={{ color }} />
+                    <p
+                        className="text-overline"
+                        style={{ fontSize: "10px", color: "hsl(var(--text-secondary))" }}
+                    >
+                        Fallback-verdict rate · last {data?.window_hours ?? 24}h
+                    </p>
+                </div>
+                <div className="flex items-baseline gap-2">
+                    <span
+                        className="font-mono"
+                        style={{ fontSize: "20px", color }}
+                        data-testid="admin-fallback-rate-pct"
+                    >
+                        {rate.toFixed(1)}%
+                    </span>
+                    <span
+                        className="font-mono"
+                        style={{ fontSize: "10px", color: "hsl(var(--text-muted))" }}
+                    >
+                        {fb} / {total} verdicts
+                    </span>
+                </div>
+            </div>
+            {breakdown.length > 0 && (
+                <p
+                    className="mt-2 font-mono text-xs flex flex-wrap gap-x-3 gap-y-1"
+                    style={{ color: "hsl(var(--text-muted))", fontSize: "11px" }}
+                    data-testid="admin-fallback-rate-breakdown"
+                >
+                    {breakdown.map(([prov, n]) => {
+                        const isPrimary = prov === (data?.primary_provider || "anthropic");
+                        return (
+                            <span key={prov}>
+                                {prov}
+                                {isPrimary ? " (primary)" : ""}
+                                <span style={{ color: "hsl(var(--text-secondary))" }}> · {n}</span>
+                            </span>
+                        );
+                    })}
+                </p>
+            )}
+        </div>
+    );
+}
+
 function ProviderHealthStrip({ data }) {
     if (!data || !data.providers) return null;
     const providerLabel = {
