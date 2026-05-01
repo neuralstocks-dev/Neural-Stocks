@@ -690,11 +690,25 @@ export default function AnalysisReportPage() {
                                                 {analysis.executive_summary}
                                             </p>
                                             <p
-                                                className="text-overline mt-4"
+                                                className="text-overline mt-4 inline-flex items-center gap-2 flex-wrap"
                                                 style={{ fontSize: "0.56rem" }}
                                                 data-testid="analysis-generated-at"
                                             >
-                                                Generated {formatAnalysisTimestamp(analysis.created_at)} · Horizon {analysis.time_horizon_weeks || 12}w
+                                                <span
+                                                    className="inline-flex items-center gap-1 px-1.5 py-0.5"
+                                                    style={{
+                                                        border: "1px solid hsl(var(--buy))",
+                                                        color: "hsl(var(--buy))",
+                                                        letterSpacing: "0.1em",
+                                                    }}
+                                                    data-testid="analysis-complete-badge"
+                                                    title="Analysis finished. The verdict below reflects the LLM's final reasoning against the fresh price, fundamentals, technicals, and news snapshot captured at the timestamp on the right."
+                                                >
+                                                    ✓ Complete
+                                                </span>
+                                                <span style={{ color: "hsl(var(--text-muted))" }}>
+                                                    Generated {formatAnalysisTimestamp(analysis.created_at)} · Horizon {analysis.time_horizon_weeks || 12}w
+                                                </span>
                                             </p>
                                             <LLMProvenanceBadge analysis={analysis} />
 

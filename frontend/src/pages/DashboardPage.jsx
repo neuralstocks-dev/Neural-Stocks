@@ -74,7 +74,7 @@ const WATCHLIST_PHASE_LABELS = {
     calibrating: "Calibrating",
 };
 
-function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyzing, analyzingPhase, failed, failedMsg, canTimeline, revealed }) {
+function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyzing, analyzingPhase, failed, failedMsg, canTimeline, revealed, justCompleted }) {
     const q = item.quote || {};    const up = (q.change_pct ?? 0) >= 0;
     return (
         <div
@@ -165,6 +165,35 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                                 >
                                     <Loader2 size={9} strokeWidth={2} className="animate-spin" />
                                     {analyzingPhase || "Refreshing"}…
+                                </span>
+                            </div>
+                        )}
+                        {/* Completion pill — overlays the verdict for 5s after a
+                            successful analyze so the moment-of-done is obviously
+                            visible instead of a silent state flip. Fades out with
+                            CSS on the timer set by `justCompletedTicker` in the
+                            parent. Rendered above the verdict (which is slightly
+                            dimmed via opacity:0.4 in the `analyzing` branch; here
+                            the verdict is full-opacity so the pill just sits on
+                            top). Only fires on a BRAND-NEW verdict — re-renders
+                            of an existing row don't trigger it because the pill
+                            is bound to the parent's per-analysis timer. */}
+                        {justCompleted && !analyzing && !failed && (
+                            <div
+                                className="absolute inset-0 flex items-center justify-start pointer-events-none"
+                                data-testid={`done-pill-${item.ticker}`}
+                            >
+                                <span
+                                    className="font-mono text-[10px] inline-flex items-center gap-1.5 px-2 py-1 done-pill"
+                                    style={{
+                                        background: "hsl(var(--surface-elevated))",
+                                        color: "hsl(var(--buy))",
+                                        border: "1px solid hsl(var(--buy))",
+                                        letterSpacing: "0.12em",
+                                        textTransform: "uppercase",
+                                    }}
+                                >
+                                    ✓ Done · just now
                                 </span>
                             </div>
                         )}
@@ -403,6 +432,11 @@ export default function DashboardPage() {
     const [failedTicker, setFailedTicker] = useState(null);
     const [failedTickerMsg, setFailedTickerMsg] = useState("");
     const [revealedTicker, setRevealedTicker] = useState(null);
+    // `justCompletedTicker` — ticker that JUST finished analysis. Used to
+    // render a transient "✓ DONE · just now" pill on the watchlist row for
+    // 5s, then fades back to the normal verdict display. Makes analysis
+    // completion a noticeable moment instead of a silent state flip.
+    const [justCompletedTicker, setJustCompletedTicker] = useState(null);
     const [quickBusy, setQuickBusy] = useState(null); // 'top' | 'bottom' | null
     // Live job state for the floating QuickAnalyzeProgress panel. Set to
     // a polled job snapshot during a Top/Bottom 3 sweep, then cleared 4s
@@ -560,6 +594,18 @@ export default function DashboardPage() {
                     setTimeout(() => {
                         setRevealedTicker((cur) => (cur === ticker ? null : cur));
                     }, 1600);
+                    // Longer-lived "✓ DONE · just now" pill overlaid on the
+                    // verdict cell — fades out 5s after analysis completes.
+                    // This is the explicit "completion label" users asked for:
+                    // without it, the row just silently flips from
+                    // "ANALYZING…" to a verdict badge and the moment-of-success
+                    // flies by. 5s is long enough to catch the eye even if
+                    // the user looked away mid-run, short enough that it's
+                    // gone before they come back for another analyze.
+                    setJustCompletedTicker(ticker);
+                    setTimeout(() => {
+                        setJustCompletedTicker((cur) => (cur === ticker ? null : cur));
+                    }, 5000);
                 }
 
                 await fetchWatchlist();
@@ -1030,6 +1076,7 @@ export default function DashboardPage() {
                                         failed={failedTicker === item.ticker}
                                         failedMsg={failedTicker === item.ticker ? failedTickerMsg : ""}
                                         revealed={revealedTicker === item.ticker}
+                                        justCompleted={justCompletedTicker === item.ticker}
                                     />
                                 ))}
                             </div>

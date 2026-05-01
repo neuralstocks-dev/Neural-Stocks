@@ -462,6 +462,21 @@ body {
     animation: refreshingPulse 1.4s ease-in-out infinite;
 }
 
+/* "✓ DONE · just now" completion pill on watchlist rows. Quick fade-in so
+   the user notices a state change, then a soft fade-out over the last 1.5s
+   of its 5s on-screen life — the pill unmounts when the parent's
+   `justCompletedTicker` state clears. A subtle scale-down keeps the row's
+   visual weight stable while the verdict badge underneath re-emerges. */
+@keyframes donePillFade {
+    0%   { opacity: 0; transform: translateY(2px) scale(0.96); }
+    12%  { opacity: 1; transform: translateY(0)  scale(1); }
+    70%  { opacity: 1; transform: translateY(0)  scale(1); }
+    100% { opacity: 0; transform: translateY(0)  scale(0.98); }
+}
+.done-pill {
+    animation: donePillFade 5s ease-out both;
+}
+
 /* Checkered background utility for empty-state / hero ambience */
 .grid-bg {
     background-image: linear-gradient(
