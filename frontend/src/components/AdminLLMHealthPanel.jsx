@@ -388,6 +388,70 @@ export default function AdminLLMHealthPanel() {
  * Pure-presentational — receives the API payload + a copy callback from
  * the parent so clipboard logic stays in one place.
  */
+function DownloadEscalationCsvButton({ days = 30 }) {
+    // Downloads the full escalation CSV as a file attachment. The
+    // endpoint is admin-gated + returns `text/csv`, so we can't use a
+    // plain `<a href>` — the Bearer token needs to ride on the request.
+    // Fetch via `api.get`, turn the response into a Blob, then synthesise
+    // a temporary <a> click to trigger the browser download.
+    const [state, setState] = useState("idle"); // idle · busy · done · error
+    const download = async () => {
+        setState("busy");
+        try {
+            const r = await api.get(
+                `/admin/llm-events/escalation-report.csv?days=${days}`,
+                { responseType: "blob" },
+            );
+            // Derive filename from Content-Disposition if present; fall back to a sane default.
+            const cd = r.headers?.["content-disposition"] || "";
+            const match = cd.match(/filename="([^"]+)"/);
+            const filename = match ? match[1] : `neulab-escalation-${days}d.csv`;
+            const blob = new Blob([r.data], { type: "text/csv;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            // Give the browser a tick to flush the download before
+            // revoking — otherwise Safari sometimes aborts the save.
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            setState("done");
+            setTimeout(() => setState("idle"), 2500);
+        } catch (ex) {
+            console.error("escalation csv download failed:", ex);
+            setState("error");
+            setTimeout(() => setState("idle"), 3000);
+        }
+    };
+    return (
+        <button
+            type="button"
+            onClick={download}
+            disabled={state === "busy"}
+            className="text-xs inline-flex items-center gap-1.5 px-3 py-1 rounded transition-colors"
+            style={{
+                cursor: state === "busy" ? "wait" : "pointer",
+                border: "1px solid hsl(var(--sell))",
+                color:
+                    state === "done"
+                        ? "hsl(var(--buy))"
+                        : state === "error"
+                        ? "hsl(var(--gold))"
+                        : "hsl(var(--sell))",
+            }}
+            data-testid="admin-llm-health-download-csv"
+            title="Download every logged upstream LLM failure as a CSV you can attach to an email to Emergent Support. Includes a preamble explaining the failures are from the LLM proxy (not your app code), a credit-waste summary, and a per-event detail table with full error messages."
+        >
+            {state === "busy"  ? "Downloading…" :
+             state === "done"  ? "✓ Downloaded — attach to support email" :
+             state === "error" ? "Download failed — retry?" :
+                                 "⬇ Download CSV (for support email)"}
+        </button>
+    );
+}
+
 function RecoupTracker({ recoup, onCopy, copyState }) {
     const reasons = Object.entries(recoup.by_reason || {}).sort((a, b) => b[1] - a[1]);
     const tickers = recoup.by_ticker || [];
@@ -406,30 +470,33 @@ function RecoupTracker({ recoup, onCopy, copyState }) {
                 <p className="text-overline" style={{ color: "hsl(var(--sell))", fontSize: "10px" }}>
                     Credit-recoup tracker · last {recoup.window_days}d
                 </p>
-                <button
-                    type="button"
-                    onClick={onCopy}
-                    disabled={copyState === "copied"}
-                    className="text-xs inline-flex items-center gap-1.5 px-3 py-1 rounded transition-colors"
-                    style={{
-                        cursor: copyState === "copied" ? "default" : "pointer",
-                        border: "1px solid hsl(var(--sell))",
-                        color:
-                            copyState === "copied"
-                                ? "hsl(var(--buy))"
-                                : copyState === "error"
-                                ? "hsl(var(--gold))"
-                                : "hsl(var(--sell))",
-                        position: "relative",
-                        zIndex: 1,
-                    }}
-                    data-testid="admin-llm-health-copy-escalation"
-                    aria-label="Copy escalation summary"
-                >
-                    {copyState === "copied" ? "✓ Copied — paste into email" :
-                     copyState === "error"  ? "Copy failed (clipboard blocked)" :
-                                              "Copy escalation summary"}
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <DownloadEscalationCsvButton days={recoup.window_days || 30} />
+                    <button
+                        type="button"
+                        onClick={onCopy}
+                        disabled={copyState === "copied"}
+                        className="text-xs inline-flex items-center gap-1.5 px-3 py-1 rounded transition-colors"
+                        style={{
+                            cursor: copyState === "copied" ? "default" : "pointer",
+                            border: "1px solid hsl(var(--sell))",
+                            color:
+                                copyState === "copied"
+                                    ? "hsl(var(--buy))"
+                                    : copyState === "error"
+                                    ? "hsl(var(--gold))"
+                                    : "hsl(var(--sell))",
+                            position: "relative",
+                            zIndex: 1,
+                        }}
+                        data-testid="admin-llm-health-copy-escalation"
+                        aria-label="Copy escalation summary"
+                    >
+                        {copyState === "copied" ? "✓ Copied — paste into email" :
+                         copyState === "error"  ? "Copy failed (clipboard blocked)" :
+                                                  "Copy escalation summary"}
+                    </button>
+                </div>
             </div>
 
             <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4">

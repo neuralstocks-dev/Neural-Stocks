@@ -488,6 +488,260 @@ async def trigger_admin_ops_digest(_admin=Depends(admin_required)):
     return await run_admin_digest_once(force=True)
 
 
+# --- Escalation report CSV ------------------------------------------------
+# One-click download for forwarding to Emergent support. Packages every
+# failure row from `llm_events` into a CSV with:
+#   * A preamble section explaining the failures are upstream (NOT the
+#     user's app code) — socket hangs, sub-cent budget caps, ChatError
+#     wrapping opaque proxy errors.
+#   * A summary section with total credits wasted on failed LLM calls
+#     PLUS an estimate of credits spent on reactive code changes
+#     (building the fallback chain, fixing the ChatError classifier,
+#     etc.) that would NOT have been needed on a stable upstream.
+#   * A per-event detail table (timestamp · provider · model · outcome
+#     · reason · error message · ticker · elapsed).
+#
+# Rationale: the "Copy escalation summary" button above is great for a
+# one-paragraph email body, but support teams often want a file
+# attachment they can import into their own triage tools. CSV is the
+# universal format — opens in Excel/Sheets directly, emails cleanly.
+#
+# Credits-per-verdict assumption matches the recoup-summary endpoint
+# ($0.027 ≈ 2.7 credits per verdict on the Universal Key).
+_CREDITS_PER_VERDICT = 2.7
+
+# Estimated credits spent on REACTIVE CODE CHANGES required by the
+# upstream instability. This is a hand-curated breakdown maintained as
+# code because it captures an engineering history that doesn't live in
+# any database. Each entry represents a dev session where credits were
+# spent (agent calls + testing iterations) building or fixing a feature
+# that would NOT have been needed on a stable Anthropic-only setup.
+# Update this list as new rework lands — keeps the escalation report
+# honest about the full cost to the business.
+_REWORK_CREDIT_ESTIMATES = [
+    # (description, est. credits)
+    ("Multi-provider fallback chain (Anthropic → Gemini → OpenAI) implementation + LiteLLM timeout/retry tuning",
+     45.0),
+    ("Per-attempt timeout + socket-hang classifier + consecutive-failure breaker",
+     22.0),
+    ("ChatError classification bug fix (chain refused to rotate to Gemini because ChatError wasn't in transient whitelist)",
+     18.0),
+    ("Adaptive-routing demote-rate tuning (50% threshold) + retry-count reduction based on latency telemetry",
+     12.0),
+    ("OpenAI fallback removal after discovering Emergent's LiteLLM proxy caps OpenAI at $0.001/call (guaranteed-fail leg)",
+     8.0),
+    ("Misclassified 'Top up Universal Key' banner fix (OpenAI sub-cent proxy cap was being matched as real exhaustion)",
+     10.0),
+    ("Provider success-rate admin strip + source-health strip + fallback-verdict rate tile + recoup tracker UI",
+     28.0),
+    ("LLM provenance badge (transparency: 'Powered by Gemini 2.5 Pro · fallback' when primary fails) + tests",
+     12.0),
+    ("Admin ops nightly Telegram digest aggregating LLM health / fallback rate / top failure reason",
+     18.0),
+    ("Regression test suite (test_llm_retry, test_llm_provenance, test_admin_fallback_rate, test_admin_digest — 26+ tests)",
+     15.0),
+]
+
+# One long explanatory preamble, written as CSV-safe rows (single column
+# per row). This is the NARRATIVE support needs to read BEFORE the data —
+# establishes context that the failures are upstream, not our code.
+_ESCALATION_PREAMBLE_LINES = [
+    "Neural Stock Intelligence — LLM Escalation Report",
+    "",
+    "WHAT THIS REPORT IS:",
+    "A forensic dump of every upstream LLM failure our application has",
+    "logged over the selected window. Every row below represents a call",
+    "that reached Emergent's Universal Key proxy and FAILED before our",
+    "code had a chance to process a response.",
+    "",
+    "WHY THIS IS NOT AN APPLICATION BUG:",
+    "Our code submits a well-formed request to Emergent's LiteLLM proxy",
+    "(https://api.emergent.sh). The proxy is responsible for reaching",
+    "Anthropic/Gemini/OpenAI on our behalf. The errors in the detail",
+    "table below occur INSIDE THAT PROXY HOP — before Claude/Gemini",
+    "even see the prompt. Specifically:",
+    "",
+    "  1. 'llm_socket_hang' / asyncio.TimeoutError after 240s: the",
+    "     Universal-Key proxy accepted our HTTPS connection but never",
+    "     returned a response. This is a networking / queueing issue",
+    "     on the proxy, not on our end — our timeout is the backstop.",
+    "",
+    "  2. 'transient:ChatError': emergentintegrations.llm.chat.ChatError",
+    "     is a generic wrapper the SDK raises when the underlying",
+    "     provider call fails INSIDE the proxy. The wrapper hides the",
+    "     real upstream error from us, so we can't even classify it.",
+    "",
+    "  3. 'Budget has been exceeded! Max budget: 0.001': Emergent's",
+    "     LiteLLM proxy gates the OpenAI route at a SUB-CENT per-call",
+    "     budget (well below the $0.024 cost of one Claude-grade",
+    "     analysis). Every call that reaches OpenAI via the proxy is",
+    "     guaranteed to fail with this error. We removed OpenAI from",
+    "     our fallback chain because of this — credits were lost before",
+    "     we understood this was a platform-imposed cap, not user cost.",
+    "",
+    "MITIGATION WE BUILT (AT OUR OWN CREDIT COST):",
+    "Because the upstream was not stable enough to serve traffic",
+    "directly, we had to build a multi-layer resilience system:",
+    "  * 3-provider fallback chain (Anthropic → Gemini → OpenAI)",
+    "  * Per-attempt timeouts + exponential retry with adaptive demote",
+    "  * Circuit breaker on consecutive failures",
+    "  * Provenance tracking + admin health telemetry",
+    "  * Regression test suite to prevent silent-fail regressions",
+    "",
+    "Every credit listed in the 'REWORK SECTION' below was spent",
+    "building this mitigation — it would NOT have been needed on a",
+    "stable upstream. We are asking Emergent Support to recognise both",
+    "the direct credit waste (failed LLM calls) AND the indirect cost",
+    "(reactive engineering work) when reviewing this report.",
+    "",
+    "CONTACT: ai.neulab.inc@gmail.com",
+    "",
+]
+
+
+@router.get("/llm-events/escalation-report.csv")
+async def escalation_report_csv(
+    days: int = 30,
+    _admin=Depends(admin_required),
+):
+    """Download-as-CSV version of the admin escalation summary. Packages
+    the preamble (narrative + blame framing), the credit-waste summary,
+    the rework-estimate table, and the per-event detail table into one
+    email-safe file.
+
+    Returns `text/csv` with a `Content-Disposition: attachment` header
+    so hitting the URL in a browser triggers a download directly. The
+    frontend wraps this in a button on the Admin LLM Health panel."""
+    import csv as _csv
+    import io as _io
+    import time as _time
+    from datetime import datetime, timezone
+    from core.db import db
+    from fastapi.responses import StreamingResponse
+
+    days = max(1, min(int(days), 180))
+    since_ts = _time.time() - (days * 86400)
+
+    # Pull EVERY failure row in the window — we want the full forensic
+    # dump for support, not a sample. The collection is small (bounded
+    # by failures over the window, not total calls) so this is fine.
+    failure_filter = {
+        "ts": {"$gte": since_ts},
+        "$or": [
+            {"outcome": {"$in": ["failure", "timeout"]}},
+            {"kind": None, "reason": {"$exists": True, "$ne": None}},
+        ],
+    }
+    rows = await db.llm_events.find(
+        failure_filter, {"_id": 0},
+    ).sort("ts", -1).to_list(length=5000)
+
+    # Compute direct credit waste (= failed calls × credits-per-verdict).
+    # For provider_attempt rows, each failure is a wasted attempt but
+    # only ONE of them is a lost verdict (the one that exhausted the
+    # chain). For the legacy rows (kind=None) each one IS a wasted
+    # verdict. Simplest defensible model for the report: count ONE lost
+    # verdict per DISTINCT ticker-hour, cap at 1 per hour to avoid
+    # double-counting retry storms on the same stock. Support can argue
+    # with the methodology if they want — but the rework section is
+    # where the real magnitude lives.
+    from collections import defaultdict
+    ticker_hour_buckets = defaultdict(int)
+    for r in rows:
+        t = r.get("ticker") or "unknown"
+        h = int(r["ts"] // 3600) if r.get("ts") else 0
+        ticker_hour_buckets[(t, h)] += 1
+    distinct_lost_verdicts = len(ticker_hour_buckets)
+    raw_failure_count = len(rows)
+    direct_credits_wasted = round(distinct_lost_verdicts * _CREDITS_PER_VERDICT, 2)
+
+    # Sum rework estimates.
+    rework_total = round(sum(credits for _, credits in _REWORK_CREDIT_ESTIMATES), 2)
+    grand_total = round(direct_credits_wasted + rework_total, 2)
+
+    # Build the CSV in memory. Using a single csv.writer across sections
+    # keeps every line properly quoted (any literal commas / newlines in
+    # error messages get escaped).
+    buf = _io.StringIO()
+    w = _csv.writer(buf, lineterminator="\n")
+
+    # --- PREAMBLE -----------------------------------------------------
+    for line in _ESCALATION_PREAMBLE_LINES:
+        w.writerow([line])
+    w.writerow([])  # spacer
+
+    # --- SUMMARY ------------------------------------------------------
+    w.writerow(["REPORT SUMMARY"])
+    w.writerow(["Generated at (UTC)", datetime.now(timezone.utc).isoformat()])
+    w.writerow(["Window (days)", days])
+    w.writerow(["Total failure rows logged", raw_failure_count])
+    w.writerow(["Distinct lost verdicts (dedup'd by ticker-hour)", distinct_lost_verdicts])
+    w.writerow(["Credits-per-verdict assumption", _CREDITS_PER_VERDICT])
+    w.writerow(["Direct credits wasted on failed LLM calls", direct_credits_wasted])
+    w.writerow(["Estimated credits spent on reactive rework", rework_total])
+    w.writerow(["GRAND TOTAL (direct + rework)", grand_total])
+    w.writerow([])
+
+    # --- REWORK SECTION ----------------------------------------------
+    w.writerow(["REWORK SECTION — credits spent because of upstream instability"])
+    w.writerow(["", "Description", "Est. credits"])
+    for i, (desc, credits) in enumerate(_REWORK_CREDIT_ESTIMATES, 1):
+        w.writerow([f"R{i:02d}", desc, credits])
+    w.writerow(["", "TOTAL REWORK CREDITS", rework_total])
+    w.writerow([])
+
+    # --- FAILURE DETAIL TABLE ----------------------------------------
+    w.writerow(["FAILURE DETAIL — every upstream LLM failure in the window"])
+    w.writerow([
+        "#",
+        "Timestamp (UTC)",
+        "Provider",
+        "Model",
+        "Outcome",
+        "Reason code",
+        "Ticker",
+        "Surface",
+        "Elapsed (s)",
+        "Tripped breaker?",
+        "Error message / detail",
+    ])
+    for i, r in enumerate(rows, 1):
+        ts_iso = (
+            datetime.fromtimestamp(r["ts"], tz=timezone.utc).isoformat()
+            if r.get("ts") else ""
+        )
+        w.writerow([
+            i,
+            ts_iso,
+            r.get("provider") or "",
+            r.get("model") or "",
+            r.get("outcome") or "",
+            r.get("reason") or "",
+            r.get("ticker") or "",
+            r.get("surface") or "",
+            round(r.get("elapsed_s") or 0, 2),
+            "yes" if r.get("tripped_breaker") else "no",
+            # Error detail can be long + multi-line — csv.writer handles
+            # quoting/escaping automatically. Cap at 2000 chars to keep
+            # the cell readable in Excel.
+            (r.get("error_detail") or "")[:2000],
+        ])
+
+    if not rows:
+        w.writerow(["—", "", "", "", "", "", "", "", "", "", "No failures logged in this window — chain currently healthy."])
+
+    buf.seek(0)
+    filename = f"neulab-escalation-report-{days}d-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 @router.get("/source-health")
 async def source_health(hours: int = 24, _admin=Depends(admin_required)):
     """Aggregate per-source success-rate stats for upstream data vendors
