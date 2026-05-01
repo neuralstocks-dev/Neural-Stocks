@@ -742,6 +742,126 @@ async def escalation_report_csv(
     )
 
 
+@router.get("/llm-events/escalation-email-draft")
+async def escalation_email_draft(
+    days: int = 30,
+    _admin=Depends(admin_required),
+):
+    """Ready-to-paste email body + subject for the Emergent Support
+    escalation. Computes the same direct/rework/grand-total credit
+    figures as `escalation-report.csv` and weaves them into a polite,
+    professional 3-paragraph body that references the CSV attachment.
+
+    Called alongside the CSV download button so the admin hits ONE
+    button and walks away with both the attachment AND the email body
+    on the clipboard — turns "download CSV, write email from scratch"
+    into "download + paste + send"."""
+    import time as _time
+    from collections import defaultdict
+    from core.db import db
+
+    days = max(1, min(int(days), 180))
+    since_ts = _time.time() - (days * 86400)
+
+    failure_filter = {
+        "ts": {"$gte": since_ts},
+        "$or": [
+            {"outcome": {"$in": ["failure", "timeout"]}},
+            {"kind": None, "reason": {"$exists": True, "$ne": None}},
+        ],
+    }
+    rows = await db.llm_events.find(
+        failure_filter, {"_id": 0, "ts": 1, "ticker": 1, "reason": 1},
+    ).to_list(length=5000)
+
+    # Same dedup logic as the CSV so the numbers MATCH — support will
+    # compare the email body against the attached CSV and any drift
+    # would undermine credibility.
+    ticker_hour_buckets = defaultdict(int)
+    reason_counts = defaultdict(int)
+    for r in rows:
+        t = r.get("ticker") or "unknown"
+        h = int(r["ts"] // 3600) if r.get("ts") else 0
+        ticker_hour_buckets[(t, h)] += 1
+        reason = (r.get("reason") or "unknown").split(":", 1)[-1]
+        reason_counts[reason] += 1
+    raw_failure_count = len(rows)
+    distinct_lost = len(ticker_hour_buckets)
+    direct = round(distinct_lost * _CREDITS_PER_VERDICT, 2)
+    rework = round(sum(c for _, c in _REWORK_CREDIT_ESTIMATES), 2)
+    grand = round(direct + rework, 2)
+    # Top 3 reasons for the "specifically, we observed" line.
+    top_reasons = sorted(reason_counts.items(), key=lambda kv: kv[1], reverse=True)[:3]
+    reasons_summary = ", ".join(f"{r} ×{n}" for r, n in top_reasons) or "(none)"
+
+    subject = (
+        f"Neural Stock Intelligence — Universal Key credit-waste escalation "
+        f"(last {days}d: {grand:.2f} credits: {direct:.2f} direct + {rework:.2f} rework)"
+    )
+    body = f"""Hi Emergent Support,
+
+I'm writing to escalate a sustained pattern of upstream LLM-proxy
+instability that has cost our project a material number of Universal
+Key credits over the last {days} days. I've attached a full forensic
+CSV (`neulab-escalation-report-{days}d-*.csv`) with the event-level
+detail; this email summarises the headline numbers and the asks.
+
+DIRECT CREDIT LOSS ({direct:.2f} credits):
+Over the window, we logged {raw_failure_count} failure rows in our
+telemetry, de-duplicated to {distinct_lost} distinct lost verdicts
+(by ticker-hour, to avoid double-counting retry storms on the same
+stock). At our measured {_CREDITS_PER_VERDICT:.2f}-credit per-verdict
+cost, that's {direct:.2f} credits consumed WITHOUT a response returning
+to the user. The top failure reasons were: {reasons_summary}. Every
+one of these originates INSIDE the Emergent LiteLLM proxy hop —
+the CSV preamble explains each error mode in detail so the support
+team can match them to your own proxy logs.
+
+INDIRECT CREDIT LOSS ({rework:.2f} credits):
+Because the upstream was not stable enough to serve traffic
+directly, we had to rebuild our entire LLM call path around it —
+a 3-provider fallback chain, per-attempt timeouts, a circuit
+breaker, a ChatError classifier bug fix, adaptive routing based
+on rolling success rates, a provenance layer to tell users when
+fallback fired, admin-panel health telemetry, and a regression
+test suite to prevent silent-fail regressions. None of this work
+would have been needed on a stable Anthropic-only setup. The CSV
+"REWORK SECTION" lists the 10 dev sessions with individual
+credit estimates summing to {rework:.2f} credits.
+
+GRAND TOTAL: {grand:.2f} credits ({direct:.2f} direct + {rework:.2f} rework).
+
+ASKS:
+1. Credit reimbursement for the direct loss where it came from
+   upstream proxy issues (socket hangs / ChatError wrapping
+   opaque errors / the sub-cent OpenAI `Max budget: 0.001` cap
+   that made that route guaranteed-fail).
+2. A root-cause update on the underlying proxy behaviour so we
+   can stop layering defensive code around it.
+3. Confirmation that OpenAI fallback is safe to re-enable (we
+   removed it from our chain because of the sub-cent budget cap).
+
+Happy to jump on a call if it would help. Thanks for your time.
+
+— Neural Stock Intelligence
+Contact: ai.neulab.inc@gmail.com
+"""
+
+    return {
+        "subject": subject,
+        "body": body,
+        "summary": {
+            "window_days": days,
+            "raw_failure_count": raw_failure_count,
+            "distinct_lost_verdicts": distinct_lost,
+            "direct_credits": direct,
+            "rework_credits": rework,
+            "grand_total_credits": grand,
+            "top_reasons": top_reasons,
+        },
+    }
+
+
 @router.get("/source-health")
 async def source_health(hours: int = 24, _admin=Depends(admin_required)):
     """Aggregate per-source success-rate stats for upstream data vendors

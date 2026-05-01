@@ -389,24 +389,38 @@ export default function AdminLLMHealthPanel() {
  * the parent so clipboard logic stays in one place.
  */
 function DownloadEscalationCsvButton({ days = 30 }) {
-    // Downloads the full escalation CSV as a file attachment. The
-    // endpoint is admin-gated + returns `text/csv`, so we can't use a
-    // plain `<a href>` — the Bearer token needs to ride on the request.
-    // Fetch via `api.get`, turn the response into a Blob, then synthesise
-    // a temporary <a> click to trigger the browser download.
-    const [state, setState] = useState("idle"); // idle · busy · done · error
+    // Downloads the full escalation CSV as a file attachment AND copies
+    // a ready-to-paste email body to the clipboard. One click = both
+    // artefacts ready — admin just opens their email client, attaches
+    // the downloaded CSV, pastes the body, hits send.
+    //
+    // Two UI states worth noting:
+    //   * "done" — both CSV downloaded AND email copied (happy path)
+    //   * "done-no-clipboard" — CSV downloaded but clipboard was
+    //     blocked (e.g. Safari without user-activation, strict iframe).
+    //     Don't mis-advertise success; tell the admin to copy the body
+    //     manually from a second endpoint hit.
+    const [state, setState] = useState("idle"); // idle · busy · done · done-no-clipboard · error
     const download = async () => {
         setState("busy");
         try {
-            const r = await api.get(
-                `/admin/llm-events/escalation-report.csv?days=${days}`,
-                { responseType: "blob" },
-            );
-            // Derive filename from Content-Disposition if present; fall back to a sane default.
-            const cd = r.headers?.["content-disposition"] || "";
+            // Parallel: fetch the CSV blob + fetch the email-draft JSON.
+            // A single catastrophic failure (e.g. token expired) takes
+            // both down together, which is what we want — the admin
+            // can't ship a half-baked email.
+            const [csvRes, draftRes] = await Promise.all([
+                api.get(
+                    `/admin/llm-events/escalation-report.csv?days=${days}`,
+                    { responseType: "blob" },
+                ),
+                api.get(`/admin/llm-events/escalation-email-draft?days=${days}`),
+            ]);
+
+            // 1. Trigger the CSV download.
+            const cd = csvRes.headers?.["content-disposition"] || "";
             const match = cd.match(/filename="([^"]+)"/);
             const filename = match ? match[1] : `neulab-escalation-${days}d.csv`;
-            const blob = new Blob([r.data], { type: "text/csv;charset=utf-8" });
+            const blob = new Blob([csvRes.data], { type: "text/csv;charset=utf-8" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
@@ -414,17 +428,38 @@ function DownloadEscalationCsvButton({ days = 30 }) {
             document.body.appendChild(a);
             a.click();
             a.remove();
-            // Give the browser a tick to flush the download before
-            // revoking — otherwise Safari sometimes aborts the save.
             setTimeout(() => URL.revokeObjectURL(url), 2000);
-            setState("done");
-            setTimeout(() => setState("idle"), 2500);
+
+            // 2. Copy the email draft body to clipboard. Prefix with
+            // the subject line so the admin can see both at a glance
+            // when they paste into a scratchpad; most email clients
+            // accept the first line as subject when pasted into their
+            // compose field anyway.
+            const { subject, body } = draftRes.data || {};
+            const clipboardText = `Subject: ${subject}\n\n${body}`;
+            let clipboardOk = false;
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(clipboardText);
+                    clipboardOk = true;
+                }
+            } catch {
+                clipboardOk = false;
+            }
+            setState(clipboardOk ? "done" : "done-no-clipboard");
+            setTimeout(() => setState("idle"), 4000);
         } catch (ex) {
             console.error("escalation csv download failed:", ex);
             setState("error");
             setTimeout(() => setState("idle"), 3000);
         }
     };
+    const label =
+        state === "busy"              ? "Preparing…" :
+        state === "done"              ? "✓ Downloaded + email body copied" :
+        state === "done-no-clipboard" ? "✓ Downloaded (clipboard blocked — copy body manually)" :
+        state === "error"             ? "Download failed — retry?" :
+                                        "⬇ Download CSV + email draft";
     return (
         <button
             type="button"
@@ -437,17 +472,16 @@ function DownloadEscalationCsvButton({ days = 30 }) {
                 color:
                     state === "done"
                         ? "hsl(var(--buy))"
+                        : state === "done-no-clipboard"
+                        ? "hsl(var(--gold))"
                         : state === "error"
                         ? "hsl(var(--gold))"
                         : "hsl(var(--sell))",
             }}
             data-testid="admin-llm-health-download-csv"
-            title="Download every logged upstream LLM failure as a CSV you can attach to an email to Emergent Support. Includes a preamble explaining the failures are from the LLM proxy (not your app code), a credit-waste summary, and a per-event detail table with full error messages."
+            title="One click: downloads the full escalation CSV for attaching to an email AND copies a ready-to-paste 3-paragraph email body (subject + body, with the direct/rework credit totals pre-filled) to your clipboard. Just open your email client, attach the CSV, paste the body, send."
         >
-            {state === "busy"  ? "Downloading…" :
-             state === "done"  ? "✓ Downloaded — attach to support email" :
-             state === "error" ? "Download failed — retry?" :
-                                 "⬇ Download CSV (for support email)"}
+            {label}
         </button>
     );
 }
