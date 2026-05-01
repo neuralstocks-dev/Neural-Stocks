@@ -5,6 +5,7 @@ import IdxBudgetCard from "@/components/IdxBudgetCard";
 import IdxCatalogCard from "@/components/IdxCatalogCard";
 import AdminLLMHealthPanel from "@/components/AdminLLMHealthPanel";
 import AdminWizardFunnelPanel from "@/components/AdminWizardFunnelPanel";
+import AdminQuickAnchorRefresh from "@/components/AdminQuickAnchorRefresh";
 import PayPalWebhookCard from "@/components/PayPalWebhookCard";
 import ExperimentsCard from "@/components/ExperimentsCard";
 import AnonTryResetCard from "@/components/AnonTryResetCard";
@@ -429,6 +430,8 @@ export default function AdminPage() {
                 </div>
 
                 <AdminLLMHealthPanel />
+
+                <AdminQuickAnchorRefresh />
 
                 <AdminWizardFunnelPanel />
 
