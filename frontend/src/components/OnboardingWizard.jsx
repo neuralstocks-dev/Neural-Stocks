@@ -300,10 +300,30 @@ function Step2Run({ picks, onComplete, onError }) {
                 if (!jobId) throw new Error("No job id returned");
                 if (cancelled) return;
 
-                // 3. Poll. The pipeline takes 20-60s typically; bail at 90s.
+                // 3. Poll. The pipeline runs against the same 240s
+                // server-side job budget the backend enforces — so the
+                // wizard's hard stop must NEVER fire before that, otherwise
+                // we show a scary error to a brand-new user even when the
+                // analysis is genuinely about to land. Two key lessons
+                // from the May 2026 production incident
+                // (rhendamukti@googlemail.com, screenshot timestamp
+                // 8:49pm Sun 3 May): (a) when Anthropic is degraded,
+                // ONE failed attempt eats ~60s before the chain rotates
+                // to Gemini; (b) Gemini then takes another ~30s for the
+                // actual response, so a HEALTHY run during a degraded
+                // window is 90-105s — right at the previous 90s
+                // ceiling. We now use 210s here (slightly under the
+                // 240s server budget so the server can return a clean
+                // failure status before our hard stop), and we keep
+                // polling without showing ANY warning until 90s — the
+                // first 90s is the happy-path window where most calls
+                // land.
+                const WIZARD_HARD_STOP_S = 210;
+                const WIZARD_SOFT_NOTICE_S = 90;
                 const startedAt = Date.now();
                 const phases = ["Fetching market data", "Running candlestick scan", "Asking Claude", "Composing verdict"];
                 let phaseIdx = 0;
+                let softNoticeShown = false;
                 let consecutiveErrors = 0;
                 const MAX_CONSECUTIVE_POLL_ERRORS = 5;
                 const pollOnce = async () => {
@@ -339,15 +359,33 @@ function Step2Run({ picks, onComplete, onError }) {
                         if (status === "failed") {
                             throw new Error(r.data?.error || "Analysis failed");
                         }
-                        // bump label every ~10s for visual liveliness
+                        // Bump label every ~10s for visual liveliness.
                         const elapsed = (Date.now() - startedAt) / 1000;
                         const newPhaseIdx = Math.min(phases.length - 1, Math.floor(elapsed / 10));
                         if (newPhaseIdx !== phaseIdx) {
                             phaseIdx = newPhaseIdx;
                             setProgress({ phase: "running", label: phases[phaseIdx] + "…" });
                         }
-                        if (elapsed > 90) {
-                            throw new Error("Analysis is taking longer than expected — your watchlist is saved, you can re-run from the dashboard.");
+                        // Past the soft-notice threshold? Tell the user
+                        // honestly that this run is on the slower side
+                        // — but DON'T show an error. The job is still
+                        // running; we're still polling. The reassuring
+                        // tone matters more than anything here because
+                        // a brand-new user is watching this exact
+                        // moment decide whether they trust the product.
+                        if (elapsed > WIZARD_SOFT_NOTICE_S && !softNoticeShown) {
+                            softNoticeShown = true;
+                            setProgress({
+                                phase: "running-slow",
+                                label: "Still working — sometimes the AI takes a moment, hang tight…",
+                            });
+                        }
+                        if (elapsed > WIZARD_HARD_STOP_S) {
+                            // Server's own 240s job budget will land a
+                            // `failed` status shortly; we hard-stop
+                            // slightly before that so the wizard
+                            // doesn't appear frozen.
+                            throw new Error("This run is taking longer than usual — your watchlist is saved. Close this and check the dashboard in a minute; the verdict will appear there as soon as it lands.");
                         }
                         pollHandle = setTimeout(pollOnce, 2000);
                     } catch (e) {
