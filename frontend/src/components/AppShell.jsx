@@ -52,7 +52,7 @@ export default function AppShell({ children }) {
         <Link
             key={item.to}
             to={item.to}
-            className={`${mobile ? "block py-3 text-base" : "text-sm"} font-medium link-underline ${
+            className={`${mobile ? "block py-3 text-base" : "text-sm whitespace-nowrap"} font-medium link-underline ${
                 isActive(item.to)
                     ? "text-[hsl(var(--text-primary))]"
                     : "text-[hsl(var(--text-secondary))]"
@@ -82,7 +82,7 @@ export default function AppShell({ children }) {
                 <div className="max-w-[1400px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between gap-3">
                     <Link
                         to="/"
-                        className="flex items-center gap-3 min-w-0"
+                        className="flex items-center gap-3 shrink-0"
                         data-testid="brand-link"
                     >
                         <div
@@ -97,15 +97,15 @@ export default function AppShell({ children }) {
                         >
                             <LineChart size={14} strokeWidth={1.5} />
                         </div>
-                        <div className="flex flex-col leading-none min-w-0">
+                        <div className="flex flex-col leading-none">
                             <span
-                                className="font-serif text-lg tracking-wide truncate"
+                                className="font-serif text-lg tracking-wide whitespace-nowrap"
                                 style={{ letterSpacing: "0.08em", fontWeight: 600 }}
                             >
                                 NEULAB
                             </span>
                             <span
-                                className="text-overline truncate"
+                                className="text-overline whitespace-nowrap hidden min-[1400px]:inline-block"
                                 style={{ fontSize: "0.56rem", marginTop: 3 }}
                             >
                                 Neural Stock Intelligence&trade;
@@ -113,7 +113,7 @@ export default function AppShell({ children }) {
                         </div>
                     </Link>
 
-                    <nav className="hidden md:flex items-center gap-8">
+                    <nav className="hidden xl:flex items-center gap-5 2xl:gap-6">
                         {NAV_ITEMS.map((it) => renderNavLink(it))}
                         {user?.is_admin && (
                             <Link
@@ -178,7 +178,7 @@ export default function AppShell({ children }) {
                         )}
                         {user && (
                             <span
-                                className="hidden lg:inline text-overline mr-2 max-w-[160px] truncate"
+                                className="hidden xl:inline text-overline mr-2 max-w-[160px] truncate"
                                 data-testid="current-user-email"
                             >
                                 {user.email}
@@ -199,7 +199,7 @@ export default function AppShell({ children }) {
                         {user && (
                             <button
                                 onClick={onLogout}
-                                className="btn-ghost !p-2 !hidden md:!inline-flex"
+                                className="btn-ghost !p-2 !hidden xl:!inline-flex"
                                 aria-label="Logout"
                                 data-testid="logout-button"
                             >
@@ -209,7 +209,7 @@ export default function AppShell({ children }) {
                         {/* Mobile hamburger — visible below md */}
                         <button
                             onClick={() => setMobileOpen(true)}
-                            className="btn-ghost !p-2 md:!hidden"
+                            className="btn-ghost !p-2 xl:!hidden"
                             aria-label="Open menu"
                             aria-expanded={mobileOpen}
                             data-testid="mobile-menu-button"
@@ -223,7 +223,7 @@ export default function AppShell({ children }) {
             {/* Mobile nav drawer */}
             {mobileOpen && (
                 <div
-                    className="fixed inset-0 z-50 md:hidden"
+                    className="fixed inset-0 z-50 xl:hidden"
                     role="dialog"
                     aria-modal="true"
                     aria-label="Main navigation"
