@@ -17,9 +17,19 @@ const CTA_FALLBACK = {
     render: { label: "ANALYZE" },
 };
 
+// Empty-state placeholder A/B — variant `examples` ("Try AAPL, MSFT, or AMD")
+// tests show-don't-tell against the instructional default. The fallback
+// matches the `instruct` variant so the UX is unchanged when the experiment
+// endpoint is unreachable.
+const PLACEHOLDER_FALLBACK = {
+    key: "instruct",
+    render: { placeholder: "Type a ticker (e.g. AAPL, BBCA.JK)" },
+};
+
 export default function TryNowBox({ variant = "default", className = "" }) {
     const navigate = useNavigate();
     const cta = useExperimentVariant("try_cta", CTA_FALLBACK);
+    const placeholderExp = useExperimentVariant("try_placeholder", PLACEHOLDER_FALLBACK);
     const [ticker, setTicker] = useState("");
     const [status, setStatus] = useState(null);
     const [submitting, setSubmitting] = useState(false);
@@ -41,6 +51,7 @@ export default function TryNowBox({ variant = "default", className = "" }) {
         setSubmitting(true);
         setError("");
         trackConversion("try_cta");
+        trackConversion("try_placeholder");
         // Navigate to the try page — it runs the analysis itself, so the
         // visitor sees a loading state instead of a dead form.
         setTimeout(() => navigate(`/try/${encodeURIComponent(t)}`), 50);
@@ -73,7 +84,7 @@ export default function TryNowBox({ variant = "default", className = "" }) {
                     type="text"
                     value={ticker}
                     onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                    placeholder={alreadyUsed ? "Used today — sign up for 3/day" : "Type a ticker (e.g. AAPL, BBCA.JK)"}
+                    placeholder={alreadyUsed ? "Used today — sign up for 3/day" : (placeholderExp?.render?.placeholder || PLACEHOLDER_FALLBACK.render.placeholder)}
                     disabled={alreadyUsed || submitting}
                     className="flex-1 min-w-0 bg-transparent outline-none font-mono text-xs sm:text-sm tracking-wide truncate"
                     style={{

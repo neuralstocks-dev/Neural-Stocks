@@ -72,6 +72,16 @@ EXPERIMENTS = [
             {"key": "what_watching",  "render": {"prefix": "WHAT NEULAB IS WATCHING"}},
         ],
     },
+    {
+        "key": "try_placeholder",
+        "description": "TryNowBox empty-state placeholder — tests instructional 'tell' vs example-led 'show, don't tell' to lift first-click conversion on the guest landing.",
+        "surface": "TryNowBox (login/signup hero)",
+        "conversion_event": "try_submit",
+        "variants": [
+            {"key": "instruct",  "render": {"placeholder": "Type a ticker (e.g. AAPL, BBCA.JK)"}},
+            {"key": "examples",  "render": {"placeholder": "Try AAPL, MSFT, or AMD"}},
+        ],
+    },
 ]
 
 _EXP_BY_KEY = {e["key"]: e for e in EXPERIMENTS}
