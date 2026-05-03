@@ -1357,6 +1357,132 @@ async def timeline_pdf(ticker: str, user=Depends(get_current_user)):
     )
 
 
+def _public_timeline_view(reco: dict) -> dict:
+    """Strict public projection of a timeline reco — strips owner-private fields.
+
+    Whitelist approach (fail-closed): only keys explicitly listed below are
+    surfaced on the public `/t/{share_id}` page. Mirrors `_public_view` for
+    verdicts.
+    """
+    if not reco:
+        return {}
+    keys = (
+        "ticker", "name", "recommendation_label", "summary", "confidence_score",
+        "recommended_timeline", "other_timelines", "explanation", "strengths",
+        "risks", "data_completeness_note", "price_at_analysis", "currency",
+        "created_at",
+    )
+    return {k: reco.get(k) for k in keys}
+
+
+@router.post("/analysis/timeline/{ticker}/share")
+async def share_timeline(ticker: str, user=Depends(get_current_user)):
+    """Mint a public share link for the latest Timeline Fit reco of `ticker`.
+
+    Same plan + daily-share gating as the verdict share endpoint. Daily quota
+    counts BOTH `shared_verdicts` and `shared_timelines` against the user's
+    `share_per_day` cap — a share is a share regardless of artifact type.
+    """
+    ticker = ticker.upper().strip()
+
+    # Plan gate — Pro/Elite (matches the Timeline Fit gate). Admins always pass.
+    if not user.get("is_admin"):
+        p = await resolved_plan_for(user)
+        if not p["quick_actions"]:
+            raise HTTPException(
+                status_code=402,
+                detail=(
+                    f"Sharing Timeline Fit is a Pro/Elite feature. Upgrade from "
+                    f"{p['name']} to share horizon recommendations."
+                ),
+            )
+        # Daily share rate limit — sum verdicts + timelines.
+        daily_limit = p.get("share_per_day")
+        if daily_limit is not None:
+            since = iso(now_utc() - timedelta(days=1))
+            verdict_shares = await db.shared_verdicts.count_documents(
+                {"owner_id": user["id"], "created_at": {"$gte": since}}
+            )
+            timeline_shares = await db.shared_timelines.count_documents(
+                {"owner_id": user["id"], "created_at": {"$gte": since}}
+            )
+            if verdict_shares + timeline_shares >= daily_limit:
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"Daily share limit reached ({daily_limit}/day on "
+                        f"{p['name']} plan). Upgrade to unlock more shares."
+                    ),
+                )
+
+    reco = await db.timeline_recos.find_one(
+        {"user_id": user["id"], "ticker": ticker},
+        sort=[("created_at", -1)],
+        projection={"_id": 0},
+    )
+    if not reco:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No Timeline Fit recommendation found for {ticker}. Run the analysis first.",
+        )
+
+    # Reuse existing share if one already points at this reco.
+    existing = await db.shared_timelines.find_one(
+        {"timeline_id": reco["id"], "owner_id": user["id"]},
+        {"_id": 0},
+    )
+    if existing:
+        return {
+            "share_id": existing["share_id"],
+            "url_path": f"/t/{existing['share_id']}",
+            "created_at": existing["created_at"],
+        }
+
+    share_id = uuid.uuid4().hex[:12]
+    created_at = iso(now_utc())
+    await db.shared_timelines.insert_one({
+        "share_id": share_id,
+        "timeline_id": reco["id"],
+        "owner_id": user["id"],
+        "ticker": reco["ticker"],
+        "created_at": created_at,
+    })
+    return {
+        "share_id": share_id,
+        "url_path": f"/t/{share_id}",
+        "created_at": created_at,
+    }
+
+
+@router.get("/public/timeline/{share_id}")
+async def get_shared_timeline(share_id: str):
+    """Public read of a shared Timeline Fit. No auth required."""
+    share = await db.shared_timelines.find_one({"share_id": share_id}, {"_id": 0})
+    if not share:
+        raise HTTPException(status_code=404, detail="Shared timeline not found")
+    reco = await db.timeline_recos.find_one(
+        {"id": share["timeline_id"]}, {"_id": 0}
+    )
+    if not reco:
+        raise HTTPException(
+            status_code=404,
+            detail="Underlying timeline recommendation no longer exists",
+        )
+    owner = await db.users.find_one(
+        {"id": share["owner_id"]},
+        {
+            "_id": 0, "password_hash": 0, "google_linked": 0, "plan": 0,
+            "test_unlock_expires_at": 0,
+        },
+    )
+    return {
+        "share_id": share_id,
+        "shared_at": share["created_at"],
+        "shared_by_name": owner.get("full_name") if owner else "A Neural user",
+        "timeline": _public_timeline_view(reco),
+    }
+
+
 @router.post("/analysis/quick/{kind}")
 async def quick_analyze(kind: str, user=Depends(get_current_user)):
     """Fire-and-forget: kicks off a background quick-sweep and returns a job_id
@@ -1715,14 +1841,17 @@ async def share_analysis(analysis_id: str, user=Depends(get_current_user)):
                 status_code=402,
                 detail=f"Sharing verdicts is a Pro/Elite feature. Upgrade from {p['name']} to unlock public share links.",
             )
-        # Daily rate limit by effective plan
+        # Daily rate limit by effective plan — count verdicts + timelines.
         daily_limit = p.get("share_per_day")
         if daily_limit is not None:
             since = iso(now_utc() - timedelta(days=1))
-            shares_today = await db.shared_verdicts.count_documents(
+            verdict_shares = await db.shared_verdicts.count_documents(
                 {"owner_id": user["id"], "created_at": {"$gte": since}}
             )
-            if shares_today >= daily_limit:
+            timeline_shares = await db.shared_timelines.count_documents(
+                {"owner_id": user["id"], "created_at": {"$gte": since}}
+            )
+            if verdict_shares + timeline_shares >= daily_limit:
                 raise HTTPException(
                     status_code=429,
                     detail=f"Daily share limit reached ({daily_limit}/day on {p['name']} plan). Upgrade to unlock more shares.",

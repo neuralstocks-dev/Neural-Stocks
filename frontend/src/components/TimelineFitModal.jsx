@@ -1,6 +1,54 @@
 import React, { useEffect, useState } from "react";
-import { Loader2, X, Clock, TrendingUp, Calendar, Target, AlertTriangle, Info, FileDown } from "lucide-react";
+import { Loader2, X, Clock, TrendingUp, Calendar, Target, AlertTriangle, Info, FileDown, Share2, Copy, Check, Send, MessageCircle } from "lucide-react";
 import api from "@/lib/api";
+
+const SOCIAL_HANDLE = "@neuralstockintelligence";
+
+// Build a research-framed share blurb for Timeline Fit shares — mirrors the
+// `buildShareCopy` helper in ShareVerdictButton but adapted to horizon
+// recommendations (no BUY/SELL — uses the recommended_timeline label).
+function buildTimelineShareCopy(timeline, shareUrl) {
+    const ticker = (timeline?.ticker || "").toUpperCase();
+    // Strip the "Best fit: " prefix the model adds to recommendation_label so
+    // the share blurb reads "AI horizon fit: Long Term" instead of the
+    // doubly-prefixed "AI horizon fit: Best fit: Long Term".
+    const rawHorizon = timeline?.recommendation_label || "horizon fit";
+    const horizon = rawHorizon.replace(/^best fit\s*[:\-—]\s*/i, "").trim() || rawHorizon;
+    const rawConf = timeline?.confidence_score;
+    const conf = Number.isFinite(rawConf) ? Math.round(rawConf) : null;
+
+    const headline = ticker
+        ? conf != null
+            ? `${ticker} · AI horizon fit: ${horizon} · ${conf}% confidence`
+            : `${ticker} · ${horizon}`
+        : "Neural Stock Intelligence — Timeline Fit";
+
+    const body = `${headline} — full reasoning + risks:`;
+    const tail = `Research only. Not financial advice. ${SOCIAL_HANDLE}`;
+    return { body, tail };
+}
+
+// X (formerly Twitter) glyph — clean two-stroke, matches the verdict-share
+// modal so brand recall stays consistent across share artifacts.
+function XIcon({ size = 14, strokeWidth = 1.5 }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+        >
+            <path d="M4 4l16 16" />
+            <path d="M20 4L4 20" />
+        </svg>
+    );
+}
 
 const TIMELINES = [
     { key: "short_term", label: "Short Term", range: "days – 3 months", icon: Clock },
@@ -14,6 +62,14 @@ export default function TimelineFitModal({ ticker, onClose }) {
     const [error, setError] = useState("");
     const [pdfState, setPdfState] = useState("idle"); // idle | busy | done | error
     const [pdfError, setPdfError] = useState("");
+
+    // Share state — separate from PDF flow so a share-link mint doesn't
+    // disturb an in-progress PDF download (or vice versa).
+    const [shareOpen, setShareOpen] = useState(false);
+    const [shareLoading, setShareLoading] = useState(false);
+    const [shareError, setShareError] = useState("");
+    const [shareUrl, setShareUrl] = useState("");
+    const [shareCopied, setShareCopied] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -76,6 +132,41 @@ export default function TimelineFitModal({ ticker, onClose }) {
         }
     };
 
+    const openShare = async () => {
+        setShareOpen(true);
+        if (shareUrl) return; // already minted in this session
+        setShareLoading(true);
+        setShareError("");
+        try {
+            const r = await api.post(`/analysis/timeline/${ticker}/share`);
+            setShareUrl(`${window.location.origin}${r.data.url_path}`);
+        } catch (err) {
+            setShareError(err?.response?.data?.detail || "Failed to create share link");
+        } finally {
+            setShareLoading(false);
+        }
+    };
+
+    const copyShareUrl = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setShareCopied(true);
+            setTimeout(() => setShareCopied(false), 1800);
+        } catch (err) {
+            console.warn("clipboard copy failed:", err?.message || err);
+        }
+    };
+
+    const blurb = (data && shareUrl) ? buildTimelineShareCopy(data, shareUrl) : null;
+    const xText = blurb ? `${blurb.body} ${shareUrl}\n\n${blurb.tail}` : shareUrl;
+    const xIntent = `https://x.com/intent/post?text=${encodeURIComponent(xText)}`;
+    const tgText = blurb ? `${blurb.body}\n\n${blurb.tail}` : "";
+    const tgIntent = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}${
+        tgText ? `&text=${encodeURIComponent(tgText)}` : ""
+    }`;
+    const waText = blurb ? `${blurb.body} ${shareUrl}\n\n${blurb.tail}` : shareUrl;
+    const waIntent = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+
     return (
         <div
             className="fixed inset-0 grid place-items-center p-4"
@@ -115,40 +206,51 @@ export default function TimelineFitModal({ ticker, onClose }) {
                     </div>
                     <div className="flex items-center gap-2">
                         {data && !loading && (
-                            <button
-                                onClick={downloadPdf}
-                                disabled={pdfState === "busy"}
-                                className="btn-quick inline-flex items-center gap-2"
-                                data-testid="timeline-export-pdf-button"
-                                title={
-                                    pdfState === "error"
-                                        ? pdfError
-                                        : "Download this Timeline Fit report as a branded PDF"
-                                }
-                            >
-                                {pdfState === "busy" ? (
-                                    <>
-                                        <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
-                                        <span className="hidden sm:inline">Preparing…</span>
-                                    </>
-                                ) : pdfState === "done" ? (
-                                    <>
-                                        <FileDown size={14} strokeWidth={1.5} />
-                                        <span className="hidden sm:inline">Downloaded</span>
-                                    </>
-                                ) : pdfState === "error" ? (
-                                    <>
-                                        <FileDown size={14} strokeWidth={1.5} />
-                                        <span className="hidden sm:inline">Retry PDF</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <FileDown size={14} strokeWidth={1.5} />
-                                        <span className="hidden sm:inline">Export PDF</span>
-                                        <span className="sm:hidden">PDF</span>
-                                    </>
-                                )}
-                            </button>
+                            <>
+                                <button
+                                    onClick={openShare}
+                                    className="btn-quick inline-flex items-center gap-2"
+                                    data-testid="timeline-share-button"
+                                    title="Share this Timeline Fit publicly"
+                                >
+                                    <Share2 size={14} strokeWidth={1.5} />
+                                    <span className="hidden sm:inline">Share</span>
+                                </button>
+                                <button
+                                    onClick={downloadPdf}
+                                    disabled={pdfState === "busy"}
+                                    className="btn-quick inline-flex items-center gap-2"
+                                    data-testid="timeline-export-pdf-button"
+                                    title={
+                                        pdfState === "error"
+                                            ? pdfError
+                                            : "Download this Timeline Fit report as a branded PDF"
+                                    }
+                                >
+                                    {pdfState === "busy" ? (
+                                        <>
+                                            <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
+                                            <span className="hidden sm:inline">Preparing…</span>
+                                        </>
+                                    ) : pdfState === "done" ? (
+                                        <>
+                                            <FileDown size={14} strokeWidth={1.5} />
+                                            <span className="hidden sm:inline">Downloaded</span>
+                                        </>
+                                    ) : pdfState === "error" ? (
+                                        <>
+                                            <FileDown size={14} strokeWidth={1.5} />
+                                            <span className="hidden sm:inline">Retry PDF</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FileDown size={14} strokeWidth={1.5} />
+                                            <span className="hidden sm:inline">Export PDF</span>
+                                            <span className="sm:hidden">PDF</span>
+                                        </>
+                                    )}
+                                </button>
+                            </>
                         )}
                         <button
                             onClick={onClose}
@@ -386,6 +488,181 @@ export default function TimelineFitModal({ ticker, onClose }) {
                     )}
                 </div>
             </div>
+
+            {/* Share submodal — minted on demand, persists for the modal lifetime */}
+            {shareOpen && (
+                <div
+                    className="fixed inset-0 grid place-items-center p-4"
+                    style={{ background: "rgba(6,6,6,0.78)", backdropFilter: "blur(8px)", zIndex: 110 }}
+                    onClick={(e) => { if (e.target === e.currentTarget) setShareOpen(false); }}
+                    data-testid="timeline-share-modal"
+                >
+                    <div
+                        className="module w-full max-w-lg"
+                        style={{ background: "hsl(var(--surface-base))" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div
+                            className="p-5 flex items-center justify-between"
+                            style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
+                        >
+                            <div>
+                                <p className="text-overline">Your public link</p>
+                                <h3 className="font-serif text-2xl mt-1" style={{ letterSpacing: "-0.01em" }}>
+                                    Share this Timeline Fit
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => setShareOpen(false)}
+                                className="btn-ghost !p-2"
+                                aria-label="Close share dialog"
+                                data-testid="timeline-share-modal-close"
+                            >
+                                <X size={16} strokeWidth={1.5} />
+                            </button>
+                        </div>
+
+                        <div className="p-5 md:p-6">
+                            {shareLoading && (
+                                <div className="py-6 text-center">
+                                    <Loader2 className="animate-spin mx-auto" size={20} />
+                                    <p className="text-overline mt-3">Minting link…</p>
+                                </div>
+                            )}
+
+                            {!shareLoading && shareError && (
+                                <div
+                                    className="signal-sell px-3 py-2 text-sm font-mono"
+                                    data-testid="timeline-share-modal-error"
+                                >
+                                    {shareError}
+                                </div>
+                            )}
+
+                            {!shareLoading && shareUrl && (
+                                <>
+                                    <p className="text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                                        Anyone with this link can view your Timeline Fit recommendation,
+                                        the three horizon scorecards, and the strengths / risks bullets
+                                        (no login required). Your email and watchlist stay private.
+                                    </p>
+
+                                    <div
+                                        className="mt-5 flex items-stretch gap-2"
+                                        style={{ border: "1px solid hsl(var(--border-default))" }}
+                                    >
+                                        <input
+                                            readOnly
+                                            value={shareUrl}
+                                            className="flex-1 px-3 py-3 font-mono text-xs bg-transparent outline-none"
+                                            style={{ color: "hsl(var(--text-primary))" }}
+                                            data-testid="timeline-share-url-input"
+                                        />
+                                        <button
+                                            onClick={copyShareUrl}
+                                            className="px-4 font-ui text-xs font-medium"
+                                            style={{
+                                                background: shareCopied ? "hsl(var(--buy))" : "hsl(var(--text-primary))",
+                                                color: "hsl(var(--background))",
+                                            }}
+                                            data-testid="timeline-share-copy-button"
+                                        >
+                                            {shareCopied ? (
+                                                <>
+                                                    <Check size={12} strokeWidth={1.5} className="inline mr-1" />
+                                                    Copied
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy size={12} strokeWidth={1.5} className="inline mr-1" />
+                                                    Copy
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    <div
+                                        className="mt-5 pt-5"
+                                        style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                                        data-testid="timeline-share-intent-row"
+                                    >
+                                        <p
+                                            className="text-overline mb-3"
+                                            style={{ color: "hsl(var(--text-muted))" }}
+                                        >
+                                            Or post directly to
+                                        </p>
+                                        {blurb && (
+                                            <div
+                                                className="mb-3 p-3 font-mono text-xs leading-relaxed"
+                                                style={{
+                                                    background: "hsl(var(--background))",
+                                                    border: "1px solid hsl(var(--border-divider))",
+                                                    color: "hsl(var(--text-secondary))",
+                                                }}
+                                                data-testid="timeline-share-blurb-preview"
+                                            >
+                                                {blurb.body}{" "}
+                                                <span style={{ color: "hsl(var(--text-primary))" }}>{shareUrl}</span>
+                                                <br /><br />
+                                                <span style={{ color: "hsl(var(--text-muted))" }}>{blurb.tail}</span>
+                                            </div>
+                                        )}
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <a
+                                                href={xIntent}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="btn-ghost flex items-center justify-center gap-2 !py-2.5"
+                                                data-testid="timeline-share-intent-x"
+                                                aria-label="Post on X (Twitter)"
+                                            >
+                                                <XIcon size={14} />
+                                                <span className="text-xs font-medium">Post on X</span>
+                                            </a>
+                                            <a
+                                                href={tgIntent}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="btn-ghost flex items-center justify-center gap-2 !py-2.5"
+                                                data-testid="timeline-share-intent-telegram"
+                                                aria-label="Share on Telegram"
+                                            >
+                                                <Send size={14} strokeWidth={1.5} />
+                                                <span className="text-xs font-medium">Telegram</span>
+                                            </a>
+                                            <a
+                                                href={waIntent}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="btn-ghost flex items-center justify-center gap-2 !py-2.5"
+                                                data-testid="timeline-share-intent-whatsapp"
+                                                aria-label="Share on WhatsApp"
+                                            >
+                                                <MessageCircle size={14} strokeWidth={1.5} />
+                                                <span className="text-xs font-medium">WhatsApp</span>
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    <a
+                                        href={shareUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-overline inline-block mt-5 link-underline"
+                                        data-testid="timeline-share-open-preview"
+                                    >
+                                        Open preview →
+                                    </a>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+
+// Exposed for unit tests + reuse by other share surfaces.
+export { buildTimelineShareCopy };
