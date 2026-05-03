@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Loader2, X, Clock, TrendingUp, Calendar, Target, AlertTriangle, Info } from "lucide-react";
+import { Loader2, X, Clock, TrendingUp, Calendar, Target, AlertTriangle, Info, FileDown } from "lucide-react";
 import api from "@/lib/api";
 
 const TIMELINES = [
@@ -12,6 +12,8 @@ export default function TimelineFitModal({ ticker, onClose }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [pdfState, setPdfState] = useState("idle"); // idle | busy | done | error
+    const [pdfError, setPdfError] = useState("");
 
     useEffect(() => {
         let cancelled = false;
@@ -36,6 +38,43 @@ export default function TimelineFitModal({ ticker, onClose }) {
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, [onClose]);
+
+    const downloadPdf = async () => {
+        setPdfState("busy");
+        setPdfError("");
+        try {
+            const { data: blob } = await api.get(
+                `/analysis/timeline/${ticker}/pdf`,
+                { responseType: "blob" }
+            );
+            const url = window.URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `neulab-timeline-${ticker.toLowerCase()}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            setPdfState("done");
+            setTimeout(() => setPdfState("idle"), 2500);
+        } catch (err) {
+            // Blob responseType makes axios stash JSON errors as a Blob — read it back.
+            let detail = "PDF download failed";
+            try {
+                const errBlob = err?.response?.data;
+                if (errBlob instanceof Blob) {
+                    const txt = await errBlob.text();
+                    const parsed = JSON.parse(txt);
+                    if (parsed?.detail) detail = parsed.detail;
+                } else if (err?.response?.data?.detail) {
+                    detail = err.response.data.detail;
+                }
+            } catch (_) { /* swallow — use default */ }
+            setPdfError(detail);
+            setPdfState("error");
+            setTimeout(() => setPdfState("idle"), 4500);
+        }
+    };
 
     return (
         <div
@@ -74,13 +113,51 @@ export default function TimelineFitModal({ ticker, onClose }) {
                             )}
                         </h2>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="btn-ghost !py-1.5 !px-2"
-                        data-testid="timeline-modal-close"
-                    >
-                        <X size={14} strokeWidth={1.5} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {data && !loading && (
+                            <button
+                                onClick={downloadPdf}
+                                disabled={pdfState === "busy"}
+                                className="btn-quick inline-flex items-center gap-2"
+                                data-testid="timeline-export-pdf-button"
+                                title={
+                                    pdfState === "error"
+                                        ? pdfError
+                                        : "Download this Timeline Fit report as a branded PDF"
+                                }
+                            >
+                                {pdfState === "busy" ? (
+                                    <>
+                                        <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
+                                        <span className="hidden sm:inline">Preparing…</span>
+                                    </>
+                                ) : pdfState === "done" ? (
+                                    <>
+                                        <FileDown size={14} strokeWidth={1.5} />
+                                        <span className="hidden sm:inline">Downloaded</span>
+                                    </>
+                                ) : pdfState === "error" ? (
+                                    <>
+                                        <FileDown size={14} strokeWidth={1.5} />
+                                        <span className="hidden sm:inline">Retry PDF</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <FileDown size={14} strokeWidth={1.5} />
+                                        <span className="hidden sm:inline">Export PDF</span>
+                                        <span className="sm:hidden">PDF</span>
+                                    </>
+                                )}
+                            </button>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="btn-ghost !py-1.5 !px-2"
+                            data-testid="timeline-modal-close"
+                        >
+                            <X size={14} strokeWidth={1.5} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Body */}

@@ -713,6 +713,289 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
 
 
 # ---------------------------------------------------------------------------
+# Timeline Fit — branded PDF for the "Timeline Fit" modal output. Renders
+# the full short/medium/long-term fit cards, AI recommendation, why-text,
+# strengths, and risks. Mirrors the typographic system of the main analysis
+# PDF so a Pro/Elite user can archive both verdicts side-by-side.
+# ---------------------------------------------------------------------------
+
+_TIMELINE_LABELS = {
+    "short_term": ("Short Term", "days – 3 months"),
+    "medium_term": ("Medium Term", "3 months – 2 years"),
+    "long_term": ("Long Term", "2+ years"),
+}
+
+
+def generate_timeline_pdf(reco: dict) -> bytes:
+    """Render a Timeline Fit recommendation document to a PDF byte string.
+
+    `reco` is a row from `db.timeline_recos` — fields match the `TimelineFitModal`
+    response payload (recommendation_label, summary, confidence_score,
+    recommended_timeline, other_timelines, explanation, strengths, risks,
+    data_completeness_note, ticker, name, price_at_analysis, currency,
+    created_at).
+    """
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=LETTER,
+        leftMargin=0.9 * inch, rightMargin=0.9 * inch,
+        topMargin=0.7 * inch, bottomMargin=0.7 * inch,
+        title=f"Neural Stock Intelligence · Timeline Fit · {reco.get('ticker', '')}",
+        author="NeuLab Inc.",
+    )
+    s = _styles()
+    story = []
+
+    # Header
+    story.append(Paragraph("NEULAB · NEURAL STOCK INTELLIGENCE™ · TIMELINE FIT", s["overline"]))
+    name_html = ""
+    if reco.get("name"):
+        name_html = f"&nbsp;&nbsp;<font color='#6b7280' size='14'>{reco['name']}</font>"
+    story.append(Paragraph(
+        f"{reco.get('ticker', '—')}{name_html}",
+        s["h1"],
+    ))
+
+    currency = reco.get("currency") or "USD"
+    price = reco.get("price_at_analysis")
+    created = reco.get("created_at", "")
+    try:
+        created_fmt = datetime.fromisoformat(created.replace("Z", "+00:00")).strftime(
+            "%d %b %Y · %H:%M UTC"
+        )
+    except Exception:
+        created_fmt = created
+    price_str = _fmt_price(price, currency) if price is not None else "—"
+    story.append(Paragraph(
+        f"Price at analysis: <b>{price_str}</b> · Generated {created_fmt}",
+        s["muted"],
+    ))
+    story.append(Spacer(1, 14))
+
+    # Educational research banner — same calm tone as the main report so the
+    # framing carries across artifacts when forwarded.
+    banner_para = (
+        Paragraph(
+            "EDUCATIONAL RESEARCH REPORT",
+            ParagraphStyle("BannerOL", parent=s["overline"], textColor=BRAND_GOLD),
+        ),
+        Paragraph(
+            "Timeline Fit ranks how well the current setup matches a "
+            "<b>short / medium / long-term</b> investment horizon. The output is "
+            "a horizon-suitability classification, <b>not</b> a buy / sell signal "
+            "and <b>not</b> personalized financial advice.",
+            ParagraphStyle("BannerBody", parent=s["body"], fontSize=10.5, leading=15),
+        ),
+        Paragraph(
+            "<b>Confidence</b> reflects the model's internal classification "
+            "strength based on the fundamentals, technicals, and price history "
+            "used as input — not the probability of any future outcome.",
+            ParagraphStyle(
+                "BannerSub", parent=s["body"], fontSize=9, leading=13,
+                textColor=BRAND_MUTED,
+            ),
+        ),
+    )
+    banner_tbl = Table([[c] for c in banner_para], colWidths=[doc.width - 12])
+    banner_tbl.setStyle(TableStyle([
+        ("LINEBEFORE", (0, 0), (0, -1), 2.5, BRAND_GOLD),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, 0), 6),
+        ("TOPPADDING", (0, 1), (-1, 1), 4),
+        ("TOPPADDING", (0, 2), (-1, 2), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    story.append(banner_tbl)
+    story.append(Spacer(1, 14))
+
+    # Recommendation block — gold-bordered, headline label + summary.
+    rec_label = reco.get("recommendation_label") or "—"
+    summary = reco.get("summary") or ""
+    confidence = reco.get("confidence_score") or 0
+    rec_inner = [
+        Paragraph("AI RECOMMENDATION", ParagraphStyle(
+            "RecOL", parent=s["overline"], textColor=BRAND_GOLD)),
+        Paragraph(rec_label, ParagraphStyle(
+            "RecLabel", parent=s["h1"], fontSize=22, leading=26,
+            textColor=HOLD_AMBER, spaceAfter=4)),
+        Paragraph(summary, ParagraphStyle(
+            "RecSummary", parent=s["body"], fontSize=11, leading=15)),
+        Paragraph(
+            f"Confidence · <b><font color='#d97706'>{confidence}%</font></b>",
+            ParagraphStyle("RecConf", parent=s["mono"], fontSize=9, leading=12,
+                           textColor=BRAND_MUTED, spaceBefore=4),
+        ),
+    ]
+    rec_tbl = Table([[c] for c in rec_inner], colWidths=[doc.width - 12])
+    rec_tbl.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 1.2, HOLD_AMBER),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#fef9f0")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+        ("TOPPADDING", (0, 0), (-1, 0), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, -1), (-1, -1), 12),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    story.append(rec_tbl)
+    story.append(Spacer(1, 18))
+
+    # Three-column horizon scorecards. Each card: label, range, fit %, note.
+    # Best fit gets a thicker gold border so the recommended horizon jumps out
+    # at a glance even when the PDF is printed in greyscale.
+    other = reco.get("other_timelines") or {}
+    best = reco.get("recommended_timeline")
+    card_cells = []
+    for key in ("short_term", "medium_term", "long_term"):
+        info = other.get(key) or {}
+        is_best = key == best
+        label, rng = _TIMELINE_LABELS[key]
+        fit = info.get("fit_score")
+        fit_str = f"{fit}%" if isinstance(fit, (int, float)) else "—"
+        note = info.get("note") or ""
+        cell_paras = [
+            Paragraph(
+                "BEST FIT" if is_best else "&nbsp;",
+                ParagraphStyle(
+                    "CardTag", parent=s["overline"],
+                    textColor=BRAND_GOLD if is_best else colors.white,
+                    fontSize=7, leading=9,
+                ),
+            ),
+            Paragraph(label, ParagraphStyle(
+                "CardLabel", parent=s["h2"], fontSize=14, leading=16,
+                spaceBefore=2, spaceAfter=2)),
+            Paragraph(rng, ParagraphStyle(
+                "CardRange", parent=s["muted"], fontSize=8, leading=10)),
+            Spacer(1, 6),
+            Paragraph(
+                f"<b>{fit_str}</b> fit",
+                ParagraphStyle(
+                    "CardFit", parent=s["mono"], fontSize=11, leading=14,
+                    textColor=HOLD_AMBER if is_best else BRAND_INK,
+                ),
+            ),
+            Spacer(1, 4),
+            Paragraph(note, ParagraphStyle(
+                "CardNote", parent=s["body"], fontSize=9, leading=12)),
+        ]
+        card_cells.append(cell_paras)
+
+    col_w = (doc.width - 16) / 3
+    cards_tbl = Table([card_cells], colWidths=[col_w, col_w, col_w])
+    style_cmds = [
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+    ]
+    # Per-column borders (thicker for best-fit).
+    for col_idx, key in enumerate(("short_term", "medium_term", "long_term")):
+        is_best = key == best
+        style_cmds.append((
+            "BOX", (col_idx, 0), (col_idx, 0),
+            1.5 if is_best else 0.6,
+            BRAND_GOLD if is_best else RULE_GREY,
+        ))
+        if is_best:
+            style_cmds.append((
+                "BACKGROUND", (col_idx, 0), (col_idx, 0),
+                colors.HexColor("#fef9f0"),
+            ))
+    cards_tbl.setStyle(TableStyle(style_cmds))
+    story.append(cards_tbl)
+    story.append(Spacer(1, 18))
+
+    # Why this timeline
+    if reco.get("explanation"):
+        story.append(Paragraph("WHY THIS TIMELINE", s["overline"]))
+        story.append(Paragraph(
+            reco["explanation"].replace("\n", "<br/>"),
+            s["body"],
+        ))
+        story.append(Spacer(1, 10))
+
+    # Strengths + Risks — two-column layout to mirror the modal.
+    strengths = reco.get("strengths") or []
+    risks = reco.get("risks") or []
+    if strengths or risks:
+        def _bullets(items, color):
+            return [
+                Paragraph(
+                    f"<font color='{color}'>—</font> &nbsp;{item}",
+                    ParagraphStyle(
+                        "Bullet", parent=s["body"], fontSize=10, leading=14,
+                        leftIndent=4,
+                    ),
+                )
+                for item in items
+            ]
+        strengths_block = [
+            Paragraph(
+                "STRENGTHS",
+                ParagraphStyle(
+                    "OL_S", parent=s["overline"],
+                    textColor=BUY_GREEN,
+                ),
+            ),
+            *_bullets(strengths, "#16a34a"),
+        ]
+        risks_block = [
+            Paragraph(
+                "RISKS",
+                ParagraphStyle(
+                    "OL_R", parent=s["overline"],
+                    textColor=SELL_RED,
+                ),
+            ),
+            *_bullets(risks, "#dc2626"),
+        ]
+        sr_tbl = Table(
+            [[strengths_block, risks_block]],
+            colWidths=[(doc.width - 10) / 2, (doc.width - 10) / 2],
+        )
+        sr_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(sr_tbl)
+        story.append(Spacer(1, 14))
+
+    # Data completeness note
+    if reco.get("data_completeness_note"):
+        story.append(Paragraph(
+            f"<i>{reco['data_completeness_note']}</i>",
+            s["muted"],
+        ))
+        story.append(Spacer(1, 8))
+
+    # Footer disclaimer + social
+    story.append(Spacer(1, 8))
+    story.append(Paragraph(
+        "This Timeline Fit report is generated by Neural Stock Intelligence™ "
+        "(developed by NeuLab Inc.) using AI models and publicly available "
+        "market data. It is informational and educational only — not financial "
+        "advice, a recommendation to buy or sell, or an offer of securities. "
+        "Markets involve risk of loss. Always do your own research and consult "
+        "a licensed financial professional.",
+        s["muted"],
+    ))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph(SOCIAL_LINE_HTML, s["muted"]))
+
+    doc.build(story)
+    pdf_bytes = buf.getvalue()
+    buf.close()
+    return pdf_bytes
+
+
+# ---------------------------------------------------------------------------
 # Trade Slip — single-page shareable card optimized for screenshotting into
 # Discord/Telegram trading channels. Strips the full report down to: verdict,
 # calibration breadcrumb, entry/stop/target/horizon, one-liner thesis, and a

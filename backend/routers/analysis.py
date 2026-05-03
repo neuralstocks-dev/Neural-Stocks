@@ -1314,6 +1314,49 @@ async def timeline_latest(ticker: str, user=Depends(get_current_user)):
     return doc
 
 
+@router.get("/analysis/timeline/{ticker}/pdf")
+async def timeline_pdf(ticker: str, user=Depends(get_current_user)):
+    """Download the latest Timeline Fit recommendation as a branded PDF.
+
+    Owner-only. Same Pro/Elite gate as the timeline POST endpoint so Free users
+    can't reach the artifact via a stale doc lying in the collection.
+    """
+    from fastapi.responses import StreamingResponse
+    from services.pdf import generate_timeline_pdf
+    import io
+
+    p = plan_for(user)
+    if not p["quick_actions"]:
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"Timeline Fit PDF export is a Pro/Elite feature. Upgrade from "
+                f"{p['name']} to download Timeline Fit reports."
+            ),
+        )
+
+    ticker = ticker.upper().strip()
+    doc = await db.timeline_recos.find_one(
+        {"user_id": user["id"], "ticker": ticker},
+        sort=[("created_at", -1)],
+        projection={"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No Timeline Fit recommendation found for {ticker}. Run the analysis first.",
+        )
+
+    pdf_bytes = generate_timeline_pdf(doc)
+    safe_ticker = ticker.lower().replace("/", "-")
+    filename = f"neulab-timeline-{safe_ticker}-{doc.get('id', '')[:8]}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post("/analysis/quick/{kind}")
 async def quick_analyze(kind: str, user=Depends(get_current_user)):
     """Fire-and-forget: kicks off a background quick-sweep and returns a job_id
