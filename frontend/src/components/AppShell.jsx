@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
-import { Sun, Moon, LogOut, LineChart, Menu, X } from "lucide-react";
+import { Sun, Moon, LogOut, Menu, X } from "lucide-react";
 import SocialLinks from "@/components/SocialLinks";
 
 const NAV_ITEMS = [
@@ -79,6 +79,9 @@ export default function AppShell({ children }) {
                 }}
                 data-testid="app-header"
             >
+                {/* Row 1 — Brand (left) + primary nav (right). At <xl the right
+                    side collapses to theme toggle + hamburger; the utility
+                    cluster (admin / plan / email / logout) moves to Row 2. */}
                 <div className="max-w-[1400px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between gap-3">
                     <Link
                         to="/"
@@ -87,15 +90,29 @@ export default function AppShell({ children }) {
                     >
                         <div
                             style={{
-                                width: 28,
-                                height: 28,
-                                border: "1px solid hsl(var(--text-primary))",
+                                width: 36,
+                                height: 36,
+                                background: "hsl(220 35% 8%)",
                                 display: "grid",
                                 placeItems: "center",
                                 flexShrink: 0,
+                                borderRadius: 4,
+                                overflow: "hidden",
                             }}
                         >
-                            <LineChart size={14} strokeWidth={1.5} />
+                            <img
+                                src="/neulab-mark.png"
+                                alt="NeuLab"
+                                width={32}
+                                height={32}
+                                style={{
+                                    width: 32,
+                                    height: 32,
+                                    objectFit: "contain",
+                                    display: "block",
+                                }}
+                                data-testid="brand-logo-img"
+                            />
                         </div>
                         <div className="flex flex-col leading-none">
                             <span
@@ -141,10 +158,46 @@ export default function AppShell({ children }) {
                         </Link>
                     </nav>
 
-                    <div className="flex items-center gap-2">
+                    {/* Compact right-side cluster — only on <xl. Theme + hamburger
+                        stay accessible from row 1. Admin/plan/email/logout move
+                        into the drawer (already wired below). */}
+                    <div className="flex items-center gap-2 xl:hidden">
+                        <button
+                            onClick={toggle}
+                            className="btn-ghost !p-2"
+                            aria-label="Toggle theme"
+                            data-testid="theme-toggle-mobile"
+                        >
+                            {theme === "dark" ? (
+                                <Sun size={16} strokeWidth={1.5} />
+                            ) : (
+                                <Moon size={16} strokeWidth={1.5} />
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setMobileOpen(true)}
+                            className="btn-ghost !p-2"
+                            aria-label="Open menu"
+                            aria-expanded={mobileOpen}
+                            data-testid="mobile-menu-button"
+                        >
+                            <Menu size={18} strokeWidth={1.5} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Row 2 — Utility cluster. Only on xl+; mobile users still see
+                    these inside the hamburger drawer. Right-aligned so the row
+                    feels visually anchored under the nav above. */}
+                <div
+                    className="hidden xl:block max-w-[1400px] mx-auto px-4 md:px-8"
+                    style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                    data-testid="header-utility-row"
+                >
+                    <div className="h-10 flex items-center justify-end gap-3">
                         {user?.is_admin && (
                             <span
-                                className="text-overline hidden sm:inline-flex items-center px-2 py-1"
+                                className="text-overline inline-flex items-center px-2 py-1"
                                 style={{
                                     border: "1px solid hsl(var(--hold))",
                                     color: "hsl(var(--hold))",
@@ -159,7 +212,7 @@ export default function AppShell({ children }) {
                         {user?.plan && !user?.is_admin && (
                             <Link
                                 to="/pricing"
-                                className="text-overline mr-1 hidden sm:inline-flex items-center px-2 py-1"
+                                className="text-overline inline-flex items-center px-2 py-1"
                                 style={{
                                     border: "1px solid hsl(var(--border-default))",
                                     borderRadius: 2,
@@ -178,7 +231,7 @@ export default function AppShell({ children }) {
                         )}
                         {user && (
                             <span
-                                className="hidden xl:inline text-overline mr-2 max-w-[160px] truncate"
+                                className="text-overline max-w-[220px] truncate"
                                 data-testid="current-user-email"
                             >
                                 {user.email}
@@ -199,23 +252,13 @@ export default function AppShell({ children }) {
                         {user && (
                             <button
                                 onClick={onLogout}
-                                className="btn-ghost !p-2 !hidden xl:!inline-flex"
+                                className="btn-ghost !p-2 inline-flex"
                                 aria-label="Logout"
                                 data-testid="logout-button"
                             >
                                 <LogOut size={16} strokeWidth={1.5} />
                             </button>
                         )}
-                        {/* Mobile hamburger — visible below md */}
-                        <button
-                            onClick={() => setMobileOpen(true)}
-                            className="btn-ghost !p-2 xl:!hidden"
-                            aria-label="Open menu"
-                            aria-expanded={mobileOpen}
-                            data-testid="mobile-menu-button"
-                        >
-                            <Menu size={18} strokeWidth={1.5} />
-                        </button>
                     </div>
                 </div>
             </header>
