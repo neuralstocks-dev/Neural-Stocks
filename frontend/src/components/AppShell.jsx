@@ -15,6 +15,7 @@ const NAV_ITEMS = [
     { to: "/why", label: "Why us", testid: "nav-why" },
     { to: "/manual", label: "Manual", testid: "nav-manual" },
     { to: "/technical", label: "Technical", testid: "nav-technical" },
+    { to: "/resources", label: "Resources", testid: "nav-resources" },
 ];
 
 export default function AppShell({ children }) {

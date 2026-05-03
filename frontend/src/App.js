@@ -21,6 +21,8 @@ import PortfolioPage from "@/pages/PortfolioPage";
 import SettingsPage from "@/pages/SettingsPage";
 import TechnicalPage from "@/pages/TechnicalPage";
 import UserManualPage from "@/pages/UserManualPage";
+import ResourcesPage from "@/pages/ResourcesPage";
+import ResourceDetailPage from "@/pages/ResourceDetailPage";
 import PaypalSmokeTestPage from "@/pages/PaypalSmokeTestPage";
 import BacktestPage from "@/pages/BacktestPage";
 import AlertsPage from "@/pages/AlertsPage";
@@ -94,6 +96,8 @@ function AppRoutes() {
                 <Route path="/why" element={<WhyUsPage />} />
                 <Route path="/manual" element={<UserManualPage />} />
                 <Route path="/technical" element={<TechnicalPage />} />
+                <Route path="/resources" element={<ResourcesPage />} />
+                <Route path="/resources/:slug" element={<ResourceDetailPage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 <Route path="/admin/cost" element={<AdminCostPage />} />
                 <Route path="/portfolio" element={<PortfolioPage />} />
