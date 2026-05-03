@@ -1,7 +1,6 @@
 import React from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Download, BookOpen, Youtube, ExternalLink } from "lucide-react";
-import AppShell from "@/components/AppShell";
 import { findResource } from "@/data/resources";
 
 const ICON_BY_KIND = { pdf: BookOpen, youtube: Youtube, link: ExternalLink };
@@ -134,34 +133,31 @@ export default function ResourceDetailPage() {
 
     if (!resource) {
         return (
-            <AppShell>
-                <div className="max-w-3xl mx-auto px-5 md:px-8 py-16 text-center" data-testid="resource-not-found">
-                    <p className="text-overline" style={{ color: "hsl(var(--text-muted))", fontSize: "10px" }}>
-                        404
-                    </p>
-                    <h1 className="mt-3 font-mono text-2xl" style={{ color: "hsl(var(--text-primary))" }}>
-                        Resource not found
-                    </h1>
-                    <p className="mt-3 text-base" style={{ color: "hsl(var(--text-secondary))" }}>
-                        That link may be outdated or the resource was renamed.
-                    </p>
-                    <Link
-                        to="/resources"
-                        className="mt-6 inline-flex items-center gap-2 text-sm"
-                        style={{ color: "hsl(var(--gold))" }}
-                    >
-                        <ArrowLeft size={13} strokeWidth={1.8} /> Back to all resources
-                    </Link>
-                </div>
-            </AppShell>
+            <div className="max-w-3xl mx-auto px-5 md:px-8 py-16 text-center" data-testid="resource-not-found">
+                <p className="text-overline" style={{ color: "hsl(var(--text-muted))", fontSize: "10px" }}>
+                    404
+                </p>
+                <h1 className="mt-3 font-mono text-2xl" style={{ color: "hsl(var(--text-primary))" }}>
+                    Resource not found
+                </h1>
+                <p className="mt-3 text-base" style={{ color: "hsl(var(--text-secondary))" }}>
+                    That link may be outdated or the resource was renamed.
+                </p>
+                <Link
+                    to="/resources"
+                    className="mt-6 inline-flex items-center gap-2 text-sm"
+                    style={{ color: "hsl(var(--gold))" }}
+                >
+                    <ArrowLeft size={13} strokeWidth={1.8} /> Back to all resources
+                </Link>
+            </div>
         );
     }
 
     const Icon = ICON_BY_KIND[resource.kind] || ExternalLink;
 
     return (
-        <AppShell>
-            <article className="max-w-3xl mx-auto px-5 md:px-8 py-10 md:py-14" data-testid={`resource-detail-${resource.slug}`}>
+        <article className="max-w-3xl mx-auto px-5 md:px-8 py-10 md:py-14" data-testid={`resource-detail-${resource.slug}`}>
                 <Link
                     to="/resources"
                     className="inline-flex items-center gap-2 text-xs"
@@ -250,7 +246,6 @@ export default function ResourceDetailPage() {
                         <CtaButton resource={resource} testid="resource-cta-footer" />
                     </div>
                 </footer>
-            </article>
-        </AppShell>
+        </article>
     );
 }
