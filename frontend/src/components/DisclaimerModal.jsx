@@ -14,6 +14,15 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
     const [error, setError] = useState("");
     const [ackRead, setAckRead] = useState(false);
     const [ackOwnRisk, setAckOwnRisk] = useState(false);
+    // JS-driven max-height. iOS Safari < 16.4 doesn't support `svh`, and
+    // `100vh` on iOS includes the area BEHIND the bottom toolbar — both
+    // can push the accept button off-screen. A pixel value computed from
+    // `window.innerHeight` (the visual viewport height in iOS Safari) is
+    // bulletproof. Updated on resize + orientation change so the modal
+    // re-clamps when the URL bar shows/hides as the user scrolls.
+    const [maxH, setMaxH] = useState(() =>
+        typeof window !== "undefined" ? Math.round(window.innerHeight * 0.92) : 800
+    );
 
     useEffect(() => {
         if (!open) {
@@ -28,6 +37,20 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
             .then((r) => setData(r.data))
             .catch((e) => setError(e?.response?.data?.detail || "Failed to load disclaimer"))
             .finally(() => setLoading(false));
+    }, [open]);
+
+    // Re-clamp the modal whenever the visual viewport changes — covers
+    // Safari URL-bar show/hide, orientation change, and tablet split-view.
+    useEffect(() => {
+        if (!open) return;
+        const update = () => setMaxH(Math.round(window.innerHeight * 0.92));
+        update();
+        window.addEventListener("resize", update);
+        window.addEventListener("orientationchange", update);
+        return () => {
+            window.removeEventListener("resize", update);
+            window.removeEventListener("orientationchange", update);
+        };
     }, [open]);
 
     const accept = async () => {
@@ -57,16 +80,12 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
                 className="module-elevated w-full max-w-2xl flex flex-col"
                 style={{
                     background: "hsl(var(--surface))",
-                    // Cap the entire modal to the safe viewport height so the
-                    // accept button is ALWAYS visible regardless of disclaimer
-                    // length. Using svh (small viewport height) on supporting
-                    // browsers correctly accounts for mobile URL/toolbar UI;
-                    // falls back to vh on older WebKit. The previous layout
-                    // capped only the disclaimer text at 52vh and let the
-                    // checkbox + footer rows push out of the bottom of the
-                    // viewport on phones with long disclaimers — making the
-                    // accept button unreachable.
-                    maxHeight: "min(92svh, 92vh)",
+                    // JS-computed pixel cap (see useEffect above) — bulletproof
+                    // across iOS Safari URL-bar show/hide, older WebKit lacking
+                    // `svh` support, and tablet split-view. The previous
+                    // `min(92svh, 92vh)` silently dropped on iOS < 16.4 and let
+                    // the modal grow past the viewport.
+                    maxHeight: `${maxH}px`,
                 }}
             >
                 <div
@@ -85,7 +104,7 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
                             </p>
                             <h3
                                 className="font-serif mt-1"
-                                style={{ fontSize: "clamp(1.6rem, 3vw, 2rem)", letterSpacing: "-0.015em" }}
+                                style={{ fontSize: "clamp(1.4rem, 3vw, 2rem)", letterSpacing: "-0.015em" }}
                             >
                                 Not financial advice.
                             </h3>
@@ -93,7 +112,7 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
                     </div>
                     <button
                         onClick={onClose}
-                        className="btn-ghost !p-2"
+                        className="btn-ghost !p-2 flex-shrink-0"
                         aria-label="Close"
                         data-testid="disclaimer-close-button"
                     >
@@ -109,59 +128,79 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
 
                 {data && (
                     <>
+                        {/* Single scroll region — disclaimer text + checkboxes
+                            live here together so the Accept button (footer
+                            below) is ALWAYS pinned to the visible modal
+                            bottom regardless of how tall the text or
+                            checkbox labels render on a narrow phone. */}
                         <div
-                            className="px-5 md:px-6 py-5 flex-1 min-h-0 overflow-y-auto text-sm leading-relaxed whitespace-pre-line"
-                            style={{ color: "hsl(var(--text-secondary))" }}
-                            data-testid="disclaimer-text"
+                            className="flex-1 min-h-0 overflow-y-auto"
+                            data-testid="disclaimer-scroll-region"
                         >
-                            {data.text}
+                            <div
+                                className="px-5 md:px-6 py-5 text-sm leading-relaxed whitespace-pre-line"
+                                style={{ color: "hsl(var(--text-secondary))" }}
+                                data-testid="disclaimer-text"
+                            >
+                                {data.text}
+                            </div>
+
+                            <div
+                                className="px-5 md:px-6 py-4 space-y-3"
+                                style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                            >
+                                <label
+                                    className="flex items-start gap-3 cursor-pointer select-none"
+                                    data-testid="disclaimer-ack-read"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={ackRead}
+                                        onChange={(e) => setAckRead(e.target.checked)}
+                                        className="mt-1 accent-[hsl(var(--buy))]"
+                                    />
+                                    <span className="text-sm" style={{ color: "hsl(var(--text-primary))" }}>
+                                        I have read the disclaimer and understand that all outputs are{" "}
+                                        <em className="italic">educational, not advice</em>.
+                                    </span>
+                                </label>
+                                <label
+                                    className="flex items-start gap-3 cursor-pointer select-none"
+                                    data-testid="disclaimer-ack-risk"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={ackOwnRisk}
+                                        onChange={(e) => setAckOwnRisk(e.target.checked)}
+                                        className="mt-1 accent-[hsl(var(--buy))]"
+                                    />
+                                    <span className="text-sm" style={{ color: "hsl(var(--text-primary))" }}>
+                                        I accept full responsibility for any investment decisions I make and agree to
+                                        use Neural at my own risk.
+                                    </span>
+                                </label>
+
+                                {error && (
+                                    <div className="signal-sell px-3 py-2 text-xs font-mono" data-testid="disclaimer-error">
+                                        {typeof error === "string" ? error : JSON.stringify(error)}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
+                        {/* Sticky footer — always visible; never scrolls. The
+                            primary CTA (Accept) sits here so a user with a
+                            very long disclaimer + tall checkbox labels can
+                            still tap it without scrolling-and-hunting. */}
                         <div
-                            className="px-5 md:px-6 py-4 space-y-3 flex-shrink-0"
-                            style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
-                        >
-                            <label
-                                className="flex items-start gap-3 cursor-pointer select-none"
-                                data-testid="disclaimer-ack-read"
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={ackRead}
-                                    onChange={(e) => setAckRead(e.target.checked)}
-                                    className="mt-1 accent-[hsl(var(--buy))]"
-                                />
-                                <span className="text-sm" style={{ color: "hsl(var(--text-primary))" }}>
-                                    I have read the disclaimer and understand that all outputs are{" "}
-                                    <em className="italic">educational, not advice</em>.
-                                </span>
-                            </label>
-                            <label
-                                className="flex items-start gap-3 cursor-pointer select-none"
-                                data-testid="disclaimer-ack-risk"
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={ackOwnRisk}
-                                    onChange={(e) => setAckOwnRisk(e.target.checked)}
-                                    className="mt-1 accent-[hsl(var(--buy))]"
-                                />
-                                <span className="text-sm" style={{ color: "hsl(var(--text-primary))" }}>
-                                    I accept full responsibility for any investment decisions I make and agree to
-                                    use Neural at my own risk.
-                                </span>
-                            </label>
-
-                            {error && (
-                                <div className="signal-sell px-3 py-2 text-xs font-mono" data-testid="disclaimer-error">
-                                    {typeof error === "string" ? error : JSON.stringify(error)}
-                                </div>
-                            )}
-                        </div>
-
-                        <div
-                            className="px-5 md:px-6 py-4 flex items-center justify-between gap-3 flex-wrap flex-shrink-0"
-                            style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                            className="px-5 md:px-6 py-3 flex items-center justify-between gap-3 flex-wrap flex-shrink-0"
+                            style={{
+                                borderTop: "1px solid hsl(var(--border-divider))",
+                                background: "hsl(var(--surface-elevated))",
+                                // Honour iOS home-bar safe area so the button
+                                // never lands underneath the gesture bar.
+                                paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+                            }}
                         >
                             <span className="text-overline" style={{ fontSize: "0.56rem" }}>
                                 Version {data.version}
