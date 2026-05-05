@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from core.security import get_current_user
 from services import idx_rapidapi
+from services.quota import effective_plan_key
 
 router = APIRouter(prefix="/idx", tags=["idx"])
 
@@ -21,12 +22,17 @@ router = APIRouter(prefix="/idx", tags=["idx"])
 @router.get("/top-picks")
 async def top_picks(limit: int = 10, user: dict = Depends(get_current_user)):
     """Top N IDX picks — marketed as a Pro/Elite feature so Free users
-    see the upsell rather than the payload."""
-    # Gate on tier first — cheaper than a provider call
-    plan = (user.get("plan") or "free").lower()
-    if user.get("is_admin"):
-        pass  # admins bypass
-    elif plan not in ("pro", "elite", "daypass"):
+    see the upsell rather than the payload.
+
+    Uses `effective_plan_key()` (NOT raw `user["plan"]`) so admin-granted
+    test-unlocks and active day-passes correctly bypass the gate. The
+    previous direct read of `user["plan"]` ignored these unlock paths,
+    causing Pro+ features to be denied to test-unlocked users.
+    """
+    # Gate on EFFECTIVE plan — handles is_admin, test_unlock, and daypass
+    # in one helper so the gate stays consistent with the rest of the app.
+    plan = effective_plan_key(user)
+    if plan not in ("pro", "elite", "daypass"):
         raise HTTPException(
             status_code=402,
             detail="Top Picks is a Pro+ feature. Upgrade to unlock real-time IDX leaders.",
