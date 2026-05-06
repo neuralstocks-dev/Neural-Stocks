@@ -50,6 +50,12 @@ export default function KidsPreviewPage() {
     const [feedbackBusy, setFeedbackBusy] = useState(false);
     const [showShare, setShowShare] = useState(false);
 
+    // Mark this browser as having seen StockKids — silences the
+    // dashboard cross-promo nudge.
+    useEffect(() => {
+        try { localStorage.setItem("kids_preview_visited", "1"); } catch (_) { /* ignore quota / private-mode */ }
+    }, []);
+
     useEffect(() => {
         let cancelled = false;
         (async () => {

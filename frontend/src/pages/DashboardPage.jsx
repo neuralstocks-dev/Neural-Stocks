@@ -34,6 +34,7 @@ function _isBudgetError(payload) {
 }
 import TestUnlockBanner from "@/components/TestUnlockBanner";
 import FirstTimeManualPill from "@/components/FirstTimeManualPill";
+import KidsDiscoverNudge from "@/components/KidsDiscoverNudge";
 import OnboardingWizard, { isOnboardingCompleted } from "@/components/OnboardingWizard";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import AnalysisModeSelector from "@/components/AnalysisModeSelector";
@@ -843,6 +844,9 @@ export default function DashboardPage() {
 
                 {/* Test-unlock banner (admin-granted) */}
                 <TestUnlockBanner quota={quota} />
+
+                {/* Cross-promo nudge — surfaces only to users who haven't visited /kids/preview */}
+                <KidsDiscoverNudge />
 
                 {/* First-time manual nudge (auto-hides after first analysis this week) */}
                 <FirstTimeManualPill quota={quota} />
