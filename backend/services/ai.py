@@ -246,7 +246,7 @@ def _run_chat(system_prompt: str, session_prefix: str, user_text: str, *, provid
 # guards against the proxy-cap signature in case OpenAI re-enters via
 # misconfiguration.
 _LLM_FALLBACK_CHAIN = [
-    ("anthropic", "claude-sonnet-4-5-20250929", "claude-sonnet-4-5"),
+    ("anthropic", "claude-sonnet-4-6", "claude-sonnet-4-6"),
     ("gemini",    "gemini-2.5-pro",             "gemini-2.5-pro"),
 ]
 _LLM_PER_ATTEMPT_TIMEOUT_S = 75.0
