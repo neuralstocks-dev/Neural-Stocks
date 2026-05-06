@@ -58,9 +58,13 @@ export function KidsAuthProvider({ children }) {
 
     const signup = useCallback(async (body) => {
         const r = await kidsApi.post("/kids/auth/signup", body);
-        localStorage.setItem(KID_TOKEN_KEY, r.data.token);
-        setStudent(r.data.student);
-        return r.data.student;
+        // 8-12 → response has no token; the kid waits for parental consent.
+        // 13+ → response has a token; we set it like a login.
+        if (r.data?.token) {
+            localStorage.setItem(KID_TOKEN_KEY, r.data.token);
+            setStudent(r.data.student);
+        }
+        return r.data;
     }, []);
 
     const logout = useCallback(() => {

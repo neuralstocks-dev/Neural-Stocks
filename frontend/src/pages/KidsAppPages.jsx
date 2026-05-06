@@ -10,6 +10,7 @@ import {
     MessageCircle, Brain, Star, StarOff, ShoppingCart, ShieldAlert,
 } from "lucide-react";
 import { useKidsAuth } from "@/contexts/KidsAuthContext";
+import { KidsTradeJournalModal } from "@/components/KidsTradeJournalModal";
 
 const ACCENT = "#ff7676";
 const NAVY = "#1a1a2e";
@@ -381,6 +382,8 @@ export function KidsAnalyzePage() {
     const [tradeError, setTradeError] = useState("");
     const [tradeOk, setTradeOk] = useState("");
     const [qty, setQty] = useState(1);
+    // Last successful trade — drives the post-trade journal modal.
+    const [lastTrade, setLastTrade] = useState(null);
 
     const sym = (ticker || "").toUpperCase();
 
@@ -420,6 +423,7 @@ export function KidsAnalyzePage() {
         try {
             const r = await kidsApi.post("/kids/trades", { ticker: sym, side, qty: parseInt(qty, 10) });
             setTradeOk(`${side === "BUY" ? "Bought" : "Sold"} ${r.data.qty} ${sym}!`);
+            setLastTrade(r.data); // surfaces the journal modal
             await refreshAuth();
             // Refresh held qty
             const p = await kidsApi.get("/kids/portfolio");
@@ -579,6 +583,15 @@ export function KidsAnalyzePage() {
             <p style={{ marginTop: 24, fontSize: 11, opacity: 0.5, lineHeight: 1.6, textAlign: "center" }}>
                 Educational only · Not financial advice · Real investing involves the risk of losing money.
             </p>
+
+            {lastTrade && (
+                <KidsTradeJournalModal
+                    trade={lastTrade}
+                    kidsApi={kidsApi}
+                    onClose={() => setLastTrade(null)}
+                    onBonusEarned={() => { refreshAuth(); }}
+                />
+            )}
         </div>
     );
 }

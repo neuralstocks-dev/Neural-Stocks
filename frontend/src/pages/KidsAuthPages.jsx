@@ -193,13 +193,20 @@ export function KidsSignupPage() {
         setError("");
         setBusy(true);
         try {
-            await signup({
+            const result = await signup({
                 full_name: form.full_name,
                 email: form.email,
                 password: form.password,
                 birthdate: form.birthdate,
                 parent_email: form.parent_email || undefined,
             });
+            // 8-12 → backend returns awaiting_parental_consent (no token).
+            // Route the kid to a "waiting on parent" page so they don't
+            // sit on a confused signup form.
+            if (result?.status === "awaiting_parental_consent") {
+                navigate(`/kids/awaiting-consent?email=${encodeURIComponent(form.email)}&parent=${encodeURIComponent(form.parent_email)}`);
+                return;
+            }
             navigate("/kids/dashboard");
         } catch (err) {
             setError(err?.response?.data?.detail || "Couldn't create your account.");
@@ -220,9 +227,9 @@ export function KidsSignupPage() {
                 <input style={inputStyle} required type="email" autoComplete="email" data-testid="kids-signup-email" value={form.email} onChange={update("email")} />
                 <label style={labelStyle}>Password (8+ characters)</label>
                 <input style={inputStyle} required type="password" minLength={8} autoComplete="new-password" data-testid="kids-signup-password" value={form.password} onChange={update("password")} />
-                <label style={labelStyle}>Birthday <span style={{ fontWeight: 400, opacity: 0.6 }}>· you must be 13 or older</span></label>
+                <label style={labelStyle}>Birthday <span style={{ fontWeight: 400, opacity: 0.6 }}>· ages 8+ (under 13 needs a parent's OK)</span></label>
                 <input style={inputStyle} required type="date" data-testid="kids-signup-birthdate" value={form.birthdate} onChange={update("birthdate")} />
-                <label style={labelStyle}>Parent's email <span style={{ fontWeight: 400, opacity: 0.6 }}>· optional</span></label>
+                <label style={labelStyle}>Parent's email <span style={{ fontWeight: 400, opacity: 0.6 }}>· required if you're under 13</span></label>
                 <input style={inputStyle} type="email" data-testid="kids-signup-parent-email" value={form.parent_email} onChange={update("parent_email")} />
                 <button type="submit" disabled={busy} data-testid="kids-signup-submit" style={submitStyle(busy)}>
                     {busy ? <Loader2 size={16} className="animate-spin" /> : <>Sign up · Get 10,000 SC <ArrowRight size={16} /></>}

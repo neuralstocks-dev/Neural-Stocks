@@ -260,6 +260,132 @@ def _weekly_digest_html(full_name: str, signals: list[dict], locked_count: int,
 </body></html>"""
 
 
+# ─── StockKids: COPPA Parental Consent ────────────────────────────────────
+
+def _parental_consent_html(kid_full_name: str, kid_email: str, kid_age: int, consent_url: str) -> str:
+    return f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#fff8f0;color:#1a1a2e;font-family:'Outfit','Quicksand',system-ui,sans-serif">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#fff8f0">
+    <tr><td align="center" style="padding:40px 16px">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
+        <tr><td>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">StockKids · Parental Consent Needed</p>
+          <h1 style="font-size:26px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">
+            Your child wants to learn investing — do you approve?
+          </h1>
+          <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:18px">
+            Hi there — <strong>{kid_full_name}</strong> (age {kid_age}, email <code style="background:#fff8f0;padding:1px 6px;border-radius:4px">{kid_email}</code>) just tried to sign up for <strong>StockKids</strong>, an AI-powered educational stock-investing app for kids and teens.
+          </p>
+          <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:14px">
+            Because they're under 13, US law (COPPA) requires us to get your permission before activating their account. <strong>No real money is involved</strong> — kids learn by trading with virtual "StockCoins".
+          </p>
+
+          <div style="background:#fff8f0;border:1.5px solid #e5d5b8;border-radius:14px;padding:18px;margin:20px 0">
+            <p style="font-size:11px;letter-spacing:1.5px;color:#7a5a00;text-transform:uppercase;margin:0;font-weight:700">What we'll collect</p>
+            <ul style="margin:10px 0 0;padding-left:20px;color:#1a1a2e;font-size:14px;line-height:1.6">
+              <li>Your child's email and a hashed password (we never store the password as text)</li>
+              <li>Their first name and birth year (to pick the right vocabulary level)</li>
+              <li>Their virtual trades and reflection journals (to help them learn)</li>
+            </ul>
+            <p style="font-size:11px;letter-spacing:1.5px;color:#7a5a00;text-transform:uppercase;margin:14px 0 0;font-weight:700">What we'll never do</p>
+            <ul style="margin:10px 0 0;padding-left:20px;color:#1a1a2e;font-size:14px;line-height:1.6">
+              <li>Sell or share their data with third parties for marketing</li>
+              <li>Show them ads, in-app purchases, or real-money trading</li>
+              <li>Contact them outside the app without your permission</li>
+            </ul>
+          </div>
+
+          <p style="color:#1a1a2e;font-size:14px;line-height:1.65;margin-top:8px">
+            You can review the full data we collect, withdraw consent, or delete the account at any time by replying to this email.
+          </p>
+
+          <p style="margin:28px 0 8px;text-align:center">
+            <a href="{consent_url}" data-testid="parent-consent-cta" style="display:inline-block;padding:14px 28px;background:#ff7676;color:#fff;font-weight:700;font-size:15px;text-decoration:none;border-radius:14px">
+              Review &amp; give consent →
+            </a>
+          </p>
+          <p style="color:#888;font-size:12px;line-height:1.5;text-align:center;margin-top:14px">
+            This link expires in 7 days. If the button doesn't work, copy this URL into your browser:<br />
+            <span style="color:#1a1a2e;word-break:break-all;font-family:monospace;font-size:11px">{consent_url}</span>
+          </p>
+
+          {DISCLAIMER_FOOTER}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+
+async def send_parental_consent_email(to_email: str, kid_full_name: str, kid_email: str,
+                                       kid_age: int, consent_token: str) -> bool:
+    if not RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not set — skipping parental consent email")
+        return False
+    base = _PUBLIC_APP_URL or "https://neulab.xyz"
+    consent_url = f"{base}/kids/parental-consent/{consent_token}"
+    html = _parental_consent_html(kid_full_name, kid_email, kid_age, consent_url)
+    params = {
+        "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
+        "to": [to_email],
+        "reply_to": REPLY_TO,
+        "subject": f"Action needed: approve {kid_full_name}'s StockKids account",
+        "html": html,
+    }
+    try:
+        result = await asyncio.to_thread(resend.Emails.send, params)
+        logger.info("Parental consent email sent to %s · id=%s", to_email, result.get("id"))
+        return True
+    except Exception as e:
+        logger.error("Parental consent email send failed: %s", e)
+        return False
+
+
+def _consent_confirmation_html(kid_full_name: str, parent_full_name: str) -> str:
+    return f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#fff8f0;color:#1a1a2e;font-family:'Outfit','Quicksand',system-ui,sans-serif">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#fff8f0">
+    <tr><td align="center" style="padding:40px 16px">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
+        <tr><td>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#76b876;text-transform:uppercase;margin:0;font-weight:700">StockKids · Consent Confirmed</p>
+          <h1 style="font-size:26px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">
+            Thanks, {parent_full_name.split(" ")[0] if parent_full_name else "there"} — {kid_full_name}'s account is active.
+          </h1>
+          <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:18px">
+            We've received your consent. <strong>{kid_full_name}</strong> can now log in and start learning to invest with virtual StockCoins.
+          </p>
+          <p style="color:#1a1a2e;font-size:14px;line-height:1.65;margin-top:14px">
+            You can withdraw consent or request data deletion at any time by replying to this email. We'll honour the request within 7 days.
+          </p>
+          {DISCLAIMER_FOOTER}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+
+async def send_consent_confirmation_email(to_email: str, kid_full_name: str, parent_full_name: str) -> bool:
+    if not RESEND_API_KEY:
+        return False
+    html = _consent_confirmation_html(kid_full_name, parent_full_name)
+    params = {
+        "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
+        "to": [to_email],
+        "reply_to": REPLY_TO,
+        "subject": f"Confirmed: {kid_full_name}'s StockKids account is active",
+        "html": html,
+    }
+    try:
+        result = await asyncio.to_thread(resend.Emails.send, params)
+        logger.info("Consent confirmation email sent to %s · id=%s", to_email, result.get("id"))
+        return True
+    except Exception as e:
+        logger.error("Consent confirmation send failed: %s", e)
+        return False
+
+
 async def send_weekly_digest_email(to_email: str, full_name: str, signals: list[dict],
                                    locked_count: int, is_paid: bool, plan: str) -> bool:
     if not RESEND_API_KEY:

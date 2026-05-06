@@ -16,6 +16,7 @@ import KidsPreviewPage from "@/pages/KidsPreviewPage";
 import { KidsAuthProvider } from "@/contexts/KidsAuthContext";
 import KidsShell from "@/components/KidsShell";
 import { KidsLoginPage, KidsSignupPage } from "@/pages/KidsAuthPages";
+import { KidsAwaitingConsentPage, KidsParentalConsentPage } from "@/pages/KidsConsentPages";
 import {
     KidsDashboardPage,
     KidsDiscoverPage,
@@ -101,6 +102,8 @@ function AppRoutes() {
             {/* StockKids V1 — separate auth scope, separate shell. */}
             <Route path="/kids/login" element={<KidsAuthProvider><KidsLoginPage /></KidsAuthProvider>} />
             <Route path="/kids/signup" element={<KidsAuthProvider><KidsSignupPage /></KidsAuthProvider>} />
+            <Route path="/kids/awaiting-consent" element={<KidsAwaitingConsentPage />} />
+            <Route path="/kids/parental-consent/:token" element={<KidsParentalConsentPage />} />
             <Route element={<KidsAuthProvider><KidsShell /></KidsAuthProvider>}>
                 <Route path="/kids/dashboard" element={<KidsDashboardPage />} />
                 <Route path="/kids/discover" element={<KidsDiscoverPage />} />

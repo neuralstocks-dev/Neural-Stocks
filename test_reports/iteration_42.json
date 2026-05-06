@@ -1,0 +1,59 @@
+{
+  "summary": "StockKids V1-β backend + frontend regression. Backend: 19/19 NEW V1-β pytest cases PASS in 10s (signup tiers 8-12 awaiting/13+ instant/<8 reject, login 403 on awaiting + 401 on bad pw, parental-consent GET preview/POST happy/agree:false/idempotent re-submit, resend supersedes old token (old returns 410)/no-leak on active+nonexistent, journal awards +50 SC first time / idempotent on 2nd / 422 on empty why / 404 on unknown trade / GET single + GET list filtered / daily cap caps bonus to 5 per UTC day / adult JWT 401 on kid journal). Existing 20/20 V1-α tests still PASS. Frontend (mobile 414x896): /kids/awaiting-consent renders parent email + 3-step explainer + working 'Email resent!' confirmation. /kids/parental-consent/{valid_token} shows kid name (Maya Chen) + email + age + COPPA copy; submit DISABLED initially, DISABLED with name only, ENABLED only after both name+checkbox; submit succeeds → success state with kid name + /kids/login link. /kids/parental-consent/INVALID shows 'This link can't be used' error. After resend, the OLD consent link UI shows the superseded error correctly (410 from API). Trade journal modal: BUY 1 AAPL on /kids/analyze/AAPL opens KidsTradeJournalModal with 3 textareas; submit button at y=778-824 sits ABOVE the 'Made with Emergent' badge at y=840 (no overlap, fully clickable at 414px); after submit, '+50 StockCoins!' celebration + new balance shown; balance verified via /api/kids/auth/me (delta = -276.83 buy + 50 journal = -226.83 net, matches arithmetic). No mocks — Mongo + Anthropic/Gemini + Resend all live.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verified_acceptance_criteria": [
+    "PASS BE: under-13 +parent_email signup → {status:awaiting_parental_consent, parent_email, student} with NO token; balance=0; status string matches exactly",
+    "PASS BE: under-13 without parent_email → 400 with 'parent' in message",
+    "PASS BE: age 7 → 400",
+    "PASS BE: age 13 → instant active + token + 10000 SC (V1-α behavior preserved)",
+    "PASS BE: age 18 → instant active + token + 10000 SC",
+    "PASS BE: login on awaiting kid → 403 with parent-approval message",
+    "PASS BE: login wrong pw on awaiting kid → 401 (does NOT leak account state)",
+    "PASS BE: GET /parental-consent/{valid} → preview with kid_full_name/email/age_at_signup/parent_email/expires_at; already_consented:false",
+    "PASS BE: GET /parental-consent/INVALID → 404",
+    "PASS BE: POST consent agree:true → ok:true, already_consented:false; DB stamps parent_full_name+parent_ip+parent_user_agent+consented_at; kid status→active; balance→10000",
+    "PASS BE: POST consent agree:false → 400",
+    "PASS BE: re-submit consent → idempotent {ok:true, already_consented:true}",
+    "PASS BE: After consent, login → 200 + token + balance=10000",
+    "PASS BE: resend-consent supersedes prior un-consented token (old GET → 410), mints fresh token",
+    "PASS BE: resend on already-active kid → {ok:true, sent:false}",
+    "PASS BE: resend on nonexistent email → {ok:true, sent:false}",
+    "PASS BE: First journal POST → {bonus_awarded_sc:50, new_balance:+50, already_journaled:false}; balance verified via /me",
+    "PASS BE: Second journal POST → {already_journaled:true, bonus:0}, balance unchanged, prompts overwritten",
+    "PASS BE: Empty 'why' → 422 Pydantic error",
+    "PASS BE: Journal on unknown/foreign trade_id → 404",
+    "PASS BE: GET /trades/{id}/journal returns saved journal; GET on UNKNOWN → 404",
+    "PASS BE: GET /journals?ticker=AAPL returns only AAPL items",
+    "PASS BE: 6th journal same UTC day → bonus_awarded_sc:0, daily_cap_hit:true (capped at 5/day)",
+    "PASS BE: Adult sai_token on /kids/trades/{id}/journal → 401 (JWT isolation enforced)",
+    "PASS FE: /kids/awaiting-consent renders parent email + 'Almost there!' + 3-step explainer + working 'Email resent!' confirmation",
+    "PASS FE: /kids/parental-consent/{valid_token} shows kid_full_name+email+age+COPPA copy; submit disabled until name AND checkbox; success state shows kid name + /kids/login link",
+    "PASS FE: Superseded token URL (old link after resend) shows 'This link can't be used' error",
+    "PASS FE: Invalid token URL shows error state (404 from API surfaces as error UI)",
+    "PASS FE: After BUY on /kids/analyze/AAPL the KidsTradeJournalModal opens with 3 prompts; submit button is above (not under) Made-with-Emergent badge at 414px viewport; submitting fills all 3 → +50 SC celebration + balance increments by 50 (verified via API)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_stockkids_v1beta.py",
+    "/app/backend/tests/test_stockkids_v1alpha.py",
+    "/app/test_reports/pytest/iteration42_v1beta.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "kids_consent.py POST /parental-consent: granting starting_stock_coins is gated on `not kid.get('starting_stock_coins')` — fine, but note that if a manual admin pre-set starting_stock_coins>0 the consent flow will silently skip the grant. Acceptable for V1-β but worth a comment.",
+    "kids_consent.py resend_consent: silently swallows email-send exceptions — by design (no enumeration), but the new token IS minted regardless of email success, so a parent who doesn't get the email can't differentiate from a broken send. Consider logging at WARN at least.",
+    "kids_journal.py daily-cap counts journals with bonus_awarded_sc>0 AND bonus_award_day==today. The day boundary uses UTC; for a kid in PST the cap can roll over at 4pm local. Acceptable design choice but document in user-facing copy if needed.",
+    "kids_auth.py /signup: parent_email is lowercased+stripped only if truthy; the existing-account 409 check uses lowercased email but doesn't trim whitespace from input email before the dup query. Edge case: user types 'kid@x.io ' — stored as 'kid@x.io' (good) and queried as 'kid@x.io' (good after .strip()). Already correct; no action.",
+    "Frontend KidsTradeJournalModal: submit button bbox at y=778.5+45.5=824, badge at y=840. Only ~16px gap on 414x896. Tighter mobile devices (e.g. 375x667) may not have been tested — recommend visual QA at iPhone SE size. Did not block on this since 414 is the request's spec viewport."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_stockkids_v1beta.py (NEW — 19 V1-β pytest cases covering signup tiers, login gate, consent GET/POST/resend with DB stamping checks, journal upsert with bonus/idempotency/daily-cap/JWT-isolation)"
+  ],
+  "success_rate": {"backend": "100% (19/19 V1-β + 20/20 V1-α regression)", "frontend": "100% (awaiting-consent + parental-consent valid/invalid/superseded + trade journal modal +50 bonus all verified at mobile 414px)"},
+  "test_credentials": "kid10test@kids.io / securepass123 (active, used for journal modal FE test). Throwaway TEST_v1b_* kids minted per test (under-13 + 13+/18+).",
+  "seed_data_creation": "All test data created in-band via signup API. Consent tokens read directly from db.kids_consents (since RESEND email delivery is best-effort). No production data touched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "V1-β fully green. Re-run full suite: cd /app/backend && python -m pytest tests/test_stockkids_v1alpha.py tests/test_stockkids_v1beta.py -v (39 tests, ~35s with cached LLM, up to 60s on cold GAL). The V1-β tests use pymongo (sync) directly to read consent_token from db.kids_consents — DB_NAME from /app/backend/.env (test_database). Email lowercasing matters: kid_email is stored .lower()+.strip(), so query lowercase. SELL→journal frontend path was NOT explicitly verified; only BUY was. Daily-cap test relies on the kid_token_and_trades fixture creating ≥6 successful BUYs — depends on at least 6 KID_TRADABLE tickers having a fresh adult analysis (AAPL/MSFT/GOOGL/AMZN/META/NVDA/TSLA/AMD/NFLX/DIS, 14-day cache); skip-safe if not.",
+  "rca_of_the_issue": "N/A — no defects. Two false-positives during test development: (1) initial async tests failed because pytest-asyncio not installed → switched to sync pymongo; (2) trade fixture failed because TradeBody requires Literal['BUY','SELL'] uppercase, not 'buy' lowercase → corrected. Both were test-script bugs, not product bugs."
+}
