@@ -1,37 +1,39 @@
 /**
  * KidsDiscoverNudge — soft cross-promo banner inside the adult dashboard.
  *
- * Surfaces ONLY to users who haven't visited /kids/preview yet AND
- * haven't dismissed the nudge. Both states tracked in localStorage:
- *   - `kids_preview_visited` — written by KidsPreviewPage on mount
- *   - `kids_nudge_dismissed`  — written here when X is tapped
+ * Surfaces ONLY to users who haven't clicked through yet AND haven't
+ * dismissed the nudge. State tracked in localStorage:
+ *   - `kids_nudge_dismissed`  — set when × is tapped OR when the CTA
+ *     is clicked (since the kid site opens in a new tab, we treat
+ *     "they went there" as equivalent to "they've seen the pitch").
  *
- * Dismiss is permanent (no time-based reappearance) — at this scale a
- * one-time prompt is plenty. Anyone who later types /kids/preview into
- * the URL bar can still find it; we just stop interrupting the working
- * zone.
+ * Target domain: https://kidstocks.net (StockKids has its own domain).
  */
 import React, { useState, useEffect } from "react";
 import { Sparkles, X } from "lucide-react";
 
-const STORAGE_VISITED = "kids_preview_visited";
 const STORAGE_DISMISSED = "kids_nudge_dismissed";
+const KIDS_URL = "https://kidstocks.net";
 
 export default function KidsDiscoverNudge() {
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
-        // Defer the visibility check by one tick so we never flash the
-        // banner during the same paint that could have just written
-        // `kids_preview_visited` on a fast back-nav.
-        const visited = localStorage.getItem(STORAGE_VISITED) === "1";
         const dismissed = localStorage.getItem(STORAGE_DISMISSED) === "1";
-        if (!visited && !dismissed) setVisible(true);
+        if (!dismissed) setVisible(true);
     }, []);
 
     const dismiss = () => {
         localStorage.setItem(STORAGE_DISMISSED, "1");
         setVisible(false);
+    };
+
+    // When the CTA is clicked we ALSO mark the nudge as dismissed —
+    // no point re-surfacing to someone who's already seen it.
+    const onCtaClick = () => {
+        localStorage.setItem(STORAGE_DISMISSED, "1");
+        // Don't hide visually during this paint; the new tab opens and
+        // the banner will be gone on next dashboard visit.
     };
 
     if (!visible) return null;
@@ -62,7 +64,10 @@ export default function KidsDiscoverNudge() {
                 </p>
             </div>
             <a
-                href="/kids/preview/AAPL?age=11-13"
+                href={KIDS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onCtaClick}
                 data-testid="kids-discover-nudge-cta"
                 className="text-overline whitespace-nowrap"
                 style={{
@@ -75,7 +80,7 @@ export default function KidsDiscoverNudge() {
                     borderRadius: 2,
                 }}
             >
-                OPEN STOCKKIDS &rarr;
+                OPEN KIDSTOCKS.NET &rarr;
             </a>
             <button
                 onClick={dismiss}

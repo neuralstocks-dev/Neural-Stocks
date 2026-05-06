@@ -128,7 +128,9 @@ export default function SignupPage() {
                         <SocialLinks variant="muted" size="sm" />
                         <p>
                             <a
-                                href="/kids/preview/AAPL?age=11-13"
+                                href="https://kidstocks.net"
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 data-testid="signup-footer-kids-link"
                                 style={{ color: "rgba(255, 200, 100, 0.85)", textDecoration: "none", marginRight: 14 }}
                             >

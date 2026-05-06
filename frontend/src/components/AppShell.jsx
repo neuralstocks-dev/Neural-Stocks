@@ -439,7 +439,9 @@ export default function AppShell({ children }) {
                     </p>
                     <div className="flex items-center gap-4">
                         <a
-                            href="/kids/preview/AAPL?age=11-13"
+                            href="https://kidstocks.net"
+                            target="_blank"
+                            rel="noopener noreferrer"
                             data-testid="footer-kids-link"
                             className="text-overline hover:opacity-100 transition-opacity"
                             style={{
