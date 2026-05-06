@@ -437,7 +437,25 @@ export default function AppShell({ children }) {
                     >
                         &copy; 2026 NeuLab Inc. · Neural Stock Intelligence&trade; · Not financial advice
                     </p>
-                    <SocialLinks variant="default" size="sm" />
+                    <div className="flex items-center gap-4">
+                        <a
+                            href="/kids/preview/AAPL?age=11-13"
+                            data-testid="footer-kids-link"
+                            className="text-overline hover:opacity-100 transition-opacity"
+                            style={{
+                                color: "hsl(var(--accent-gold))",
+                                fontSize: "0.56rem",
+                                letterSpacing: "0.16em",
+                                opacity: 0.85,
+                                textDecoration: "none",
+                                whiteSpace: "nowrap",
+                            }}
+                            title="StockKids — AI-powered learning for ages 8-18"
+                        >
+                            ✨ For Kids 8-18 &rarr;
+                        </a>
+                        <SocialLinks variant="default" size="sm" />
+                    </div>
                 </div>
             </footer>
         </div>

@@ -126,7 +126,16 @@ export default function SignupPage() {
                         style={{ color: "rgba(255,255,255,0.4)" }}
                     >
                         <SocialLinks variant="muted" size="sm" />
-                        <p>© 2026 NeuLab Inc. · Neural Stock Intelligence™ · Not financial advice</p>
+                        <p>
+                            <a
+                                href="/kids/preview/AAPL?age=11-13"
+                                data-testid="signup-footer-kids-link"
+                                style={{ color: "rgba(255, 200, 100, 0.85)", textDecoration: "none", marginRight: 14 }}
+                            >
+                                &#10024; For Kids 8-18 &rarr;
+                            </a>
+                            <span>&copy; 2026 NeuLab Inc. · Neural Stock Intelligence&trade; · Not financial advice</span>
+                        </p>
                     </div>
                 </div>
 
