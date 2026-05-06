@@ -13,6 +13,16 @@ import PricingPage from "@/pages/PricingPage";
 import PublicVerdictPage from "@/pages/PublicVerdictPage";
 import PublicTimelinePage from "@/pages/PublicTimelinePage";
 import KidsPreviewPage from "@/pages/KidsPreviewPage";
+import { KidsAuthProvider } from "@/contexts/KidsAuthContext";
+import KidsShell from "@/components/KidsShell";
+import { KidsLoginPage, KidsSignupPage } from "@/pages/KidsAuthPages";
+import {
+    KidsDashboardPage,
+    KidsDiscoverPage,
+    KidsPortfolioPage,
+    KidsWatchlistPage,
+    KidsAnalyzePage,
+} from "@/pages/KidsAppPages";
 import PublicTryVerdictPage from "@/pages/PublicTryVerdictPage";
 import AuthCallback from "@/pages/AuthCallback";
 import AdminPage from "@/pages/AdminPage";
@@ -87,6 +97,18 @@ function AppRoutes() {
             <Route path="/t/:shareId" element={<PublicTimelinePage />} />
             <Route path="/kids/preview" element={<Navigate to="/kids/preview/AAPL?age=11-13" replace />} />
             <Route path="/kids/preview/:ticker" element={<KidsPreviewPage />} />
+
+            {/* StockKids V1 — separate auth scope, separate shell. */}
+            <Route path="/kids/login" element={<KidsAuthProvider><KidsLoginPage /></KidsAuthProvider>} />
+            <Route path="/kids/signup" element={<KidsAuthProvider><KidsSignupPage /></KidsAuthProvider>} />
+            <Route element={<KidsAuthProvider><KidsShell /></KidsAuthProvider>}>
+                <Route path="/kids/dashboard" element={<KidsDashboardPage />} />
+                <Route path="/kids/discover" element={<KidsDiscoverPage />} />
+                <Route path="/kids/portfolio" element={<KidsPortfolioPage />} />
+                <Route path="/kids/watchlist" element={<KidsWatchlistPage />} />
+                <Route path="/kids/analyze/:ticker" element={<KidsAnalyzePage />} />
+            </Route>
+            <Route path="/kids" element={<Navigate to="/kids/dashboard" replace />} />
             <Route path="/try/:ticker" element={<PublicTryVerdictPage />} />
             <Route path="/ts/:shareId" element={<PublicTryVerdictPage />} />
 

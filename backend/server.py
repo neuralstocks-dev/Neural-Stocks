@@ -5,7 +5,7 @@ from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 
 from core.db import client
-from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry, kids_preview
+from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry, kids_preview, kids_auth, kids_portfolio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +42,8 @@ api_router.include_router(backtest.router)
 api_router.include_router(alerts.router)
 api_router.include_router(telemetry.router)
 api_router.include_router(kids_preview.router)
+api_router.include_router(kids_auth.router)
+api_router.include_router(kids_portfolio.router)
 
 app.include_router(api_router)
 
@@ -125,6 +127,17 @@ async def start_background_tasks():
         logger.info("Started analysis queue snapshot loop")
     except Exception as e:
         logger.warning("Failed to start queue snapshot loop: %s", e)
+    # StockKids — case-insensitive unique email constraint via collation
+    # so signup correctly rejects "Alice@x.com" when "alice@x.com" exists.
+    try:
+        from core.db import db as _db
+        await _db.kids_users.create_index("email", unique=True)
+        await _db.kids_users.create_index("id", unique=True)
+        await _db.kids_trades.create_index([("student_id", 1), ("created_at", -1)])
+        await _db.kids_watchlist.create_index([("student_id", 1), ("ticker", 1)], unique=True)
+        logger.info("Ensured StockKids indexes")
+    except Exception as e:
+        logger.warning("Failed to ensure StockKids indexes: %s", e)
 
 
 _BG_TASKS: set = set()
