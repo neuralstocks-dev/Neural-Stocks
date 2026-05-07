@@ -50,6 +50,11 @@
     --input: 222 14% 17%;
     --ring: 210 40% 98%;
     --radius: 0.125rem;
+
+    /* Old-money antique gold accent — used for eyebrows, attribution
+       links, intrinsic-value chips, and the kid cross-promo nudge. */
+    --gold: 41 47% 57%;
+    --accent-gold: 41 47% 57%;
 }
 
 .light {
@@ -86,6 +91,11 @@
     --border: 214 20% 89%;
     --input: 214 20% 89%;
     --ring: 222 47% 11%;
+
+    /* Slightly deeper antique gold for light mode so it stays
+       legible on white backgrounds. */
+    --gold: 38 55% 42%;
+    --accent-gold: 38 55% 42%;
 }
 
 * {
