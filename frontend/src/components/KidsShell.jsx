@@ -9,6 +9,7 @@ import React, { useState } from "react";
 import { Link, NavLink, Outlet, Navigate, useNavigate } from "react-router-dom";
 import { Sparkles, Wallet, LineChart, Star, LogOut, Menu, X, Search } from "lucide-react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import KidStocksLogo from "@/components/KidStocksLogo";
 import { useKidsAuth } from "@/contexts/KidsAuthContext";
 
 const NAV = [
@@ -61,7 +62,7 @@ export default function KidsShell() {
                 }}
             >
                 <Link to="/kids/dashboard" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
-                    <Sparkles size={18} strokeWidth={1.8} />
+                    <KidStocksLogo size={26} />
                     <span style={{ fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
                 </Link>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
@@ -97,6 +97,39 @@ function RootRedirect() {
 
 function AppRoutes() {
     const location = useLocation();
+
+    // Brand-aware favicon: swap to the KidStocks mark on /kids/* routes
+    // and on the kidstocks.net hostname; restore the NeuLab favicon
+    // everywhere else. Targets ALL <link rel="icon"> tags so that
+    // browsers (which prefer the .ico) pick up the change.
+    useEffect(() => {
+        const host = window.location.hostname.toLowerCase();
+        const onKidSurface = (
+            location.pathname.startsWith("/kids")
+            || host === "kidstocks.net"
+            || host.endsWith(".kidstocks.net")
+        );
+        const allIconLinks = document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]');
+        allIconLinks.forEach((link) => {
+            // Stash the original NeuLab href the very first time we touch it.
+            if (!link.dataset.originalHref) {
+                link.dataset.originalHref = link.getAttribute("href") || "";
+                link.dataset.originalType = link.getAttribute("type") || "";
+            }
+            if (onKidSurface) {
+                link.setAttribute("href", "/kidstocks-logo.svg");
+                link.setAttribute("type", "image/svg+xml");
+            } else {
+                link.setAttribute("href", link.dataset.originalHref);
+                if (link.dataset.originalType) {
+                    link.setAttribute("type", link.dataset.originalType);
+                } else {
+                    link.removeAttribute("type");
+                }
+            }
+        });
+    }, [location.pathname]);
+
     // CRITICAL race-condition guard: process Google OAuth callback BEFORE normal routes
     if (location.hash?.includes("session_id=")) {
         return <AuthCallback />;

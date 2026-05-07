@@ -8,6 +8,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, ArrowRight, Brain, Coins, ShieldCheck, Lightbulb, Users } from "lucide-react";
+import KidStocksLogo from "@/components/KidStocksLogo";
 import { useKidsLang, t } from "@/lib/kidsI18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
@@ -34,7 +35,7 @@ export default function KidsLandingPage() {
         <div style={shellStyle} data-testid="kids-landing-page">
             <header style={{ ...wrapStyle, paddingTop: 22, paddingBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Link to="/kids/about" style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none", color: NAVY }}>
-                    <Sparkles size={26} color={ACCENT} strokeWidth={1.8} />
+                    <KidStocksLogo size={32} />
                     <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
                 </Link>
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>

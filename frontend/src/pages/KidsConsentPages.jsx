@@ -18,6 +18,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Sparkles, Mail, CheckCircle2, AlertCircle, Loader2, ShieldCheck, Heart } from "lucide-react";
+import KidStocksLogo from "@/components/KidStocksLogo";
 import { API_BASE } from "@/lib/api";
 import { useKidsLang, t } from "@/lib/kidsI18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -51,7 +52,7 @@ function BrandHeader() {
     return (
         <div style={headerStyle}>
             <Link to="/kids/about" style={{ textDecoration: "none", color: "inherit", display: "inline-flex", alignItems: "center", gap: 10 }}>
-                <Sparkles size={28} color={ACCENT} strokeWidth={1.8} />
+                <KidStocksLogo size={32} />
                 <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
             </Link>
             <p style={{ fontSize: 13, opacity: 0.6, marginTop: 6 }}>{t(lang, "brand.tagline")}</p>

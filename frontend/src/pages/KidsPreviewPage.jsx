@@ -14,6 +14,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Loader2, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, Share2, Brain, Lightbulb, MessageCircle, ShieldAlert } from "lucide-react";
+import KidStocksLogo from "@/components/KidStocksLogo";
 import axios from "axios";
 import { API_BASE } from "@/lib/api";
 
@@ -139,8 +140,8 @@ export default function KidsPreviewPage() {
                     justifyContent: "space-between",
                 }}
             >
-                <Link to="/" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
-                    <Sparkles size={18} strokeWidth={1.8} />
+                <Link to="/kids/about" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
+                    <KidStocksLogo size={26} />
                     <span style={{ fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
                     <span style={{ fontSize: 11, opacity: 0.6, marginLeft: 6 }}>by NeuLab</span>
                 </Link>
