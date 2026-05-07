@@ -6,6 +6,22 @@
         <meta name="theme-color" content="#0A0C10" />
         <meta name="description" content="Neural Stock Intelligence™ — AI stock intelligence without the noise. Explainable signals, risk-aware analytics. Built by NeuLab Inc." />
 
+        <!-- Open Graph / social sharing — defaults to the KidStocks landing card
+             since kidstocks.net is the heaviest-shared surface. Per-page
+             overrides can be wired later via SSR. -->
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="KidStocks · by NeuLab" />
+        <meta property="og:title" content="KidStocks — show your kid how the AI thinks" />
+        <meta property="og:description" content="AI-powered educational stock investing for ages 8-18. Same engine our adult investors use, rewritten in language a 9-year-old can understand. Virtual money only." />
+        <meta property="og:image" content="%PUBLIC_URL%/og-kids-landing.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:url" content="https://kidstocks.net/" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="KidStocks — show your kid how the AI thinks" />
+        <meta name="twitter:description" content="AI-powered educational stock investing for ages 8-18. Virtual money only." />
+        <meta name="twitter:image" content="%PUBLIC_URL%/og-kids-landing.png" />
+
         <!-- PWA manifest & install metadata -->
         <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
         <link rel="icon" type="image/x-icon" href="%PUBLIC_URL%/favicon.ico" />

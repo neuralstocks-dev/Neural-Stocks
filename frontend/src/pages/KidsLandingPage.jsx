@@ -7,7 +7,7 @@
  */
 import React from "react";
 import { Link } from "react-router-dom";
-import { Sparkles, ArrowRight, Brain, Coins, ShieldCheck, Lightbulb, Users } from "lucide-react";
+import { Sparkles, ArrowRight, Brain, Coins, ShieldCheck, Lightbulb, Users, GraduationCap, Clock, BookOpen, MapPin, ExternalLink } from "lucide-react";
 import KidStocksLogo from "@/components/KidStocksLogo";
 import { useKidsLang, t } from "@/lib/kidsI18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -79,6 +79,31 @@ export default function KidsLandingPage() {
                 </div>
             </section>
 
+            {/* Why start early — research-backed */}
+            <section style={{ background: NAVY, color: "#fff" }}>
+                <div style={{ ...wrapStyle, paddingTop: 56, paddingBottom: 56 }}>
+                    <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: GOLD, fontWeight: 700, margin: 0 }}>
+                        {t(lang, "why.eyebrow")}
+                    </p>
+                    <h2 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 700, marginTop: 10, lineHeight: 1.2, maxWidth: 760, letterSpacing: -0.5 }}>
+                        {t(lang, "why.title")}
+                    </h2>
+                    <p style={{ fontSize: 16, lineHeight: 1.65, marginTop: 16, maxWidth: 760, opacity: 0.78 }}>
+                        {t(lang, "why.intro")}
+                    </p>
+                    <div style={{ marginTop: 28, display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }} data-testid="why-early-grid">
+                        <ResearchCard icon={<Clock size={20} color={GOLD} />} title={t(lang, "why.r1_title")} body={t(lang, "why.r1_body")} source={t(lang, "why.r1_source")} url={t(lang, "why.r1_url")} testId="research-1" />
+                        <ResearchCard icon={<GraduationCap size={20} color={GOLD} />} title={t(lang, "why.r2_title")} body={t(lang, "why.r2_body")} source={t(lang, "why.r2_source")} url={t(lang, "why.r2_url")} testId="research-2" />
+                        <ResearchCard icon={<Coins size={20} color={GOLD} />} title={t(lang, "why.r3_title")} body={t(lang, "why.r3_body")} source={t(lang, "why.r3_source")} url={t(lang, "why.r3_url")} testId="research-3" />
+                        <ResearchCard icon={<BookOpen size={20} color={GOLD} />} title={t(lang, "why.r4_title")} body={t(lang, "why.r4_body")} source={t(lang, "why.r4_source")} url={t(lang, "why.r4_url")} testId="research-4" />
+                        <ResearchCard icon={<MapPin size={20} color={GOLD} />} title={t(lang, "why.r5_title")} body={t(lang, "why.r5_body")} source={t(lang, "why.r5_source")} url={t(lang, "why.r5_url")} testId="research-5" />
+                    </div>
+                    <p style={{ marginTop: 22, fontSize: 12, opacity: 0.55, textAlign: "center" }}>
+                        {t(lang, "why.disclaimer")}
+                    </p>
+                </div>
+            </section>
+
             {/* How it works */}
             <section style={{ background: "#fff", borderTop: `1px solid ${SAND_BORDER}`, borderBottom: `1px solid ${SAND_BORDER}` }}>
                 <div style={{ ...wrapStyle, paddingTop: 48, paddingBottom: 48 }}>
@@ -135,6 +160,37 @@ function Step({ icon, title, body }) {
             </div>
             <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>{title}</h3>
             <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, opacity: 0.78 }}>{body}</p>
+        </div>
+    );
+}
+
+function ResearchCard({ icon, title, body, source, url, testId }) {
+    return (
+        <div data-testid={testId} style={{
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: 14, padding: 20,
+        }}>
+            <div style={{ marginBottom: 10 }}>{icon}</div>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, lineHeight: 1.35 }}>{title}</h3>
+            <p style={{ marginTop: 10, fontSize: 14, lineHeight: 1.65, opacity: 0.82 }}>{body}</p>
+            <p style={{ marginTop: 12, fontSize: 11, opacity: 0.55, lineHeight: 1.55, fontStyle: "italic" }}>
+                {source}
+                {url && (
+                    <>
+                        {" · "}
+                        <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-testid={`${testId}-source-link`}
+                            style={{ color: GOLD, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}
+                        >
+                            view source <ExternalLink size={10} />
+                        </a>
+                    </>
+                )}
+            </p>
         </div>
     );
 }

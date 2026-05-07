@@ -102,6 +102,9 @@ function AppRoutes() {
     // and on the kidstocks.net hostname; restore the NeuLab favicon
     // everywhere else. Targets ALL <link rel="icon"> tags so that
     // browsers (which prefer the .ico) pick up the change.
+    // Also overrides og:image / twitter:image per-route — this only
+    // helps JS-aware scrapers (LinkedIn, Slack), but it's defence in
+    // depth and lays groundwork for future SSR.
     useEffect(() => {
         const host = window.location.hostname.toLowerCase();
         const onKidSurface = (
@@ -111,7 +114,6 @@ function AppRoutes() {
         );
         const allIconLinks = document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]');
         allIconLinks.forEach((link) => {
-            // Stash the original NeuLab href the very first time we touch it.
             if (!link.dataset.originalHref) {
                 link.dataset.originalHref = link.getAttribute("href") || "";
                 link.dataset.originalType = link.getAttribute("type") || "";
@@ -128,6 +130,18 @@ function AppRoutes() {
                 }
             }
         });
+
+        // Per-page OG image override — for-parents page shares its own card.
+        const isForParents = location.pathname === "/kids/for-parents";
+        const ogImagePath = isForParents ? "/og-kids-parents.png" : "/og-kids-landing.png";
+        const setMeta = (selector, attr, value) => {
+            const el = document.querySelector(selector);
+            if (el) el.setAttribute(attr, value);
+        };
+        const fullUrl = window.location.origin + ogImagePath;
+        setMeta('meta[property="og:image"]', "content", fullUrl);
+        setMeta('meta[name="twitter:image"]', "content", fullUrl);
+        setMeta('meta[property="og:url"]', "content", window.location.href);
     }, [location.pathname]);
 
     // CRITICAL race-condition guard: process Google OAuth callback BEFORE normal routes
