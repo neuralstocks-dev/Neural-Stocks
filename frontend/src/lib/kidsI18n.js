@@ -27,6 +27,12 @@ const DICT = {
         "brand.tagline": "Learn investing with AI · by NeuLab",
         "brand.educational_only": "Educational only · Not financial advice · Real investing involves the risk of losing money.",
 
+        // Footer attribution — links the kid product to the adult NSI
+        "attr.eyebrow": "Powered by NeuLab Inc.",
+        "attr.body": "KidStocks is the kid-safe layer over Neural Stock Intelligence™ — the AI investing platform we built for adult traders. Same AI engine, age-adapted explanations.",
+        "attr.cta_adult": "Visit Neural Stock Intelligence (for adults) →",
+        "attr.copyright": "© 2026 NeuLab Inc. · KidStocks is educational and uses no real money.",
+
         // Language switcher
         "lang.switcher_label": "Language",
 
@@ -234,6 +240,12 @@ const DICT = {
         // Brand / shared
         "brand.tagline": "Belajar investasi dengan AI · oleh NeuLab",
         "brand.educational_only": "Hanya untuk edukasi · Bukan saran keuangan · Investasi sungguhan punya risiko kerugian.",
+
+        // Footer attribution — kaitkan produk anak ke NSI dewasa
+        "attr.eyebrow": "Didukung oleh NeuLab Inc.",
+        "attr.body": "KidStocks adalah lapisan ramah-anak di atas Neural Stock Intelligence™ — platform investasi AI yang kami bangun untuk trader dewasa. Mesin AI yang sama, penjelasan yang disesuaikan usia.",
+        "attr.cta_adult": "Kunjungi Neural Stock Intelligence (untuk dewasa) →",
+        "attr.copyright": "© 2026 NeuLab Inc. · KidStocks bersifat edukasi dan tidak pakai uang sungguhan.",
 
         // Language switcher
         "lang.switcher_label": "Bahasa",
