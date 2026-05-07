@@ -19,7 +19,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Link, useSearchParams } from "react-router-dom";
 import { Sparkles, Mail, CheckCircle2, AlertCircle, Loader2, Send, Users, TrendingUp, MessageCircle, ExternalLink } from "lucide-react";
-import KidStocksLogo from "@/components/KidStocksLogo";
+import KidsBrandMark from "@/components/KidsBrandMark";
 import { API_BASE } from "@/lib/api";
 import { useKidsLang, t } from "@/lib/kidsI18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -43,11 +43,10 @@ function PageHeader() {
     const { lang } = useKidsLang();
     return (
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <Link to="/kids/about" style={{ textDecoration: "none", color: "inherit", display: "inline-flex", alignItems: "center", gap: 10 }}>
-                <KidStocksLogo size={32} />
-                <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
+            <Link to="/kids/about" style={{ textDecoration: "none", color: "inherit" }}>
+                <KidsBrandMark size={32} wordmarkSize={24} color="inherit" taglineOpacity={0.6} />
             </Link>
-            <p style={{ fontSize: 13, opacity: 0.6, marginTop: 6 }}>{t(lang, "brand.tagline")}</p>
+            <p style={{ fontSize: 13, opacity: 0.6, marginTop: 10 }}>{t(lang, "brand.tagline")}</p>
             <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
                 <LanguageSwitcher />
             </div>

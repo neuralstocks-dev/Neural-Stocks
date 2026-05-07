@@ -9,7 +9,7 @@ import React, { useState } from "react";
 import { Link, NavLink, Outlet, Navigate, useNavigate } from "react-router-dom";
 import { Sparkles, Wallet, LineChart, Star, LogOut, Menu, X, Search } from "lucide-react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import KidStocksLogo from "@/components/KidStocksLogo";
+import KidsBrandMark from "@/components/KidsBrandMark";
 import KidsFooter from "@/components/KidsFooter";
 import { useKidsAuth } from "@/contexts/KidsAuthContext";
 
@@ -62,9 +62,8 @@ export default function KidsShell() {
                     paddingTop: "calc(env(safe-area-inset-top) + 12px)",
                 }}
             >
-                <Link to="/kids/dashboard" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
-                    <KidStocksLogo size={26} />
-                    <span style={{ fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
+                <Link to="/kids/dashboard" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center" }}>
+                    <KidsBrandMark size={26} wordmarkSize={18} color="#fff" taglineOpacity={0.7} />
                 </Link>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div

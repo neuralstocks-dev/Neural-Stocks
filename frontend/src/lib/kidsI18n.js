@@ -25,6 +25,7 @@ const DICT = {
     en: {
         // Brand / shared
         "brand.tagline": "Learn investing with AI · by NeuLab",
+        "brand.powered_by": "Powered by NeuLab Inc.",
         "brand.educational_only": "Educational only · Not financial advice · Real investing involves the risk of losing money.",
 
         // Footer attribution — links the kid product to the adult NSI
@@ -239,6 +240,7 @@ const DICT = {
     id: {
         // Brand / shared
         "brand.tagline": "Belajar investasi dengan AI · oleh NeuLab",
+        "brand.powered_by": "Didukung oleh NeuLab Inc.",
         "brand.educational_only": "Hanya untuk edukasi · Bukan saran keuangan · Investasi sungguhan punya risiko kerugian.",
 
         // Footer attribution — kaitkan produk anak ke NSI dewasa

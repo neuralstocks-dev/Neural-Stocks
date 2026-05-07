@@ -8,7 +8,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, ArrowRight, Brain, Coins, ShieldCheck, Lightbulb, Users, GraduationCap, Clock, BookOpen, MapPin, ExternalLink } from "lucide-react";
-import KidStocksLogo from "@/components/KidStocksLogo";
+import KidsBrandMark from "@/components/KidsBrandMark";
 import { useKidsLang, t } from "@/lib/kidsI18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import KidsFooter from "@/components/KidsFooter";
@@ -35,9 +35,8 @@ export default function KidsLandingPage() {
     return (
         <div style={shellStyle} data-testid="kids-landing-page">
             <header style={{ ...wrapStyle, paddingTop: 22, paddingBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Link to="/kids/about" style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none", color: NAVY }}>
-                    <KidStocksLogo size={32} />
-                    <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
+                <Link to="/kids/about" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none", color: NAVY }}>
+                    <KidsBrandMark size={32} wordmarkSize={24} color={NAVY} />
                 </Link>
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                     <LanguageSwitcher />

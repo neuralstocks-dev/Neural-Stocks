@@ -8,7 +8,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Sparkles, Loader2, ArrowRight, AlertCircle } from "lucide-react";
-import KidStocksLogo from "@/components/KidStocksLogo";
+import KidsBrandMark from "@/components/KidsBrandMark";
 import { useKidsAuth } from "@/contexts/KidsAuthContext";
 import { useKidsLang, t } from "@/lib/kidsI18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -106,11 +106,10 @@ function BrandHeader() {
     const { lang } = useKidsLang();
     return (
         <div style={headerStyle}>
-            <Link to="/kids/about" style={{ textDecoration: "none", color: "inherit", display: "inline-flex", alignItems: "center", gap: 10 }}>
-                <KidStocksLogo size={32} />
-                <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
+            <Link to="/kids/about" style={{ textDecoration: "none", color: "inherit" }}>
+                <KidsBrandMark size={32} wordmarkSize={26} color="inherit" taglineOpacity={0.6} />
             </Link>
-            <p style={{ fontSize: 13, opacity: 0.6, marginTop: 6 }}>{t(lang, "brand.tagline")}</p>
+            <p style={{ fontSize: 13, opacity: 0.6, marginTop: 10 }}>{t(lang, "brand.tagline")}</p>
             <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
                 <LanguageSwitcher />
             </div>
