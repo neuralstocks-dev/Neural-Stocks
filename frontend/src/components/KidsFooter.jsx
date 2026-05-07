@@ -4,9 +4,10 @@
  *
  * Pulls strings from kidsI18n (`attr.eyebrow`, `attr.body`,
  * `attr.cta_adult`, `attr.copyright`) so it's bilingual EN/ID by
- * default. The adult-site CTA links to "/" — on kidstocks.net the
- * server-side 301 forwards to the adult production domain; on the
- * main app domain "/" lands on the adult dashboard/login.
+ * default. The adult-site CTA links to https://neulab.xyz (the
+ * canonical adult production domain) in a new tab so kid users
+ * never lose their KidStocks tab when curiosity sends them over to
+ * the parent product.
  *
  * Variant prop:
  *   - "dark"  (default) → navy band, cream text. Used inside the
@@ -72,7 +73,9 @@ export default function KidsFooter({ variant = "dark" }) {
                 </p>
                 <a
                     data-testid="kids-footer-adult-cta"
-                    href="/"
+                    href="https://neulab.xyz"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     style={{
                         display: "inline-block",
                         marginTop: 14,
