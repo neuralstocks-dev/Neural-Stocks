@@ -1,5 +1,5 @@
 /**
- * KidsLoginPage + KidsSignupPage — entry points for StockKids.
+ * KidsLoginPage + KidsSignupPage — entry points for KidStocks.
  *
  * Two pages in one file (small file) — minimises route boilerplate.
  * Bright form layout, oversized inputs (kids on phones), helpful
@@ -107,7 +107,7 @@ function BrandHeader() {
         <div style={headerStyle}>
             <Link to="/kids/about" style={{ textDecoration: "none", color: "inherit", display: "inline-flex", alignItems: "center", gap: 10 }}>
                 <Sparkles size={28} color={ACCENT} strokeWidth={1.8} />
-                <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: 1 }}>StockKids</span>
+                <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
             </Link>
             <p style={{ fontSize: 13, opacity: 0.6, marginTop: 6 }}>{t(lang, "brand.tagline")}</p>
             <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>

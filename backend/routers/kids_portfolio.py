@@ -1,4 +1,4 @@
-"""StockKids portfolio + watchlist + authenticated analyze.
+"""KidStocks portfolio + watchlist + authenticated analyze.
 
 Design choices:
 * **Holdings are computed from `kids_trades`**, not denormalised. With
@@ -209,7 +209,7 @@ async def place_trade(body: TradeBody, student=Depends(get_current_kid)):
     if ticker not in KID_TRADABLE:
         raise HTTPException(
             status_code=400,
-            detail=f"{ticker} isn't on the StockKids learning list yet.",
+            detail=f"{ticker} isn't on the KidStocks learning list yet.",
         )
 
     p = await _latest_price_for(ticker)

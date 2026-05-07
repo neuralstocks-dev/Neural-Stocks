@@ -1,4 +1,4 @@
-"""StockKids V1-alpha end-to-end backend tests.
+"""KidStocks V1-alpha end-to-end backend tests.
 
 Covers: signup (happy + age floor + dup + bad date), login, /me, JWT isolation
 (adult vs kid), tradable list, portfolio, BUY/SELL trades (incl. error paths),

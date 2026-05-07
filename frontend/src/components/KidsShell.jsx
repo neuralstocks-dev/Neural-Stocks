@@ -1,5 +1,5 @@
 /**
- * KidsShell — logged-in shell for StockKids (V1-α).
+ * KidsShell — logged-in shell for KidStocks (V1-α).
  *
  * Visually distinct from the adult AppShell: bright cream backdrop,
  * playful Outfit/Quicksand typography, large rounded nav pills.
@@ -62,7 +62,7 @@ export default function KidsShell() {
             >
                 <Link to="/kids/dashboard" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
                     <Sparkles size={18} strokeWidth={1.8} />
-                    <span style={{ fontWeight: 700, letterSpacing: 1 }}>StockKids</span>
+                    <span style={{ fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
                 </Link>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div

@@ -1,4 +1,4 @@
-"""StockKids V1.1 — bilingual EN/ID backend tests.
+"""KidStocks V1.1 — bilingual EN/ID backend tests.
 
 Covers:
   * /api/kids/preview/{ticker}?lang=en|id language switching

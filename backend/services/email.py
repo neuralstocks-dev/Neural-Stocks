@@ -260,7 +260,7 @@ def _weekly_digest_html(full_name: str, signals: list[dict], locked_count: int,
 </body></html>"""
 
 
-# ─── StockKids: COPPA Parental Consent ────────────────────────────────────
+# ─── KidStocks: COPPA Parental Consent ────────────────────────────────────
 
 def _parental_consent_html(kid_full_name: str, kid_email: str, kid_age: int, consent_url: str, lang: str = "en") -> str:
     if lang == "id":
@@ -270,12 +270,12 @@ def _parental_consent_html(kid_full_name: str, kid_email: str, kid_age: int, con
     <tr><td align="center" style="padding:40px 16px">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
         <tr><td>
-          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">StockKids · Persetujuan Orang Tua Diperlukan</p>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">KidStocks · Persetujuan Orang Tua Diperlukan</p>
           <h1 style="font-size:26px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">
             Anak Anda ingin belajar investasi — apakah Anda setuju?
           </h1>
           <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:18px">
-            Halo — <strong>{kid_full_name}</strong> (usia {kid_age}, email <code style="background:#fff8f0;padding:1px 6px;border-radius:4px">{kid_email}</code>) baru saja mencoba mendaftar <strong>StockKids</strong>, aplikasi edukasi investasi saham bertenaga AI untuk anak dan remaja.
+            Halo — <strong>{kid_full_name}</strong> (usia {kid_age}, email <code style="background:#fff8f0;padding:1px 6px;border-radius:4px">{kid_email}</code>) baru saja mencoba mendaftar <strong>KidStocks</strong>, aplikasi edukasi investasi saham bertenaga AI untuk anak dan remaja.
           </p>
           <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:14px">
             Karena mereka di bawah 13 tahun, hukum AS (COPPA) mengharuskan kami mendapat izin Anda sebelum mengaktifkan akun mereka. <strong>Tidak ada uang sungguhan</strong> — anak belajar dengan bertransaksi pakai "StockCoins" virtual.
@@ -323,12 +323,12 @@ def _parental_consent_html(kid_full_name: str, kid_email: str, kid_age: int, con
     <tr><td align="center" style="padding:40px 16px">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
         <tr><td>
-          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">StockKids · Parental Consent Needed</p>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">KidStocks · Parental Consent Needed</p>
           <h1 style="font-size:26px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">
             Your child wants to learn investing — do you approve?
           </h1>
           <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:18px">
-            Hi there — <strong>{kid_full_name}</strong> (age {kid_age}, email <code style="background:#fff8f0;padding:1px 6px;border-radius:4px">{kid_email}</code>) just tried to sign up for <strong>StockKids</strong>, an AI-powered educational stock-investing app for kids and teens.
+            Hi there — <strong>{kid_full_name}</strong> (age {kid_age}, email <code style="background:#fff8f0;padding:1px 6px;border-radius:4px">{kid_email}</code>) just tried to sign up for <strong>KidStocks</strong>, an AI-powered educational stock-investing app for kids and teens.
           </p>
           <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:14px">
             Because they're under 13, US law (COPPA) requires us to get your permission before activating their account. <strong>No real money is involved</strong> — kids learn by trading with virtual "StockCoins".
@@ -380,9 +380,9 @@ async def send_parental_consent_email(to_email: str, kid_full_name: str, kid_ema
     consent_url = f"{base}/kids/parental-consent/{consent_token}"
     html = _parental_consent_html(kid_full_name, kid_email, kid_age, consent_url, lang)
     if lang == "id":
-        subject = f"Tindakan diperlukan: setujui akun StockKids untuk {kid_full_name}"
+        subject = f"Tindakan diperlukan: setujui akun KidStocks untuk {kid_full_name}"
     else:
-        subject = f"Action needed: approve {kid_full_name}'s StockKids account"
+        subject = f"Action needed: approve {kid_full_name}'s KidStocks account"
     params = {
         "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
         "to": [to_email],
@@ -409,7 +409,7 @@ def _consent_confirmation_html(kid_full_name: str, parent_full_name: str, lang: 
     <tr><td align="center" style="padding:40px 16px">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
         <tr><td>
-          <p style="font-size:11px;letter-spacing:1.5px;color:#76b876;text-transform:uppercase;margin:0;font-weight:700">StockKids · Persetujuan Diterima</p>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#76b876;text-transform:uppercase;margin:0;font-weight:700">KidStocks · Persetujuan Diterima</p>
           <h1 style="font-size:26px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">
             {greeting}
           </h1>
@@ -432,7 +432,7 @@ def _consent_confirmation_html(kid_full_name: str, parent_full_name: str, lang: 
     <tr><td align="center" style="padding:40px 16px">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
         <tr><td>
-          <p style="font-size:11px;letter-spacing:1.5px;color:#76b876;text-transform:uppercase;margin:0;font-weight:700">StockKids · Consent Confirmed</p>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#76b876;text-transform:uppercase;margin:0;font-weight:700">KidStocks · Consent Confirmed</p>
           <h1 style="font-size:26px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">
             Thanks, {parent_full_name.split(" ")[0] if parent_full_name else "there"} — {kid_full_name}'s account is active.
           </h1>
@@ -455,9 +455,9 @@ async def send_consent_confirmation_email(to_email: str, kid_full_name: str, par
         return False
     html = _consent_confirmation_html(kid_full_name, parent_full_name, lang)
     if lang == "id":
-        subject = f"Dikonfirmasi: akun StockKids untuk {kid_full_name} sudah aktif"
+        subject = f"Dikonfirmasi: akun KidStocks untuk {kid_full_name} sudah aktif"
     else:
-        subject = f"Confirmed: {kid_full_name}'s StockKids account is active"
+        subject = f"Confirmed: {kid_full_name}'s KidStocks account is active"
     params = {
         "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
         "to": [to_email],
@@ -474,7 +474,7 @@ async def send_consent_confirmation_email(to_email: str, kid_full_name: str, par
         return False
 
 
-# ─── StockKids: Parent Portal Magic Link ──────────────────────────────────
+# ─── KidStocks: Parent Portal Magic Link ──────────────────────────────────
 
 def _parent_dashboard_link_html(kid_full_name: str, dashboard_url: str, lang: str = "en") -> str:
     if lang == "id":
@@ -484,7 +484,7 @@ def _parent_dashboard_link_html(kid_full_name: str, dashboard_url: str, lang: st
     <tr><td align="center" style="padding:40px 16px">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
         <tr><td>
-          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">StockKids · Portal Orang Tua</p>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">KidStocks · Portal Orang Tua</p>
           <h1 style="font-size:24px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">Lihat perkembangan {kid_full_name}</h1>
           <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:18px">
             Klik link di bawah untuk membuka portal orang tua. Anda akan melihat ringkasan saldo StockCoins, transaksi, dan jurnal refleksi mereka minggu ini.
@@ -505,7 +505,7 @@ def _parent_dashboard_link_html(kid_full_name: str, dashboard_url: str, lang: st
     <tr><td align="center" style="padding:40px 16px">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
         <tr><td>
-          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">StockKids · Parent Portal</p>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">KidStocks · Parent Portal</p>
           <h1 style="font-size:24px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">See {kid_full_name}'s progress</h1>
           <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:18px">
             Click the link below to open the parent portal. You'll see a summary of their StockCoin balance, this week's trades, and their reflection journals.
@@ -531,9 +531,9 @@ async def send_parent_dashboard_link_email(to_email: str, kid_full_name: str,
     dashboard_url = f"{base}/kids/parent/dashboard?token={session_token}"
     html = _parent_dashboard_link_html(kid_full_name, dashboard_url, lang)
     subject = (
-        f"Portal orang tua StockKids — lihat perkembangan {kid_full_name}"
+        f"Portal orang tua KidStocks — lihat perkembangan {kid_full_name}"
         if lang == "id"
-        else f"StockKids parent portal — see {kid_full_name}'s progress"
+        else f"KidStocks parent portal — see {kid_full_name}'s progress"
     )
     params = {
         "from": f"{FROM_NAME} <{SENDER_EMAIL}>",

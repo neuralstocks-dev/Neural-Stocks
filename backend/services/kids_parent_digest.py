@@ -1,8 +1,8 @@
-"""StockKids Parent Telegram Digest — nightly per-parent summary.
+"""KidStocks Parent Telegram Digest — nightly per-parent summary.
 
 Runs once per UTC day at 21:00 (≈ early morning Asia / late evening US,
 balancing both target audiences). Builds a short message per linked
-parent summarising the day's StockKids activity for all of their kids:
+parent summarising the day's KidStocks activity for all of their kids:
 
   • StockCoin balance change (+/− vs yesterday)
   • Trades placed today
@@ -75,10 +75,10 @@ async def _digest_for_parent(parent_email: str, chat_id: str, lang: str = "en") 
         return None
 
     if lang == "id":
-        header = "🌙 <b>Ringkasan StockKids hari ini</b>\n\n"
+        header = "🌙 <b>Ringkasan KidStocks hari ini</b>\n\n"
         footer = "\n\n<i>Edukasi · bukan saran investasi · uang virtual saja.</i>"
     else:
-        header = "🌙 <b>StockKids · today's activity</b>\n\n"
+        header = "🌙 <b>KidStocks · today's activity</b>\n\n"
         footer = "\n\n<i>Educational · not financial advice · virtual money only.</i>"
     return header + "\n".join(lines) + footer
 
@@ -118,7 +118,7 @@ async def run_once():
         except Exception as e:
             logger.error("Parent digest failed for %s: %s", parent_email, e)
     if sent:
-        logger.info("StockKids parent digest pushed to %d parent(s)", sent)
+        logger.info("KidStocks parent digest pushed to %d parent(s)", sent)
     return sent
 
 

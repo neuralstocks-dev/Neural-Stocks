@@ -1,4 +1,4 @@
-"""COPPA-compliant parental consent flow for under-13 StockKids signups.
+"""COPPA-compliant parental consent flow for under-13 KidStocks signups.
 
 Method: **Email-Plus** — the FTC-approved minimum standard for COPPA
 verifiable parental consent. Two-step flow:

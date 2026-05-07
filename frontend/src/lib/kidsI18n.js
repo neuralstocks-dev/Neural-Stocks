@@ -1,5 +1,5 @@
 /**
- * StockKids i18n — light-weight bilingual dictionary (English + Bahasa Indonesia).
+ * KidStocks i18n — light-weight bilingual dictionary (English + Bahasa Indonesia).
  *
  * Why a hand-rolled dict instead of i18next: the kid surface is small,
  * we don't need pluralization/gender rules, and shipping a heavyweight
@@ -33,7 +33,7 @@ const DICT = {
         // Landing page (/kids/about)
         "landing.eyebrow": "AI-powered learning · ages 8-18",
         "landing.hero_title": "Show your kid how the AI thinks.",
-        "landing.hero_sub": "StockKids translates institutional-grade stock analysis into language a 9-year-old can understand — so kids learn to invest by reasoning, not by gambling.",
+        "landing.hero_sub": "KidStocks translates institutional-grade stock analysis into language a 9-year-old can understand — so kids learn to invest by reasoning, not by gambling.",
         "landing.cta_primary": "Try a kid-friendly analysis →",
         "landing.cta_secondary": "Why parents pick us",
         "landing.how_eyebrow": "How it works",
@@ -56,10 +56,10 @@ const DICT = {
         // For-Parents / Why-Us page (/kids/for-parents)
         "parents.eyebrow": "For parents",
         "parents.hero_title": "The investing app that teaches kids to think.",
-        "parents.hero_sub": "Most kids' investing apps focus on chores, banking, or fractional shares. StockKids focuses on reasoning. Here's how we compare.",
+        "parents.hero_sub": "Most kids' investing apps focus on chores, banking, or fractional shares. KidStocks focuses on reasoning. Here's how we compare.",
         "parents.compare_eyebrow": "Side-by-side",
         "parents.compare_title": "How we compare",
-        "parents.col_us": "StockKids",
+        "parents.col_us": "KidStocks",
         "parents.col_greenlight": "Greenlight",
         "parents.col_fidelity": "Fidelity Youth",
         "parents.col_stockpile": "Stockpile",
@@ -120,7 +120,7 @@ const DICT = {
         "parents.why2_title": "We reward thinking, not trading.",
         "parents.why2_body": "Every virtual buy or sell triggers a 3-question reflection journal (Why? Which signal? When would you sell?). Submitting earns +50 StockCoins, capped at 5/day. The cap is intentional: we don't want to game churn — we want kids to slow down and reason.",
         "parents.why3_title": "We default to no real money.",
-        "parents.why3_body": "Every kid starts with 10,000 virtual StockCoins. There is no path to real-money trading inside StockKids. When they're 18, they graduate to NeuLab — our adult platform — with the reasoning habits already in place.",
+        "parents.why3_body": "Every kid starts with 10,000 virtual StockCoins. There is no path to real-money trading inside KidStocks. When they're 18, they graduate to NeuLab — our adult platform — with the reasoning habits already in place.",
         "parents.cta_title": "Ready to give your kid an unfair head-start?",
         "parents.cta_body": "Sign-up takes 30 seconds. Under-13s need a quick parental consent (COPPA-compliant — you control the data).",
         "parents.cta_button": "Sign your kid up — free →",
@@ -142,7 +142,7 @@ const DICT = {
         "auth.signup_disclaimer": "Educational use only. Not investment advice. We never use real money — you trade with virtual StockCoins.",
         "auth.signup_have_account": "Already have an account?",
         "auth.signup_login_link": "Log in",
-        "auth.login_no_account": "New to StockKids?",
+        "auth.login_no_account": "New to KidStocks?",
         "auth.login_signup_link": "Create an account",
         "auth.error_login": "Couldn't log you in. Check your email & password.",
         "auth.error_signup": "Couldn't create your account.",
@@ -163,7 +163,7 @@ const DICT = {
 
         // Parent consent page
         "consent.parent_title": "Parental Consent · COPPA",
-        "consent.parent_intro": "Your child wants to sign up for StockKids, an AI-powered educational stock-investing app. Because they're under 13, US law (the Children's Online Privacy Protection Act) requires us to get your permission first.",
+        "consent.parent_intro": "Your child wants to sign up for KidStocks, an AI-powered educational stock-investing app. Because they're under 13, US law (the Children's Online Privacy Protection Act) requires us to get your permission first.",
         "consent.parent_kid_label": "Account awaiting your approval",
         "consent.parent_collect_label": "What we collect",
         "consent.parent_collect_1": "Email + hashed password (we never store passwords as text)",
@@ -176,13 +176,13 @@ const DICT = {
         "consent.parent_never_4": "Contact them outside the app without your permission",
         "consent.parent_name_label": "Your full name",
         "consent.parent_name_hint": "(parent or legal guardian)",
-        "consent.parent_agree_text": "I am the parent or legal guardian of {kid}, and I give my consent for StockKids to collect and process their information as described above. I understand I can withdraw consent at any time by emailing the support address in our footer.",
+        "consent.parent_agree_text": "I am the parent or legal guardian of {kid}, and I give my consent for KidStocks to collect and process their information as described above. I understand I can withdraw consent at any time by emailing the support address in our footer.",
         "consent.parent_submit": "Give consent & activate account",
         "consent.parent_done_title": "All set — thank you!",
-        "consent.parent_done_body": "{kid}'s StockKids account is now active. They can log in any time at",
+        "consent.parent_done_body": "{kid}'s KidStocks account is now active. They can log in any time at",
         "consent.parent_done_withdraw": "You can withdraw consent or request data deletion any time by replying to the consent email.",
         "consent.parent_invalid_title": "This link can't be used",
-        "consent.parent_invalid_body": "Ask your child to request a new link from the StockKids signup page.",
+        "consent.parent_invalid_body": "Ask your child to request a new link from the KidStocks signup page.",
 
         // Trade journal modal
         "journal.eyebrow": "Trade Journal",
@@ -214,7 +214,7 @@ const DICT = {
         // Landing page
         "landing.eyebrow": "Belajar dengan AI · usia 8-18",
         "landing.hero_title": "Tunjukkan ke anakmu cara AI berpikir.",
-        "landing.hero_sub": "StockKids menerjemahkan analisis saham kelas institusi menjadi bahasa yang bisa dimengerti anak 9 tahun — supaya anak belajar investasi dengan menalar, bukan menebak.",
+        "landing.hero_sub": "KidStocks menerjemahkan analisis saham kelas institusi menjadi bahasa yang bisa dimengerti anak 9 tahun — supaya anak belajar investasi dengan menalar, bukan menebak.",
         "landing.cta_primary": "Coba analisis ramah-anak →",
         "landing.cta_secondary": "Kenapa orang tua memilih kami",
         "landing.how_eyebrow": "Cara kerjanya",
@@ -237,10 +237,10 @@ const DICT = {
         // For-Parents page
         "parents.eyebrow": "Untuk orang tua",
         "parents.hero_title": "Aplikasi investasi yang mengajarkan anak berpikir.",
-        "parents.hero_sub": "Kebanyakan aplikasi investasi anak fokus pada uang jajan, perbankan, atau saham fraksi. StockKids fokus pada cara berpikir. Berikut perbandingannya.",
+        "parents.hero_sub": "Kebanyakan aplikasi investasi anak fokus pada uang jajan, perbankan, atau saham fraksi. KidStocks fokus pada cara berpikir. Berikut perbandingannya.",
         "parents.compare_eyebrow": "Perbandingan",
         "parents.compare_title": "Bagaimana kami berbeda",
-        "parents.col_us": "StockKids",
+        "parents.col_us": "KidStocks",
         "parents.col_greenlight": "Greenlight",
         "parents.col_fidelity": "Fidelity Youth",
         "parents.col_stockpile": "Stockpile",
@@ -301,7 +301,7 @@ const DICT = {
         "parents.why2_title": "Kami menghadiahi pemikiran, bukan transaksi.",
         "parents.why2_body": "Setiap pembelian atau penjualan virtual memicu jurnal refleksi 3 pertanyaan (Kenapa? Sinyal mana? Kapan jual?). Mengisi mendapat +50 StockCoins, dibatasi 5/hari. Pembatasan disengaja: kami tidak ingin menggairahkan churn — kami ingin anak melambat dan menalar.",
         "parents.why3_title": "Kami default tanpa uang sungguhan.",
-        "parents.why3_body": "Setiap anak mulai dengan 10.000 StockCoins virtual. Tidak ada jalur ke trading uang sungguhan di dalam StockKids. Saat 18 tahun, mereka lulus ke NeuLab — platform dewasa kami — dengan kebiasaan menalar yang sudah terbentuk.",
+        "parents.why3_body": "Setiap anak mulai dengan 10.000 StockCoins virtual. Tidak ada jalur ke trading uang sungguhan di dalam KidStocks. Saat 18 tahun, mereka lulus ke NeuLab — platform dewasa kami — dengan kebiasaan menalar yang sudah terbentuk.",
         "parents.cta_title": "Siap memberi anakmu modal awal yang tak adil?",
         "parents.cta_body": "Daftar hanya 30 detik. Usia di bawah 13 butuh persetujuan orang tua singkat (COPPA-compliant — kamu kontrol datanya).",
         "parents.cta_button": "Daftarkan anakmu — gratis →",
@@ -323,7 +323,7 @@ const DICT = {
         "auth.signup_disclaimer": "Hanya untuk edukasi. Bukan saran investasi. Kami tidak pernah pakai uang sungguhan — kamu bertransaksi dengan StockCoins virtual.",
         "auth.signup_have_account": "Sudah punya akun?",
         "auth.signup_login_link": "Masuk",
-        "auth.login_no_account": "Baru di StockKids?",
+        "auth.login_no_account": "Baru di KidStocks?",
         "auth.login_signup_link": "Buat akun",
         "auth.error_login": "Tidak bisa masuk. Cek email & kata sandimu.",
         "auth.error_signup": "Tidak bisa membuat akunmu.",
@@ -344,7 +344,7 @@ const DICT = {
 
         // Parent consent
         "consent.parent_title": "Persetujuan Orang Tua · COPPA",
-        "consent.parent_intro": "Anak Anda ingin mendaftar StockKids, aplikasi edukasi investasi saham bertenaga AI. Karena mereka di bawah 13 tahun, hukum AS (Children's Online Privacy Protection Act) mengharuskan kami mendapat izin Anda terlebih dahulu.",
+        "consent.parent_intro": "Anak Anda ingin mendaftar KidStocks, aplikasi edukasi investasi saham bertenaga AI. Karena mereka di bawah 13 tahun, hukum AS (Children's Online Privacy Protection Act) mengharuskan kami mendapat izin Anda terlebih dahulu.",
         "consent.parent_kid_label": "Akun menunggu persetujuan Anda",
         "consent.parent_collect_label": "Apa yang kami kumpulkan",
         "consent.parent_collect_1": "Email + kata sandi yang di-hash (kami tidak pernah menyimpan kata sandi sebagai teks biasa)",
@@ -357,13 +357,13 @@ const DICT = {
         "consent.parent_never_4": "Menghubungi anak di luar aplikasi tanpa izin Anda",
         "consent.parent_name_label": "Nama lengkap Anda",
         "consent.parent_name_hint": "(orang tua atau wali sah)",
-        "consent.parent_agree_text": "Saya orang tua atau wali sah dari {kid}, dan saya memberi izin StockKids untuk mengumpulkan dan memproses informasi mereka seperti dijelaskan di atas. Saya paham saya bisa mencabut izin kapan saja dengan email ke alamat dukungan di footer kami.",
+        "consent.parent_agree_text": "Saya orang tua atau wali sah dari {kid}, dan saya memberi izin KidStocks untuk mengumpulkan dan memproses informasi mereka seperti dijelaskan di atas. Saya paham saya bisa mencabut izin kapan saja dengan email ke alamat dukungan di footer kami.",
         "consent.parent_submit": "Beri izin & aktifkan akun",
         "consent.parent_done_title": "Selesai — terima kasih!",
-        "consent.parent_done_body": "Akun StockKids {kid} sekarang aktif. Mereka bisa masuk kapan saja di",
+        "consent.parent_done_body": "Akun KidStocks {kid} sekarang aktif. Mereka bisa masuk kapan saja di",
         "consent.parent_done_withdraw": "Anda bisa mencabut izin atau meminta penghapusan data kapan saja dengan membalas email persetujuan.",
         "consent.parent_invalid_title": "Link ini tidak bisa digunakan",
-        "consent.parent_invalid_body": "Minta anakmu untuk meminta link baru dari halaman pendaftaran StockKids.",
+        "consent.parent_invalid_body": "Minta anakmu untuk meminta link baru dari halaman pendaftaran KidStocks.",
 
         // Trade journal modal
         "journal.eyebrow": "Jurnal Transaksi",

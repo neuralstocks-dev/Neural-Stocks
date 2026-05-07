@@ -1,5 +1,5 @@
 /**
- * StockKids logged-in pages — Dashboard, Discover, Portfolio,
+ * KidStocks logged-in pages — Dashboard, Discover, Portfolio,
  * Watchlist, AnalyzeWithBuy. Bundled in one file to minimise route
  * boilerplate; each is a small focused component.
  */

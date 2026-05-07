@@ -1,4 +1,4 @@
-"""StockKids V1-β tests — COPPA parental consent + Trade Journal bonus.
+"""KidStocks V1-β tests — COPPA parental consent + Trade Journal bonus.
 
 Covers:
   * Signup tiers: <8 reject, 8-12 awaiting consent, 13+ instant active

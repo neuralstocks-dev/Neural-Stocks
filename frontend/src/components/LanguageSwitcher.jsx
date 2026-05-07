@@ -1,5 +1,5 @@
 /**
- * LanguageSwitcher — small EN/ID toggle for StockKids surfaces.
+ * LanguageSwitcher — small EN/ID toggle for KidStocks surfaces.
  *
  * Persists choice via `useKidsLang()` (localStorage `kids_lang`).
  * Style is intentionally lightweight — sits in headers without

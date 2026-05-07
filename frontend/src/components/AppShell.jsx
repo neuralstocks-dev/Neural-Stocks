@@ -452,7 +452,7 @@ export default function AppShell({ children }) {
                                 textDecoration: "none",
                                 whiteSpace: "nowrap",
                             }}
-                            title="StockKids — AI-powered learning for ages 8-18"
+                            title="KidStocks — AI-powered learning for ages 8-18"
                         >
                             ✨ For Kids 8-18 &rarr;
                         </a>

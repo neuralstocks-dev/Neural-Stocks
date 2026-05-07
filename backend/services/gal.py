@@ -1,6 +1,6 @@
-"""Grade Adaptation Layer (GAL) — StockKids Phase Zero.
+"""Grade Adaptation Layer (GAL) — KidStocks Phase Zero.
 
-The GAL is the ONE genuinely new AI service in StockKids. It takes an
+The GAL is the ONE genuinely new AI service in KidStocks. It takes an
 adult NSI verdict (the `AnalysisResult` JSON produced by `services.ai`)
 and rewrites it into age-appropriate language for a kid audience.
 
@@ -155,7 +155,7 @@ def _build_prompt(adult: dict, band: AgeBand, lang: Lang = "en") -> tuple[str, s
     spec = _BAND_SPECS[band]
     lang_rule = _LANG_RULES.get(lang, _LANG_RULES["en"])
 
-    system = f"""You are the Grade Adaptation Layer (GAL) for StockKids — an AI-native financial
+    system = f"""You are the Grade Adaptation Layer (GAL) for KidStocks — an AI-native financial
 literacy platform that teaches kids to invest by translating institutional-grade
 AI stock analysis into age-appropriate language.
 

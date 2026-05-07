@@ -1,4 +1,4 @@
-"""StockKids Phase Zero router — single public endpoint to prove the GAL.
+"""KidStocks Phase Zero router — single public endpoint to prove the GAL.
 
 Scope (strictly Phase Zero — no auth, no DB writes beyond feedback):
   * GET  /api/kids/preview/{ticker}?age=8-10|11-13|14-18

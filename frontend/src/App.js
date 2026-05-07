@@ -76,7 +76,7 @@ function ProtectedLayout() {
 function RootRedirect() {
     const { user, bootstrapping } = useAuth();
     // Domain-aware routing: visitors to kidstocks.net (or *.kidstocks.net)
-    // land on the kid-friendly StockKids landing page, NOT the adult NeuLab
+    // land on the kid-friendly KidStocks landing page, NOT the adult NeuLab
     // dashboard. Hostname check runs synchronously before bootstrap finishes
     // so kidstocks.net traffic skips the adult-auth bootstrap entirely.
     if (typeof window !== "undefined") {
@@ -116,7 +116,7 @@ function AppRoutes() {
             <Route path="/kids/parent/login" element={<KidsParentLoginPage />} />
             <Route path="/kids/parent/dashboard" element={<KidsParentDashboardPage />} />
 
-            {/* StockKids V1 — separate auth scope, separate shell. */}
+            {/* KidStocks V1 — separate auth scope, separate shell. */}
             <Route path="/kids/login" element={<KidsAuthProvider><KidsLoginPage /></KidsAuthProvider>} />
             <Route path="/kids/signup" element={<KidsAuthProvider><KidsSignupPage /></KidsAuthProvider>} />
             <Route path="/kids/awaiting-consent" element={<KidsAwaitingConsentPage />} />

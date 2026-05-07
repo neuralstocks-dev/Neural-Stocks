@@ -103,7 +103,7 @@ async def poll_and_link() -> int:
             continue
         # Accept "/start 123456" or just "123456". Also recognise
         # parent-portal codes prefixed with `parent` (e.g. "parent123456")
-        # and route them to the StockKids parent linker instead of the
+        # and route them to the KidStocks parent linker instead of the
         # adult-user link.
         tokens = text.split()
         candidate = None
@@ -117,19 +117,19 @@ async def poll_and_link() -> int:
                 break
 
         if parent_candidate:
-            # StockKids parent portal flow.
+            # KidStocks parent portal flow.
             from routers.kids_parent import link_parent_chat
             parent_email = await link_parent_chat(parent_candidate, chat_id, chat.get("username"))
             if parent_email:
                 linked += 1
                 await _send_message(
                     chat_id,
-                    "✅ StockKids parent portal linked.\n\n"
+                    "✅ KidStocks parent portal linked.\n\n"
                     "You'll get a nightly summary of your child's StockCoin activity, trades, and reflection journals here.\n\n"
                     "Reply /unlink to disconnect at any time."
                 )
             else:
-                await _send_message(chat_id, "Sorry, that StockKids parent code wasn't found or has expired. Please request a fresh code from the parent portal.")
+                await _send_message(chat_id, "Sorry, that KidStocks parent code wasn't found or has expired. Please request a fresh code from the parent portal.")
             continue
 
         if not candidate:

@@ -1,4 +1,4 @@
-"""StockKids Parent Portal — magic-link auth + read-only dashboard + Telegram link.
+"""KidStocks Parent Portal — magic-link auth + read-only dashboard + Telegram link.
 
 Why magic-link (not password): parents check ~1×/week. Passwords would
 add friction without value, and we already have a trust relationship

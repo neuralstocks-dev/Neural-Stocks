@@ -1,5 +1,5 @@
 /**
- * StockKids Parent Portal — magic-link request + read-only dashboard.
+ * KidStocks Parent Portal — magic-link request + read-only dashboard.
  *
  * Two pages:
  *   • KidsParentLoginPage at /kids/parent/login
@@ -44,7 +44,7 @@ function PageHeader() {
         <div style={{ textAlign: "center", marginBottom: 24 }}>
             <Link to="/kids/about" style={{ textDecoration: "none", color: "inherit", display: "inline-flex", alignItems: "center", gap: 10 }}>
                 <Sparkles size={26} color={ACCENT} strokeWidth={1.8} />
-                <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: 1 }}>StockKids</span>
+                <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
             </Link>
             <p style={{ fontSize: 13, opacity: 0.6, marginTop: 6 }}>{t(lang, "brand.tagline")}</p>
             <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
@@ -223,7 +223,7 @@ export function KidsParentDashboardPage() {
                     {lang === "id" ? "Selamat datang, orang tua" : "Welcome, parent"}
                 </h1>
                 <p style={{ fontSize: 14, opacity: 0.75, marginTop: 6 }}>
-                    {lang === "id" ? "Aktivitas StockKids minggu ini untuk" : "This week's StockKids activity for"}{" "}
+                    {lang === "id" ? "Aktivitas KidStocks minggu ini untuk" : "This week's KidStocks activity for"}{" "}
                     <strong>{data.parent_email}</strong>
                 </p>
 

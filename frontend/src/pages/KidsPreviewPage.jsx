@@ -1,5 +1,5 @@
 /**
- * KidsPreviewPage — StockKids Phase Zero proof-of-concept page.
+ * KidsPreviewPage — KidStocks Phase Zero proof-of-concept page.
  *
  * Public route at /kids/preview/:ticker (no auth, no AppShell). Shows
  * the GAL-translated kid view of an existing adult NSI verdict, plus
@@ -50,7 +50,7 @@ export default function KidsPreviewPage() {
     const [feedbackBusy, setFeedbackBusy] = useState(false);
     const [showShare, setShowShare] = useState(false);
 
-    // Mark this browser as having seen StockKids — silences the
+    // Mark this browser as having seen KidStocks — silences the
     // dashboard cross-promo nudge.
     useEffect(() => {
         try { localStorage.setItem("kids_preview_visited", "1"); } catch (_) { /* ignore quota / private-mode */ }
@@ -141,7 +141,7 @@ export default function KidsPreviewPage() {
             >
                 <Link to="/" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
                     <Sparkles size={18} strokeWidth={1.8} />
-                    <span style={{ fontWeight: 700, letterSpacing: 1 }}>StockKids</span>
+                    <span style={{ fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
                     <span style={{ fontSize: 11, opacity: 0.6, marginLeft: 6 }}>by NeuLab</span>
                 </Link>
                 <button
@@ -544,7 +544,7 @@ export default function KidsPreviewPage() {
                     }}
                 >
                     Educational use only. Not investment advice. Real investing involves the risk of losing money.
-                    <br />StockKids is a NeuLab Inc. preview — Phase Zero pilot.
+                    <br />KidStocks is a NeuLab Inc. preview — Phase Zero pilot.
                 </footer>
             </main>
 

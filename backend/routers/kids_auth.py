@@ -1,4 +1,4 @@
-"""StockKids auth router — signup, login, /me.
+"""KidStocks auth router — signup, login, /me.
 
 V1-β scope (as of Feb 2026):
   * Ages 13-18: instant signup, no parental consent required (matches
@@ -101,7 +101,7 @@ async def signup(body: SignupBody):
     if age < MIN_AGE_WITH_CONSENT:
         raise HTTPException(
             status_code=400,
-            detail=f"StockKids is for ages {MIN_AGE_WITH_CONSENT} and up.",
+            detail=f"KidStocks is for ages {MIN_AGE_WITH_CONSENT} and up.",
         )
     if age > 100:
         raise HTTPException(status_code=400, detail="Birthdate looks wrong — please check.")

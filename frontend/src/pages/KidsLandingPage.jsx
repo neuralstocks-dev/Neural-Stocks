@@ -1,5 +1,5 @@
 /**
- * KidsLandingPage (`/kids/about`) — kid-friendly background of StockKids.
+ * KidsLandingPage (`/kids/about`) — kid-friendly background of KidStocks.
  *
  * The default landing for kidstocks.net visitors. Kid-friendly hero,
  * 3-step "how it works", 3 feature pillars, dual CTA (signup or live
@@ -35,7 +35,7 @@ export default function KidsLandingPage() {
             <header style={{ ...wrapStyle, paddingTop: 22, paddingBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Link to="/kids/about" style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none", color: NAVY }}>
                     <Sparkles size={26} color={ACCENT} strokeWidth={1.8} />
-                    <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: 1 }}>StockKids</span>
+                    <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: 1 }}>KidStocks</span>
                 </Link>
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                     <LanguageSwitcher />

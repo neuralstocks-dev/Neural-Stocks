@@ -1,4 +1,4 @@
-"""StockKids JWT auth — strict isolation from adult Neural auth.
+"""KidStocks JWT auth — strict isolation from adult Neural auth.
 
 Architecture lock (decision recorded in PRD):
 * Kid users live in a SEPARATE `kids_users` collection — NEVER share the
@@ -31,7 +31,7 @@ security = HTTPBearer(auto_error=False)
 
 
 def create_kid_jwt(student_id: str) -> str:
-    """Mint a JWT scoped strictly to StockKids endpoints."""
+    """Mint a JWT scoped strictly to KidStocks endpoints."""
     payload = {
         "sub": student_id,
         "aud": JWT_AUD_KIDS,
@@ -44,7 +44,7 @@ def create_kid_jwt(student_id: str) -> str:
 async def get_current_kid(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> dict:
-    """Resolve the StockKids student bound to the bearer token.
+    """Resolve the KidStocks student bound to the bearer token.
 
     Order of guards (fail-closed):
       1. Bearer token present → else 401
@@ -63,9 +63,9 @@ async def get_current_kid(
         )
     except pyjwt.MissingRequiredClaimError:
         # Adult tokens have no aud — reject cleanly.
-        raise HTTPException(status_code=401, detail="Token not valid for StockKids")
+        raise HTTPException(status_code=401, detail="Token not valid for KidStocks")
     except pyjwt.InvalidAudienceError:
-        raise HTTPException(status_code=401, detail="Token not valid for StockKids")
+        raise HTTPException(status_code=401, detail="Token not valid for KidStocks")
     except pyjwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 

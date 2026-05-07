@@ -7,7 +7,7 @@
  *     is clicked (since the kid site opens in a new tab, we treat
  *     "they went there" as equivalent to "they've seen the pitch").
  *
- * Target domain: https://kidstocks.net (StockKids has its own domain).
+ * Target domain: https://kidstocks.net (KidStocks has its own domain).
  */
 import React, { useState, useEffect } from "react";
 import { Sparkles, X } from "lucide-react";

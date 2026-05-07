@@ -130,7 +130,7 @@ async def start_background_tasks():
         logger.info("Started analysis queue snapshot loop")
     except Exception as e:
         logger.warning("Failed to start queue snapshot loop: %s", e)
-    # StockKids — case-insensitive unique email constraint via collation
+    # KidStocks — case-insensitive unique email constraint via collation
     # so signup correctly rejects "Alice@x.com" when "alice@x.com" exists.
     try:
         from core.db import db as _db
@@ -142,17 +142,17 @@ async def start_background_tasks():
         await _db.kids_parent_sessions.create_index("parent_email")
         await _db.kids_parent_telegram.create_index("parent_email", unique=True)
         await _db.kids_parent_telegram_codes.create_index("code", unique=True)
-        logger.info("Ensured StockKids indexes")
+        logger.info("Ensured KidStocks indexes")
     except Exception as e:
-        logger.warning("Failed to ensure StockKids indexes: %s", e)
+        logger.warning("Failed to ensure KidStocks indexes: %s", e)
 
-    # StockKids — nightly Telegram digest for parents.
+    # KidStocks — nightly Telegram digest for parents.
     try:
         from services.kids_parent_digest import digest_loop as kids_parent_digest_loop
         t8 = asyncio.create_task(kids_parent_digest_loop())
         _BG_TASKS.add(t8)
         t8.add_done_callback(_BG_TASKS.discard)
-        logger.info("Started StockKids parent Telegram digest scheduler")
+        logger.info("Started KidStocks parent Telegram digest scheduler")
     except Exception as e:
         logger.warning("Failed to start kids parent digest loop: %s", e)
 

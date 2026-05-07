@@ -1,4 +1,4 @@
-"""StockKids V1.2 — Parent Portal + Telegram nightly digest.
+"""KidStocks V1.2 — Parent Portal + Telegram nightly digest.
 
 Covers:
   * POST /api/kids/parent/request-link — leak prevention + active-kid only
