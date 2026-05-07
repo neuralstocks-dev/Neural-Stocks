@@ -62,9 +62,7 @@ export default function KidsShell() {
                     paddingTop: "calc(env(safe-area-inset-top) + 12px)",
                 }}
             >
-                <Link to="/kids/dashboard" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center" }}>
-                    <KidsBrandMark size={26} wordmarkSize={18} color="#fff" taglineOpacity={0.7} />
-                </Link>
+                <KidsBrandMark size={26} wordmarkSize={18} color="#fff" taglineOpacity={0.7} linkTo="/kids/dashboard" />
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div
                         data-testid="kids-balance-pill"

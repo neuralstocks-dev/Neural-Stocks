@@ -106,9 +106,7 @@ function BrandHeader() {
     const { lang } = useKidsLang();
     return (
         <div style={headerStyle}>
-            <Link to="/kids/about" style={{ textDecoration: "none", color: "inherit" }}>
-                <KidsBrandMark size={32} wordmarkSize={26} color="inherit" taglineOpacity={0.6} />
-            </Link>
+            <KidsBrandMark size={32} wordmarkSize={26} color="inherit" taglineOpacity={0.6} />
             <p style={{ fontSize: 13, opacity: 0.6, marginTop: 10 }}>{t(lang, "brand.tagline")}</p>
             <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
                 <LanguageSwitcher />

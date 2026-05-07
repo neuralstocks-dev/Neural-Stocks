@@ -35,9 +35,7 @@ export default function KidsLandingPage() {
     return (
         <div style={shellStyle} data-testid="kids-landing-page">
             <header style={{ ...wrapStyle, paddingTop: 22, paddingBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Link to="/kids/about" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none", color: NAVY }}>
-                    <KidsBrandMark size={32} wordmarkSize={24} color={NAVY} />
-                </Link>
+                <KidsBrandMark size={32} wordmarkSize={24} color={NAVY} />
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                     <LanguageSwitcher />
                     <Link to="/kids/parent/login" data-testid="landing-parent-portal-link" style={{ fontSize: 13, color: NAVY, textDecoration: "none", fontWeight: 600, opacity: 0.85 }}>
