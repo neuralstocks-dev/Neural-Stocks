@@ -14,6 +14,7 @@ import { Sparkles, ArrowRight, ShieldCheck, Brain, Coins, Check, X } from "lucid
 import KidStocksLogo from "@/components/KidStocksLogo";
 import { useKidsLang, t } from "@/lib/kidsI18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import KidsFooter from "@/components/KidsFooter";
 
 const ACCENT = "#ff7676";
 const NAVY = "#1a1a2e";
@@ -217,6 +218,8 @@ export default function KidsForParentsPage() {
                     </Link>
                 </div>
             </section>
+
+            <KidsFooter variant="dark" />
         </div>
     );
 }

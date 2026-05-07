@@ -10,6 +10,7 @@ import { Link, NavLink, Outlet, Navigate, useNavigate } from "react-router-dom";
 import { Sparkles, Wallet, LineChart, Star, LogOut, Menu, X, Search } from "lucide-react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import KidStocksLogo from "@/components/KidStocksLogo";
+import KidsFooter from "@/components/KidsFooter";
 import { useKidsAuth } from "@/contexts/KidsAuthContext";
 
 const NAV = [
@@ -224,9 +225,11 @@ export default function KidsShell() {
                 </div>
             )}
 
-            <main style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px 80px" }}>
+            <main style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px 40px" }}>
                 <Outlet />
             </main>
+
+            <KidsFooter variant="dark" />
 
             <style>{`
                 @media (min-width: 768px) {
