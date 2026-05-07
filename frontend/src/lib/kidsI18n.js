@@ -39,7 +39,7 @@ const DICT = {
 
         // Why-Early section
         "why.eyebrow": "Why start early",
-        "why.title": "The research is clear: financial habits form young.",
+        "why.title": "The research is clear: financial habits take shape young.",
         "why.intro": "Money habits crystallize earlier than most parents realize. Here's what the research actually says — and why we built KidStocks now, not when your kid hits 18.",
         "why.r1_title": "Money habits set by age 7",
         "why.r1_body": "A landmark Cambridge University study tracking 8,000 children found that core financial behaviours — patience with rewards, planning ahead, attitudes toward saving — are largely formed by the age of 7. Waiting until high school is waiting until the cement has set.",
