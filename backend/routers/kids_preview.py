@@ -124,6 +124,9 @@ async def preview_kids(
         )
 
     if lang not in ("en", "id"):
+        # Silent coercion is intentional here (vs. strict 422 on /signup):
+        # the public preview is hit by random visitors via shareable URLs
+        # and we'd rather show English than break the demo.
         lang = "en"
 
     # 1) Pull most-recent adult analysis from the shared pool — ANY user.
