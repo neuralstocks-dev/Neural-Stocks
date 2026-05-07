@@ -17,6 +17,8 @@ import { KidsAuthProvider } from "@/contexts/KidsAuthContext";
 import KidsShell from "@/components/KidsShell";
 import { KidsLoginPage, KidsSignupPage } from "@/pages/KidsAuthPages";
 import { KidsAwaitingConsentPage, KidsParentalConsentPage } from "@/pages/KidsConsentPages";
+import KidsLandingPage from "@/pages/KidsLandingPage";
+import KidsForParentsPage from "@/pages/KidsForParentsPage";
 import {
     KidsDashboardPage,
     KidsDiscoverPage,
@@ -72,6 +74,16 @@ function ProtectedLayout() {
 
 function RootRedirect() {
     const { user, bootstrapping } = useAuth();
+    // Domain-aware routing: visitors to kidstocks.net (or *.kidstocks.net)
+    // land on the kid-friendly StockKids landing page, NOT the adult NeuLab
+    // dashboard. Hostname check runs synchronously before bootstrap finishes
+    // so kidstocks.net traffic skips the adult-auth bootstrap entirely.
+    if (typeof window !== "undefined") {
+        const host = window.location.hostname.toLowerCase();
+        if (host === "kidstocks.net" || host.endsWith(".kidstocks.net")) {
+            return <Navigate to="/kids/about" replace />;
+        }
+    }
     if (bootstrapping) {
         return (
             <div className="min-h-screen grid place-items-center">
@@ -98,6 +110,8 @@ function AppRoutes() {
             <Route path="/t/:shareId" element={<PublicTimelinePage />} />
             <Route path="/kids/preview" element={<Navigate to="/kids/preview/AAPL?age=11-13" replace />} />
             <Route path="/kids/preview/:ticker" element={<KidsPreviewPage />} />
+            <Route path="/kids/about" element={<KidsLandingPage />} />
+            <Route path="/kids/for-parents" element={<KidsForParentsPage />} />
 
             {/* StockKids V1 — separate auth scope, separate shell. */}
             <Route path="/kids/login" element={<KidsAuthProvider><KidsLoginPage /></KidsAuthProvider>} />

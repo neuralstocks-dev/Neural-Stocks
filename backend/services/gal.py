@@ -35,8 +35,31 @@ from services.ai import _parse_ai_json_async, _run_chat_in_thread
 log = logging.getLogger(__name__)
 
 AgeBand = Literal["8-10", "11-13", "14-18"]
+Lang = Literal["en", "id"]
 
 VALID_BANDS: tuple[AgeBand, ...] = ("8-10", "11-13", "14-18")
+VALID_LANGS: tuple[Lang, ...] = ("en", "id")
+
+
+# Per-language language-output rules. The English path stays as-is for
+# backwards compatibility; the Indonesian path swaps the entire output
+# language and lightly localises the analogies (pocket money → uang
+# jajan, candy shop → toko jajan).
+_LANG_RULES: dict[Lang, str] = {
+    "en": "Respond entirely in fluent natural English appropriate for the age band. Use US/UK English idioms.",
+    "id": (
+        "TULIS SELURUH HASIL DALAM BAHASA INDONESIA YANG NATURAL DAN RAMAH ANAK. "
+        "Use Bahasa Indonesia for every field — kid_headline, kid_explanation, "
+        "did_you_know titles AND bodies, reflection_question, what_would_change_my_mind, "
+        "confidence_plain_english. Use natural Indonesian idioms — uang jajan instead of "
+        "pocket money, toko jajan / warung instead of candy shop, sepak bola for sports "
+        "analogies. The emoji_mood field stays as a single emoji (no language). "
+        "Do NOT mix English words for technical concepts — translate them: "
+        "moving average → rata-rata pergerakan, momentum → momentum (untranslated, OK), "
+        "buying pressure → tekanan beli, selling pressure → tekanan jual, "
+        "RSI → RSI (kept), bullish → bullish/optimistis, bearish → bearish/pesimistis."
+    ),
+}
 
 
 # Per-age-band guidance injected into the system prompt. The model is
@@ -127,9 +150,10 @@ def _slim_adult_nsi(adult: dict) -> dict:
     }
 
 
-def _build_prompt(adult: dict, band: AgeBand) -> tuple[str, str]:
+def _build_prompt(adult: dict, band: AgeBand, lang: Lang = "en") -> tuple[str, str]:
     """Return `(system_prompt, user_text)` for the GAL LLM call."""
     spec = _BAND_SPECS[band]
+    lang_rule = _LANG_RULES.get(lang, _LANG_RULES["en"])
 
     system = f"""You are the Grade Adaptation Layer (GAL) for StockKids — an AI-native financial
 literacy platform that teaches kids to invest by translating institutional-grade
@@ -137,6 +161,9 @@ AI stock analysis into age-appropriate language.
 
 Your task: take an adult AI stock verdict (Neural Stock Intelligence output) and
 rewrite it for a {spec['audience']}.
+
+## Output language
+{lang_rule}
 
 ## Vocabulary rules
 {spec['vocabulary']}
@@ -170,53 +197,63 @@ CRITICAL: This is for EDUCATIONAL USE ONLY. The child is not using real money.
 Respond with ONLY the JSON object. No preamble, no code fences, no trailing text."""
 
     user_text = (
-        f"ADULT NSI VERDICT (translate this for a {spec['audience']}):\n\n"
+        f"ADULT NSI VERDICT (translate this for a {spec['audience']}, output language: {lang}):\n\n"
         f"{json.dumps(_slim_adult_nsi(adult), ensure_ascii=False, indent=2)}"
     )
     return system, user_text
 
 
-async def translate_for_age(adult_verdict: dict, age_band: AgeBand, ticker: str) -> dict:
+async def translate_for_age(adult_verdict: dict, age_band: AgeBand, ticker: str, lang: Lang = "en") -> dict:
     """Translate an adult NSI verdict into a kid-appropriate output.
 
-    Returns a strict dict with the GAL JSON shape. On LLM failure, falls
-    back to a minimally-safe stub (so the kid preview page can still
-    render a "this ticker isn't ready yet" card rather than crashing).
-
-    This function deliberately does NOT persist anything — Phase Zero is
-    read-only on the adult analyses collection. The caller may cache the
-    result in-memory if needed for demo performance.
+    `lang` selects the output language: "en" (English, default — preserves
+    existing behaviour) or "id" (Bahasa Indonesia). Caching keys upstream
+    must include the language so EN and ID outputs don't clobber each
+    other.
     """
     if age_band not in VALID_BANDS:
         raise ValueError(f"Invalid age_band '{age_band}', must be one of {VALID_BANDS}")
+    if lang not in VALID_LANGS:
+        lang = "en"
 
-    system, user_text = _build_prompt(adult_verdict, age_band)
-    session_prefix = f"gal-{ticker}-{age_band}"
+    system, user_text = _build_prompt(adult_verdict, age_band, lang)
+    session_prefix = f"gal-{ticker}-{age_band}-{lang}"
 
     raw, meta = await _run_chat_in_thread(system, session_prefix, user_text)
     try:
         out = await _parse_ai_json_async(raw)
     except Exception as e:
-        log.warning("GAL JSON parse failed for %s (age=%s): %s", ticker, age_band, e)
-        # Return a deliberate degraded card so the frontend can show a
-        # "we're still learning this one" message rather than a 500.
-        out = {
-            "kid_headline": f"We're still learning about {ticker}!",
-            "kid_explanation": (
-                "The AI was a bit confused translating this one. Try another "
-                "stock from the list — or come back in a few minutes."
-            ),
-            "did_you_know": [],
-            "reflection_question": "Why do you think the AI might get confused sometimes?",
-            "what_would_change_my_mind": "",
-            "confidence_plain_english": "Not sure — the AI didn't finish its thought.",
-            "emoji_mood": "🤔",
-            "_degraded": True,
-        }
+        log.warning("GAL JSON parse failed for %s (age=%s, lang=%s): %s", ticker, age_band, lang, e)
+        if lang == "id":
+            out = {
+                "kid_headline": f"Kami masih belajar tentang {ticker}!",
+                "kid_explanation": (
+                    "AI agak bingung menerjemahkan yang ini. Coba saham lain dari daftar — "
+                    "atau kembali lagi beberapa menit lagi."
+                ),
+                "did_you_know": [],
+                "reflection_question": "Menurutmu kenapa AI kadang bisa bingung?",
+                "what_would_change_my_mind": "",
+                "confidence_plain_english": "Belum yakin — AI belum selesai berpikir.",
+                "emoji_mood": "🤔",
+                "_degraded": True,
+            }
+        else:
+            out = {
+                "kid_headline": f"We're still learning about {ticker}!",
+                "kid_explanation": (
+                    "The AI was a bit confused translating this one. Try another "
+                    "stock from the list — or come back in a few minutes."
+                ),
+                "did_you_know": [],
+                "reflection_question": "Why do you think the AI might get confused sometimes?",
+                "what_would_change_my_mind": "",
+                "confidence_plain_english": "Not sure — the AI didn't finish its thought.",
+                "emoji_mood": "🤔",
+                "_degraded": True,
+            }
 
-    # Attach provenance so the admin can debug which provider generated
-    # each kid translation (Sonnet vs Gemini fallback). Inherits the
-    # same meta dict shape `services.ai` uses.
     out["_provider"] = meta.get("provider")
     out["_model"] = meta.get("model")
+    out["_lang"] = lang
     return out

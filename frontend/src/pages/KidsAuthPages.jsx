@@ -9,6 +9,8 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Sparkles, Loader2, ArrowRight, AlertCircle } from "lucide-react";
 import { useKidsAuth } from "@/contexts/KidsAuthContext";
+import { useKidsLang, t } from "@/lib/kidsI18n";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const SHELL_BG = "#fff8f0";
 const ACCENT = "#ff7676";
@@ -100,13 +102,17 @@ function ErrorBox({ msg }) {
 }
 
 function BrandHeader() {
+    const { lang } = useKidsLang();
     return (
         <div style={headerStyle}>
-            <Link to="/kids/login" style={{ textDecoration: "none", color: "inherit", display: "inline-flex", alignItems: "center", gap: 10 }}>
+            <Link to="/kids/about" style={{ textDecoration: "none", color: "inherit", display: "inline-flex", alignItems: "center", gap: 10 }}>
                 <Sparkles size={28} color={ACCENT} strokeWidth={1.8} />
                 <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: 1 }}>StockKids</span>
             </Link>
-            <p style={{ fontSize: 13, opacity: 0.6, marginTop: 6 }}>Learn investing with AI · by NeuLab</p>
+            <p style={{ fontSize: 13, opacity: 0.6, marginTop: 6 }}>{t(lang, "brand.tagline")}</p>
+            <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
+                <LanguageSwitcher />
+            </div>
         </div>
     );
 }
@@ -114,6 +120,7 @@ function BrandHeader() {
 export function KidsLoginPage() {
     const { login } = useKidsAuth();
     const navigate = useNavigate();
+    const { lang } = useKidsLang();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -127,7 +134,7 @@ export function KidsLoginPage() {
             await login(email, password);
             navigate("/kids/dashboard");
         } catch (err) {
-            setError(err?.response?.data?.detail || "Couldn't log you in. Check your email & password.");
+            setError(err?.response?.data?.detail || t(lang, "auth.error_login"));
         } finally {
             setBusy(false);
         }
@@ -137,9 +144,9 @@ export function KidsLoginPage() {
         <div style={sharedShellStyle} data-testid="kids-login-page">
             <BrandHeader />
             <form style={cardStyle} onSubmit={onSubmit}>
-                <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, textAlign: "center" }}>Welcome back!</h2>
+                <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, textAlign: "center" }}>{t(lang, "auth.welcome_back")}</h2>
                 <ErrorBox msg={error} />
-                <label style={labelStyle}>Email</label>
+                <label style={labelStyle}>{t(lang, "auth.email_label")}</label>
                 <input
                     style={inputStyle}
                     type="email"
@@ -149,7 +156,7 @@ export function KidsLoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                 />
-                <label style={labelStyle}>Password</label>
+                <label style={labelStyle}>{t(lang, "auth.password_label")}</label>
                 <input
                     style={inputStyle}
                     type="password"
@@ -160,12 +167,12 @@ export function KidsLoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                 />
                 <button type="submit" disabled={busy} data-testid="kids-login-submit" style={submitStyle(busy)}>
-                    {busy ? <Loader2 size={16} className="animate-spin" /> : <>Log in <ArrowRight size={16} /></>}
+                    {busy ? <Loader2 size={16} className="animate-spin" /> : <>{t(lang, "auth.login_submit")} <ArrowRight size={16} /></>}
                 </button>
                 <p style={{ marginTop: 18, fontSize: 13, textAlign: "center", color: "#1a1a2e", opacity: 0.7 }}>
-                    New to StockKids?{" "}
+                    {t(lang, "auth.login_no_account")}{" "}
                     <Link to="/kids/signup" style={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }} data-testid="kids-go-signup">
-                        Create an account
+                        {t(lang, "auth.login_signup_link")}
                     </Link>
                 </p>
             </form>
@@ -176,6 +183,7 @@ export function KidsLoginPage() {
 export function KidsSignupPage() {
     const { signup } = useKidsAuth();
     const navigate = useNavigate();
+    const { lang } = useKidsLang();
     const [form, setForm] = useState({
         full_name: "",
         email: "",
@@ -199,17 +207,15 @@ export function KidsSignupPage() {
                 password: form.password,
                 birthdate: form.birthdate,
                 parent_email: form.parent_email || undefined,
+                lang,
             });
-            // 8-12 → backend returns awaiting_parental_consent (no token).
-            // Route the kid to a "waiting on parent" page so they don't
-            // sit on a confused signup form.
             if (result?.status === "awaiting_parental_consent") {
                 navigate(`/kids/awaiting-consent?email=${encodeURIComponent(form.email)}&parent=${encodeURIComponent(form.parent_email)}`);
                 return;
             }
             navigate("/kids/dashboard");
         } catch (err) {
-            setError(err?.response?.data?.detail || "Couldn't create your account.");
+            setError(err?.response?.data?.detail || t(lang, "auth.error_signup"));
         } finally {
             setBusy(false);
         }
@@ -219,28 +225,28 @@ export function KidsSignupPage() {
         <div style={sharedShellStyle} data-testid="kids-signup-page">
             <BrandHeader />
             <form style={cardStyle} onSubmit={onSubmit}>
-                <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, textAlign: "center" }}>Start investing with AI</h2>
+                <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, textAlign: "center" }}>{t(lang, "auth.signup_title")}</h2>
                 <ErrorBox msg={error} />
-                <label style={labelStyle}>Your name</label>
+                <label style={labelStyle}>{t(lang, "auth.signup_name_label")}</label>
                 <input style={inputStyle} required data-testid="kids-signup-name" value={form.full_name} onChange={update("full_name")} placeholder="Alex Tester" />
-                <label style={labelStyle}>Your email</label>
+                <label style={labelStyle}>{t(lang, "auth.email_label")}</label>
                 <input style={inputStyle} required type="email" autoComplete="email" data-testid="kids-signup-email" value={form.email} onChange={update("email")} />
-                <label style={labelStyle}>Password (8+ characters)</label>
+                <label style={labelStyle}>{t(lang, "auth.signup_password_label")}</label>
                 <input style={inputStyle} required type="password" minLength={8} autoComplete="new-password" data-testid="kids-signup-password" value={form.password} onChange={update("password")} />
-                <label style={labelStyle}>Birthday <span style={{ fontWeight: 400, opacity: 0.6 }}>· ages 8+ (under 13 needs a parent's OK)</span></label>
+                <label style={labelStyle}>{t(lang, "auth.signup_birthday_label")} <span style={{ fontWeight: 400, opacity: 0.6 }}>· {t(lang, "auth.signup_birthday_hint")}</span></label>
                 <input style={inputStyle} required type="date" data-testid="kids-signup-birthdate" value={form.birthdate} onChange={update("birthdate")} />
-                <label style={labelStyle}>Parent's email <span style={{ fontWeight: 400, opacity: 0.6 }}>· required if you're under 13</span></label>
+                <label style={labelStyle}>{t(lang, "auth.signup_parent_label")} <span style={{ fontWeight: 400, opacity: 0.6 }}>· {t(lang, "auth.signup_parent_hint")}</span></label>
                 <input style={inputStyle} type="email" data-testid="kids-signup-parent-email" value={form.parent_email} onChange={update("parent_email")} />
                 <button type="submit" disabled={busy} data-testid="kids-signup-submit" style={submitStyle(busy)}>
-                    {busy ? <Loader2 size={16} className="animate-spin" /> : <>Sign up · Get 10,000 SC <ArrowRight size={16} /></>}
+                    {busy ? <Loader2 size={16} className="animate-spin" /> : <>{t(lang, "auth.signup_submit")} <ArrowRight size={16} /></>}
                 </button>
                 <p style={{ marginTop: 12, fontSize: 11, textAlign: "center", color: "#1a1a2e", opacity: 0.6, lineHeight: 1.5 }}>
-                    Educational use only. Not investment advice. We never use real money — you trade with virtual StockCoins.
+                    {t(lang, "auth.signup_disclaimer")}
                 </p>
                 <p style={{ marginTop: 12, fontSize: 13, textAlign: "center", color: "#1a1a2e", opacity: 0.7 }}>
-                    Already have an account?{" "}
+                    {t(lang, "auth.signup_have_account")}{" "}
                     <Link to="/kids/login" style={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }} data-testid="kids-go-login">
-                        Log in
+                        {t(lang, "auth.signup_login_link")}
                     </Link>
                 </p>
             </form>

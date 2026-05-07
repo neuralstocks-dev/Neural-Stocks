@@ -19,7 +19,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.db import db
@@ -365,13 +365,20 @@ async def remove_watchlist(ticker: str, student=Depends(get_current_kid)):
 # ---------------------------------------------------------------------------
 
 @router.get("/analyze/{ticker}")
-async def analyze_ticker(ticker: str, student=Depends(get_current_kid)):
+async def analyze_ticker(
+    ticker: str,
+    student=Depends(get_current_kid),
+    lang: str = Query(default="en", description="Output language: en or id"),
+):
     from services.gal import translate_for_age
     from routers.kids_preview import _adult_to_gal_input
 
     ticker = ticker.upper().strip()
     if ticker not in KID_TRADABLE:
         raise HTTPException(status_code=400, detail=f"{ticker} isn't on the learning list yet.")
+
+    if lang not in ("en", "id"):
+        lang = student.get("lang") or "en"
 
     cutoff = (datetime.now(timezone.utc) - _MAX_PRICE_AGE).isoformat()
     doc = await db.analyses.find_one(
@@ -386,12 +393,13 @@ async def analyze_ticker(ticker: str, student=Depends(get_current_kid)):
         )
 
     age_band = student.get("age_band") or "11-13"
-    kid_view = await translate_for_age(_adult_to_gal_input(doc), age_band, ticker)
+    kid_view = await translate_for_age(_adult_to_gal_input(doc), age_band, ticker, lang)
     quote = doc.get("quote_snapshot") if isinstance(doc.get("quote_snapshot"), dict) else {}
     return {
         "ticker": ticker,
         "name": quote.get("name") or ticker,
         "age_band": age_band,
+        "lang": lang,
         "current_price": doc.get("price_at_analysis"),
         "currency": quote.get("currency") or "USD",
         "kid_view": {k: v for k, v in kid_view.items() if not k.startswith("_")},

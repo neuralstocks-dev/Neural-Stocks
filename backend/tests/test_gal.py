@@ -76,7 +76,7 @@ def test_translate_for_age_uses_correct_band_spec():
         assert k in out, f"missing required key: {k}"
     assert out["_provider"] == "anthropic"
     assert out["_model"] == "claude-sonnet-4-5-20250929"
-    assert captured["session_prefix"] == "gal-AAPL-8-10"
+    assert captured["session_prefix"] == "gal-AAPL-8-10-en"
 
     # Prompt-side contract — band-specific guidance landed in the system prompt
     sys_prompt = captured["system"]

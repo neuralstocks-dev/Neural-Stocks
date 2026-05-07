@@ -133,6 +133,7 @@ async def get_consent_preview(token: str):
 class ConsentBody(BaseModel):
     parent_full_name: str = Field(..., min_length=2, max_length=100)
     agree: bool
+    lang: str = Field(default="en", pattern=r"^(en|id)$")
 
 
 @router.post("/parental-consent/{token}")
@@ -197,6 +198,7 @@ async def submit_consent(token: str, body: ConsentBody, request: Request):
             to_email=consent_doc["parent_email"],
             kid_full_name=consent_doc.get("kid_full_name") or "your child",
             parent_full_name=body.parent_full_name.strip(),
+            lang=body.lang,
         )
         await db.kids_consents.update_one(
             {"id": consent_doc["id"]},
@@ -215,6 +217,7 @@ async def submit_consent(token: str, body: ConsentBody, request: Request):
 
 class ResendBody(BaseModel):
     email: EmailStr
+    lang: str = Field(default="en", pattern=r"^(en|id)$")
 
 
 @router.post("/resend-consent")
@@ -235,6 +238,7 @@ async def resend_consent(body: ResendBody):
             kid_email=kid["email"],
             kid_age=kid.get("age_at_signup", 0),
             consent_token=token,
+            lang=body.lang or kid.get("lang") or "en",
         )
     except Exception:
         # Don't surface email-provider failures to a parent flow.

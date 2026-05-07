@@ -103,6 +103,7 @@ def _adult_to_gal_input(doc: dict) -> dict:
 async def preview_kids(
     ticker: str,
     age: str = Query(default="11-13", description="Age band: 8-10, 11-13, or 14-18"),
+    lang: str = Query(default="en", description="Output language: en or id"),
 ):
     """Public kid-friendly translation of the latest NSI verdict."""
     ticker = ticker.upper().strip()
@@ -122,10 +123,10 @@ async def preview_kids(
             detail=f"Invalid age band '{age}'. Use one of {list(VALID_BANDS)}.",
         )
 
+    if lang not in ("en", "id"):
+        lang = "en"
+
     # 1) Pull most-recent adult analysis from the shared pool — ANY user.
-    #    This is fine because the public preview only surfaces the
-    #    verdict-level findings (no personalization, no user_id) and
-    #    these tickers are all mainstream.
     cutoff = (datetime.now(timezone.utc) - _MAX_CACHE_AGE).isoformat()
     doc = await db.analyses.find_one(
         {"ticker": ticker, "created_at": {"$gte": cutoff}},
@@ -142,18 +143,16 @@ async def preview_kids(
             ),
         )
 
-    # 2) In-process memo lookup — skip the GAL LLM call if this exact
-    #    (ticker, age, analysis_id) has been translated before and the
-    #    underlying adult verdict hasn't rolled over.
+    # 2) In-process memo lookup — keyed by (ticker, age, analysis_id, lang)
+    #    so EN and ID outputs cache independently.
     analysis_id = doc.get("id", "")
-    memo_key = (ticker, age, analysis_id)
+    memo_key = (ticker, age, analysis_id, lang)
     now_s = time.time()
     cached = _GAL_MEMO.get(memo_key)
     if cached and (now_s - cached[0]) < _GAL_MEMO_TTL_S:
         kid_view = cached[1]
     else:
-        # 3) Run the GAL — single Claude/Gemini call.
-        kid_view = await translate_for_age(_adult_to_gal_input(doc), age, ticker)
+        kid_view = await translate_for_age(_adult_to_gal_input(doc), age, ticker, lang)
         _GAL_MEMO[memo_key] = (now_s, kid_view)
 
     # 4) Shape the final response. Include a minimal "adult snapshot" so

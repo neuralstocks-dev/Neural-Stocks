@@ -262,7 +262,61 @@ def _weekly_digest_html(full_name: str, signals: list[dict], locked_count: int,
 
 # ─── StockKids: COPPA Parental Consent ────────────────────────────────────
 
-def _parental_consent_html(kid_full_name: str, kid_email: str, kid_age: int, consent_url: str) -> str:
+def _parental_consent_html(kid_full_name: str, kid_email: str, kid_age: int, consent_url: str, lang: str = "en") -> str:
+    if lang == "id":
+        return f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#fff8f0;color:#1a1a2e;font-family:'Outfit','Quicksand',system-ui,sans-serif">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#fff8f0">
+    <tr><td align="center" style="padding:40px 16px">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
+        <tr><td>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">StockKids · Persetujuan Orang Tua Diperlukan</p>
+          <h1 style="font-size:26px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">
+            Anak Anda ingin belajar investasi — apakah Anda setuju?
+          </h1>
+          <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:18px">
+            Halo — <strong>{kid_full_name}</strong> (usia {kid_age}, email <code style="background:#fff8f0;padding:1px 6px;border-radius:4px">{kid_email}</code>) baru saja mencoba mendaftar <strong>StockKids</strong>, aplikasi edukasi investasi saham bertenaga AI untuk anak dan remaja.
+          </p>
+          <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:14px">
+            Karena mereka di bawah 13 tahun, hukum AS (COPPA) mengharuskan kami mendapat izin Anda sebelum mengaktifkan akun mereka. <strong>Tidak ada uang sungguhan</strong> — anak belajar dengan bertransaksi pakai "StockCoins" virtual.
+          </p>
+
+          <div style="background:#fff8f0;border:1.5px solid #e5d5b8;border-radius:14px;padding:18px;margin:20px 0">
+            <p style="font-size:11px;letter-spacing:1.5px;color:#7a5a00;text-transform:uppercase;margin:0;font-weight:700">Apa yang kami kumpulkan</p>
+            <ul style="margin:10px 0 0;padding-left:20px;color:#1a1a2e;font-size:14px;line-height:1.6">
+              <li>Email anak Anda dan kata sandi yang di-hash (kami tidak pernah simpan kata sandi sebagai teks biasa)</li>
+              <li>Nama depan dan tahun lahir mereka (untuk memilih kosakata yang tepat)</li>
+              <li>Transaksi virtual dan jurnal refleksi mereka (untuk membantu belajar)</li>
+            </ul>
+            <p style="font-size:11px;letter-spacing:1.5px;color:#7a5a00;text-transform:uppercase;margin:14px 0 0;font-weight:700">Apa yang tidak kami lakukan</p>
+            <ul style="margin:10px 0 0;padding-left:20px;color:#1a1a2e;font-size:14px;line-height:1.6">
+              <li>Menjual atau membagi data ke pihak ketiga untuk pemasaran</li>
+              <li>Menampilkan iklan, pembelian dalam aplikasi, atau perdagangan uang sungguhan</li>
+              <li>Menghubungi mereka di luar aplikasi tanpa izin Anda</li>
+            </ul>
+          </div>
+
+          <p style="color:#1a1a2e;font-size:14px;line-height:1.65;margin-top:8px">
+            Anda dapat meninjau seluruh data yang kami kumpulkan, mencabut izin, atau menghapus akun kapan saja dengan membalas email ini.
+          </p>
+
+          <p style="margin:28px 0 8px;text-align:center">
+            <a href="{consent_url}" data-testid="parent-consent-cta" style="display:inline-block;padding:14px 28px;background:#ff7676;color:#fff;font-weight:700;font-size:15px;text-decoration:none;border-radius:14px">
+              Tinjau &amp; beri persetujuan →
+            </a>
+          </p>
+          <p style="color:#888;font-size:12px;line-height:1.5;text-align:center;margin-top:14px">
+            Link ini berlaku 7 hari. Jika tombol tidak berfungsi, salin URL ini ke browser Anda:<br />
+            <span style="color:#1a1a2e;word-break:break-all;font-family:monospace;font-size:11px">{consent_url}</span>
+          </p>
+
+          {DISCLAIMER_FOOTER}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
     return f"""<!doctype html>
 <html><body style="margin:0;padding:0;background:#fff8f0;color:#1a1a2e;font-family:'Outfit','Quicksand',system-ui,sans-serif">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#fff8f0">
@@ -318,30 +372,60 @@ def _parental_consent_html(kid_full_name: str, kid_email: str, kid_age: int, con
 
 
 async def send_parental_consent_email(to_email: str, kid_full_name: str, kid_email: str,
-                                       kid_age: int, consent_token: str) -> bool:
+                                       kid_age: int, consent_token: str, lang: str = "en") -> bool:
     if not RESEND_API_KEY:
         logger.warning("RESEND_API_KEY not set — skipping parental consent email")
         return False
-    base = _PUBLIC_APP_URL or "https://neulab.xyz"
+    base = _PUBLIC_APP_URL or "https://kidstocks.net"
     consent_url = f"{base}/kids/parental-consent/{consent_token}"
-    html = _parental_consent_html(kid_full_name, kid_email, kid_age, consent_url)
+    html = _parental_consent_html(kid_full_name, kid_email, kid_age, consent_url, lang)
+    if lang == "id":
+        subject = f"Tindakan diperlukan: setujui akun StockKids untuk {kid_full_name}"
+    else:
+        subject = f"Action needed: approve {kid_full_name}'s StockKids account"
     params = {
         "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
         "to": [to_email],
         "reply_to": REPLY_TO,
-        "subject": f"Action needed: approve {kid_full_name}'s StockKids account",
+        "subject": subject,
         "html": html,
     }
     try:
         result = await asyncio.to_thread(resend.Emails.send, params)
-        logger.info("Parental consent email sent to %s · id=%s", to_email, result.get("id"))
+        logger.info("Parental consent email sent to %s · id=%s · lang=%s", to_email, result.get("id"), lang)
         return True
     except Exception as e:
         logger.error("Parental consent email send failed: %s", e)
         return False
 
 
-def _consent_confirmation_html(kid_full_name: str, parent_full_name: str) -> str:
+def _consent_confirmation_html(kid_full_name: str, parent_full_name: str, lang: str = "en") -> str:
+    if lang == "id":
+        first_name = parent_full_name.split(" ")[0] if parent_full_name else ""
+        greeting = f"Terima kasih, {first_name} — akun {kid_full_name} sudah aktif."
+        return f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#fff8f0;color:#1a1a2e;font-family:'Outfit','Quicksand',system-ui,sans-serif">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#fff8f0">
+    <tr><td align="center" style="padding:40px 16px">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
+        <tr><td>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#76b876;text-transform:uppercase;margin:0;font-weight:700">StockKids · Persetujuan Diterima</p>
+          <h1 style="font-size:26px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">
+            {greeting}
+          </h1>
+          <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:18px">
+            Kami sudah menerima persetujuan Anda. <strong>{kid_full_name}</strong> sekarang bisa masuk dan mulai belajar investasi dengan StockCoins virtual.
+          </p>
+          <p style="color:#1a1a2e;font-size:14px;line-height:1.65;margin-top:14px">
+            Anda bisa mencabut izin atau meminta penghapusan data kapan saja dengan membalas email ini. Kami akan memenuhi permintaan dalam 7 hari.
+          </p>
+          {DISCLAIMER_FOOTER}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
     return f"""<!doctype html>
 <html><body style="margin:0;padding:0;background:#fff8f0;color:#1a1a2e;font-family:'Outfit','Quicksand',system-ui,sans-serif">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#fff8f0">
@@ -366,20 +450,24 @@ def _consent_confirmation_html(kid_full_name: str, parent_full_name: str) -> str
 </body></html>"""
 
 
-async def send_consent_confirmation_email(to_email: str, kid_full_name: str, parent_full_name: str) -> bool:
+async def send_consent_confirmation_email(to_email: str, kid_full_name: str, parent_full_name: str, lang: str = "en") -> bool:
     if not RESEND_API_KEY:
         return False
-    html = _consent_confirmation_html(kid_full_name, parent_full_name)
+    html = _consent_confirmation_html(kid_full_name, parent_full_name, lang)
+    if lang == "id":
+        subject = f"Dikonfirmasi: akun StockKids untuk {kid_full_name} sudah aktif"
+    else:
+        subject = f"Confirmed: {kid_full_name}'s StockKids account is active"
     params = {
         "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
         "to": [to_email],
         "reply_to": REPLY_TO,
-        "subject": f"Confirmed: {kid_full_name}'s StockKids account is active",
+        "subject": subject,
         "html": html,
     }
     try:
         result = await asyncio.to_thread(resend.Emails.send, params)
-        logger.info("Consent confirmation email sent to %s · id=%s", to_email, result.get("id"))
+        logger.info("Consent confirmation email sent to %s · id=%s · lang=%s", to_email, result.get("id"), lang)
         return True
     except Exception as e:
         logger.error("Consent confirmation send failed: %s", e)

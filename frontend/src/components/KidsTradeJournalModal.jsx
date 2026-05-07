@@ -12,6 +12,7 @@
  */
 import React, { useState } from "react";
 import { Sparkles, Loader2, X, MessageCircle } from "lucide-react";
+import { useKidsLang, t } from "@/lib/kidsI18n";
 
 const ACCENT = "#ff7676";
 const NAVY = "#1a1a2e";
@@ -20,20 +21,13 @@ const SAND_BORDER = "#e5d5b8";
 const GREEN = "#76b876";
 const GOLD = "#ffb570";
 
-const PROMPTS = {
-    BUY: {
-        why: "Why do you think this stock will do well?",
-        signal: "Which signal from the analysis convinced you most?",
-        exit_plan: "When would you sell? (e.g. price drops 15%, news changes…)",
-    },
-    SELL: {
-        why: "Why are you selling now?",
-        signal: "What changed your mind since you bought it?",
-        exit_plan: "Would you buy this stock again later? Why?",
-    },
+const PROMPT_KEYS = {
+    BUY: { why: "journal.buy_q1", signal: "journal.buy_q2", exit_plan: "journal.buy_q3" },
+    SELL: { why: "journal.sell_q1", signal: "journal.sell_q2", exit_plan: "journal.sell_q3" },
 };
 
 export function KidsTradeJournalModal({ trade, kidsApi, onClose, onBonusEarned }) {
+    const { lang } = useKidsLang();
     const [why, setWhy] = useState("");
     const [signal, setSignal] = useState("");
     const [exitPlan, setExitPlan] = useState("");
@@ -42,7 +36,7 @@ export function KidsTradeJournalModal({ trade, kidsApi, onClose, onBonusEarned }
     const [result, setResult] = useState(null);
 
     if (!trade) return null;
-    const prompts = PROMPTS[trade.side] || PROMPTS.BUY;
+    const promptKeys = PROMPT_KEYS[trade.side] || PROMPT_KEYS.BUY;
     const isComplete = why.trim() && signal.trim() && exitPlan.trim();
 
     const submit = async () => {
@@ -92,30 +86,30 @@ export function KidsTradeJournalModal({ trade, kidsApi, onClose, onBonusEarned }
                 }}
             >
                 {result ? (
-                    <ResultPane result={result} side={trade.side} qty={trade.qty} ticker={trade.ticker} onClose={onClose} />
+                    <ResultPane result={result} side={trade.side} qty={trade.qty} ticker={trade.ticker} onClose={onClose} lang={lang} />
                 ) : (
                     <>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                             <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: ACCENT, fontWeight: 700, margin: 0 }}>
-                                Trade Journal
+                                {t(lang, "journal.eyebrow")}
                             </p>
                             <button onClick={onClose} aria-label="Close" data-testid="kids-journal-skip" style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer" }}>
                                 <X size={18} color={NAVY} opacity={0.6} />
                             </button>
                         </div>
                         <h3 style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.35, marginTop: 4 }}>
-                            {trade.side === "BUY" ? "Nice buy!" : "Nice sell!"} Tell future-you why.
+                            {t(lang, trade.side === "BUY" ? "journal.title_buy" : "journal.title_sell")}
                         </h3>
                         <div style={{ background: SAND, border: `1px solid ${SAND_BORDER}`, borderRadius: 12, padding: "10px 14px", marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
                             <Sparkles size={16} color={GOLD} />
                             <p style={{ margin: 0, fontSize: 13, color: "#7a5a00" }}>
-                                Answer all 3 to earn <strong>+50 StockCoins</strong> and a stronger investing brain.
+                                {t(lang, "journal.bonus_pitch")}
                             </p>
                         </div>
 
-                        <PromptInput label={prompts.why} value={why} onChange={setWhy} testId="journal-why" />
-                        <PromptInput label={prompts.signal} value={signal} onChange={setSignal} testId="journal-signal" />
-                        <PromptInput label={prompts.exit_plan} value={exitPlan} onChange={setExitPlan} testId="journal-exit-plan" />
+                        <PromptInput label={t(lang, promptKeys.why)} value={why} onChange={setWhy} testId="journal-why" />
+                        <PromptInput label={t(lang, promptKeys.signal)} value={signal} onChange={setSignal} testId="journal-signal" />
+                        <PromptInput label={t(lang, promptKeys.exit_plan)} value={exitPlan} onChange={setExitPlan} testId="journal-exit-plan" />
 
                         {err && <p style={{ color: ACCENT, fontSize: 12, marginTop: 8 }}>{err}</p>}
 
@@ -126,7 +120,7 @@ export function KidsTradeJournalModal({ trade, kidsApi, onClose, onBonusEarned }
                                 data-testid="kids-journal-skip-button"
                                 style={{ padding: "12px 16px", background: "transparent", border: `1.5px solid ${SAND_BORDER}`, borderRadius: 12, fontSize: 13, fontWeight: 600, color: NAVY, cursor: "pointer" }}
                             >
-                                Skip for now
+                                {t(lang, "journal.skip")}
                             </button>
                             <button
                                 onClick={submit}
@@ -148,7 +142,7 @@ export function KidsTradeJournalModal({ trade, kidsApi, onClose, onBonusEarned }
                                     gap: 8,
                                 }}
                             >
-                                {busy ? <Loader2 size={14} className="animate-spin" /> : <><MessageCircle size={14} /> Save reflection</>}
+                                {busy ? <Loader2 size={14} className="animate-spin" /> : <><MessageCircle size={14} /> {t(lang, "journal.submit")}</>}
                             </button>
                         </div>
                     </>
@@ -185,24 +179,32 @@ function PromptInput({ label, value, onChange, testId }) {
     );
 }
 
-function ResultPane({ result, side, qty, ticker, onClose }) {
+function ResultPane({ result, side, qty, ticker, onClose, lang }) {
     const earnedBonus = result.bonus_awarded_sc > 0;
     const capHit = result.daily_cap_hit;
+    const sideLabel = side === "BUY"
+        ? (lang === "id" ? "Pembelian" : "Buy")
+        : (lang === "id" ? "Penjualan" : "Sell");
     return (
         <div data-testid="kids-journal-result" style={{ textAlign: "center", padding: "8px 4px" }}>
             <div style={{ fontSize: 56, marginBottom: 6 }}>
                 {earnedBonus ? "🎉" : capHit ? "💡" : "✓"}
             </div>
             <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
-                {earnedBonus ? `+${result.bonus_awarded_sc} StockCoins!` : "Reflection saved"}
+                {earnedBonus
+                    ? t(lang, "journal.bonus_title", { n: result.bonus_awarded_sc })
+                    : t(lang, "journal.cap_title")}
             </h3>
             <p style={{ fontSize: 14, opacity: 0.85, lineHeight: 1.55 }}>
                 {earnedBonus ? (
-                    <>Your {side === "BUY" ? "buy" : "sell"} of {qty} {ticker} is locked in your journal. New balance: <strong style={{ color: GREEN }}>{(result.new_balance || 0).toLocaleString(undefined,{maximumFractionDigits:2})} SC</strong></>
+                    <>
+                        {t(lang, "journal.bonus_body", { side: sideLabel, qty, ticker })}{" "}
+                        <strong style={{ color: GREEN }}>{(result.new_balance || 0).toLocaleString(undefined,{maximumFractionDigits:2})} SC</strong>
+                    </>
                 ) : capHit ? (
-                    <>You've already earned today's max bonus — but every reflection still makes you a sharper investor. Come back tomorrow for more!</>
+                    t(lang, "journal.cap_body")
                 ) : (
-                    <>Saved.</>
+                    "✓"
                 )}
             </p>
             <button
@@ -220,7 +222,7 @@ function ResultPane({ result, side, qty, ticker, onClose }) {
                     cursor: "pointer",
                 }}
             >
-                Got it
+                {t(lang, "journal.got_it")}
             </button>
         </div>
     );

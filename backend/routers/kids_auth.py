@@ -65,6 +65,7 @@ class SignupBody(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=80)
     birthdate: str = Field(..., description="YYYY-MM-DD")
     parent_email: Optional[EmailStr] = None  # required only for ages 8-12
+    lang: str = Field(default="en", pattern=r"^(en|id)$")
 
 
 class LoginBody(BaseModel):
@@ -80,6 +81,7 @@ def _public_kid(doc: dict) -> dict:
         "birthdate": doc.get("birthdate"),
         "age_band": doc.get("age_band"),
         "parent_email": doc.get("parent_email"),
+        "lang": doc.get("lang", "en"),
         "stock_coins_balance": doc.get("stock_coins_balance", 0),
         "starting_stock_coins": doc.get("starting_stock_coins", 0),
         "status": doc.get("status", "active"),
@@ -140,6 +142,7 @@ async def signup(body: SignupBody):
         "age_at_signup": age,
         "age_band": band,
         "parent_email": parent_email,
+        "lang": body.lang,
         "stock_coins_balance": balance,
         "starting_stock_coins": starting,
         "status": status,
@@ -161,6 +164,7 @@ async def signup(body: SignupBody):
                 kid_email=doc["email"],
                 kid_age=age,
                 consent_token=token,
+                lang=body.lang,
             )
         except Exception as e:
             logger.error("Failed to send parental consent email: %s", e)

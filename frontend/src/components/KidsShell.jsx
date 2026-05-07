@@ -8,6 +8,7 @@
 import React, { useState } from "react";
 import { Link, NavLink, Outlet, Navigate, useNavigate } from "react-router-dom";
 import { Sparkles, Wallet, LineChart, Star, LogOut, Menu, X, Search } from "lucide-react";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useKidsAuth } from "@/contexts/KidsAuthContext";
 
 const NAV = [
@@ -137,26 +138,28 @@ export default function KidsShell() {
                         </NavLink>
                     );
                 })}
-                <button
-                    onClick={handleLogout}
-                    data-testid="kids-logout-button"
-                    style={{
-                        marginLeft: "auto",
-                        background: "transparent",
-                        color: "#7a5a00",
-                        border: "1.5px solid #e5d5b8",
-                        borderRadius: 12,
-                        padding: "8px 14px",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                    }}
-                >
-                    <LogOut size={14} /> Logout
-                </button>
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+                    <LanguageSwitcher />
+                    <button
+                        onClick={handleLogout}
+                        data-testid="kids-logout-button"
+                        style={{
+                            background: "transparent",
+                            color: "#7a5a00",
+                            border: "1.5px solid #e5d5b8",
+                            borderRadius: 12,
+                            padding: "8px 14px",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                        }}
+                    >
+                        <LogOut size={14} /> Logout
+                    </button>
+                </div>
             </nav>
 
             {/* Mobile drawer */}
