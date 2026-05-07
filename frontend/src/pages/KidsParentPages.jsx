@@ -248,9 +248,15 @@ export function KidsParentDashboardPage() {
 }
 
 function KidCard({ kid, lang }) {
-    const pnl = (kid.stock_coins_balance || 0) - (kid.starting_stock_coins || 10000);
-    const pnlPct = ((pnl / (kid.starting_stock_coins || 10000)) * 100);
-    const pnlGreen = pnl >= 0;
+    // Cash deployed in positions (avg-cost basis — we don't have live
+    // quotes in this read-only payload; showing "P&L" would be misleading
+    // since it would only reflect cash drawdown, not market gains).
+    const cashInPositions = (kid.positions || []).reduce(
+        (s, p) => s + ((p.qty || 0) * (p.avg_cost || 0)), 0,
+    );
+    const totalBonusesSc = (kid.recent_journals || []).reduce(
+        (s, j) => s + (j.bonus_awarded_sc || 0), 0,
+    );
     return (
         <section data-testid={`parent-kid-card-${kid.id}`} style={{
             background: "#fff", border: `1px solid ${SAND_BORDER}`, borderRadius: 16, padding: 22,
@@ -262,14 +268,21 @@ function KidCard({ kid, lang }) {
                 </div>
                 <div style={{ textAlign: "right" }}>
                     <p style={{ fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", color: "#7a5a00", fontWeight: 700, margin: 0 }}>
-                        {lang === "id" ? "Saldo" : "Balance"}
+                        {lang === "id" ? "Saldo tunai" : "Cash balance"}
                     </p>
                     <p style={{ fontSize: 22, fontWeight: 700, marginTop: 2 }}>
                         {kid.stock_coins_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span style={{ fontSize: 12, opacity: 0.6 }}>SC</span>
                     </p>
-                    <p style={{ fontSize: 12, marginTop: 2, color: pnlGreen ? GREEN : ACCENT, fontWeight: 600 }}>
-                        {pnlGreen ? "+" : ""}{pnl.toFixed(0)} SC ({pnlGreen ? "+" : ""}{pnlPct.toFixed(1)}%)
-                    </p>
+                    {cashInPositions > 0 && (
+                        <p style={{ fontSize: 12, marginTop: 2, opacity: 0.7 }}>
+                            {lang === "id" ? "Di posisi:" : "In positions:"} ~{cashInPositions.toLocaleString(undefined, { maximumFractionDigits: 0 })} SC
+                        </p>
+                    )}
+                    {totalBonusesSc > 0 && (
+                        <p style={{ fontSize: 12, marginTop: 2, color: GREEN, fontWeight: 600 }}>
+                            {lang === "id" ? "Bonus jurnal:" : "Journal bonuses:"} +{totalBonusesSc} SC
+                        </p>
+                    )}
                 </div>
             </div>
 
