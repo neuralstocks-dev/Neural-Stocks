@@ -474,6 +474,83 @@ async def send_consent_confirmation_email(to_email: str, kid_full_name: str, par
         return False
 
 
+# ─── StockKids: Parent Portal Magic Link ──────────────────────────────────
+
+def _parent_dashboard_link_html(kid_full_name: str, dashboard_url: str, lang: str = "en") -> str:
+    if lang == "id":
+        return f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#fff8f0;color:#1a1a2e;font-family:'Outfit','Quicksand',system-ui,sans-serif">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#fff8f0">
+    <tr><td align="center" style="padding:40px 16px">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
+        <tr><td>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">StockKids · Portal Orang Tua</p>
+          <h1 style="font-size:24px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">Lihat perkembangan {kid_full_name}</h1>
+          <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:18px">
+            Klik link di bawah untuk membuka portal orang tua. Anda akan melihat ringkasan saldo StockCoins, transaksi, dan jurnal refleksi mereka minggu ini.
+          </p>
+          <p style="margin:28px 0 8px;text-align:center">
+            <a href="{dashboard_url}" style="display:inline-block;padding:14px 28px;background:#ff7676;color:#fff;font-weight:700;font-size:15px;text-decoration:none;border-radius:14px">Buka portal orang tua →</a>
+          </p>
+          <p style="color:#888;font-size:12px;line-height:1.5;text-align:center;margin-top:14px">Link berlaku 24 jam.</p>
+          {DISCLAIMER_FOOTER}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+    return f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#fff8f0;color:#1a1a2e;font-family:'Outfit','Quicksand',system-ui,sans-serif">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#fff8f0">
+    <tr><td align="center" style="padding:40px 16px">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;padding:32px;box-shadow:0 8px 24px rgba(26,26,46,0.08)">
+        <tr><td>
+          <p style="font-size:11px;letter-spacing:1.5px;color:#ff7676;text-transform:uppercase;margin:0;font-weight:700">StockKids · Parent Portal</p>
+          <h1 style="font-size:24px;color:#1a1a2e;margin:10px 0 0;font-weight:700;line-height:1.3">See {kid_full_name}'s progress</h1>
+          <p style="color:#1a1a2e;font-size:15px;line-height:1.65;margin-top:18px">
+            Click the link below to open the parent portal. You'll see a summary of their StockCoin balance, this week's trades, and their reflection journals.
+          </p>
+          <p style="margin:28px 0 8px;text-align:center">
+            <a href="{dashboard_url}" style="display:inline-block;padding:14px 28px;background:#ff7676;color:#fff;font-weight:700;font-size:15px;text-decoration:none;border-radius:14px">Open parent portal →</a>
+          </p>
+          <p style="color:#888;font-size:12px;line-height:1.5;text-align:center;margin-top:14px">Link expires in 24 hours.</p>
+          {DISCLAIMER_FOOTER}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+
+async def send_parent_dashboard_link_email(to_email: str, kid_full_name: str,
+                                            session_token: str, lang: str = "en") -> bool:
+    if not RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not set — skipping parent dashboard link email")
+        return False
+    base = _PUBLIC_APP_URL or "https://kidstocks.net"
+    dashboard_url = f"{base}/kids/parent/dashboard?token={session_token}"
+    html = _parent_dashboard_link_html(kid_full_name, dashboard_url, lang)
+    subject = (
+        f"Portal orang tua StockKids — lihat perkembangan {kid_full_name}"
+        if lang == "id"
+        else f"StockKids parent portal — see {kid_full_name}'s progress"
+    )
+    params = {
+        "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
+        "to": [to_email],
+        "reply_to": REPLY_TO,
+        "subject": subject,
+        "html": html,
+    }
+    try:
+        result = await asyncio.to_thread(resend.Emails.send, params)
+        logger.info("Parent dashboard link email sent to %s · id=%s · lang=%s", to_email, result.get("id"), lang)
+        return True
+    except Exception as e:
+        logger.error("Parent dashboard link email send failed: %s", e)
+        return False
+
+
 async def send_weekly_digest_email(to_email: str, full_name: str, signals: list[dict],
                                    locked_count: int, is_paid: bool, plan: str) -> bool:
     if not RESEND_API_KEY:

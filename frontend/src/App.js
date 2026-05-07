@@ -17,6 +17,7 @@ import { KidsAuthProvider } from "@/contexts/KidsAuthContext";
 import KidsShell from "@/components/KidsShell";
 import { KidsLoginPage, KidsSignupPage } from "@/pages/KidsAuthPages";
 import { KidsAwaitingConsentPage, KidsParentalConsentPage } from "@/pages/KidsConsentPages";
+import { KidsParentLoginPage, KidsParentDashboardPage } from "@/pages/KidsParentPages";
 import KidsLandingPage from "@/pages/KidsLandingPage";
 import KidsForParentsPage from "@/pages/KidsForParentsPage";
 import {
@@ -112,6 +113,8 @@ function AppRoutes() {
             <Route path="/kids/preview/:ticker" element={<KidsPreviewPage />} />
             <Route path="/kids/about" element={<KidsLandingPage />} />
             <Route path="/kids/for-parents" element={<KidsForParentsPage />} />
+            <Route path="/kids/parent/login" element={<KidsParentLoginPage />} />
+            <Route path="/kids/parent/dashboard" element={<KidsParentDashboardPage />} />
 
             {/* StockKids V1 — separate auth scope, separate shell. */}
             <Route path="/kids/login" element={<KidsAuthProvider><KidsLoginPage /></KidsAuthProvider>} />

@@ -39,6 +39,9 @@ export default function KidsLandingPage() {
                 </Link>
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                     <LanguageSwitcher />
+                    <Link to="/kids/parent/login" data-testid="landing-parent-portal-link" style={{ fontSize: 13, color: NAVY, textDecoration: "none", fontWeight: 600, opacity: 0.85 }}>
+                        {t(lang, "parents.eyebrow") === "For parents" ? "Parent portal" : "Portal orang tua"} →
+                    </Link>
                     <Link to="/kids/login" data-testid="landing-login-link" style={{ fontSize: 13, color: NAVY, textDecoration: "none", fontWeight: 600, opacity: 0.85 }}>
                         {t(lang, "auth.login_submit")} →
                     </Link>

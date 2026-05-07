@@ -5,7 +5,7 @@ from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 
 from core.db import client
-from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry, kids_preview, kids_auth, kids_portfolio, kids_journal, kids_consent
+from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry, kids_preview, kids_auth, kids_portfolio, kids_journal, kids_consent, kids_parent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,6 +46,7 @@ api_router.include_router(kids_auth.router)
 api_router.include_router(kids_portfolio.router)
 api_router.include_router(kids_journal.router)
 api_router.include_router(kids_consent.router)
+api_router.include_router(kids_parent.router)
 
 app.include_router(api_router)
 
@@ -137,9 +138,23 @@ async def start_background_tasks():
         await _db.kids_users.create_index("id", unique=True)
         await _db.kids_trades.create_index([("student_id", 1), ("created_at", -1)])
         await _db.kids_watchlist.create_index([("student_id", 1), ("ticker", 1)], unique=True)
+        await _db.kids_parent_sessions.create_index("token", unique=True)
+        await _db.kids_parent_sessions.create_index("parent_email")
+        await _db.kids_parent_telegram.create_index("parent_email", unique=True)
+        await _db.kids_parent_telegram_codes.create_index("code", unique=True)
         logger.info("Ensured StockKids indexes")
     except Exception as e:
         logger.warning("Failed to ensure StockKids indexes: %s", e)
+
+    # StockKids — nightly Telegram digest for parents.
+    try:
+        from services.kids_parent_digest import digest_loop as kids_parent_digest_loop
+        t8 = asyncio.create_task(kids_parent_digest_loop())
+        _BG_TASKS.add(t8)
+        t8.add_done_callback(_BG_TASKS.discard)
+        logger.info("Started StockKids parent Telegram digest scheduler")
+    except Exception as e:
+        logger.warning("Failed to start kids parent digest loop: %s", e)
 
 
 _BG_TASKS: set = set()

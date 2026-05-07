@@ -101,13 +101,37 @@ async def poll_and_link() -> int:
         text = (msg.get("text") or "").strip()
         if not chat_id or not text:
             continue
-        # Accept "/start 123456" or just "123456"
+        # Accept "/start 123456" or just "123456". Also recognise
+        # parent-portal codes prefixed with `parent` (e.g. "parent123456")
+        # and route them to the StockKids parent linker instead of the
+        # adult-user link.
         tokens = text.split()
         candidate = None
+        parent_candidate = None
         for tok in tokens:
+            if tok.startswith("parent") and tok[6:].isdigit() and len(tok) == 12:
+                parent_candidate = tok[6:]
+                break
             if tok.isdigit() and len(tok) == 6:
                 candidate = tok
                 break
+
+        if parent_candidate:
+            # StockKids parent portal flow.
+            from routers.kids_parent import link_parent_chat
+            parent_email = await link_parent_chat(parent_candidate, chat_id, chat.get("username"))
+            if parent_email:
+                linked += 1
+                await _send_message(
+                    chat_id,
+                    "✅ StockKids parent portal linked.\n\n"
+                    "You'll get a nightly summary of your child's StockCoin activity, trades, and reflection journals here.\n\n"
+                    "Reply /unlink to disconnect at any time."
+                )
+            else:
+                await _send_message(chat_id, "Sorry, that StockKids parent code wasn't found or has expired. Please request a fresh code from the parent portal.")
+            continue
+
         if not candidate:
             continue
         user = await db.users.find_one({"telegram_link_code": candidate}, {"_id": 0})
