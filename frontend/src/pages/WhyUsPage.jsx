@@ -21,6 +21,8 @@ import {
     CalendarRange,
     Award,
     History,
+    GraduationCap,
+    Heart,
 } from "lucide-react";
 import SocialLinks from "@/components/SocialLinks";
 
@@ -373,6 +375,48 @@ function ModuleCard({ mod }) {
     );
 }
 
+function KidsStat({ value, label }) {
+    return (
+        <div
+            className="p-4"
+            style={{
+                background: "hsl(var(--background) / 0.5)",
+                border: "1px solid hsl(var(--gold) / 0.30)",
+                borderRadius: 4,
+            }}
+        >
+            <div
+                className="font-serif"
+                style={{
+                    fontSize: "clamp(1.5rem, 2.6vw, 2rem)",
+                    fontWeight: 700,
+                    color: "hsl(var(--gold))",
+                    letterSpacing: "-0.01em",
+                    lineHeight: 1.1,
+                }}
+            >
+                {value}
+            </div>
+            <p className="mt-2 text-xs" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.5 }}>
+                {label}
+            </p>
+        </div>
+    );
+}
+
+function KidsBullet({ text }) {
+    return (
+        <li className="flex gap-2.5 items-start text-sm md:text-base">
+            <Check
+                size={16}
+                strokeWidth={2}
+                style={{ color: "hsl(var(--gold))", marginTop: 4, flexShrink: 0 }}
+            />
+            <span>{text}</span>
+        </li>
+    );
+}
+
 export default function WhyUsPage() {
     const [infoKey, setInfoKey] = useState(null);
     const info = infoKey ? INFO_CONTENT[infoKey] : null;
@@ -657,6 +701,152 @@ export default function WhyUsPage() {
                         >
                             <strong style={{ color: "hsl(var(--text-primary))" }}>Neural Stock Intelligence&trade;</strong> is
                             our flagship product, available at <span className="font-mono">neulab.xyz</span>.
+                        </p>
+                    </div>
+                </section>
+
+                {/* ------------------- Mission: KidStocks ------------------- */}
+                <section className="mt-20 md:mt-28" data-testid="kids-mission">
+                    <div
+                        className="module p-8 md:p-12 relative overflow-hidden"
+                        style={{
+                            background: "linear-gradient(135deg, hsl(var(--gold) / 0.08) 0%, hsl(var(--gold) / 0.02) 100%)",
+                            border: "1px solid hsl(var(--gold) / 0.45)",
+                        }}
+                    >
+                        <p className="text-overline" style={{ color: "hsl(var(--gold))" }}>
+                            <Heart size={11} className="inline mr-1" strokeWidth={1.5} />
+                            Why we also build for kids
+                        </p>
+                        <h2
+                            className="font-serif mt-2"
+                            style={{ fontSize: "clamp(2rem, 3.6vw, 2.8rem)", letterSpacing: "-0.02em", lineHeight: 1.1 }}
+                        >
+                            We didn't stop at adults.<br />
+                            <em style={{ color: "hsl(var(--gold))" }}>The damage is already done by then.</em>
+                        </h2>
+
+                        {/* Loss-aversion / urgency hook */}
+                        <p
+                            className="mt-6 text-base md:text-lg leading-relaxed max-w-3xl"
+                            style={{ color: "hsl(var(--text-primary))" }}
+                        >
+                            By the time most adults get serious about their money, the costliest habits
+                            are already locked in. <strong style={{ color: "hsl(var(--text-primary))" }}>Cambridge research found that
+                            financial behaviours crystallise by age 7.</strong> By 18, the patterns are so
+                            entrenched that even a great tool like NSI is fighting against a decade of
+                            unconscious anchoring.
+                        </p>
+
+                        {/* Stat shock — social proof of the problem */}
+                        <div className="mt-8 grid gap-4 sm:grid-cols-3" data-testid="kids-stats-grid">
+                            <KidsStat
+                                value="76%"
+                                label="of US teens fail basic financial-literacy questions (FINRA 2024)"
+                            />
+                            <KidsStat
+                                value="2 of 5"
+                                label="OECD-PISA students worldwide can't read a payslip or budget (OECD 2023)"
+                            />
+                            <KidsStat
+                                value="$1,819"
+                                label="annual cost to the average American of being financially illiterate (NFEC 2024)"
+                            />
+                        </div>
+
+                        {/* Identity / mission framing — psychological commitment */}
+                        <p
+                            className="mt-8 text-base md:text-lg leading-relaxed max-w-3xl"
+                            style={{ color: "hsl(var(--text-primary))" }}
+                        >
+                            We didn't build NSI just to help adults trade smarter.{" "}
+                            <strong style={{ color: "hsl(var(--gold))" }}>
+                                We built it to break the cycle.
+                            </strong>{" "}
+                            Every parent reading this knows the feeling of wanting to teach their kid
+                            something about money — and not knowing where to start, or worse, handing
+                            them a fake-trading game that rewards gambling instincts.
+                        </p>
+
+                        <p
+                            className="mt-4 text-base md:text-lg leading-relaxed max-w-3xl"
+                            style={{ color: "hsl(var(--text-primary))" }}
+                        >
+                            That's why we built{" "}
+                            <strong style={{ color: "hsl(var(--gold))" }}>KidStocks</strong> — the
+                            kid-safe layer over the same Neural Stock Intelligence engine you trust
+                            for yourself. Same Claude + Gemini reasoning. Same real-market data.{" "}
+                            <em style={{ color: "hsl(var(--text-primary))" }}>Translated</em> into
+                            language an 8-year-old can actually understand.
+                        </p>
+
+                        {/* Concrete proof points */}
+                        <ul className="mt-6 space-y-2 max-w-3xl" style={{ color: "hsl(var(--text-secondary))" }}>
+                            <KidsBullet text="Three age bands — 8-10 / 11-13 / 14-18 — each with its own vocabulary, analogies, and reasoning depth" />
+                            <KidsBullet text="10,000 virtual StockCoins. Zero real money. Zero gambling instincts." />
+                            <KidsBullet text="Reflection journals after every trade — kids learn to reason, not react" />
+                            <KidsBullet text="COPPA-compliant under-13 parental consent flow, built-in" />
+                        </ul>
+
+                        {/* Founder-conviction close — identity hook */}
+                        <p
+                            className="mt-8 text-sm md:text-base italic max-w-3xl"
+                            style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.7, borderLeft: "2px solid hsl(var(--gold))", paddingLeft: 16 }}
+                        >
+                            Most of you reading this didn't have a parent who could explain a P/E
+                            ratio at the dinner table. We can't change that for you.{" "}
+                            <span style={{ color: "hsl(var(--text-primary))", fontStyle: "normal", fontWeight: 600 }}>
+                                But if you have a kid, niece, or nephew between 8 and 18 — you can
+                                change it for them. In the next ten minutes.
+                            </span>
+                        </p>
+
+                        <div className="mt-8 flex flex-wrap gap-3">
+                            <a
+                                href="https://kidstocks.net"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2"
+                                style={{
+                                    background: "hsl(var(--gold))",
+                                    color: "#1a1a1a",
+                                    padding: "12px 24px",
+                                    borderRadius: 2,
+                                    fontSize: "0.78rem",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.14em",
+                                    textTransform: "uppercase",
+                                    textDecoration: "none",
+                                }}
+                                data-testid="kids-mission-cta-primary"
+                            >
+                                <GraduationCap size={14} strokeWidth={1.8} />
+                                Show your kid how the AI thinks
+                                <ArrowRight size={14} strokeWidth={1.8} />
+                            </a>
+                            <Link
+                                to="/kids/preview/AAPL?age=11-13"
+                                target="_blank"
+                                className="inline-flex items-center gap-2"
+                                style={{
+                                    color: "hsl(var(--gold))",
+                                    border: "1px solid hsl(var(--gold) / 0.6)",
+                                    padding: "12px 20px",
+                                    borderRadius: 2,
+                                    fontSize: "0.78rem",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.14em",
+                                    textTransform: "uppercase",
+                                    textDecoration: "none",
+                                }}
+                                data-testid="kids-mission-cta-sample"
+                            >
+                                See a live sample
+                            </Link>
+                        </div>
+
+                        <p className="mt-4 text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                            Free · No card · Educational only · No real-money trading inside KidStocks.
                         </p>
                     </div>
                 </section>

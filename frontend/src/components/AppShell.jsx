@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { Sun, Moon, LogOut, Menu, X, ExternalLink } from "lucide-react";
 import SocialLinks from "@/components/SocialLinks";
+import KidsTopRibbon from "@/components/KidsTopRibbon";
 
 const NAV_ITEMS = [
     { to: "/dashboard", label: "Dashboard", testid: "nav-dashboard" },
@@ -453,7 +454,10 @@ export default function AppShell({ children }) {
                 </div>
             )}
 
-            <main className="relative z-10">{children}</main>
+            <main className="relative z-10">
+                <KidsTopRibbon />
+                {children}
+            </main>
 
             {/* Global authenticated footer — Support & Admin email + TikTok handle */}
             <footer
