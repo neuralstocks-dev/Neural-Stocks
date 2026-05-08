@@ -135,6 +135,7 @@ export default function KidsPreviewPage() {
                     background: "#1a1a2e",
                     color: "#fff",
                     padding: "12px 20px",
+                    paddingTop: "calc(env(safe-area-inset-top) + 12px)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
