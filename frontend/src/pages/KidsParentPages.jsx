@@ -37,6 +37,7 @@ const shellStyle = {
     fontFamily: '"Outfit", "Quicksand", system-ui, -apple-system, sans-serif',
     color: NAVY,
     padding: "24px 20px",
+    paddingTop: "calc(env(safe-area-inset-top) + 24px)",
 };
 
 function PageHeader() {

@@ -28,6 +28,7 @@ const shellStyle = {
     background: SAND,
     fontFamily: '"Outfit", "Quicksand", system-ui, -apple-system, sans-serif',
     color: NAVY,
+    paddingTop: "env(safe-area-inset-top)",
 };
 const wrapStyle = { maxWidth: 1180, margin: "0 auto", padding: "24px 20px 60px" };
 

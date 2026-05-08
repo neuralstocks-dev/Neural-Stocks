@@ -22,6 +22,7 @@ const sharedShellStyle = {
     fontFamily: '"Outfit", "Quicksand", system-ui, -apple-system, sans-serif',
     color: "#1a1a2e",
     padding: "24px 20px",
+    paddingTop: "calc(env(safe-area-inset-top) + 24px)",
 };
 
 const headerStyle = {

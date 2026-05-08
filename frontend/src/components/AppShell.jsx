@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
-import { Sun, Moon, LogOut, Menu, X } from "lucide-react";
+import { Sun, Moon, LogOut, Menu, X, ExternalLink } from "lucide-react";
 import SocialLinks from "@/components/SocialLinks";
 
 const NAV_ITEMS = [
@@ -156,6 +156,27 @@ export default function AppShell({ children }) {
                         >
                             Settings
                         </Link>
+                        {/* Permanent cross-promo to KidStocks. Always visible
+                            in the adult nav so parents who land in the app
+                            after dismissing the dashboard nudge still have
+                            an obvious one-tap path to the kid product. */}
+                        <a
+                            href="https://kidstocks.net"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium inline-flex items-center gap-1.5 whitespace-nowrap"
+                            style={{
+                                color: "hsl(var(--gold))",
+                                padding: "4px 10px",
+                                border: "1px solid hsl(var(--gold) / 0.55)",
+                                borderRadius: 999,
+                            }}
+                            title="KidStocks — AI-powered learning for ages 8-18"
+                            data-testid="nav-kidstocks"
+                        >
+                            For Kids 8-18
+                            <ExternalLink size={12} strokeWidth={1.8} />
+                        </a>
                     </nav>
 
                     {/* Compact right-side cluster — only on <xl. Theme + hamburger
@@ -396,6 +417,20 @@ export default function AppShell({ children }) {
                                 >
                                     Settings
                                 </Link>
+                                {/* Permanent KidStocks cross-promo (also in
+                                    desktop nav). Mirrored here so mobile users
+                                    have the same one-tap path. */}
+                                <a
+                                    href="https://kidstocks.net"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block py-3 text-base font-medium inline-flex items-center gap-2"
+                                    style={{ color: "hsl(var(--gold))" }}
+                                    data-testid="nav-kidstocks-mobile"
+                                >
+                                    For Kids 8-18
+                                    <ExternalLink size={14} strokeWidth={1.8} />
+                                </a>
                             </nav>
                         </div>
 
