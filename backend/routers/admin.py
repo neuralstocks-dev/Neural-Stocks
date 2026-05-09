@@ -1,11 +1,20 @@
 """Admin: user management, test-unlock, login events, pricing."""
 import logging
+import os
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 
-from core.config import UNLOCK_DURATIONS, ADMIN_EMAILS
+from core.config import (
+    UNLOCK_DURATIONS,
+    ADMIN_EMAILS,
+    PAYPAL_ENV,
+    PAYPAL_CLIENT_ID,
+    PAYPAL_SECRET,
+    PAYPAL_API_BASE,
+    PAYPAL_WEBHOOK_ID,
+)
 from core.db import db
 from core.models import UnlockReq
 from core.security import admin_required, iso, now_utc, is_admin_email
@@ -1080,6 +1089,77 @@ async def delete_user_alerts(user_id: str, _admin=Depends(admin_required)):
 @router.get("/pricing")
 async def get_admin_pricing(_admin=Depends(admin_required)):
     return await get_pricing()
+
+
+def _mask(value: str, prefix_chars: int = 8) -> dict:
+    """Return a safe descriptor of a secret env var: presence + length + prefix only."""
+    if not value:
+        return {"present": False, "length": 0, "prefix": ""}
+    return {
+        "present": True,
+        "length": len(value),
+        "prefix": value[:prefix_chars] + ("…" if len(value) > prefix_chars else ""),
+    }
+
+
+@router.get("/paypal/debug")
+async def admin_paypal_debug(_admin=Depends(admin_required)):
+    """Admin-only PayPal config audit.
+
+    Returns which PayPal environment is ACTIVE, what client_id was loaded
+    into the running process, and a presence/prefix view of every PayPal
+    env var the deployment SHOULD have set. Never returns secrets in full.
+
+    Use this on production to verify the deployment env vars match what
+    you intended without exposing credentials in logs/screenshots.
+    """
+    return {
+        "active_env": PAYPAL_ENV,
+        "active_api_base": PAYPAL_API_BASE,
+        "loaded": {
+            "client_id": _mask(PAYPAL_CLIENT_ID),
+            "secret": _mask(PAYPAL_SECRET, prefix_chars=4),
+            "webhook_id": _mask(PAYPAL_WEBHOOK_ID, prefix_chars=8),
+        },
+        "raw_env_presence": {
+            "PAYPAL_ENV": os.environ.get("PAYPAL_ENV", ""),
+            "PAYPAL_LIVE_CLIENT_ID": _mask(os.environ.get("PAYPAL_LIVE_CLIENT_ID", "")),
+            "PAYPAL_LIVE_SECRET": _mask(os.environ.get("PAYPAL_LIVE_SECRET", ""), prefix_chars=4),
+            "PAYPAL_SANDBOX_CLIENT_ID": _mask(os.environ.get("PAYPAL_SANDBOX_CLIENT_ID", "")),
+            "PAYPAL_SANDBOX_SECRET": _mask(os.environ.get("PAYPAL_SANDBOX_SECRET", ""), prefix_chars=4),
+            "PAYPAL_WEBHOOK_ID": _mask(os.environ.get("PAYPAL_WEBHOOK_ID", "")),
+        },
+        "diagnosis": _diagnose_paypal_config(),
+    }
+
+
+def _diagnose_paypal_config() -> list:
+    """Return a list of plain-English issues with the current PayPal config."""
+    issues = []
+    if PAYPAL_ENV not in ("live", "sandbox"):
+        issues.append(
+            f"PAYPAL_ENV is set to '{PAYPAL_ENV}' — only 'live' or 'sandbox' are valid."
+        )
+    if PAYPAL_ENV == "sandbox":
+        issues.append(
+            "PAYPAL_ENV is 'sandbox' — pricing page will show the SANDBOX MODE banner. "
+            "Set PAYPAL_ENV=live (and the matching live credentials) on the deployment to go live."
+        )
+    if not PAYPAL_CLIENT_ID:
+        issues.append(
+            f"No client_id loaded for env='{PAYPAL_ENV}'. "
+            f"Expected env var: PAYPAL_{PAYPAL_ENV.upper()}_CLIENT_ID"
+        )
+    if not PAYPAL_SECRET:
+        issues.append(
+            f"No secret loaded for env='{PAYPAL_ENV}'. "
+            f"Expected env var: PAYPAL_{PAYPAL_ENV.upper()}_SECRET"
+        )
+    if not PAYPAL_WEBHOOK_ID:
+        issues.append("PAYPAL_WEBHOOK_ID is empty — webhook-driven plan changes won't fire.")
+    if not issues:
+        issues.append(f"Looks healthy. Active environment: {PAYPAL_ENV}.")
+    return issues
 
 
 @router.put("/pricing")
