@@ -296,7 +296,7 @@ const DICT = {
         "landing.feature1_title": "Dibangun di atas AI sungguhan",
         "landing.feature1_body": "Rangkaian Claude + Gemini yang sama dengan platform dewasa kami. Bukan aplikasi anak versi murahan.",
         "landing.feature2_title": "100% uang virtual",
-        "landing.feature2_body": "Setiap anak mulai dengan 10.000 StockCoins. Tidak ada risiko uang sungguhan. Pernah.",
+        "landing.feature2_body": "Setiap anak mulai dengan 10.000 StockCoins. Tidak ada risiko uang sungguhan. Tidak akan pernah.",
         "landing.feature3_title": "Dikontrol orang tua (8-12)",
         "landing.feature3_body": "Alur persetujuan COPPA-compliant untuk usia di bawah 13. Kami tidak pernah ambil data tanpa izinmu.",
         "landing.cta_signup": "Daftarkan anakmu — gratis →",
