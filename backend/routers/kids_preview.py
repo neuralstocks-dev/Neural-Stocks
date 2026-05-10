@@ -108,13 +108,14 @@ async def preview_kids(
     """Public kid-friendly translation of the latest NSI verdict."""
     ticker = ticker.upper().strip()
 
-    if ticker not in DEMO_TICKERS:
+    # Basic shape validation only — no allowlist. Any ticker the adult
+    # NSI engine has analysed (by ANY user, within the cache window) is
+    # eligible for kid translation. Tickers no adult has analysed yet
+    # fall through to the 503 fallback below with a kid-friendly tip.
+    if not ticker or len(ticker) > 12 or not all(c.isalnum() or c in ".-^" for c in ticker):
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"Phase Zero is limited to these demo tickers: "
-                f"{sorted(DEMO_TICKERS)}. More tickers unlock after the pilot."
-            ),
+            detail="That doesn't look like a valid ticker. Try something like AAPL, KO, NVDA, or BBCA.JK.",
         )
 
     if age not in VALID_BANDS:
@@ -140,9 +141,9 @@ async def preview_kids(
         raise HTTPException(
             status_code=503,
             detail=(
-                f"No fresh analysis of {ticker} available yet. Our adult "
-                f"investors haven't analysed this one recently — try AAPL, "
-                f"MSFT, NVDA, TSLA, or BBCA.JK in the meantime."
+                f"We haven't analysed {ticker} yet — none of our grown-up "
+                f"investors have looked at it in the last 14 days. Try a "
+                f"big famous one like AAPL, MSFT, NVDA, KO, TSLA, or BBCA.JK."
             ),
         )
 

@@ -13,7 +13,8 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
-import { Loader2, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, Share2, Brain, Lightbulb, MessageCircle, ShieldAlert } from "lucide-react";
+import { Loader2, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, Share2, Brain, Lightbulb, MessageCircle, ShieldAlert, Search, Download, Calendar } from "lucide-react";
+import { jsPDF } from "jspdf";
 import KidStocksLogo from "@/components/KidStocksLogo";
 import axios from "axios";
 import { API_BASE } from "@/lib/api";
@@ -50,6 +51,8 @@ export default function KidsPreviewPage() {
     const [feedbackComment, setFeedbackComment] = useState("");
     const [feedbackBusy, setFeedbackBusy] = useState(false);
     const [showShare, setShowShare] = useState(false);
+    const [tickerInput, setTickerInput] = useState("");
+    const [tickerErr, setTickerErr] = useState("");
 
     // Mark this browser as having seen KidStocks — silences the
     // dashboard cross-promo nudge.
@@ -81,6 +84,161 @@ export default function KidsPreviewPage() {
 
     const setTicker = (sym) => navigate(`/kids/preview/${sym}?age=${age}`);
     const setAge = (a) => setParams({ age: a });
+
+    /**
+     * Submit a free-text ticker symbol the kid (or parent) typed.
+     * Backend resolves Yahoo / IDX / global; basic shape validation here so
+     * we don't ship gibberish like "asdf!@#" through the URL.
+     */
+    const submitCustomTicker = (e) => {
+        e?.preventDefault?.();
+        const cleaned = (tickerInput || "").trim().toUpperCase();
+        if (!cleaned) return;
+        if (!/^[A-Z0-9.\-^]{1,12}$/.test(cleaned)) {
+            setTickerErr("Use letters, numbers, dot or dash. e.g. NVDA, BBCA.JK");
+            return;
+        }
+        setTickerErr("");
+        setTickerInput("");
+        navigate(`/kids/preview/${cleaned}?age=${age}`);
+    };
+
+    /**
+     * Format the verdict's generated_at ISO string into a kid-friendly
+     * "Updated Mon 12 Feb 2026, 09:34" style stamp. Defensive against
+     * missing/invalid dates from the backend.
+     */
+    const verdictDate = useMemo(() => {
+        const iso = data?.generated_at;
+        if (!iso) return null;
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return null;
+        return d;
+    }, [data?.generated_at]);
+
+    const formatVerdictDate = (d) => {
+        if (!d) return "";
+        return d.toLocaleString("en-GB", {
+            weekday: "short", day: "2-digit", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit",
+        });
+    };
+
+    /**
+     * Export the kid verdict as a child-friendly PDF that scales its
+     * typography & whitespace to the selected age band.
+     *
+     *   8-10  : super-large fonts, generous whitespace, single-column
+     *   11-13 : medium-large fonts, slightly denser
+     *   14-18 : standard book-style PDF — closest to the adult format
+     *
+     * jsPDF uses WinAnsi (Helvetica) so emoji are stripped before
+     * rendering; on-screen UI keeps emoji intact.
+     */
+    const exportPDF = () => {
+        if (!kv || !data) return;
+        // Age-band typography ladder. Numbers are points (jsPDF default unit).
+        const profile = {
+            "8-10":  { title: 26, body: 16, label: 12, gap: 14, margin: 56 },
+            "11-13": { title: 22, body: 14, label: 11, gap: 12, margin: 50 },
+            "14-18": { title: 20, body: 12, label: 10, gap: 10, margin: 48 },
+        }[age] || { title: 22, body: 14, label: 11, gap: 12, margin: 50 };
+
+        const stripEmoji = (s) => (s == null ? "" : String(s)
+            .replace(/[\u2300-\u27FF\u2B00-\u2BFF\u3030\u303D\uFE0F\u200D]/g, "")
+            .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
+            .replace(/\s+/g, " ").trim());
+
+        const doc = new jsPDF({ unit: "pt", format: "a4" });
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const M = profile.margin;
+        let y = M;
+
+        const newPageIfNeeded = (need) => {
+            if (y + need > pageH - M) { doc.addPage(); y = M; }
+        };
+        const writeWrapped = (text, size, opts = {}) => {
+            doc.setFontSize(size);
+            doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+            const c = opts.color || [42, 42, 70];
+            doc.setTextColor(c[0], c[1], c[2]);
+            const lines = doc.splitTextToSize(stripEmoji(text), pageW - M * 2);
+            const block = lines.length * (size * 1.35);
+            newPageIfNeeded(block);
+            doc.text(lines, M, y);
+            y += block + (opts.gap ?? profile.gap);
+        };
+        const accent = (h) => {
+            // Coral accent banner used between sections — kid-friendly visual rhythm
+            newPageIfNeeded(profile.title + 18);
+            doc.setFillColor(255, 118, 118);
+            doc.rect(M, y, pageW - M * 2, 4, "F");
+            y += 14;
+            writeWrapped(h, profile.label, { bold: true, color: [255, 118, 118], gap: profile.gap });
+        };
+
+        // ── Cover band ────────────────────────────────────────────
+        doc.setFillColor(255, 248, 240);                  // soft cream
+        doc.rect(0, 0, pageW, M + profile.title * 3.2, "F");
+        writeWrapped("KidStocks", profile.title, { bold: true, color: [26, 26, 46], gap: 4 });
+        writeWrapped("by NeuLab Inc.", profile.label, { color: [120, 120, 130], gap: profile.gap + 6 });
+        writeWrapped(`${data.name || ""} (${currentTicker})`, profile.title - 2, { bold: true, color: [255, 118, 118], gap: 4 });
+        writeWrapped(`Ages ${age}  ·  My Stock Verdict`, profile.label, { color: [120, 120, 130], gap: profile.gap });
+        if (verdictDate) {
+            writeWrapped(`AI verdict generated: ${formatVerdictDate(verdictDate)}`, profile.label - 1, { color: [140, 140, 150], gap: profile.gap });
+        }
+
+        // ── Mood + Headline ───────────────────────────────────────
+        accent("How does the AI feel?");
+        writeWrapped(kv.kid_headline || "", profile.body + 4, { bold: true, color: [26, 26, 46], gap: profile.gap });
+
+        // ── Why ────────────────────────────────────────────────────
+        if (kv.kid_explanation) {
+            accent("Why?");
+            writeWrapped(kv.kid_explanation, profile.body, { gap: profile.gap });
+        }
+
+        // ── How sure is the AI ────────────────────────────────────
+        if (kv.confidence_plain_english) {
+            accent("How sure is the AI?");
+            writeWrapped(kv.confidence_plain_english, profile.body, { gap: profile.gap });
+        }
+
+        // ── Did you know ──────────────────────────────────────────
+        if (kv.did_you_know?.length) {
+            accent("Did you know?");
+            kv.did_you_know.forEach((c) => {
+                writeWrapped(c.title, profile.body, { bold: true, color: [255, 118, 118], gap: 4 });
+                writeWrapped(c.body, profile.body, { gap: profile.gap });
+            });
+        }
+
+        // ── Reflection question ───────────────────────────────────
+        if (kv.reflection_question) {
+            accent("Think about this");
+            writeWrapped(kv.reflection_question, profile.body + 1, { color: [26, 26, 46], gap: profile.gap });
+        }
+
+        // ── What would change my mind ─────────────────────────────
+        if (kv.what_would_change_my_mind) {
+            accent("What would change the AI's mind?");
+            writeWrapped(kv.what_would_change_my_mind, profile.body, { gap: profile.gap });
+        }
+
+        // ── Footer on every page ──────────────────────────────────
+        const pages = doc.internal.pages.length - 1;
+        for (let p = 1; p <= pages; p++) {
+            doc.setPage(p);
+            doc.setFontSize(8);
+            doc.setTextColor(140, 140, 150);
+            doc.text(stripEmoji(`KidStocks · NeuLab Inc. · kidstocks.net   —   Educational only · No real money · Not financial advice`), M, pageH - 24);
+            doc.text(`${p} / ${pages}`, pageW - M, pageH - 24, { align: "right" });
+        }
+
+        const stamp = verdictDate ? verdictDate.toISOString().slice(0, 10) : "today";
+        doc.save(`KidStocks_${currentTicker}_ages-${age}_${stamp}.pdf`);
+    };
 
     const submitFeedback = async (sentiment) => {
         setFeedbackBusy(true);
@@ -202,6 +360,70 @@ export default function KidsPreviewPage() {
                             );
                         })}
                     </div>
+                    {/* Free-text ticker input — anything from Yahoo Finance.
+                        Lives under the chip picker so kids can type their
+                        own (Roblox = RBLX, Coca-Cola = KO, BBRI.JK etc.). */}
+                    <form
+                        onSubmit={submitCustomTicker}
+                        data-testid="kids-ticker-form"
+                        style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                background: "#fff",
+                                border: `2px solid ${tickerErr ? "#ff7676" : "#e5d5b8"}`,
+                                borderRadius: 16,
+                                padding: "8px 14px",
+                                flex: "1 1 240px",
+                                minWidth: 0,
+                            }}
+                        >
+                            <Search size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+                            <input
+                                type="text"
+                                value={tickerInput}
+                                onChange={(e) => { setTickerInput(e.target.value); setTickerErr(""); }}
+                                placeholder="Type any ticker — RBLX, KO, BBRI.JK"
+                                aria-label="Custom ticker"
+                                data-testid="kids-ticker-input"
+                                maxLength={12}
+                                style={{
+                                    flex: 1,
+                                    border: "none",
+                                    outline: "none",
+                                    background: "transparent",
+                                    fontSize: 14,
+                                    fontFamily: "inherit",
+                                    color: "#1a1a2e",
+                                    minWidth: 0,
+                                }}
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            data-testid="kids-ticker-submit"
+                            disabled={!tickerInput.trim()}
+                            style={{
+                                background: tickerInput.trim() ? "#1a1a2e" : "#e5d5b8",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 16,
+                                padding: "10px 18px",
+                                fontSize: 13,
+                                fontWeight: 700,
+                                cursor: tickerInput.trim() ? "pointer" : "not-allowed",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Look it up →
+                        </button>
+                    </form>
+                    {tickerErr && (
+                        <p data-testid="kids-ticker-error" style={{ marginTop: 6, fontSize: 12, color: "#ff7676" }}>{tickerErr}</p>
+                    )}
                 </div>
 
                 {/* Age picker */}
@@ -277,6 +499,21 @@ export default function KidsPreviewPage() {
                                 <p style={{ marginTop: 12, fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", opacity: 0.6 }}>
                                     {data.name} · {currentTicker}
                                 </p>
+                                {verdictDate && (
+                                    <p
+                                        data-testid="kids-verdict-date"
+                                        style={{
+                                            marginTop: 4,
+                                            fontSize: 11,
+                                            opacity: 0.55,
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: 4,
+                                        }}
+                                    >
+                                        <Calendar size={11} /> Updated {formatVerdictDate(verdictDate)}
+                                    </p>
+                                )}
                                 <h1
                                     data-testid="kids-headline"
                                     style={{
@@ -454,6 +691,55 @@ export default function KidsPreviewPage() {
                         </>
                     )}
                 </section>
+
+                {/* Save as PDF — kid-friendly, age-aware export */}
+                {!loading && kv && !error && (
+                    <div
+                        data-testid="kids-pdf-block"
+                        style={{
+                            marginTop: 18,
+                            padding: "16px 18px",
+                            background: "#fff",
+                            border: "2px solid #e5d5b8",
+                            borderRadius: 16,
+                            display: "flex",
+                            gap: 14,
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                        }}
+                    >
+                        <div style={{ flex: 1, minWidth: 220 }}>
+                            <p style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", marginBottom: 2 }}>
+                                Save this verdict
+                            </p>
+                            <p style={{ fontSize: 12, color: "#2c2c4a", opacity: 0.7, lineHeight: 1.5 }}>
+                                One-page PDF tuned for ages <strong>{age}</strong> — bigger fonts for younger readers,
+                                more compact for teens. Great for school projects or fridge-door reading.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={exportPDF}
+                            data-testid="kids-pdf-button"
+                            style={{
+                                background: "#ff7676",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 16,
+                                padding: "12px 20px",
+                                fontSize: 14,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 8,
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            <Download size={16} /> Save as PDF
+                        </button>
+                    </div>
+                )}
 
                 {/* Feedback widget — only show after content loaded */}
                 {!loading && kv && !error && (
