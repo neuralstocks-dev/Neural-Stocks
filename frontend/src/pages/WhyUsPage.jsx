@@ -705,6 +705,83 @@ export default function WhyUsPage() {
                     </div>
                 </section>
 
+                {/* ------------------- StockDNA — Why personality matters ------------------- */}
+                <section className="mt-20 md:mt-28" data-testid="stockdna-section">
+                    <div
+                        className="module p-8 md:p-12 relative overflow-hidden"
+                        style={{
+                            background: "linear-gradient(135deg, hsl(259 78% 60% / 0.10) 0%, hsl(259 78% 60% / 0.02) 100%)",
+                            border: "1px solid hsl(259 78% 60% / 0.45)",
+                        }}
+                    >
+                        <p className="text-overline" style={{ color: "hsl(259 80% 70%)" }}>
+                            🧬 The fourth pillar
+                        </p>
+                        <h2
+                            className="font-serif mt-2"
+                            style={{ fontSize: "clamp(2rem, 3.6vw, 2.8rem)", letterSpacing: "-0.02em", lineHeight: 1.1 }}
+                        >
+                            Even the best AI is useless if it<br />
+                            <em style={{ color: "hsl(259 80% 70%)" }}>doesn't fit how you think.</em>
+                        </h2>
+
+                        <p className="mt-6 text-base md:text-lg leading-relaxed max-w-3xl" style={{ color: "hsl(var(--text-primary))" }}>
+                            Most investors lose money not because the analysis was wrong, but because the strategy didn't match their psychology.
+                            A fundamental investor sells too early. A momentum trader holds too long. A value hunter chases growth.{" "}
+                            <strong style={{ color: "hsl(var(--text-primary))" }}>Personality, not intelligence, is the silent variable.</strong>
+                        </p>
+
+                        <p className="mt-4 text-base md:text-lg leading-relaxed max-w-3xl" style={{ color: "hsl(var(--text-primary))" }}>
+                            That's why we built{" "}
+                            <strong style={{ color: "hsl(259 80% 70%)" }}>StockDNA™</strong> — a 5-minute psychometric quiz
+                            grounded in Nobel Prize–winning behavioural finance research. It maps you to one of 8 investor archetypes,
+                            then matches you to stocks that fit how you actually reason about money.
+                        </p>
+
+                        <ul className="mt-6 space-y-2 max-w-3xl" style={{ color: "hsl(var(--text-secondary))" }}>
+                            <KidsBullet text="10 questions. Built on Kahneman & Tversky, Markowitz, Fama & French, Klontz, and Mayfield et al." />
+                            <KidsBullet text="8 archetypes — Visionary, Analyst, Maverick, Steady Hand, Explorer, Guardian, Strategist, Time Lord" />
+                            <KidsBullet text="Matched stocks for IDX, US/Global, or both — based on your DNA, not generic advice" />
+                            <KidsBullet text="Free, public, no signup needed. Available in English & Bahasa Indonesia" />
+                        </ul>
+
+                        <p className="mt-8 text-sm md:text-base italic max-w-3xl" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.7, borderLeft: "2px solid hsl(259 80% 70%)", paddingLeft: 16 }}>
+                            Ray Dalio rebuilt Bridgewater around personality fit. Charlie Munger called it the most under-discussed
+                            edge in markets.{" "}
+                            <span style={{ color: "hsl(var(--text-primary))", fontStyle: "normal", fontWeight: 600 }}>
+                                Five minutes from now you'll know which archetype you are — and which stocks were built for the way your brain works.
+                            </span>
+                        </p>
+
+                        <div className="mt-8 flex flex-wrap gap-3">
+                            <Link
+                                to="/stockdna"
+                                className="inline-flex items-center gap-2"
+                                style={{
+                                    background: "hsl(259 78% 60%)",
+                                    color: "#fff",
+                                    padding: "12px 24px",
+                                    borderRadius: 2,
+                                    fontSize: "0.78rem",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.14em",
+                                    textTransform: "uppercase",
+                                    textDecoration: "none",
+                                }}
+                                data-testid="stockdna-section-cta-take"
+                            >
+                                <span style={{ fontSize: "1.05rem" }}>🧬</span>
+                                Take the StockDNA quiz
+                                <ArrowRight size={14} strokeWidth={1.8} />
+                            </Link>
+                        </div>
+
+                        <p className="mt-4 text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                            Free · 5 minutes · Export your result as PDF · Not financial advice.
+                        </p>
+                    </div>
+                </section>
+
                 {/* ------------------- Mission: KidStocks ------------------- */}
                 <section className="mt-20 md:mt-28" data-testid="kids-mission">
                     <div

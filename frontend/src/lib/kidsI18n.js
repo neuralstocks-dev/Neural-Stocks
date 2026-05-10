@@ -160,6 +160,18 @@ const DICT = {
         "parents.cta_button": "Sign your kid up — free →",
         "parents.cta_preview": "Or try the live demo first →",
 
+        // StockDNA section (parent-facing)
+        "parents.dna_eyebrow": "🧬 5-MINUTE QUIZ — FREE",
+        "parents.dna_title": "Discover your kid's investor personality",
+        "parents.dna_body1": "Before you teach a kid to invest, find out *how they already think* about money. Our StockDNA™ quiz — built on Nobel Prize-winning behavioural finance research — maps any 14-year-old (or yourself) to one of 8 investor archetypes in 5 minutes.",
+        "parents.dna_body2": "Want a real conversation starter at the dinner table? Take the quiz with them. The reveal of their archetype, matched stocks, and academic basis is one of the easiest, most fun ways to open up a money conversation that doesn't feel like a lecture.",
+        "parents.dna_bullet1": "Bilingual EN / Bahasa Indonesia",
+        "parents.dna_bullet2": "Ages 14+ (younger kids can take it with a parent)",
+        "parents.dna_bullet3": "Export your result as a PDF · No login needed",
+        "parents.dna_bullet4": "Built on Kahneman, Markowitz, Klontz, Mayfield et al.",
+        "parents.dna_cta": "Take the StockDNA quiz",
+        "parents.dna_disclaimer": "Free · 5 min · Educational only · Not financial advice.",
+
         // Auth pages (kid-facing)
         "auth.welcome_back": "Welcome back!",
         "auth.email_label": "Email",
@@ -374,6 +386,18 @@ const DICT = {
         "parents.cta_body": "Daftar hanya 30 detik. Usia di bawah 13 butuh persetujuan orang tua singkat (COPPA-compliant — kamu kontrol datanya).",
         "parents.cta_button": "Daftarkan anakmu — gratis →",
         "parents.cta_preview": "Atau coba demo dulu →",
+
+        // StockDNA section (parent-facing)
+        "parents.dna_eyebrow": "🧬 KUIS 5 MENIT — GRATIS",
+        "parents.dna_title": "Temukan kepribadian investor anak Anda",
+        "parents.dna_body1": "Sebelum Anda mengajari anak berinvestasi, cari tahu dulu *bagaimana mereka sudah berpikir* tentang uang. Kuis StockDNA™ kami — berdasarkan penelitian keuangan perilaku pemenang Nobel — memetakan anak usia 14+ (atau Anda sendiri) ke salah satu dari 8 arketipe investor dalam 5 menit.",
+        "parents.dna_body2": "Mau pembuka obrolan yang seru di meja makan? Ikuti kuis bersama anak Anda. Mengungkap arketipe mereka, saham yang cocok, dan dasar penelitiannya adalah salah satu cara termudah dan paling menyenangkan untuk membuka pembicaraan soal uang yang tidak terasa seperti ceramah.",
+        "parents.dna_bullet1": "Dwibahasa EN / Bahasa Indonesia",
+        "parents.dna_bullet2": "Usia 14+ (anak yang lebih kecil bisa kerjakan bersama orang tua)",
+        "parents.dna_bullet3": "Ekspor hasil sebagai PDF · Tanpa login",
+        "parents.dna_bullet4": "Dibangun di atas Kahneman, Markowitz, Klontz, Mayfield dkk.",
+        "parents.dna_cta": "Ambil kuis StockDNA",
+        "parents.dna_disclaimer": "Gratis · 5 menit · Hanya edukasi · Bukan saran keuangan.",
 
         // Auth
         "auth.welcome_back": "Selamat datang kembali!",

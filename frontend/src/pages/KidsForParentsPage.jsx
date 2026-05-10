@@ -190,6 +190,66 @@ export default function KidsForParentsPage() {
                 </div>
             </section>
 
+            {/* StockDNA — parent-facing section */}
+            <section style={{ ...wrapStyle, paddingTop: 28, paddingBottom: 36 }} data-testid="parents-stockdna-section">
+                <div
+                    style={{
+                        background: "linear-gradient(135deg, #ffe7e3 0%, #fff8f0 100%)",
+                        border: `2px solid ${ACCENT}33`,
+                        borderRadius: 24,
+                        padding: "32px 28px",
+                        position: "relative",
+                        overflow: "hidden",
+                    }}
+                >
+                    <p style={{
+                        fontSize: 11, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase",
+                        color: ACCENT, marginBottom: 8,
+                    }}>
+                        {t(lang, "parents.dna_eyebrow")}
+                    </p>
+                    <h2 style={{
+                        fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 700, lineHeight: 1.15,
+                        color: NAVY, marginBottom: 18,
+                    }}>
+                        {t(lang, "parents.dna_title")}
+                    </h2>
+                    <p style={{ fontSize: 15, lineHeight: 1.7, color: NAVY, opacity: 0.85, maxWidth: 720, marginBottom: 12 }}>
+                        {t(lang, "parents.dna_body1")}
+                    </p>
+                    <p style={{ fontSize: 15, lineHeight: 1.7, color: NAVY, opacity: 0.85, maxWidth: 720, marginBottom: 22 }}>
+                        {t(lang, "parents.dna_body2")}
+                    </p>
+                    <ul style={{ listStyle: "none", padding: 0, margin: "0 0 26px 0", display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+                        {[1, 2, 3, 4].map((n) => (
+                            <li key={n} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 14, color: NAVY, lineHeight: 1.5 }}>
+                                <span style={{ color: ACCENT, fontWeight: 700, flexShrink: 0 }}>✓</span>
+                                <span>{t(lang, `parents.dna_bullet${n}`)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                        <Link
+                            to="/kids/stockdna"
+                            data-testid="parents-stockdna-cta"
+                            style={{
+                                display: "inline-flex", alignItems: "center", gap: 10,
+                                padding: "14px 26px",
+                                background: ACCENT, color: "#fff",
+                                fontSize: 15, fontWeight: 700, borderRadius: 999, textDecoration: "none",
+                            }}
+                        >
+                            <span style={{ fontSize: "1.1rem" }}>🧬</span>
+                            {t(lang, "parents.dna_cta")}
+                            <ArrowRight size={16} />
+                        </Link>
+                        <span style={{ fontSize: 12, color: NAVY, opacity: 0.6 }}>
+                            {t(lang, "parents.dna_disclaimer")}
+                        </span>
+                    </div>
+                </div>
+            </section>
+
             {/* CTA */}
             <section style={{ ...wrapStyle, paddingTop: 48, paddingBottom: 56, textAlign: "center" }}>
                 <h3 style={{ fontSize: "clamp(1.4rem, 3.2vw, 2rem)", fontWeight: 700, lineHeight: 1.25 }}>
