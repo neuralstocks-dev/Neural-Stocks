@@ -530,9 +530,34 @@ const rupiah = (n) => {
     return "Rp " + Math.round(n).toLocaleString();
 };
 
+// Map StockDNA archetype keys → StockHoroscope type keys. Most align 1:1;
+// the four that differ get mapped here. Read by HoroscopeUI so a user who
+// already took the StockDNA quiz lands directly on their reading.
+const DNA_TO_HORO = {
+    visionary: "visionary",
+    analyst: "analyst",
+    bold: "maverick",
+    steady: "steady",
+    explorer: "explorer",
+    conservative: "guardian",
+    balanced: "strategist",
+    patient: "timelord",
+};
+
 // ── 1. StockHoroscope ──
 function HoroscopeUI({ lang }) {
-    const [pick, setPick] = useState(null);
+    // Auto-select the archetype the user identified with in StockDNA — if any.
+    // Falls back to null (manual picker) when no result has been saved.
+    const initialPick = (() => {
+        try {
+            const dna = localStorage.getItem("stockdna_archetype");
+            return dna && DNA_TO_HORO[dna] && HORO_READINGS[DNA_TO_HORO[dna]]
+                ? DNA_TO_HORO[dna]
+                : null;
+        } catch (_) { return null; }
+    })();
+    const [pick, setPick] = useState(initialPick);
+    const [autoSourced, setAutoSourced] = useState(Boolean(initialPick));
     // Real macro data — fetched from /api/neutools/market-pulse (server-cached
     // 5 min). On failure we surface a small "Market data unavailable" note
     // rather than fall back to fake numbers — the whole point of this fix.
@@ -568,6 +593,49 @@ function HoroscopeUI({ lang }) {
     return (
         <section style={cuiStyle}>
             <div style={ctitStyle}>✦ {lang === "id" ? "Bacaan Pasar Harian Anda" : "Your Daily Market Reading"}</div>
+            {autoSourced && pick && (
+                <div
+                    data-testid="horo-autopicked-banner"
+                    style={{
+                        background: "#7c3aed14",
+                        border: "1px solid #7c3aed55",
+                        padding: "8px 12px",
+                        marginBottom: 14,
+                        fontSize: 11,
+                        color: "#c4b5fd",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        flexWrap: "wrap",
+                    }}
+                >
+                    <span>
+                        🧬 {lang === "id"
+                            ? "Dipersonalisasi dari hasil StockDNA Anda — "
+                            : "Personalised from your StockDNA — "}
+                        <strong style={{ color: "#ddd6fe" }}>
+                            {HORO_TYPES[pick]?.[lang] || HORO_TYPES[pick]?.en}
+                        </strong>
+                    </span>
+                    <button
+                        onClick={() => { setAutoSourced(false); setPick(null); }}
+                        data-testid="horo-switch-archetype"
+                        style={{
+                            background: "transparent",
+                            border: "1px solid #7c3aed55",
+                            color: "#c4b5fd",
+                            fontFamily: T.fontBody,
+                            fontSize: 9,
+                            letterSpacing: 1,
+                            padding: "4px 10px",
+                            cursor: "pointer",
+                        }}
+                    >
+                        {lang === "id" ? "GANTI" : "SWITCH"}
+                    </button>
+                </div>
+            )}
             <div style={{ ...flStyle, marginBottom: 10 }}>
                 {lang === "id" ? "PILIH TIPE INVESTOR ANDA" : "SELECT YOUR INVESTOR TYPE"}
             </div>
@@ -578,7 +646,7 @@ function HoroscopeUI({ lang }) {
                 {Object.entries(HORO_TYPES).map(([k, t]) => (
                     <button
                         key={k}
-                        onClick={() => setPick(k)}
+                        onClick={() => { setPick(k); setAutoSourced(false); }}
                         data-testid={`horo-type-${k}`}
                         style={{
                             background: pick === k ? `${T.primary}22` : T.panel2,

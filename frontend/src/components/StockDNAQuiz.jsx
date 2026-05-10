@@ -80,7 +80,14 @@ export default function StockDNAQuiz({ theme }) {
                 Object.keys(traits).forEach((tr) => { sc[tr] = (sc[tr] || 0) + traits[tr]; });
             });
             const top = Object.keys(sc).sort((a, b) => sc[b] - sc[a])[0];
-            setResult(TYPES[top] || TYPES.balanced);
+            const chosen = TYPES[top] ? top : "balanced";
+            setResult(TYPES[chosen]);
+            // Persist the archetype key so other surfaces (e.g. NeuTools
+            // StockHoroscope) can auto-personalise without re-asking.
+            try {
+                localStorage.setItem("stockdna_archetype", chosen);
+                localStorage.setItem("stockdna_archetype_ts", new Date().toISOString());
+            } catch (_) { /* private mode / quota — non-fatal */ }
             setScreen(SCREEN.RESULT);
             window.scrollTo(0, 0);
         }, 2600);
