@@ -140,11 +140,13 @@ export default function StockDNAQuiz({ theme }) {
             y += 14;
         };
         // Header
-        writeWrapped("StockDNA(TM)", 24, { bold: true, color: [124, 58, 237], gap: 2 });
-        writeWrapped(`${T.powered_by} NeuLab Inc.`, 9, { color: [120, 120, 130], gap: 14 });
-        // Result
-        writeWrapped(T.result_eyebrow, 8, { color: [124, 58, 237], gap: 4 });
-        writeWrapped(isE ? result.ne : result.ni, 22, { bold: true, color: [20, 20, 30], gap: 8 });
+        writeWrapped("StockDNA(TM)", 20, { bold: true, color: [124, 58, 237], gap: 4 });
+        writeWrapped(`${T.powered_by} NeuLab Inc.`, 9, { color: [120, 120, 130], gap: 18 });
+        // Result — eyebrow gets a wide bottom gap so the archetype name's
+        // cap-height clears it (jsPDF text() positions glyphs by baseline,
+        // not top-of-line, so a small numeric gap can still visually overlap).
+        writeWrapped(T.result_eyebrow, 9, { bold: true, color: [124, 58, 237], gap: 14 });
+        writeWrapped(isE ? result.ne : result.ni, 16, { bold: true, color: [20, 20, 30], gap: 10 });
         writeWrapped(isE ? result.de : result.di, 11, { gap: 12 });
         // Meta
         writeWrapped(
