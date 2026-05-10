@@ -53,6 +53,11 @@ export default function KidsPreviewPage() {
     const [showShare, setShowShare] = useState(false);
     const [tickerInput, setTickerInput] = useState("");
     const [tickerErr, setTickerErr] = useState("");
+    // Live-analysis job state — only used when the backend reports a
+    // cache miss for a brand-new ticker that no adult has analysed in
+    // the last 14 days. Holds {job_id, stage_label, ticker} while the
+    // background pipeline runs.
+    const [jobState, setJobState] = useState(null);
 
     // Mark this browser as having seen KidStocks — silences the
     // dashboard cross-promo nudge.
@@ -62,24 +67,83 @@ export default function KidsPreviewPage() {
 
     useEffect(() => {
         let cancelled = false;
+        let pollTimer = null;
+
+        const lang = (() => {
+            try { return localStorage.getItem("kids_lang") === "id" ? "id" : "en"; } catch (_) { return "en"; }
+        })();
+
+        const pollJob = async (jobId) => {
+            if (cancelled) return;
+            try {
+                const r = await axios.get(`${API_BASE}/kids/preview/job/${jobId}`);
+                if (cancelled) return;
+                const job = r.data?._job;
+                if (job?.status === "done") {
+                    setData(r.data);
+                    setJobState(null);
+                    setLoading(false);
+                    return;
+                }
+                if (job?.status === "error") {
+                    setError(job?.error || "Couldn't analyse that ticker — try another one.");
+                    setJobState(null);
+                    setLoading(false);
+                    return;
+                }
+                // Still pending — refresh stage label and re-poll in 2s
+                setJobState({
+                    job_id: jobId,
+                    ticker: job?.ticker || currentTicker,
+                    stage_label: job?.stage_label || "Thinking…",
+                });
+                pollTimer = setTimeout(() => pollJob(jobId), 2000);
+            } catch (err) {
+                if (cancelled) return;
+                setError(err?.response?.data?.detail || "Lost touch with the AI — please try again.");
+                setJobState(null);
+                setLoading(false);
+            }
+        };
+
         (async () => {
             setLoading(true);
             setError("");
-            // Clear stale data so a previous ticker/age's kid_view doesn't
-            // render alongside the new error state if the new request 503s.
             setData(null);
+            setJobState(null);
             setFeedbackSent(false);
             setShowAdult(false);
             try {
-                const r = await axios.get(`${API_BASE}/kids/preview/${currentTicker}?age=${age}`);
-                if (!cancelled) setData(r.data);
+                const r = await axios.get(
+                    `${API_BASE}/kids/preview/${currentTicker}?age=${age}&lang=${lang}`,
+                    // axios treats 202 as success — we read status + body to
+                    // decide whether we got a cached verdict (200) or a job
+                    // handle to poll (202).
+                    { validateStatus: (s) => s >= 200 && s < 300 },
+                );
+                if (cancelled) return;
+                if (r.status === 202 && r.data?.job_id) {
+                    setJobState({
+                        job_id: r.data.job_id,
+                        ticker: r.data.ticker || currentTicker,
+                        stage_label: "Looking up the company…",
+                    });
+                    pollTimer = setTimeout(() => pollJob(r.data.job_id), 1500);
+                } else {
+                    setData(r.data);
+                    setLoading(false);
+                }
             } catch (err) {
-                if (!cancelled) setError(err?.response?.data?.detail || "Couldn't load this one — try another stock or age.");
-            } finally {
-                if (!cancelled) setLoading(false);
+                if (!cancelled) {
+                    setError(err?.response?.data?.detail || "Couldn't load this one — try another stock or age.");
+                    setLoading(false);
+                }
             }
         })();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            if (pollTimer) clearTimeout(pollTimer);
+        };
     }, [currentTicker, age]);
 
     const setTicker = (sym) => navigate(`/kids/preview/${sym}?age=${age}`);
@@ -475,9 +539,30 @@ export default function KidsPreviewPage() {
                     }}
                 >
                     {loading && (
-                        <div style={{ padding: 80, textAlign: "center" }} data-testid="kids-loading">
+                        <div style={{ padding: 60, textAlign: "center" }} data-testid="kids-loading">
                             <Loader2 size={28} style={{ animation: "spin 1s linear infinite" }} />
-                            <p style={{ marginTop: 16, opacity: 0.6 }}>Asking the AI to think it over…</p>
+                            {jobState ? (
+                                <>
+                                    <p
+                                        data-testid="kids-job-headline"
+                                        style={{ marginTop: 16, fontWeight: 700, fontSize: 16 }}
+                                    >
+                                        🧠 Cooking up a fresh verdict for {jobState.ticker}…
+                                    </p>
+                                    <p
+                                        data-testid="kids-job-stage"
+                                        style={{ marginTop: 8, opacity: 0.7, fontSize: 13 }}
+                                    >
+                                        {jobState.stage_label || "Thinking…"}
+                                    </p>
+                                    <p style={{ marginTop: 14, opacity: 0.5, fontSize: 12, lineHeight: 1.5 }}>
+                                        First look at this stock — usually about 30 seconds.
+                                        <br />Hang tight!
+                                    </p>
+                                </>
+                            ) : (
+                                <p style={{ marginTop: 16, opacity: 0.6 }}>Asking the AI to think it over…</p>
+                            )}
                         </div>
                     )}
 
