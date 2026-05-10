@@ -1,26 +1,55 @@
 <!doctype html>
 <html lang="en">
     <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="theme-color" content="#0A0C10" />
-        <meta name="description" content="Neural Stock Intelligence™ — AI stock intelligence without the noise. Explainable signals, risk-aware analytics. Built by NeuLab Inc." />
 
-        <!-- Open Graph / social sharing — defaults to the KidStocks landing card
-             since kidstocks.net is the heaviest-shared surface. Per-page
-             overrides can be wired later via SSR. -->
-        <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="KidStocks · by NeuLab" />
-        <meta property="og:title" content="KidStocks — show your kid how the AI thinks" />
-        <meta property="og:description" content="AI-powered educational stock investing for ages 8-18. Same engine our adult investors use, rewritten in language a 9-year-old can understand. Virtual money only." />
-        <meta property="og:image" content="%PUBLIC_URL%/og-kids-landing.png" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:url" content="https://kidstocks.net/" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="KidStocks — show your kid how the AI thinks" />
-        <meta name="twitter:description" content="AI-powered educational stock investing for ages 8-18. Virtual money only." />
-        <meta name="twitter:image" content="%PUBLIC_URL%/og-kids-landing.png" />
+        <!-- Primary SEO -->
+        <title>Neural Stock Intelligence™ — AI Stock Research Assistant</title>
+        <meta name="description" content="AI-powered stock research for every investor. Neural Stock Intelligence analyzes markets, surfaces signals, and guides smarter decisions — free to start.">
+        <meta name="robots" content="index, follow">
+        <link rel="canonical" href="https://neulab.xyz/">
+
+        <!-- Open Graph -->
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="https://neulab.xyz/">
+        <meta property="og:site_name" content="Neural Stock Intelligence™">
+        <meta property="og:title" content="Neural Stock Intelligence™ — AI Stock Research Assistant">
+        <meta property="og:description" content="Your AI research analyst for stocks. Signals, insights, and market intelligence — powered by neural networks. Free tier available.">
+        <meta property="og:image" content="https://neulab.xyz/og-image.png">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Neural Stock Intelligence™ — AI Stock Research Assistant">
+        <meta name="twitter:description" content="Your AI research analyst for stocks. Signals, insights, and market intelligence — powered by neural networks. Free tier available.">
+        <meta name="twitter:image" content="https://neulab.xyz/og-image.png">
+
+        <!-- JSON-LD Structured Data -->
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          "name": "Neural Stock Intelligence",
+          "applicationCategory": "FinanceApplication",
+          "operatingSystem": "Web",
+          "url": "https://neulab.xyz",
+          "description": "All-in-one AI stock research assistant. Analyzes markets, surfaces buy and sell signals, and delivers portfolio intelligence for retail investors, traders, and financial advisors.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "description": "Free tier available"
+          },
+          "publisher": {
+            "@type": "Organization",
+            "name": "NeuLab Inc.",
+            "url": "https://neulab.xyz"
+          }
+        }
+        </script>
 
         <!-- PWA manifest & install metadata -->
         <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
@@ -37,20 +66,7 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
-        <!--
-        manifest.json provides metadata used when your web app is installed on a
-        user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-        -->
-        <!--
-        Notice the use of %PUBLIC_URL% in the tags above.
-        It will be replaced with the URL of the `public` folder during the build.
-        Only files inside the `public` folder can be referenced from the HTML.
 
-        Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-        work correctly both with client-side routing and a non-root public URL.
-        Learn how to configure a non-root public URL by running `npm run build`.
-        -->
-        <title>Neural Stock Intelligence™ · by NeuLab Inc.</title>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
     </head>
