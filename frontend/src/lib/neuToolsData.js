@@ -114,11 +114,11 @@ export const NEUTOOLS = [
 export const TOOL_INFO = {
     horo: {
         en: {
-            wh: "<strong>StockHoroscope™</strong> delivers a daily personalised market reading in horoscope language — powered by randomised real-world macro signals (VIX, sector momentum, S&P and IHSG 5-day performance). Each of the 8 investor personality types gets a unique reading covering a Celestial Signal, Guidance, Power Move, Avoid Today, Lucky/Unlucky Sector, and a Fortune closing line.",
+            wh: "<strong>StockHoroscope™</strong> delivers a daily personalised market reading in horoscope language — powered by live real-world macro signals (VIX, sector momentum, S&P and IHSG 5-day performance) fetched fresh from market data every five minutes. Each of the 8 investor personality types gets a unique reading covering a Celestial Signal, Guidance, Power Move, Avoid Today, Lucky/Unlucky Sector, and a Fortune closing line.",
             wy: "Horoscopes are read by 70M+ people daily globally — not because of astrology, but because they provide a <strong>daily ritual with personalised framing</strong>. Research by <strong>Thaler & Sunstein (Nudge, 2008)</strong> shows that identical information delivered in personalised emotionally resonant language dramatically increases both engagement and behaviour change. StockHoroscope uses this pattern for genuine financial education.",
             hw: [
                 "<strong>Select your investor type</strong> from the 8 options — or take the StockDNA quiz to discover yours",
-                "<strong>Check the Market Weather bar</strong> — driven by simulated VIX data showing overall market conditions",
+                "<strong>Check the Market Weather bar</strong> — driven by live VIX data showing overall market conditions",
                 "<strong>Read your Celestial Signal</strong> — a market condition metaphor that frames the day",
                 "<strong>Review your Guidance</strong> — 2-3 sentences of personality-matched market direction",
                 "<strong>Note your Power Move</strong> — one specific watchlist-level action for today",
@@ -133,11 +133,11 @@ export const TOOL_INFO = {
             ],
         },
         id: {
-            wh: "<strong>StockHoroscope™</strong> menyampaikan bacaan pasar harian yang dipersonalisasi dalam bahasa horoskop — didukung oleh sinyal makro nyata yang disimulasikan (VIX, momentum sektor, kinerja S&P dan IHSG 5 hari).",
+            wh: "<strong>StockHoroscope™</strong> menyampaikan bacaan pasar harian yang dipersonalisasi dalam bahasa horoskop — didukung oleh sinyal makro nyata langsung dari pasar (VIX, momentum sektor, kinerja S&P dan IHSG 5 hari), diperbarui setiap lima menit.",
             wy: "Horoskop dibaca oleh 70 juta+ orang setiap hari — bukan karena astrologi, tetapi karena memberikan <strong>ritual harian dengan bingkai yang dipersonalisasi</strong>. Penelitian <strong>Thaler & Sunstein (Nudge, 2008)</strong> menunjukkan informasi identik yang disampaikan secara personal meningkatkan keterlibatan dan perubahan perilaku secara dramatis.",
             hw: [
                 "<strong>Pilih tipe investor Anda</strong> dari 8 pilihan — atau ikuti kuis StockDNA",
-                "<strong>Periksa bilah Cuaca Pasar</strong> — didorong oleh data VIX yang disimulasikan",
+                "<strong>Periksa bilah Cuaca Pasar</strong> — didorong oleh data VIX langsung",
                 "<strong>Baca Sinyal Celestial Anda</strong> — metafora kondisi pasar",
                 "<strong>Tinjau Panduan Anda</strong> — arah pasar yang cocok dengan kepribadian",
                 "<strong>Catat Power Move Anda</strong> — satu tindakan spesifik untuk hari ini",
@@ -291,7 +291,7 @@ export const TOOL_INFO = {
             ],
             rf: [
                 "<em>Kahneman & Tversky (1982)</em> — The Psychology of Preferences.",
-                "Historical stock simulation — approximate compounded returns.",
+                "Historical stock prices via yfinance — actual adjusted-close data from your chosen past date to today.",
                 "<em>The Psychology of Money</em> — Housel (2020).",
                 "IDX historical returns — IHSG BEI 1990–2024.",
             ],
@@ -308,7 +308,7 @@ export const TOOL_INFO = {
             ],
             rf: [
                 "<em>Kahneman & Tversky (1982)</em>.",
-                "Simulasi historis — imbal hasil majemuk perkiraan.",
+                "Harga saham historis via yfinance — data penutupan aktual yang disesuaikan dari tanggal masa lalu pilihan Anda hingga hari ini.",
                 "<em>The Psychology of Money</em> — Housel (2020).",
                 "Imbal hasil historis IDX — IHSG BEI 1990–2024.",
             ],
