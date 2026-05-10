@@ -44,6 +44,7 @@ import BacktestPage from "@/pages/BacktestPage";
 import AlertsPage from "@/pages/AlertsPage";
 import StockDNAPage from "@/pages/StockDNAPage";
 import KidsStockDNAPage from "@/pages/KidsStockDNAPage";
+import NeuToolsPage from "@/pages/NeuToolsPage";
 import { Loader2 } from "lucide-react";
 
 /**
@@ -169,6 +170,8 @@ function AppRoutes() {
                 surfaces. Both routes are guest-accessible (no auth gate). */}
             <Route path="/stockdna" element={<StockDNAPage />} />
             <Route path="/kids/stockdna" element={<KidsStockDNAPage />} />
+            <Route path="/neutools" element={<NeuToolsPage />} />
+            <Route path="/neutools/:toolId" element={<NeuToolsPage />} />
 
             {/* KidStocks V1 — separate auth scope, separate shell. */}
             <Route path="/kids/login" element={<KidsAuthProvider><KidsLoginPage /></KidsAuthProvider>} />

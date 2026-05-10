@@ -6,6 +6,7 @@ import { Sun, Moon, LogOut, Menu, X, ExternalLink } from "lucide-react";
 import SocialLinks from "@/components/SocialLinks";
 import KidsTopRibbon from "@/components/KidsTopRibbon";
 import StockDNATopRibbon from "@/components/StockDNATopRibbon";
+import NeuToolsTopRibbon from "@/components/NeuToolsTopRibbon";
 
 const NAV_ITEMS = [
     { to: "/dashboard", label: "Dashboard", testid: "nav-dashboard" },
@@ -458,6 +459,7 @@ export default function AppShell({ children }) {
             <main className="relative z-10">
                 <KidsTopRibbon />
                 <StockDNATopRibbon />
+                <NeuToolsTopRibbon />
                 {children}
             </main>
 
