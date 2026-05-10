@@ -417,6 +417,69 @@ function KidsBullet({ text }) {
     );
 }
 
+function NeuToolCard({ icon, name, tag, body, badge }) {
+    return (
+        <div
+            className="rounded-sm p-5"
+            style={{
+                background: "hsl(150 30% 8% / 0.5)",
+                border: "1px solid hsl(150 70% 45% / 0.22)",
+            }}
+            data-testid={`neutools-section-card-${name.replace(/\W+/g, "-").toLowerCase()}`}
+        >
+            <div className="flex items-start justify-between gap-3 mb-2">
+                <span style={{ fontSize: "1.5rem", color: "hsl(150 70% 70%)", lineHeight: 1 }}>{icon}</span>
+                {badge && (
+                    <span
+                        style={{
+                            fontSize: "0.55rem",
+                            letterSpacing: "0.12em",
+                            color: "hsl(150 70% 70%)",
+                            border: "1px solid hsl(150 70% 70% / 0.55)",
+                            padding: "2px 7px",
+                            textTransform: "uppercase",
+                        }}
+                    >
+                        {badge}
+                    </span>
+                )}
+            </div>
+            <div
+                className="font-serif"
+                style={{
+                    fontSize: "1.05rem",
+                    color: "hsl(var(--text-primary))",
+                    lineHeight: 1.2,
+                    marginBottom: 2,
+                }}
+            >
+                {name}
+            </div>
+            <div
+                style={{
+                    fontSize: "0.68rem",
+                    letterSpacing: "0.1em",
+                    color: "hsl(150 70% 70%)",
+                    textTransform: "uppercase",
+                    marginBottom: 10,
+                }}
+            >
+                {tag}
+            </div>
+            <p
+                style={{
+                    fontSize: "0.85rem",
+                    color: "hsl(var(--text-secondary))",
+                    lineHeight: 1.65,
+                }}
+            >
+                {body}
+            </p>
+        </div>
+    );
+}
+
+
 export default function WhyUsPage() {
     const [infoKey, setInfoKey] = useState(null);
     const info = infoKey ? INFO_CONTENT[infoKey] : null;
@@ -778,6 +841,116 @@ export default function WhyUsPage() {
 
                         <p className="mt-4 text-xs" style={{ color: "hsl(var(--text-muted))" }}>
                             Free · 5 minutes · Export your result as PDF · Not financial advice.
+                        </p>
+                    </div>
+                </section>
+
+                {/* ------------------- NeuTools — The Investor Toolkit ------------------- */}
+                <section className="mt-20 md:mt-28" data-testid="neutools-section">
+                    <div
+                        className="module p-8 md:p-12 relative overflow-hidden"
+                        style={{
+                            background: "linear-gradient(135deg, hsl(150 70% 45% / 0.10) 0%, hsl(150 70% 45% / 0.02) 100%)",
+                            border: "1px solid hsl(150 70% 45% / 0.45)",
+                        }}
+                    >
+                        <p className="text-overline" style={{ color: "hsl(150 70% 70%)" }}>
+                            🛠 The investor toolkit
+                        </p>
+                        <h2
+                            className="font-serif mt-2"
+                            style={{ fontSize: "clamp(2rem, 3.6vw, 2.8rem)", letterSpacing: "-0.02em", lineHeight: 1.1 }}
+                        >
+                            Six free tools to{" "}
+                            <em style={{ color: "hsl(150 70% 70%)" }}>calculate, test, learn, and grow.</em>
+                        </h2>
+
+                        <p className="mt-6 text-base md:text-lg leading-relaxed max-w-3xl" style={{ color: "hsl(var(--text-primary))" }}>
+                            Not every moment calls for a full institutional verdict. Sometimes you just want to ask{" "}
+                            <em>"what if I'd invested instead of spent?"</em> or{" "}
+                            <em>"could I have survived 2008?"</em> or{" "}
+                            <em>"what does this jargon actually mean?"</em>{" "}
+                            <strong style={{ color: "hsl(var(--text-primary))" }}>
+                                NeuTools™ is the toolkit for those questions
+                            </strong>{" "}
+                            — six bite-sized, free-forever, sign-up–free utilities that turn 30 seconds of curiosity into
+                            a sharper investor.
+                        </p>
+
+                        <div className="mt-8 grid gap-4 sm:grid-cols-2" data-testid="neutools-grid">
+                            <NeuToolCard
+                                icon="✦"
+                                name="StockHoroscope™"
+                                tag="Daily Market Reading"
+                                body="A daily personalised market read in horoscope language — VIX, S&P 5D, IHSG 5D — matched to your investor archetype. A 30-second ritual that turns macro noise into one specific action for today."
+                            />
+                            <NeuToolCard
+                                icon="≣"
+                                name="StockCalc™"
+                                tag="Compound Calculator"
+                                body="Translate Rp 500K/month into a house, a car, retirement — at IDX or global return assumptions. We show life milestones, not abstract numbers, because that's what makes saving stick."
+                            />
+                            <NeuToolCard
+                                icon="▼"
+                                name="Bear Survival Quiz™"
+                                tag="5 Historical Crashes"
+                                body="2008 GFC. March 2020 COVID. 1997 Asian Crisis. Dot-com bust. 2022 rate shock. We put you at the worst moment of each and grade your decision A–F. The biggest wealth destroyer is panic selling — measure your edge before you need it."
+                            />
+                            <NeuToolCard
+                                icon="◐"
+                                name="Latte Factor™"
+                                tag="Habit Cost Calculator"
+                                body="Your daily kopi susu costs Rp 2.3 Billion over 30 years if invested in BBCA instead. We compound every habit so you can see the real opportunity cost — and decide which ones are still worth it."
+                            />
+                            <NeuToolCard
+                                icon="§"
+                                name="StockSlang™"
+                                tag="Financial Jargon Translator"
+                                badge="EN-only"
+                                body="P/E, VIX, moat, EBITDA, free cash flow — 12 essential terms explained in plain English with a one-line street translation that makes them stick. Jargon is the #1 barrier OJK cites for low financial literacy in Indonesia. We're removing it."
+                            />
+                            <NeuToolCard
+                                icon="⌛"
+                                name="StockTimeMachine™"
+                                tag="Financial Regret Calculator"
+                                body="Pick a past date, an amount, a stock you wish you'd bought. See the missed gain in Rupiah and your Regret Score out of 100 — then a Recovery Plan showing what starting today still gets you. Regret, properly channelled, becomes action."
+                            />
+                        </div>
+
+                        <p className="mt-8 text-sm md:text-base italic max-w-3xl" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.7, borderLeft: "2px solid hsl(150 70% 70%)", paddingLeft: 16 }}>
+                            Five of the six tools are bilingual (EN + Bahasa Indonesia). StockSlang stays English because
+                            its punchline is the wordplay.{" "}
+                            <span style={{ color: "hsl(var(--text-primary))", fontStyle: "normal", fontWeight: 600 }}>
+                                Zero API calls. Zero sign-up. Zero cost. The same engineering rigour we put into
+                                institutional analysis, applied to the small, sharp decisions you make every week.
+                            </span>
+                        </p>
+
+                        <div className="mt-8 flex flex-wrap gap-3">
+                            <Link
+                                to="/neutools"
+                                className="inline-flex items-center gap-2"
+                                style={{
+                                    background: "hsl(150 70% 45%)",
+                                    color: "#fff",
+                                    padding: "12px 24px",
+                                    borderRadius: 2,
+                                    fontSize: "0.78rem",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.14em",
+                                    textTransform: "uppercase",
+                                    textDecoration: "none",
+                                }}
+                                data-testid="neutools-section-cta-open"
+                            >
+                                <span style={{ fontSize: "1.05rem" }}>🛠</span>
+                                Open the toolkit
+                                <ArrowRight size={14} strokeWidth={1.8} />
+                            </Link>
+                        </div>
+
+                        <p className="mt-4 text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                            Free · No sign-up · Works offline · Not financial advice · Educational use only.
                         </p>
                     </div>
                 </section>

@@ -68,6 +68,26 @@
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
 
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
+        <!-- Hide the bottom-right "Made with Emergent" badge on every page.
+             We keep the <a id="emergent-badge"> element in the DOM (the
+             emergent-main.js script may reference it) but make it
+             invisible, unclickable, and zero-sized so it doesn't occupy
+             any layout. Inline `display:inline-flex !important` on the
+             badge wins specificity vs external `display:none`, so we
+             collapse it via opacity + visibility + size + pointer-events
+             which have no inline overrides. -->
+        <style>
+            #emergent-badge {
+                opacity: 0 !important;
+                visibility: hidden !important;
+                pointer-events: none !important;
+                width: 0 !important;
+                height: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: hidden !important;
+            }
+        </style>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
     </head>
     <body>
@@ -116,6 +136,8 @@
     -->
         <a
             id="emergent-badge"
+            aria-hidden="true"
+            tabindex="-1"
             target="_blank"
             href="https://app.emergent.sh/?utm_source=emergent-badge"
             style="
