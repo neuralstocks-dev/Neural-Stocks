@@ -74,6 +74,8 @@ export default function NeuToolsPage() {
             }}
         >
             <NeuToolsHeader lang={lang} setLang={setLang} />
+            {/* Page-level pulse keyframe — used by the "market context refreshing" indicator in HoroscopeUI. */}
+            <style>{`@keyframes pulse{0%,100%{opacity:.35}50%{opacity:.85}}`}</style>
             {tool ? (
                 <ToolDetail
                     tool={tool} lang={effectiveLang} i18n={NEUTOOLS_I18N[effectiveLang]}
@@ -558,33 +560,46 @@ function HoroscopeUI({ lang }) {
     })();
     const [pick, setPick] = useState(initialPick);
     const [autoSourced, setAutoSourced] = useState(Boolean(initialPick));
-    // Real macro data — fetched from /api/neutools/market-pulse (server-cached
-    // 5 min). On failure we surface a small "Market data unavailable" note
-    // rather than fall back to fake numbers — the whole point of this fix.
+    // Live macro data — fetched from /api/neutools/market-pulse (server-cached
+    // 5 min). The reading itself is personality-based interpretation and does
+    // NOT depend on these numbers — they are contextual atmosphere only. If
+    // they fail we degrade quietly so the reading still feels intentional.
     const [md, setMd] = useState(null);
-    const [mdErr, setMdErr] = useState(false);
-    const [mdLoading, setMdLoading] = useState(true);
+    const [mdState, setMdState] = useState("loading"); // loading|ready|refreshing
 
     useEffect(() => {
         let cancelled = false;
-        (async () => {
+        let retryTimer = null;
+        const attempt = async (tryNum) => {
             try {
                 const r = await axios.get(`${API_BASE}/neutools/market-pulse`, { timeout: 15000 });
-                if (!cancelled) setMd(r.data);
-            } catch (e) {
-                if (!cancelled) setMdErr(true);
-            } finally {
-                if (!cancelled) setMdLoading(false);
+                if (cancelled) return;
+                setMd(r.data);
+                setMdState("ready");
+            } catch (_) {
+                if (cancelled) return;
+                // Silently retry up to 2 more times (5s, then 15s) before
+                // surfacing anything to the user. Most yfinance hiccups
+                // resolve on the second attempt.
+                if (tryNum < 3) {
+                    retryTimer = setTimeout(() => attempt(tryNum + 1), tryNum === 1 ? 5000 : 15000);
+                } else {
+                    setMdState("refreshing"); // benign label — never "UNAVAILABLE"
+                }
             }
-        })();
-        return () => { cancelled = true; };
+        };
+        attempt(1);
+        return () => {
+            cancelled = true;
+            if (retryTimer) clearTimeout(retryTimer);
+        };
     }, []);
 
     const reading = pick ? (HORO_READINGS[pick][lang] || HORO_READINGS[pick].en) : null;
 
     // Weather classification driven by REAL VIX
     const vixNum = md?.vix ?? null;
-    const weatherEn = vixNum == null ? "DATA UNAVAILABLE"
+    const weatherEn = vixNum == null ? null
         : vixNum > 28 ? "STORM WARNING"
         : vixNum > 22 ? "OVERCAST"
         : vixNum < 14 ? "CLEAR SKIES"
@@ -667,22 +682,44 @@ function HoroscopeUI({ lang }) {
                     alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
                 }}
             >
-                <div>
-                    <div style={{ fontFamily: T.fontHeading, fontSize: 14, letterSpacing: 1, color: T.text }}>
-                        {mdLoading ? (lang === "id" ? "MEMUAT DATA PASAR…" : "LOADING MARKET DATA…") : weatherEn}
-                    </div>
-                    <div style={{ fontSize: 10, color: T.muted }}>
-                        {mdErr ? (lang === "id" ? "Data pasar belum tersedia — coba lagi sebentar." : "Market data unavailable — try again in a minute.")
-                            : md ? (
-                                <>
-                                    VIX: {md.vix ?? "—"} · S&P 5D: {md.sp500_5d_pct != null ? (md.sp500_5d_pct >= 0 ? "+" : "") + md.sp500_5d_pct + "%" : "—"} · IHSG 5D: {md.ihsg_5d_pct != null ? (md.ihsg_5d_pct >= 0 ? "+" : "") + md.ihsg_5d_pct + "%" : "—"}
-                                </>
-                            ) : ""}
-                    </div>
-                </div>
-                {md && (
-                    <div style={{ fontSize: 8, letterSpacing: 1, color: T.accent, opacity: 0.8 }} title={`As of ${md.as_of}${md.cached ? " (cached)" : ""}`}>
-                        ● LIVE · yfinance
+                {md && weatherEn ? (
+                    <>
+                        <div>
+                            <div style={{ fontFamily: T.fontHeading, fontSize: 14, letterSpacing: 1, color: T.text }}>
+                                {weatherEn}
+                            </div>
+                            <div style={{ fontSize: 10, color: T.muted }}>
+                                VIX: {md.vix ?? "—"} · S&P 5D: {md.sp500_5d_pct != null ? (md.sp500_5d_pct >= 0 ? "+" : "") + md.sp500_5d_pct + "%" : "—"} · IHSG 5D: {md.ihsg_5d_pct != null ? (md.ihsg_5d_pct >= 0 ? "+" : "") + md.ihsg_5d_pct + "%" : "—"}
+                            </div>
+                        </div>
+                        <div
+                            style={{ fontSize: 8, letterSpacing: 1, color: T.accent, opacity: 0.8 }}
+                            title={`As of ${md.as_of}${md.cached ? " (cached)" : ""}`}
+                        >
+                            ● LIVE · yfinance
+                        </div>
+                    </>
+                ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span
+                            style={{
+                                width: 8, height: 8, borderRadius: "50%",
+                                background: T.muted, opacity: 0.6,
+                                animation: "pulse 1.6s ease-in-out infinite",
+                            }}
+                        />
+                        <div>
+                            <div style={{ fontFamily: T.fontHeading, fontSize: 13, letterSpacing: 1, color: T.muted }}>
+                                {mdState === "loading"
+                                    ? (lang === "id" ? "MEMUAT KONTEKS PASAR…" : "LOADING MARKET CONTEXT…")
+                                    : (lang === "id" ? "KONTEKS PASAR MENYEGAR…" : "MARKET CONTEXT REFRESHING…")}
+                            </div>
+                            <div style={{ fontSize: 10, color: T.muted, opacity: 0.75 }}>
+                                {lang === "id"
+                                    ? "Bacaan Anda di bawah ini tetap dipersonalisasi."
+                                    : "Your reading below is still personalised."}
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
