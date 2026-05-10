@@ -35,6 +35,7 @@ function _isBudgetError(payload) {
 import TestUnlockBanner from "@/components/TestUnlockBanner";
 import FirstTimeManualPill from "@/components/FirstTimeManualPill";
 import KidsDiscoverNudge from "@/components/KidsDiscoverNudge";
+import StockDNADashboardCard from "@/components/StockDNADashboardCard";
 import OnboardingWizard, { isOnboardingCompleted } from "@/components/OnboardingWizard";
 import DisclaimerModal, { useDisclaimer } from "@/components/DisclaimerModal";
 import AnalysisModeSelector from "@/components/AnalysisModeSelector";
@@ -847,6 +848,9 @@ export default function DashboardPage() {
 
                 {/* Cross-promo nudge — surfaces only to users who haven't visited /kids/preview */}
                 <KidsDiscoverNudge />
+
+                {/* StockDNA — public quiz cross-promo (dismissible, sticky) */}
+                <StockDNADashboardCard />
 
                 {/* First-time manual nudge (auto-hides after first analysis this week) */}
                 <FirstTimeManualPill quota={quota} />
