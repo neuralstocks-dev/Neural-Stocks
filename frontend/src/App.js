@@ -42,6 +42,8 @@ import ResourceDetailPage from "@/pages/ResourceDetailPage";
 import PaypalSmokeTestPage from "@/pages/PaypalSmokeTestPage";
 import BacktestPage from "@/pages/BacktestPage";
 import AlertsPage from "@/pages/AlertsPage";
+import StockDNAPage from "@/pages/StockDNAPage";
+import KidsStockDNAPage from "@/pages/KidsStockDNAPage";
 import { Loader2 } from "lucide-react";
 
 /**
@@ -162,6 +164,11 @@ function AppRoutes() {
             <Route path="/kids/for-parents" element={<KidsForParentsPage />} />
             <Route path="/kids/parent/login" element={<KidsParentLoginPage />} />
             <Route path="/kids/parent/dashboard" element={<KidsParentDashboardPage />} />
+
+            {/* StockDNA — public investor-personality quiz, two themed
+                surfaces. Both routes are guest-accessible (no auth gate). */}
+            <Route path="/stockdna" element={<StockDNAPage />} />
+            <Route path="/kids/stockdna" element={<KidsStockDNAPage />} />
 
             {/* KidStocks V1 — separate auth scope, separate shell. */}
             <Route path="/kids/login" element={<KidsAuthProvider><KidsLoginPage /></KidsAuthProvider>} />

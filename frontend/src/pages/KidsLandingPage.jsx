@@ -76,6 +76,28 @@ export default function KidsLandingPage() {
                         <Users size={16} /> {t(lang, "landing.cta_secondary")}
                     </Link>
                 </div>
+
+                {/* StockDNA — public 5-minute investor-personality quiz.
+                    Open to guests so even prospective parents and curious
+                    teens can engage before signing up. */}
+                <Link
+                    to="/kids/stockdna"
+                    data-testid="landing-stockdna-cta"
+                    style={{
+                        display: "inline-flex", alignItems: "center", gap: 12,
+                        marginTop: 18, padding: "12px 20px",
+                        background: "linear-gradient(135deg, rgba(255,118,118,0.08), rgba(255,181,112,0.10))",
+                        border: `1.5px solid ${ACCENT}55`,
+                        color: NAVY, textDecoration: "none", borderRadius: 999,
+                        fontSize: 14, fontWeight: 600,
+                    }}
+                >
+                    <span style={{ fontSize: "1.4rem", lineHeight: 1 }}>🧬</span>
+                    <span>
+                        <span style={{ display: "block", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: ACCENT, fontWeight: 700 }}>NEW · 5 MIN</span>
+                        Discover your Stock<strong>DNA</strong> →
+                    </span>
+                </Link>
             </section>
 
             {/* Why start early — research-backed */}

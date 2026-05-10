@@ -121,6 +121,31 @@ export default function LoginPage() {
                             <TryNowBox variant="muted" className="mb-3" />
                             <PublicTrendingTicker variant="muted" windowDays={7} limit={8} ctaHref="/signup" ctaLabel="Sign up & run one →" />
                         </div>
+
+                        {/* StockDNA — public 5-minute investor-personality
+                            quiz. Open to guests (no auth required) so it
+                            doubles as a top-of-funnel lead magnet. */}
+                        <a
+                            href="/stockdna"
+                            data-testid="login-stockdna-cta"
+                            className="mt-6 inline-flex items-center gap-3 px-5 py-3 transition-all"
+                            style={{
+                                background: "linear-gradient(135deg, rgba(197,164,94,0.14), rgba(124,58,237,0.10))",
+                                border: "1px solid rgba(197,164,94,0.45)",
+                                color: "#e8eaf6",
+                                textDecoration: "none",
+                                fontFamily: "'IBM Plex Mono', monospace",
+                                fontSize: "0.78rem",
+                                letterSpacing: "0.08em",
+                            }}
+                        >
+                            <span style={{ fontSize: "1.4rem", lineHeight: 1 }}>🧬</span>
+                            <span>
+                                <span style={{ color: "#c5a45e", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", fontSize: "0.66rem", display: "block" }}>NEW · 5 MIN</span>
+                                <span style={{ fontWeight: 600 }}>What's your StockDNA?</span>
+                                <span style={{ opacity: 0.65, marginLeft: 6 }}>Discover your investor personality →</span>
+                            </span>
+                        </a>
                     </div>
 
                     <div
