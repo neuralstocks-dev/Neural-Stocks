@@ -101,12 +101,23 @@ export default function StockDNAQuiz({ theme }) {
         const isE = lang === "en";
         const stocks = market === "IDX" ? result.sx : market === "INTL" ? result.si : result.sx.slice(0, 3).concat(result.si.slice(0, 3));
         const insights = isE ? result.ie : result.ii;
+        // jsPDF's default Helvetica is WinAnsi-encoded — emoji + symbols
+        // outside Latin-1 render as garbled bytes ("Ø=ÜE", "#ó", etc.).
+        // Strip emoji / pictographs / variation selectors / ZWJ before PDF
+        // text rendering. The on-screen UI keeps emoji; only the PDF is
+        // ASCII+Latin-1 so it stays legible without bundling a 1MB Unicode font.
+        const stripEmoji = (s) => (s == null ? "" : String(s)
+            // Common emoji ranges: pictographs, dingbats, transport, supplemental, flags, misc symbols
+            .replace(/[\u2300-\u27FF\u2B00-\u2BFF\u3030\u303D\uFE0F\u200D]/g, "")
+            // Surrogate-pair emoji (U+1F000–U+1FFFF); JS exposes these as two UTF-16 code units
+            .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
+            // Trademark / registered / etc. that DO render in Helvetica — keep as-is
+            .replace(/\s+/g, " ").trim());
         const doc = new jsPDF({ unit: "pt", format: "a4" });
         const pageW = doc.internal.pageSize.getWidth();
         const pageH = doc.internal.pageSize.getHeight();
-        const M = 48; // margin
+        const M = 48;
         let y = M;
-        const lh = 14;
         const newPageIfNeeded = (need) => {
             if (y + need > pageH - M) { doc.addPage(); y = M; }
         };
@@ -115,7 +126,7 @@ export default function StockDNAQuiz({ theme }) {
             if (opts.bold) doc.setFont("helvetica", "bold"); else doc.setFont("helvetica", "normal");
             if (opts.color) doc.setTextColor(opts.color[0], opts.color[1], opts.color[2]);
             else doc.setTextColor(20, 20, 30);
-            const lines = doc.splitTextToSize(text, pageW - M * 2);
+            const lines = doc.splitTextToSize(stripEmoji(text), pageW - M * 2);
             const block = lines.length * (size * 1.25);
             newPageIfNeeded(block);
             doc.text(lines, M, y);
@@ -129,11 +140,11 @@ export default function StockDNAQuiz({ theme }) {
             y += 14;
         };
         // Header
-        writeWrapped("StockDNA™", 24, { bold: true, color: [124, 58, 237], gap: 2 });
+        writeWrapped("StockDNA(TM)", 24, { bold: true, color: [124, 58, 237], gap: 2 });
         writeWrapped(`${T.powered_by} NeuLab Inc.`, 9, { color: [120, 120, 130], gap: 14 });
         // Result
         writeWrapped(T.result_eyebrow, 8, { color: [124, 58, 237], gap: 4 });
-        writeWrapped(`${result.em} ${isE ? result.ne : result.ni}`, 22, { bold: true, color: [20, 20, 30], gap: 8 });
+        writeWrapped(isE ? result.ne : result.ni, 22, { bold: true, color: [20, 20, 30], gap: 8 });
         writeWrapped(isE ? result.de : result.di, 11, { gap: 12 });
         // Meta
         writeWrapped(
@@ -144,7 +155,7 @@ export default function StockDNAQuiz({ theme }) {
         hr();
         writeWrapped(isE ? "TRAITS" : "SIFAT", 9, { bold: true, color: [124, 58, 237], gap: 6 });
         result.tr.forEach((tr) => {
-            writeWrapped(`${tr.i}  ${(isE ? tr.le : tr.li)}: ${(isE ? tr.ve : tr.vi)}`, 11, { gap: 3 });
+            writeWrapped(`• ${(isE ? tr.le : tr.li)}: ${(isE ? tr.ve : tr.vi)}`, 11, { gap: 3 });
         });
         // Stocks
         hr();
@@ -174,10 +185,10 @@ export default function StockDNAQuiz({ theme }) {
             doc.setPage(p);
             doc.setFontSize(8);
             doc.setTextColor(140, 140, 150);
-            doc.text(`StockDNA™ · NeuLab Inc. · neulab.xyz · kidstocks.net   —   ${T.disclaimer}`, M, pageH - 24);
+            doc.text(stripEmoji(`StockDNA(TM) · NeuLab Inc. · neulab.xyz · kidstocks.net   —   ${T.disclaimer}`), M, pageH - 24);
             doc.text(`${p} / ${pages}`, pageW - M, pageH - 24, { align: "right" });
         }
-        const fileName = `StockDNA_${(isE ? result.ne : result.ni).replace(/\s+/g, "_")}_${market}.pdf`;
+        const fileName = `StockDNA_${stripEmoji(isE ? result.ne : result.ni).replace(/\s+/g, "_")}_${market}.pdf`;
         doc.save(fileName);
     };
 
