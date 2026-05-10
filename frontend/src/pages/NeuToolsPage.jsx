@@ -17,11 +17,14 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
+import axios from "axios";
 import { ArrowLeft, ArrowRight, Search, Share2 } from "lucide-react";
 import {
     NEUTOOLS, TOOL_INFO, BEAR_SCENARIOS, HORO_TYPES, HORO_READINGS,
     SLANG_TERMS, NEUTOOLS_I18N,
 } from "@/lib/neuToolsData";
+
+const API_BASE = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // ── NSI design tokens (mirrors StockDNAPage / global tokens) ──
 const T = {
@@ -530,13 +533,37 @@ const rupiah = (n) => {
 // ── 1. StockHoroscope ──
 function HoroscopeUI({ lang }) {
     const [pick, setPick] = useState(null);
-    const md = useMemo(() => {
-        const vix = (15 + Math.random() * 22).toFixed(1);
-        const sp = ((Math.random() - 0.48) * 5).toFixed(1);
-        const ih = ((Math.random() - 0.45) * 3.5).toFixed(1);
-        return { vix, sp, ih };
+    // Real macro data — fetched from /api/neutools/market-pulse (server-cached
+    // 5 min). On failure we surface a small "Market data unavailable" note
+    // rather than fall back to fake numbers — the whole point of this fix.
+    const [md, setMd] = useState(null);
+    const [mdErr, setMdErr] = useState(false);
+    const [mdLoading, setMdLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const r = await axios.get(`${API_BASE}/neutools/market-pulse`, { timeout: 15000 });
+                if (!cancelled) setMd(r.data);
+            } catch (e) {
+                if (!cancelled) setMdErr(true);
+            } finally {
+                if (!cancelled) setMdLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
     }, []);
+
     const reading = pick ? (HORO_READINGS[pick][lang] || HORO_READINGS[pick].en) : null;
+
+    // Weather classification driven by REAL VIX
+    const vixNum = md?.vix ?? null;
+    const weatherEn = vixNum == null ? "DATA UNAVAILABLE"
+        : vixNum > 28 ? "STORM WARNING"
+        : vixNum > 22 ? "OVERCAST"
+        : vixNum < 14 ? "CLEAR SKIES"
+        : "PARTLY CLOUDY";
 
     return (
         <section style={cuiStyle}>
@@ -564,17 +591,32 @@ function HoroscopeUI({ lang }) {
                 ))}
             </div>
 
-            <div style={{
-                background: T.panel2, border: `1px solid ${T.border}`,
-                padding: 13, marginBottom: 14, display: "flex",
-                alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
-            }}>
+            <div
+                data-testid="horo-market-bar"
+                style={{
+                    background: T.panel2, border: `1px solid ${T.border}`,
+                    padding: 13, marginBottom: 14, display: "flex",
+                    alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
+                }}
+            >
                 <div>
                     <div style={{ fontFamily: T.fontHeading, fontSize: 14, letterSpacing: 1, color: T.text }}>
-                        {parseFloat(md.vix) > 28 ? "STORM WARNING" : parseFloat(md.vix) > 22 ? "OVERCAST" : parseFloat(md.vix) < 14 ? "CLEAR SKIES" : "PARTLY CLOUDY"}
+                        {mdLoading ? (lang === "id" ? "MEMUAT DATA PASAR…" : "LOADING MARKET DATA…") : weatherEn}
                     </div>
-                    <div style={{ fontSize: 10, color: T.muted }}>VIX: {md.vix} · S&P 5D: {md.sp}% · IHSG 5D: {md.ih}%</div>
+                    <div style={{ fontSize: 10, color: T.muted }}>
+                        {mdErr ? (lang === "id" ? "Data pasar belum tersedia — coba lagi sebentar." : "Market data unavailable — try again in a minute.")
+                            : md ? (
+                                <>
+                                    VIX: {md.vix ?? "—"} · S&P 5D: {md.sp500_5d_pct != null ? (md.sp500_5d_pct >= 0 ? "+" : "") + md.sp500_5d_pct + "%" : "—"} · IHSG 5D: {md.ihsg_5d_pct != null ? (md.ihsg_5d_pct >= 0 ? "+" : "") + md.ihsg_5d_pct + "%" : "—"}
+                                </>
+                            ) : ""}
+                    </div>
                 </div>
+                {md && (
+                    <div style={{ fontSize: 8, letterSpacing: 1, color: T.accent, opacity: 0.8 }} title={`As of ${md.as_of}${md.cached ? " (cached)" : ""}`}>
+                        ● LIVE · yfinance
+                    </div>
+                )}
             </div>
 
             {reading && (
@@ -913,21 +955,50 @@ function TimeMachineUI({ lang }) {
     const [did, setDid] = useState("spent");
     const [stk, setStk] = useState("bbca");
     const [out, setOut] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState("");
 
-    const RATES = { bbca: 0.18, ihsg: 0.13, sp500: 0.10, nvda: 0.45, apple: 0.28 };
     const NAMES = { bbca: "BBCA", ihsg: "IHSG", sp500: "S&P 500", nvda: "NVDA", apple: "Apple" };
 
-    const run = () => {
-        const d = new Date(date);
-        const now = new Date();
-        const yrs = (now - d) / 365.25 / 86400000;
-        const r = RATES[stk];
-        const fv = amt * Math.pow(1 + r, yrs);
-        const actual = did === "saved" ? amt * Math.pow(1.02, yrs) : amt;
-        const missed = fv - actual;
-        const regret = Math.min(100, Math.round((fv / amt - 1) * 20));
-        const future20 = amt * Math.pow(1 + r, 20);
-        setOut({ fv, actual, missed, regret, future20 });
+    const run = async () => {
+        setErr(""); setBusy(true); setOut(null);
+        try {
+            // Hit the real historical-return endpoint.
+            const r = await axios.get(`${API_BASE}/neutools/historical-return`, {
+                params: { ticker: stk, from: date },
+                timeout: 20000,
+            });
+            const data = r.data;
+            // What-if invested value at the date → today
+            const fv = amt * (1 + data.total_return_pct / 100);
+            // What the user actually did with the money
+            const yrs = data.years;
+            const actual = did === "saved" ? amt * Math.pow(1.02, yrs) : amt;
+            const missed = fv - actual;
+            // Regret score: capped 0–100 from total return %, gentler curve
+            const regret = Math.min(100, Math.max(0, Math.round(data.total_return_pct / 10)));
+            // Forward projection: 20 years at the realised annualised return
+            const future20 = amt * Math.pow(1 + data.annualised_return_pct / 100, 20);
+            setOut({
+                fv, actual, missed, regret, future20, yrs,
+                annualised: data.annualised_return_pct,
+                total: data.total_return_pct,
+                start_close: data.start_close,
+                end_close: data.end_close,
+                start_date: data.start_date,
+                end_date: data.end_date,
+                cached: data.cached,
+            });
+        } catch (e) {
+            setErr(
+                e?.response?.data?.detail
+                || (lang === "id"
+                    ? "Data historis tidak tersedia — coba tanggal atau saham lain."
+                    : "Historical data unavailable — try another date or ticker.")
+            );
+        } finally {
+            setBusy(false);
+        }
     };
 
     return (
@@ -950,22 +1021,32 @@ function TimeMachineUI({ lang }) {
                 </Field>
                 <Field label={lang === "id" ? "Seandainya diinvestasikan di:" : "If invested in:"}>
                     <select value={stk} onChange={(e) => setStk(e.target.value)} style={fiStyle}>
-                        <option value="bbca">BBCA (18% pa)</option>
-                        <option value="ihsg">IHSG (13% pa)</option>
-                        <option value="sp500">S&amp;P 500 (10% pa)</option>
-                        <option value="nvda">NVDA (45% pa)</option>
-                        <option value="apple">Apple (28% pa)</option>
+                        <option value="bbca">BBCA.JK</option>
+                        <option value="ihsg">IHSG (^JKSE)</option>
+                        <option value="sp500">S&amp;P 500 (^GSPC)</option>
+                        <option value="nvda">NVDA</option>
+                        <option value="apple">Apple (AAPL)</option>
                     </select>
                 </Field>
             </Row>
-            <button onClick={run} style={bgoStyle} data-testid="tm-run">
-                {lang === "id" ? "BUKA MESIN WAKTU" : "OPEN THE TIME MACHINE"}
+            <button onClick={run} disabled={busy} style={{ ...bgoStyle, opacity: busy ? 0.6 : 1 }} data-testid="tm-run">
+                {busy
+                    ? (lang === "id" ? "MENGAMBIL DATA HISTORIS…" : "FETCHING HISTORICAL DATA…")
+                    : (lang === "id" ? "BUKA MESIN WAKTU" : "OPEN THE TIME MACHINE")}
             </button>
+            {err && (
+                <div data-testid="tm-error" style={{
+                    background: `${T.danger}15`, border: `1px solid ${T.danger}55`,
+                    color: T.danger, padding: 12, marginTop: 12, fontSize: 12,
+                }}>
+                    {err}
+                </div>
+            )}
             {out && (
                 <div style={resStyle} data-testid="tm-result">
                     <div style={{ fontFamily: T.fontHeading, fontSize: "clamp(28px,7vw,46px)", color: T.primary }}>{rupiah(out.fv)}</div>
                     <div style={{ fontSize: 9, color: T.muted, letterSpacing: 2, marginTop: 4, marginBottom: 12 }}>
-                        {rupiah(amt)} {lang === "id" ? "di" : "in"} {NAMES[stk]} {lang === "id" ? "dari" : "from"} {new Date(date).toLocaleDateString()} {lang === "id" ? "sekarang bernilai" : "would be worth this today"}
+                        {rupiah(amt)} {lang === "id" ? "di" : "in"} {NAMES[stk]} {lang === "id" ? "dari" : "from"} {new Date(out.start_date).toLocaleDateString()} {lang === "id" ? "sekarang bernilai" : "would be worth this today"}
                     </div>
                     <Grid3 cells={[
                         [rupiah(out.actual), lang === "id" ? "Nilai Aktual" : "Actual Value", T.danger],
@@ -973,12 +1054,44 @@ function TimeMachineUI({ lang }) {
                         [rupiah(out.missed), lang === "id" ? "Keuntungan Terlewat" : "Missed Gain"],
                     ]} />
                     <div style={{
+                        display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
+                        gap: 8, marginTop: 4,
+                    }}>
+                        <div style={{ background: T.panel, border: `1px solid ${T.border}`, padding: 11 }}>
+                            <div style={{ fontFamily: T.fontBody, fontSize: 12, color: T.text }}>
+                                {(out.total >= 0 ? "+" : "") + out.total.toFixed(1)}%
+                            </div>
+                            <div style={{ fontSize: 9, color: T.muted, marginTop: 2 }}>
+                                {lang === "id" ? "Total Pengembalian" : "Total Return"}
+                            </div>
+                        </div>
+                        <div style={{ background: T.panel, border: `1px solid ${T.border}`, padding: 11 }}>
+                            <div style={{ fontFamily: T.fontBody, fontSize: 12, color: T.text }}>
+                                {(out.annualised >= 0 ? "+" : "") + out.annualised.toFixed(2)}% pa
+                            </div>
+                            <div style={{ fontSize: 9, color: T.muted, marginTop: 2 }}>
+                                {lang === "id" ? "Pengembalian Tahunan" : "Annualised"}
+                            </div>
+                        </div>
+                        <div style={{ background: T.panel, border: `1px solid ${T.border}`, padding: 11 }}>
+                            <div style={{ fontFamily: T.fontBody, fontSize: 12, color: T.text }}>
+                                {out.regret}/100
+                            </div>
+                            <div style={{ fontSize: 9, color: T.muted, marginTop: 2 }}>
+                                {lang === "id" ? "Skor Penyesalan" : "Regret Score"}
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ fontSize: 9, color: T.accent, marginTop: 10, letterSpacing: 1 }}>
+                        ● LIVE · yfinance · {out.start_date} → {out.end_date}{out.cached ? " · cached" : ""}
+                    </div>
+                    <div style={{
                         fontSize: 12, color: T.muted, lineHeight: 1.7,
                         borderLeft: `2px solid ${T.primary}`, paddingLeft: 12, marginTop: 12,
                     }}>
                         {lang === "id"
-                            ? <>Penyesalan adalah sinyal. Rp {amt.toLocaleString()} yang dimulai hari ini di {NAMES[stk]} selama 20 tahun = <strong style={{ color: T.primary }}>{rupiah(out.future20)}</strong>. Mulai sekarang di <Link to="/dashboard" style={{ color: T.accent }}>dashboard NSI</Link>.</>
-                            : <>The regret is a signal. Rp {amt.toLocaleString()} started today in {NAMES[stk]} for 20 years = <strong style={{ color: T.primary }}>{rupiah(out.future20)}</strong>. Start now on the <Link to="/dashboard" style={{ color: T.accent }}>NSI dashboard</Link>.</>}
+                            ? <>Penyesalan adalah sinyal. Rp {amt.toLocaleString()} yang dimulai hari ini di {NAMES[stk]} selama 20 tahun (pada {out.annualised.toFixed(1)}% pa) = <strong style={{ color: T.primary }}>{rupiah(out.future20)}</strong>. Mulai sekarang di <Link to="/dashboard" style={{ color: T.accent }}>dashboard NSI</Link>.</>
+                            : <>The regret is a signal. Rp {amt.toLocaleString()} started today in {NAMES[stk]} for 20 years (at {out.annualised.toFixed(1)}% pa) = <strong style={{ color: T.primary }}>{rupiah(out.future20)}</strong>. Start now on the <Link to="/dashboard" style={{ color: T.accent }}>NSI dashboard</Link>.</>}
                     </div>
                 </div>
             )}

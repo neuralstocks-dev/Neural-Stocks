@@ -5,7 +5,7 @@ from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 
 from core.db import client
-from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry, kids_preview, kids_auth, kids_portfolio, kids_journal, kids_consent, kids_parent
+from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry, kids_preview, kids_auth, kids_portfolio, kids_journal, kids_consent, kids_parent, neutools
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,6 +47,7 @@ api_router.include_router(kids_portfolio.router)
 api_router.include_router(kids_journal.router)
 api_router.include_router(kids_consent.router)
 api_router.include_router(kids_parent.router)
+api_router.include_router(neutools.router)
 
 app.include_router(api_router)
 
