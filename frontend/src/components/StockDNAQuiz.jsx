@@ -14,9 +14,12 @@
  *     resetting answers
  *   - Recompute-safe RETAKE
  *   - data-testids on every interactive element + result content
+ *   - Result page exports a multi-page PDF (jsPDF) and copies a full
+ *     plain-text version to clipboard. EN + ID both supported.
  */
 import React, { useEffect, useMemo, useState } from "react";
-import { Sparkles, ArrowRight, Share2, Copy, RotateCcw, ExternalLink, Globe, BookOpen } from "lucide-react";
+import { Sparkles, ArrowRight, Download, Copy, RotateCcw, ArrowLeft, BookOpen } from "lucide-react";
+import { jsPDF } from "jspdf";
 import { QBASE, MKT_Q, CO_Q, REFERENCES } from "@/lib/stockDNA.data";
 import { TYPES } from "@/lib/stockDNA.types";
 import { STRINGS } from "@/lib/stockDNA.strings";
@@ -93,22 +96,147 @@ export default function StockDNAQuiz({ theme }) {
         window.scrollTo(0, 0);
     };
 
-    const doShare = async () => {
+    const doExportPDF = () => {
         if (!result) return;
-        const txt = `🧬 My StockDNA: ${result.em} ${lang === "id" ? result.ni : result.ne}\nMarket: ${market} · Risk: ${lang === "id" ? result.ri : result.re}\nDiscover yours at neulab.xyz / kidstocks.net`;
-        if (navigator.share) {
-            try { await navigator.share({ title: "My StockDNA", text: txt }); } catch (_e) { /* user cancelled */ }
-        } else if (navigator.clipboard) {
-            await navigator.clipboard.writeText(txt);
-            // eslint-disable-next-line no-alert
-            alert(lang === "id" ? "✓ Disalin!" : "✓ Copied!");
+        const isE = lang === "en";
+        const stocks = market === "IDX" ? result.sx : market === "INTL" ? result.si : result.sx.slice(0, 3).concat(result.si.slice(0, 3));
+        const insights = isE ? result.ie : result.ii;
+        const doc = new jsPDF({ unit: "pt", format: "a4" });
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const M = 48; // margin
+        let y = M;
+        const lh = 14;
+        const newPageIfNeeded = (need) => {
+            if (y + need > pageH - M) { doc.addPage(); y = M; }
+        };
+        const writeWrapped = (text, size, opts = {}) => {
+            doc.setFontSize(size);
+            if (opts.bold) doc.setFont("helvetica", "bold"); else doc.setFont("helvetica", "normal");
+            if (opts.color) doc.setTextColor(opts.color[0], opts.color[1], opts.color[2]);
+            else doc.setTextColor(20, 20, 30);
+            const lines = doc.splitTextToSize(text, pageW - M * 2);
+            const block = lines.length * (size * 1.25);
+            newPageIfNeeded(block);
+            doc.text(lines, M, y);
+            y += block + (opts.gap ?? 6);
+        };
+        const hr = () => {
+            newPageIfNeeded(20);
+            doc.setDrawColor(220, 220, 220);
+            doc.setLineWidth(0.5);
+            doc.line(M, y, pageW - M, y);
+            y += 14;
+        };
+        // Header
+        writeWrapped("StockDNA™", 24, { bold: true, color: [124, 58, 237], gap: 2 });
+        writeWrapped(`${T.powered_by} NeuLab Inc.`, 9, { color: [120, 120, 130], gap: 14 });
+        // Result
+        writeWrapped(T.result_eyebrow, 8, { color: [124, 58, 237], gap: 4 });
+        writeWrapped(`${result.em} ${isE ? result.ne : result.ni}`, 22, { bold: true, color: [20, 20, 30], gap: 8 });
+        writeWrapped(isE ? result.de : result.di, 11, { gap: 12 });
+        // Meta
+        writeWrapped(
+            `${T.risk_tolerance}: ${isE ? result.re : result.ri} (${result.risk}/100)  ·  Market: ${market}  ·  ${new Date().toLocaleDateString(isE ? "en-US" : "id-ID", { year: "numeric", month: "long", day: "numeric" })}`,
+            9, { color: [80, 80, 90], gap: 12 },
+        );
+        // Traits
+        hr();
+        writeWrapped(isE ? "TRAITS" : "SIFAT", 9, { bold: true, color: [124, 58, 237], gap: 6 });
+        result.tr.forEach((tr) => {
+            writeWrapped(`${tr.i}  ${(isE ? tr.le : tr.li)}: ${(isE ? tr.ve : tr.vi)}`, 11, { gap: 3 });
+        });
+        // Stocks
+        hr();
+        writeWrapped(T.section_stocks, 9, { bold: true, color: [124, 58, 237], gap: 6 });
+        stocks.forEach((s) => {
+            writeWrapped(`${s.t} — ${s.n}`, 11, { bold: true, gap: 2 });
+            writeWrapped(isE ? s.e : s.i, 10, { color: [70, 70, 80], gap: 8 });
+        });
+        // Insights
+        hr();
+        writeWrapped(T.section_insights, 9, { bold: true, color: [124, 58, 237], gap: 6 });
+        insights.forEach((x) => {
+            writeWrapped(x.s, 11, { bold: true, gap: 2 });
+            writeWrapped(x.t, 10, { color: [70, 70, 80], gap: 10 });
+        });
+        // References
+        hr();
+        writeWrapped(T.section_research, 9, { bold: true, color: [124, 58, 237], gap: 6 });
+        REFERENCES.forEach((r, i) => {
+            const text = (isE ? r.e : r.i).replace(/<\/?em>/g, "");
+            writeWrapped(`[${i + 1}]  ${text}`, 9, { color: [80, 80, 90], gap: 4 });
+            writeWrapped(`     ${r.u}`, 8, { color: [124, 58, 237], gap: 8 });
+        });
+        // Footer on every page
+        const pages = doc.internal.pages.length - 1;
+        for (let p = 1; p <= pages; p++) {
+            doc.setPage(p);
+            doc.setFontSize(8);
+            doc.setTextColor(140, 140, 150);
+            doc.text(`StockDNA™ · NeuLab Inc. · neulab.xyz · kidstocks.net   —   ${T.disclaimer}`, M, pageH - 24);
+            doc.text(`${p} / ${pages}`, pageW - M, pageH - 24, { align: "right" });
         }
+        const fileName = `StockDNA_${(isE ? result.ne : result.ni).replace(/\s+/g, "_")}_${market}.pdf`;
+        doc.save(fileName);
     };
-    const doCopy = async () => {
+
+    const doCopyText = async () => {
         if (!result || !navigator.clipboard) return;
-        await navigator.clipboard.writeText(`StockDNA™: ${result.em} ${lang === "id" ? result.ni : result.ne} | ${market} | by NeuLab Inc.`);
+        const isE = lang === "en";
+        const stocks = market === "IDX" ? result.sx : market === "INTL" ? result.si : result.sx.slice(0, 3).concat(result.si.slice(0, 3));
+        const insights = isE ? result.ie : result.ii;
+        const stripEm = (s) => s.replace(/<\/?em>/g, "");
+        const lines = [];
+        lines.push("=".repeat(60));
+        lines.push("StockDNA™");
+        lines.push(`${T.powered_by} NeuLab Inc.`);
+        lines.push("=".repeat(60));
+        lines.push("");
+        lines.push(`${T.result_eyebrow}: ${result.em} ${isE ? result.ne : result.ni}`);
+        lines.push(`${T.risk_tolerance}: ${isE ? result.re : result.ri} (${result.risk}/100)`);
+        lines.push(`Market: ${market}    Date: ${new Date().toLocaleDateString()}`);
+        lines.push("");
+        lines.push(isE ? result.de : result.di);
+        lines.push("");
+        lines.push("-".repeat(60));
+        lines.push(isE ? "TRAITS" : "SIFAT");
+        lines.push("-".repeat(60));
+        result.tr.forEach((tr) => {
+            lines.push(`  ${tr.i}  ${isE ? tr.le : tr.li}: ${isE ? tr.ve : tr.vi}`);
+        });
+        lines.push("");
+        lines.push("-".repeat(60));
+        lines.push(T.section_stocks);
+        lines.push("-".repeat(60));
+        stocks.forEach((s) => {
+            lines.push(`  ${s.t} — ${s.n}`);
+            lines.push(`     ${isE ? s.e : s.i}`);
+        });
+        lines.push("");
+        lines.push("-".repeat(60));
+        lines.push(T.section_insights);
+        lines.push("-".repeat(60));
+        insights.forEach((x) => {
+            lines.push(`  ${x.s}`);
+            lines.push(`     ${x.t}`);
+            lines.push("");
+        });
+        lines.push("-".repeat(60));
+        lines.push(T.section_research);
+        lines.push("-".repeat(60));
+        REFERENCES.forEach((r, i) => {
+            lines.push(`  [${i + 1}] ${stripEm(isE ? r.e : r.i)}`);
+            lines.push(`       ${r.u}`);
+        });
+        lines.push("");
+        lines.push("=".repeat(60));
+        lines.push(`Discover yours: neulab.xyz/stockdna · kidstocks.net/kids/stockdna`);
+        lines.push(T.disclaimer);
+        lines.push("=".repeat(60));
+        await navigator.clipboard.writeText(lines.join("\n"));
         // eslint-disable-next-line no-alert
-        alert(lang === "id" ? "✓ Disalin!" : "✓ Copied!");
+        alert(isE ? "✓ Full result copied to clipboard!" : "✓ Hasil lengkap disalin ke clipboard!");
     };
 
     // Shared visual helpers driven by the theme prop
@@ -146,7 +274,7 @@ export default function StockDNAQuiz({ theme }) {
                     theme={css} T={T} lang={lang} market={market} result={result}
                     comment={comment} setComment={setComment} savedOK={savedOK}
                     onSave={() => setSavedOK(true)}
-                    onShare={doShare} onCopy={doCopy} onRetake={retake}
+                    onExportPDF={doExportPDF} onCopyText={doCopyText} onRetake={retake}
                 />
             )}
         </div>
@@ -392,7 +520,7 @@ function LoadingScreen({ theme, T, msgIdx }) {
 }
 
 /* ---------- Result ---------- */
-function ResultScreen({ theme, T, lang, market, result, comment, setComment, savedOK, onSave, onShare, onCopy, onRetake }) {
+function ResultScreen({ theme, T, lang, market, result, comment, setComment, savedOK, onSave, onExportPDF, onCopyText, onRetake }) {
     const isE = lang === "en";
     const stocks = market === "IDX" ? result.sx : market === "INTL" ? result.si : result.sx.slice(0, 3).concat(result.si.slice(0, 3));
     const insights = isE ? result.ie : result.ii;
@@ -539,14 +667,57 @@ function ResultScreen({ theme, T, lang, market, result, comment, setComment, sav
                 <p style={{ fontSize: 10, color: theme.muted, textAlign: "center", borderTop: `1px solid ${theme.border}`, paddingTop: 14 }} dangerouslySetInnerHTML={{ __html: T.proof.replace(/<span>/g, `<span style="color:${theme.primary}">`) }} />
             </div>
 
-            {/* Share buttons */}
+            {/* Save-your-result section — explicit "redo if you don't" framing */}
             <SectionHeader theme={theme}>{T.section_share}</SectionHeader>
+            <div
+                data-testid="stockdna-save-warning"
+                style={{
+                    background: theme.panel,
+                    border: `1px solid ${theme.primary2}55`,
+                    borderLeft: `3px solid ${theme.primary2}`,
+                    padding: "14px 18px",
+                    borderRadius: theme.radius,
+                    marginBottom: 12,
+                    fontSize: 12,
+                    color: theme.text,
+                    lineHeight: 1.65,
+                }}
+            >
+                <strong style={{ color: theme.primary2, fontFamily: theme.fontHeading, letterSpacing: 1, textTransform: "uppercase", fontSize: 10 }}>
+                    ⚠️ {T.save_warning_title}
+                </strong>
+                <div style={{ marginTop: 6, opacity: 0.9 }}>{T.save_warning_body}</div>
+            </div>
             <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
-                <button onClick={onShare} data-testid="stockdna-share-btn" style={shareBtn(theme)}><Share2 size={12} style={{ display: "inline", marginRight: 4 }} /> {T.share}</button>
-                <button onClick={onCopy} data-testid="stockdna-copy-btn" style={shareBtn(theme)}><Copy size={12} style={{ display: "inline", marginRight: 4 }} /> {T.copy_result}</button>
+                <button onClick={onExportPDF} data-testid="stockdna-pdf-btn" style={{ ...shareBtn(theme), background: theme.primary2, color: "#fff", border: "none" }}>
+                    <Download size={12} style={{ display: "inline", marginRight: 5 }} /> {T.export_pdf}
+                </button>
+                <button onClick={onCopyText} data-testid="stockdna-copy-btn" style={shareBtn(theme)}>
+                    <Copy size={12} style={{ display: "inline", marginRight: 4 }} /> {T.copy_result}
+                </button>
                 <button onClick={onRetake} data-testid="stockdna-retake-btn" style={{ ...shareBtn(theme), color: theme.primary2, border: `1px solid ${theme.primary2}` }}>
                     <RotateCcw size={12} style={{ display: "inline", marginRight: 4 }} /> {T.retake}
                 </button>
+            </div>
+
+            {/* Back to dashboard — context-aware: kid theme → kidstocks.net,
+                adult theme → neulab.xyz. Single source of truth via theme.homeUrl. */}
+            <div style={{ marginTop: 22, paddingTop: 16, borderTop: `1px solid ${theme.border}`, textAlign: "center" }}>
+                <a
+                    href={theme.homeUrl}
+                    data-testid="stockdna-back-home"
+                    style={{
+                        display: "inline-flex", alignItems: "center", gap: 8,
+                        color: theme.primary, textDecoration: "none",
+                        fontFamily: theme.fontHeading, fontSize: 12, fontWeight: 700,
+                        letterSpacing: 1, textTransform: "uppercase",
+                        padding: "10px 22px",
+                        border: `1px solid ${theme.primary}55`,
+                        borderRadius: theme.radius,
+                    }}
+                >
+                    <ArrowLeft size={13} /> {T.back_to_home(theme.homeLabel || theme.homeUrl.replace(/^https?:\/\//, ""))}
+                </a>
             </div>
 
             <p style={{ fontSize: 9, color: theme.muted, textAlign: "center", marginTop: 44, paddingTop: 18, borderTop: `1px solid ${theme.border}`, letterSpacing: 1, lineHeight: 2.2 }}>

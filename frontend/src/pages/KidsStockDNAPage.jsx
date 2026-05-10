@@ -25,6 +25,7 @@ const KIDS_THEME = {
     radius: 12,
     angled: false,
     homeUrl: "https://kidstocks.net",
+    homeLabel: "kidstocks.net",
     brandSuffix: "by NeuLab Inc.",
 };
 

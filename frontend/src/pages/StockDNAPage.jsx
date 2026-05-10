@@ -25,6 +25,7 @@ const ADULT_THEME = {
     radius: 2,
     angled: true,
     homeUrl: "https://neulab.xyz",
+    homeLabel: "neulab.xyz",
     brandSuffix: "by NeuLab Inc.",
 };
 
