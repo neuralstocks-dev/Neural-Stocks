@@ -1,0 +1,50 @@
+{
+  "summary": "StockHoroscope UX enhancements on /neutools/horo — FRONTEND ONLY testing per request. All 4 features PASS end-to-end: (1) Dynamic StockDNA auto-pick banner reappears whenever pick === dnaArchetype (not just initial mount); (2) Per-archetype info modal opens via ⓘ icon and PICK THIS button switches active pick; (3) 30-sec 4-question mini-quiz selects winner and auto-closes; (4) PDF export downloads multi-page client-side jsPDF file. Page renders WHAT/WHY/HOW + interactive HoroscopeUI. All 8 investor archetypes + 8 info-icon tiles present (visionary, analyst, maverick, steady, explorer, guardian, strategist, timelord). EN primary tested; ID smoke confirmed banner translates to 'Dipersonalisasi dari hasil StockDNA Anda — SI VISIONER'. Zero console errors/warnings across full flow. Market-pulse pill rendered LIVE (VIX: 17.19, S&P 5D: +2.33%, IHSG 5D: +0.18% from yfinance) so graceful-degradation path not exercised in this session.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "HoroscopeUI reading card (horo-card)", "issues": ["The card has no explicit 'Celestial Signal' or 'Fortune' section labels — the brief describes these as named sections but the implementation renders the celestial-signal content as an italic blockquote at the top (no 'Celestial Signal' header) and the fortune line as a star-bracketed centred line (no 'Fortune' header). All 5 OTHER labelled sections (YOUR GUIDANCE, POWER MOVE, AVOID TODAY, LUCKY SECTOR, UNLUCKY SECTOR) ARE rendered with their labels. Cosmetic only — content is present and correctly archetype-specific. Consider adding small CELESTIAL SIGNAL / FORTUNE eyebrow labels for consistency with the other 5 sections."]}
+    ]
+  },
+  "verified_acceptance_criteria": [
+    "PASS: /neutools/horo renders WHAT/WHY/HOW descriptive sections + interactive HoroscopeUI below (heading 'Your Daily Market Reading' present)",
+    "PASS: horo-take-quiz button visible after scroll",
+    "PASS: 8 type tiles + 8 info-icon tiles (16 total horo-type-* testids) — keys: visionary, analyst, maverick, steady, explorer, guardian, strategist, timelord",
+    "PASS: Clicking horo-type-visionary renders horo-card with YOUR GUIDANCE, POWER MOVE, AVOID TODAY, LUCKY SECTOR, UNLUCKY SECTOR + italic celestial-signal quote + star-bracketed fortune line",
+    "PASS: horo-export-pdf button visible at bottom of reading card",
+    "PASS: horo-type-info-maverick opens horo-details-modal showing THE MAVERICK, tagline 'Buys when the crowd runs', summary, KEY TRAITS list (Contrarian/Quick decisive entries/Tight position caps/High beta tolerance), BEST AT chips (Crypto infra · High-beta with revenue · Post-crash beaten names), AVOID chips, Risk Tolerance: Very High, and PICK THIS & SEE READING button",
+    "PASS: Clicking horo-details-pick closes modal AND switches active pick to Maverick (THE MAVERICK tile becomes gold-highlighted, reading card body changes to Maverick-specific content 'Mars ignites — contrarian window opens...')",
+    "PASS: horo-take-quiz opens horo-quiz-modal with 'Question 1 / 4' header and 4 option buttons horo-quiz-opt-0-0..0-3",
+    "PASS: All 4 questions answerable via horo-quiz-opt-{0..3}-0; after step 3 click the modal auto-closes and pick updates (card re-renders with new archetype)",
+    "PASS: Dynamic banner — localStorage.setItem('stockdna_archetype','visionary') + reload → horo-autopicked-banner visible containing 'Personalised from your StockDNA — THE VISIONARY' (EN) / 'Dipersonalisasi dari hasil StockDNA Anda — SI VISIONER' (ID)",
+    "PASS: horo-switch-archetype hides banner AND hides reading card",
+    "PASS: Re-clicking horo-type-visionary makes banner REAPPEAR (dynamic behaviour tied to pick === dnaArchetype, not initial-mount-only) — NEW UX confirmed working",
+    "PASS: horo-export-pdf triggers download, filename 'StockHoroscope_THE_VISIONARY_2026-05-11.pdf' (matches pattern StockHoroscope_*.pdf), saved to /tmp/horoscope.pdf, size=7353 bytes (>1KB)",
+    "PASS: ID lang toggle in NeuTools header (top-right) flips banner copy to Indonesian without losing pick state",
+    "PASS: Market-pulse pill rendered LIVE (VIX 17.19, S&P 5D +2.33%, IHSG 5D +0.18%) — no graceful-degradation banner needed this session",
+    "PASS: Zero console errors/warnings across full flow (jsPDF, React, no upstream Anthropic socket-hang either)"
+  ],
+  "test_report_links": [
+    "/tmp/horoscope.pdf (7353 bytes — sample exported PDF for inspection)"
+  ],
+  "action_items": [
+    "OPTIONAL (cosmetic): Add CELESTIAL SIGNAL and FORTUNE eyebrow labels to horo-card to match the labelling of the other 5 sections (YOUR GUIDANCE, POWER MOVE, AVOID TODAY, LUCKY SECTOR, UNLUCKY SECTOR). Currently those two blocks render as unlabelled italic-quote and centred-star-line. Not blocking — content is correctly archetype-specific and the brief's intent (display celestial+fortune content) is met."
+  ],
+  "critical_code_review_comments": [
+    "Banner dynamic-reappear logic correctly ties visibility to pick === dnaArchetype rather than initial-mount-only — verified by switch-then-repick cycle. Good.",
+    "PDF filename includes UPPER_CASE archetype name with underscores ('StockHoroscope_THE_VISIONARY_2026-05-11.pdf') — readable, ISO date suffix is great for sorting. jsPDF generation is fully client-side (no server round-trip) — fast and offline-friendly.",
+    "Reading card content body doesn't echo archetype name back to the user — that's fine because the active tile is gold-highlighted, but it makes regression testing harder. Suggestion: add the archetype name as a data attribute on horo-card (e.g., data-archetype='maverick') so tests can assert which reading is active without OCR-style content sniffing.",
+    "Info modal copy is rich (tagline + summary + traits + best-at + avoid + risk tolerance) — well-curated. ID translations confirmed at least for the banner ('SI VISIONER', 'SI MAVERICK', 'SI ANALIS', 'SI TANGAN KOKOH', 'SI PENJELAJAH', 'SI PENJAGA', 'SI AHLI STRATEGI', 'SI TUAN WAKTU' — full coverage on tiles).",
+    "Quiz auto-closes on 4th selection and updates pick atomically — no flash of empty state, no leftover focus issues."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only request)", "frontend": "100% (16/16 acceptance criteria pass; 1 minor cosmetic label suggestion)"},
+  "test_credentials": "None — public unauthenticated tools.",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "HoroscopeUI is in /app/frontend/src/pages/NeuToolsPage.jsx and lives BELOW the WHAT/WHY/HOW descriptive panels — must scroll. Archetype keys are: visionary, analyst, maverick, steady, explorer, guardian, strategist, timelord (8 total). PDF download via jsPDF is client-side — use page.expect_download() to capture; filename pattern 'StockHoroscope_<DISPLAY_NAME>_<ISO_DATE>.pdf'. Banner data-testid='horo-autopicked-banner' is driven by pick === dnaArchetype where dnaArchetype is read from localStorage.stockdna_archetype. The NeuTools header has its own EN/ID toggle (top-right) writing to NeuTools-local lang state, NOT localStorage.kids_lang. Market-pulse API (/api/neutools/market-pulse) succeeded this session; the brief mentioned occasional yfinance flakiness — UI degrades gracefully to 'LOADING MARKET CONTEXT…' or 'MARKET CONTEXT REFRESHING…' instead of crashing. Reading card body does NOT include the archetype display name in text — verify selection via gold-highlighted tile or by checking card content uniqueness, not by sniffing for 'MAVERICK' etc.",
+  "rca_of_the_issue": "N/A — no product defects. One test-script false-negative caught: looking for 'MAVERICK' substring inside horo-card text failed because the card body uses archetype-specific reading content without echoing the archetype label. Verified pick-switch actually works via direct screenshot inspection (THE MAVERICK tile gold-highlighted + Maverick-specific copy 'Mars ignites — the contrarian window opens').\n\nOnly minor cosmetic gap: 'Celestial Signal' and 'Fortune' section labels are not rendered as explicit eyebrow headers (the content for both is present — italic quote + star-bracketed centred line — just without the labels). The brief describes them as named sections; the implementation chose label-less stylised treatment. Non-blocking."
+}
