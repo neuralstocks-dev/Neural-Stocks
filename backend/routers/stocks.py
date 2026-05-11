@@ -265,15 +265,35 @@ async def search_stocks(
         ]
         merged = _dedupe(idx_matches + results)
 
-        # If the user typed a 3-5 letter bare symbol that didn't match anything
-        # and the IDX directory isn't configured, normalise it to .JK and hint
-        # the UI that they should use the "Verify" action before adding.
+        # No catalog/IDX-live match. Decide the fallback shape based on
+        # whether the user signalled IDX intent:
+        #   - typed .JK suffix → IDX only
+        #   - exchange filter == IDX → IDX only
+        #   - otherwise → return the BARE symbol as US/NASDAQ candidate first
+        #     (yfinance accepts MRAM, HIMS, RKLB, SOFI, etc. directly), AND
+        #     surface the .JK guess as a secondary suggestion so Indonesian
+        #     users who type a bare IDX symbol still see it.
+        #
+        # The old behaviour silently routed every 3-5 letter bare symbol to
+        # `.JK` — which made real US tickers like MRAM appear "Not Found".
         if not merged and len(q) <= 5 and q.replace(".", "").isalpha():
-            candidate = qu if qu.endswith(".JK") else f"{qu}.JK"
-            merged = [{
-                "ticker": candidate, "name": candidate, "exchange": "IDX",
-                "category": "other", "source": "unverified",
-            }]
+            if q.upper().endswith(".JK") or wants_idx:
+                merged = [{
+                    "ticker": qu if qu.endswith(".JK") else f"{qu}.JK",
+                    "name": qu if qu.endswith(".JK") else f"{qu}.JK",
+                    "exchange": "IDX", "category": "other", "source": "unverified",
+                }]
+            else:
+                merged = [
+                    {
+                        "ticker": qu, "name": qu, "exchange": "US",
+                        "category": "other", "source": "unverified",
+                    },
+                    {
+                        "ticker": f"{qu}.JK", "name": f"{qu}.JK", "exchange": "IDX",
+                        "category": "other", "source": "unverified",
+                    },
+                ]
         elif not merged:
             merged = [{
                 "ticker": qu, "name": qu, "exchange": "?",
