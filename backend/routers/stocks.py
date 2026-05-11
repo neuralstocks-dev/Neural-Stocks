@@ -247,6 +247,10 @@ async def search_stocks(
             t = r.get("ticker")
             if t and t not in seen:
                 seen.add(t)
+                # Ensure every row has a `source` key so the UI can render
+                # consistently (curated catalog rows didn't have one before).
+                if "source" not in r:
+                    r = {**r, "source": "curated"}
                 out.append(r)
         return out
 
@@ -265,41 +269,31 @@ async def search_stocks(
         ]
         merged = _dedupe(idx_matches + results)
 
-        # No catalog/IDX-live match. Decide the fallback shape based on
-        # whether the user signalled IDX intent:
-        #   - typed .JK suffix → IDX only
-        #   - exchange filter == IDX → IDX only
-        #   - otherwise → return the BARE symbol as US/NASDAQ candidate first
-        #     (yfinance accepts MRAM, HIMS, RKLB, SOFI, etc. directly), AND
-        #     surface the .JK guess as a secondary suggestion so Indonesian
-        #     users who type a bare IDX symbol still see it.
-        #
-        # The old behaviour silently routed every 3-5 letter bare symbol to
-        # `.JK` — which made real US tickers like MRAM appear "Not Found".
-        if not merged and len(q) <= 5 and q.replace(".", "").isalpha():
-            if q.upper().endswith(".JK") or wants_idx:
-                merged = [{
-                    "ticker": qu if qu.endswith(".JK") else f"{qu}.JK",
-                    "name": qu if qu.endswith(".JK") else f"{qu}.JK",
-                    "exchange": "IDX", "category": "other", "source": "unverified",
-                }]
-            else:
-                merged = [
-                    {
-                        "ticker": qu, "name": qu, "exchange": "US",
-                        "category": "other", "source": "unverified",
-                    },
-                    {
-                        "ticker": f"{qu}.JK", "name": f"{qu}.JK", "exchange": "IDX",
-                        "category": "other", "source": "unverified",
-                    },
-                ]
-        elif not merged:
+        # PRIMARY engine — Yahoo Finance unified search across all exchanges.
+        # Triggered for queries ≥ 2 chars. Returns equities + ETFs from
+        # NASDAQ / NYSE / IDX / ASX / LSE / TSX / HKEX / SGX / etc. with
+        # proper exchange labels — no more aggressive `.JK` guessing.
+        if len(q) >= 2:
+            try:
+                from services import yahoo_search
+                yahoo_rows = await yahoo_search.search(q, limit=15)
+            except Exception:
+                yahoo_rows = []
+            # Compose: curated catalog hits first (preserves brand-name rank
+            # for AAPL/MSFT/etc.), then IDX live, then Yahoo (which fills in
+            # MRAM, HIMS, RKLB, SOFI, IDX small-caps not in our blue-chip list,
+            # ASX names, etc.)
+            merged = _dedupe(results + idx_matches + yahoo_rows)
+
+        # Pure fallback (Yahoo unreachable + nothing matched) — return the
+        # bare typed symbol so the user can still try analysing it. We DO NOT
+        # auto-append `.JK` here — that was the old bug.
+        if not merged:
             merged = [{
                 "ticker": qu, "name": qu, "exchange": "?",
                 "category": "other", "source": "unverified",
             }]
-        return merged[:15]
+        return merged[: max(limit, 15)]
 
     # No query: apply filters. Ranking is catalog insertion order (curator rank).
     if exchange == "IDX":
