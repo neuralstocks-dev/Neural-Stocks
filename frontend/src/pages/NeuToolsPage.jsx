@@ -25,8 +25,7 @@ import {
     HORO_TYPE_DETAILS, HORO_MINIQUIZ, HORO_TO_DNA,
     SLANG_TERMS, NEUTOOLS_I18N,
 } from "@/lib/neuToolsData";
-
-const API_BASE = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { API_BASE } from "@/lib/api";
 
 // Shared emoji-stripper for jsPDF (same pattern used by StockDNA export).
 // Default Helvetica is WinAnsi-encoded; emoji + pictographs garble unless

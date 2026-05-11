@@ -26,7 +26,17 @@
  */
 
 const ANON_ID_KEY = "sai_anon_id_v1";
-const API_BASE = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
+// Same-origin pattern (see /app/frontend/src/lib/api.js for the full rationale).
+// At runtime in the browser we ALWAYS prefer same-origin so each deployment
+// talks to its own backend ingress, even if a stale REACT_APP_BACKEND_URL was
+// baked into the bundle at build time (which is exactly what bit production
+// for neulab.xyz when the env-var still pointed to a long-dead preview host).
+function _resolveTelemetryBase() {
+    const envUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
+    if (typeof window === "undefined") return envUrl;
+    try { return window.location.origin; } catch { return envUrl; }
+}
+const API_BASE = _resolveTelemetryBase();
 
 function _uuidShort() {
     // Cryptographically-strong-ish per-browser UUID. Falls back to
