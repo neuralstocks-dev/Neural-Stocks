@@ -671,65 +671,93 @@ export default function OnboardingWizard({ open, onClose, onWatchlistChanged }) 
             <DialogContent
                 className="max-w-lg"
                 data-testid="onboarding-wizard"
-                style={{ background: "hsl(var(--background))" }}
+                style={{
+                    background: "hsl(var(--background))",
+                    // Constrain to viewport on mobile so the CTA never falls off.
+                    // 100svh handles iOS Safari's address-bar shrinking quirk.
+                    maxHeight: "min(90vh, 100svh - 32px)",
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                    padding: 0,
+                }}
             >
                 <button
                     type="button"
                     onClick={handleClose}
                     aria-label="Close"
                     className="absolute right-3 top-3 p-1.5 transition-opacity"
-                    style={{ color: "hsl(var(--text-muted))", opacity: 0.7 }}
+                    style={{ color: "hsl(var(--text-muted))", opacity: 0.7, zIndex: 2 }}
                     data-testid="onboarding-close"
                 >
                     <X size={16} strokeWidth={1.8} />
                 </button>
 
-                <DialogTitle className="font-serif text-xl">
-                    {step === 1 && "Welcome to Neural Stock Intelligence™"}
-                    {step === 2 && "Hold tight…"}
-                    {step === 3 && "Your first verdict"}
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                    Three-step onboarding wizard: pick starter tickers, run your first analysis,
-                    review the verdict.
-                </DialogDescription>
-
-                <StepIndicator current={step} />
-
-                {error && (
-                    <div
-                        className="signal-sell px-3 py-2 mb-3 text-sm flex items-start gap-2"
-                        data-testid="onboarding-error"
-                    >
-                        <AlertTriangle size={14} className="mt-0.5 shrink-0" /> {error}
+                {/* Pinned header — title + step indicator stay visible while
+                    the long stock-grid scrolls below on small screens. */}
+                <div style={{ flexShrink: 0, padding: "24px 24px 12px" }}>
+                    <DialogTitle className="font-serif text-xl">
+                        {step === 1 && "Welcome to Neural Stock Intelligence™"}
+                        {step === 2 && "Hold tight…"}
+                        {step === 3 && "Your first verdict"}
+                    </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        Three-step onboarding wizard: pick starter tickers, run your first analysis,
+                        review the verdict.
+                    </DialogDescription>
+                    <div className="mt-4">
+                        <StepIndicator current={step} />
                     </div>
-                )}
+                </div>
 
-                {step === 1 && (
-                    <Step1Picks
-                        picks={picks}
-                        setPicks={setPicks}
-                        accepted={accepted}
-                        setAccepted={setAccepted}
-                        onClose={handleClose}
-                        onNext={handleStep1Next}
-                    />
-                )}
-                {step === 2 && (
-                    <Step2Run
-                        picks={picks}
-                        onComplete={handleStep2Complete}
-                        onError={handleStep2Error}
-                    />
-                )}
-                {step === 3 && verdict && (
-                    <Step3Reveal
-                        ticker={verdict.ticker}
-                        result={verdict.result}
-                        onClose={handleStep3Close}
-                        onExplore={handleStep3Explore}
-                    />
-                )}
+                {/* Scrollable body — the picks + disclaimer + actions live here.
+                    On iPhone 16 portrait this means the long IDX preset grid can
+                    scroll while the user never loses sight of the dialog frame. */}
+                <div
+                    style={{
+                        flex: 1,
+                        minHeight: 0,
+                        overflowY: "auto",
+                        WebkitOverflowScrolling: "touch",
+                        padding: "0 24px 24px",
+                    }}
+                    data-testid="onboarding-scroll-body"
+                >
+                    {error && (
+                        <div
+                            className="signal-sell px-3 py-2 mb-3 text-sm flex items-start gap-2"
+                            data-testid="onboarding-error"
+                        >
+                            <AlertTriangle size={14} className="mt-0.5 shrink-0" /> {error}
+                        </div>
+                    )}
+
+                    {step === 1 && (
+                        <Step1Picks
+                            picks={picks}
+                            setPicks={setPicks}
+                            accepted={accepted}
+                            setAccepted={setAccepted}
+                            onClose={handleClose}
+                            onNext={handleStep1Next}
+                        />
+                    )}
+                    {step === 2 && (
+                        <Step2Run
+                            picks={picks}
+                            onComplete={handleStep2Complete}
+                            onError={handleStep2Error}
+                        />
+                    )}
+                    {step === 3 && verdict && (
+                        <Step3Reveal
+                            ticker={verdict.ticker}
+                            result={verdict.result}
+                            onClose={handleStep3Close}
+                            onExplore={handleStep3Explore}
+                        />
+                    )}
+                </div>
             </DialogContent>
         </Dialog>
     );
