@@ -785,7 +785,8 @@ function HoroscopeUI({ lang }) {
             </div>
 
             {reading && (
-                <div data-testid="horo-card" style={resStyle}>
+                <div data-testid="horo-card" data-archetype={pick} style={resStyle}>
+                    <SectionLabel>✦ {lang === "id" ? "SINYAL CELESTIAL" : "CELESTIAL SIGNAL"}</SectionLabel>
                     <div style={{
                         fontFamily: '"Georgia",serif', fontStyle: "italic",
                         fontSize: "clamp(14px,2.5vw,17px)", color: T.text,
@@ -801,6 +802,7 @@ function HoroscopeUI({ lang }) {
                         <SectorChip lucky label={lang === "id" ? "SEKTOR BERUNTUNG" : "LUCKY SECTOR"} value={reading.lucky} />
                         <SectorChip label={lang === "id" ? "TIDAK BERUNTUNG" : "UNLUCKY SECTOR"} value={reading.unlucky} />
                     </div>
+                    <SectionLabel>★ {lang === "id" ? "PESAN AKHIR" : "FORTUNE"}</SectionLabel>
                     <div style={{
                         textAlign: "center", padding: 13, borderTop: `1px solid ${T.border}`,
                         fontFamily: '"Georgia",serif', fontStyle: "italic",
