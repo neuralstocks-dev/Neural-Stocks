@@ -1460,12 +1460,25 @@ function TimeMachineUI({ lang }) {
 
     const run = async () => {
         setErr(""); setBusy(true); setOut(null);
+        // One silent retry + generous client budget — mobile networks + cold yfinance
+        // can race the prior 20s ceiling and surface as a network-abort with no
+        // response body, leading to a confusing generic "data unavailable" toast.
+        const tryOnce = () => axios.get(`${API_BASE}/neutools/historical-return`, {
+            params: { ticker: stk, from: date },
+            timeout: 35000,
+        });
+        let r;
         try {
-            // Hit the real historical-return endpoint.
-            const r = await axios.get(`${API_BASE}/neutools/historical-return`, {
-                params: { ticker: stk, from: date },
-                timeout: 20000,
-            });
+            try {
+                r = await tryOnce();
+            } catch (e1) {
+                // Retry once if it was a timeout or transient 5xx — don't retry 4xx.
+                const status = e1?.response?.status;
+                const retriable = !status || status >= 500 || e1?.code === "ECONNABORTED";
+                if (!retriable) throw e1;
+                await new Promise((res) => setTimeout(res, 800));
+                r = await tryOnce();
+            }
             const data = r.data;
             // What-if invested value at the date → today
             const fv = amt * (1 + data.total_return_pct / 100);
@@ -1488,11 +1501,17 @@ function TimeMachineUI({ lang }) {
                 cached: data.cached,
             });
         } catch (e) {
+            const detail = e?.response?.data?.detail;
+            const isTimeout = e?.code === "ECONNABORTED" || /timeout/i.test(e?.message || "");
             setErr(
-                e?.response?.data?.detail
+                detail
                 || (lang === "id"
-                    ? "Data historis tidak tersedia — coba tanggal atau saham lain."
-                    : "Historical data unavailable — try another date or ticker.")
+                    ? (isTimeout
+                        ? "Pasar sedang lambat — coba lagi sebentar."
+                        : "Data historis tidak tersedia — coba tanggal atau saham lain.")
+                    : (isTimeout
+                        ? "The market data feed is slow right now — please tap the button again in a moment."
+                        : "Historical data unavailable — try another date or ticker."))
             );
         } finally {
             setBusy(false);
