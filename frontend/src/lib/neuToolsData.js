@@ -287,7 +287,7 @@ export const TOOL_INFO = {
                 "<strong>Enter the amount</strong> you spent or left in savings instead of investing",
                 "<strong>Select what you actually did</strong> with the money",
                 "<strong>Choose the stock or index</strong> you wish you had bought",
-                "<strong>See your Regret Score</strong> and the missed gain in Rupiah",
+                "<strong>See your Regret Score</strong> and the missed gain in your currency",
             ],
             rf: [
                 "<em>Kahneman & Tversky (1982)</em> — The Psychology of Preferences.",

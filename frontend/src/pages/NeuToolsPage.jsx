@@ -542,6 +542,19 @@ const rupiah = (n) => {
     return "Rp " + Math.round(n).toLocaleString();
 };
 
+// USD formatter — used by StockTimeMachine when lang !== "id".
+// Compact for large numbers, comma-separated otherwise.
+const usd = (n) => {
+    if (n >= 1e9) return "$" + (n / 1e9).toFixed(2) + "B";
+    if (n >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return "$" + (n / 1e3).toFixed(1) + "K";
+    return "$" + Math.round(n).toLocaleString();
+};
+
+// Currency switch — IDR for Indonesian, USD for all other locales.
+const cur = (n, lang) => (lang === "id" ? rupiah(n) : usd(n));
+const curSymbol = (lang) => (lang === "id" ? "Rp" : "$");
+
 // Map StockDNA archetype keys → StockHoroscope type keys. Most align 1:1;
 // the four that differ get mapped here. Read by HoroscopeUI so a user who
 // already took the StockDNA quiz lands directly on their reading.
@@ -1426,12 +1439,22 @@ function SlangUI() {
 // ── 6. StockTimeMachine ──
 function TimeMachineUI({ lang }) {
     const [date, setDate] = useState("2020-01-01");
-    const [amt, setAmt] = useState(5000000);
+    // Default amount depends on currency: USD 500 for non-ID, IDR 5,000,000 for ID.
+    const [amt, setAmt] = useState(() => (lang === "id" ? 5000000 : 500));
     const [did, setDid] = useState("spent");
     const [stk, setStk] = useState("bbca");
     const [out, setOut] = useState(null);
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
+
+    // When user toggles EN ↔ ID, reset to the canonical default for that
+    // currency AND clear any prior result (the numbers below are in a now-
+    // wrong unit, so nuking them is the only honest move).
+    useEffect(() => {
+        setAmt(lang === "id" ? 5000000 : 500);
+        setOut(null);
+        setErr("");
+    }, [lang]);
 
     const NAMES = { bbca: "BBCA", ihsg: "IHSG", sp500: "S&P 500", nvda: "NVDA", apple: "Apple" };
 
@@ -1483,7 +1506,7 @@ function TimeMachineUI({ lang }) {
                 <Field label={lang === "id" ? "Tanggal Masa Lalu" : "Past Date"}>
                     <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={fiStyle} data-testid="tm-date" />
                 </Field>
-                <Field label={lang === "id" ? "Jumlah (Rp)" : "Amount (Rp)"}>
+                <Field label={lang === "id" ? "Jumlah (Rp)" : "Amount ($)"}>
                     <input type="number" value={amt} onChange={(e) => setAmt(+e.target.value || 0)} style={fiStyle} data-testid="tm-amt" />
                 </Field>
             </Row>
@@ -1519,14 +1542,14 @@ function TimeMachineUI({ lang }) {
             )}
             {out && (
                 <div style={resStyle} data-testid="tm-result">
-                    <div style={{ fontFamily: T.fontHeading, fontSize: "clamp(28px,7vw,46px)", color: T.primary }}>{rupiah(out.fv)}</div>
+                    <div style={{ fontFamily: T.fontHeading, fontSize: "clamp(28px,7vw,46px)", color: T.primary }}>{cur(out.fv, lang)}</div>
                     <div style={{ fontSize: 9, color: T.muted, letterSpacing: 2, marginTop: 4, marginBottom: 12 }}>
-                        {rupiah(amt)} {lang === "id" ? "di" : "in"} {NAMES[stk]} {lang === "id" ? "dari" : "from"} {new Date(out.start_date).toLocaleDateString()} {lang === "id" ? "sekarang bernilai" : "would be worth this today"}
+                        {cur(amt, lang)} {lang === "id" ? "di" : "in"} {NAMES[stk]} {lang === "id" ? "dari" : "from"} {new Date(out.start_date).toLocaleDateString()} {lang === "id" ? "sekarang bernilai" : "would be worth this today"}
                     </div>
                     <Grid3 cells={[
-                        [rupiah(out.actual), lang === "id" ? "Nilai Aktual" : "Actual Value", T.danger],
-                        [rupiah(out.fv), lang === "id" ? "Jika Diinvestasikan" : "If Invested", T.accent],
-                        [rupiah(out.missed), lang === "id" ? "Keuntungan Terlewat" : "Missed Gain"],
+                        [cur(out.actual, lang), lang === "id" ? "Nilai Aktual" : "Actual Value", T.danger],
+                        [cur(out.fv, lang), lang === "id" ? "Jika Diinvestasikan" : "If Invested", T.accent],
+                        [cur(out.missed, lang), lang === "id" ? "Keuntungan Terlewat" : "Missed Gain"],
                     ]} />
                     <div style={{
                         display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
@@ -1565,8 +1588,8 @@ function TimeMachineUI({ lang }) {
                         borderLeft: `2px solid ${T.primary}`, paddingLeft: 12, marginTop: 12,
                     }}>
                         {lang === "id"
-                            ? <>Penyesalan adalah sinyal. Rp {amt.toLocaleString()} yang dimulai hari ini di {NAMES[stk]} selama 20 tahun (pada {out.annualised.toFixed(1)}% pa) = <strong style={{ color: T.primary }}>{rupiah(out.future20)}</strong>. Mulai sekarang di <Link to="/dashboard" style={{ color: T.accent }}>dashboard NSI</Link>.</>
-                            : <>The regret is a signal. Rp {amt.toLocaleString()} started today in {NAMES[stk]} for 20 years (at {out.annualised.toFixed(1)}% pa) = <strong style={{ color: T.primary }}>{rupiah(out.future20)}</strong>. Start now on the <Link to="/dashboard" style={{ color: T.accent }}>NSI dashboard</Link>.</>}
+                            ? <>Penyesalan adalah sinyal. {cur(amt, lang)} yang dimulai hari ini di {NAMES[stk]} selama 20 tahun (pada {out.annualised.toFixed(1)}% pa) = <strong style={{ color: T.primary }}>{cur(out.future20, lang)}</strong>. Mulai sekarang di <Link to="/dashboard" style={{ color: T.accent }}>dashboard NSI</Link>.</>
+                            : <>The regret is a signal. {cur(amt, lang)} started today in {NAMES[stk]} for 20 years (at {out.annualised.toFixed(1)}% pa) = <strong style={{ color: T.primary }}>{cur(out.future20, lang)}</strong>. Start now on the <Link to="/dashboard" style={{ color: T.accent }}>NSI dashboard</Link>.</>}
                     </div>
                 </div>
             )}
