@@ -215,6 +215,13 @@ function AppRoutes() {
 }
 
 function App() {
+    // Watch for new bundle deployments — silently shows a "Refresh" pill
+    // when a redeploy lands and the user is still on a stale tab.
+    React.useEffect(() => {
+        // Lazy import so the watcher never blocks paint.
+        import("@/lib/buildWatcher").then(({ startBuildWatcher }) => startBuildWatcher());
+    }, []);
+
     return (
         <div className="App">
             <ThemeProvider>

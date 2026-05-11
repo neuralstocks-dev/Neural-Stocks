@@ -5,6 +5,14 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="theme-color" content="#0A0C10" />
 
+        <!-- Cache busting: index.html must always revalidate so users pick
+             up new bundle hashes after a redeploy. JS/CSS chunks already
+             have content hashes in their filenames (CRA default) so they
+             stay long-cached and immutable, which keeps page loads fast. -->
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
+
         <!-- Primary SEO -->
         <title>Neural Stock Intelligence™ — AI Stock Research Assistant</title>
         <meta name="description" content="AI-powered stock research for every investor. Neural Stock Intelligence analyzes markets, surfaces signals, and guides smarter decisions — free to start.">
