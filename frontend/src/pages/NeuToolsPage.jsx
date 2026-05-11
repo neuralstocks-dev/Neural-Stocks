@@ -18,13 +18,23 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import axios from "axios";
-import { ArrowLeft, ArrowRight, Search, Share2 } from "lucide-react";
+import { jsPDF } from "jspdf";
+import { ArrowLeft, ArrowRight, Search, Share2, Info, X, FileDown, HelpCircle } from "lucide-react";
 import {
     NEUTOOLS, TOOL_INFO, BEAR_SCENARIOS, HORO_TYPES, HORO_READINGS,
+    HORO_TYPE_DETAILS, HORO_MINIQUIZ, HORO_TO_DNA,
     SLANG_TERMS, NEUTOOLS_I18N,
 } from "@/lib/neuToolsData";
 
 const API_BASE = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// Shared emoji-stripper for jsPDF (same pattern used by StockDNA export).
+// Default Helvetica is WinAnsi-encoded; emoji + pictographs garble unless
+// we strip them before passing text into the PDF.
+const stripEmoji = (s) => (s == null ? "" : String(s)
+    .replace(/[\u2300-\u27FF\u2B00-\u2BFF\u3030\u303D\uFE0F\u200D]/g, "")
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
+    .replace(/\s+/g, " ").trim());
 
 // ── NSI design tokens (mirrors StockDNAPage / global tokens) ──
 const T = {
@@ -548,24 +558,33 @@ const DNA_TO_HORO = {
 
 // ── 1. StockHoroscope ──
 function HoroscopeUI({ lang }) {
-    // Auto-select the archetype the user identified with in StockDNA — if any.
-    // Falls back to null (manual picker) when no result has been saved.
-    const initialPick = (() => {
+    // Read the saved StockDNA archetype. Treated as a SEPARATE concept from
+    // the current `pick` — the "personalised from StockDNA" banner shows
+    // whenever pick === dnaArchetype, regardless of how the user got there
+    // (initial auto-pick OR re-clicking the matching tile after a SWITCH).
+    const dnaArchetype = useMemo(() => {
         try {
             const dna = localStorage.getItem("stockdna_archetype");
             return dna && DNA_TO_HORO[dna] && HORO_READINGS[DNA_TO_HORO[dna]]
                 ? DNA_TO_HORO[dna]
                 : null;
         } catch (_) { return null; }
-    })();
-    const [pick, setPick] = useState(initialPick);
-    const [autoSourced, setAutoSourced] = useState(Boolean(initialPick));
+    }, []);
+    const [pick, setPick] = useState(dnaArchetype);
+    const isDnaMatch = pick && pick === dnaArchetype;
+
     // Live macro data — fetched from /api/neutools/market-pulse (server-cached
     // 5 min). The reading itself is personality-based interpretation and does
     // NOT depend on these numbers — they are contextual atmosphere only. If
     // they fail we degrade quietly so the reading still feels intentional.
     const [md, setMd] = useState(null);
     const [mdState, setMdState] = useState("loading"); // loading|ready|refreshing
+
+    // Modal state — only ONE modal is visible at a time. "details" holds the
+    // archetype key whose deep-dive popup is currently shown; "quiz" toggles
+    // the 4-question mini-quiz modal.
+    const [detailsKey, setDetailsKey] = useState(null);
+    const [quizOpen, setQuizOpen] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -578,13 +597,10 @@ function HoroscopeUI({ lang }) {
                 setMdState("ready");
             } catch (_) {
                 if (cancelled) return;
-                // Silently retry up to 2 more times (5s, then 15s) before
-                // surfacing anything to the user. Most yfinance hiccups
-                // resolve on the second attempt.
                 if (tryNum < 3) {
                     retryTimer = setTimeout(() => attempt(tryNum + 1), tryNum === 1 ? 5000 : 15000);
                 } else {
-                    setMdState("refreshing"); // benign label — never "UNAVAILABLE"
+                    setMdState("refreshing");
                 }
             }
         };
@@ -605,24 +621,50 @@ function HoroscopeUI({ lang }) {
         : vixNum < 14 ? "CLEAR SKIES"
         : "PARTLY CLOUDY";
 
+    // Called by the mini-quiz when the user finishes. Writes the winning
+    // archetype back to localStorage so future visits auto-pick on mount.
+    const onQuizFinish = (horoKey) => {
+        setPick(horoKey);
+        try {
+            localStorage.setItem("stockdna_archetype", HORO_TO_DNA[horoKey] || horoKey);
+            localStorage.setItem("stockdna_archetype_ts", new Date().toISOString());
+        } catch (_) { /* private mode / quota — non-fatal */ }
+        setQuizOpen(false);
+    };
+
+    const onExportPDF = () => exportHoroscopePDF({ pick, reading, md, weatherEn, lang });
+
     return (
         <section style={cuiStyle}>
-            <div style={ctitStyle}>✦ {lang === "id" ? "Bacaan Pasar Harian Anda" : "Your Daily Market Reading"}</div>
-            {autoSourced && pick && (
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 18 }}>
+                <div style={{ ...ctitStyle, marginBottom: 0 }}>
+                    ✦ {lang === "id" ? "Bacaan Pasar Harian Anda" : "Your Daily Market Reading"}
+                </div>
+                <button
+                    onClick={() => setQuizOpen(true)}
+                    data-testid="horo-take-quiz"
+                    style={{
+                        fontFamily: T.fontBody, fontSize: 9, letterSpacing: 1,
+                        padding: "6px 11px", cursor: "pointer",
+                        background: "transparent", color: T.primary,
+                        border: `1px solid ${T.primary}66`, display: "inline-flex",
+                        alignItems: "center", gap: 5, whiteSpace: "nowrap",
+                    }}
+                    title={lang === "id" ? "Tidak tahu tipe Anda? Ikuti kuis 30 detik." : "Don't know your type? 30-second quiz."}
+                >
+                    <HelpCircle size={11} strokeWidth={1.8} />
+                    {lang === "id" ? "30-DETIK KUIS" : "30-SEC QUIZ"}
+                </button>
+            </div>
+
+            {isDnaMatch && (
                 <div
                     data-testid="horo-autopicked-banner"
                     style={{
-                        background: "#7c3aed14",
-                        border: "1px solid #7c3aed55",
-                        padding: "8px 12px",
-                        marginBottom: 14,
-                        fontSize: 11,
-                        color: "#c4b5fd",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 8,
-                        flexWrap: "wrap",
+                        background: "#7c3aed14", border: "1px solid #7c3aed55",
+                        padding: "8px 12px", marginBottom: 14, fontSize: 11,
+                        color: "#c4b5fd", display: "flex", alignItems: "center",
+                        justifyContent: "space-between", gap: 8, flexWrap: "wrap",
                     }}
                 >
                     <span>
@@ -634,43 +676,61 @@ function HoroscopeUI({ lang }) {
                         </strong>
                     </span>
                     <button
-                        onClick={() => { setAutoSourced(false); setPick(null); }}
+                        onClick={() => setPick(null)}
                         data-testid="horo-switch-archetype"
                         style={{
-                            background: "transparent",
-                            border: "1px solid #7c3aed55",
-                            color: "#c4b5fd",
-                            fontFamily: T.fontBody,
-                            fontSize: 9,
-                            letterSpacing: 1,
-                            padding: "4px 10px",
-                            cursor: "pointer",
+                            background: "transparent", border: "1px solid #7c3aed55",
+                            color: "#c4b5fd", fontFamily: T.fontBody, fontSize: 9,
+                            letterSpacing: 1, padding: "4px 10px", cursor: "pointer",
                         }}
                     >
                         {lang === "id" ? "GANTI" : "SWITCH"}
                     </button>
                 </div>
             )}
+
             <div style={{ ...flStyle, marginBottom: 10 }}>
                 {lang === "id" ? "PILIH TIPE INVESTOR ANDA" : "SELECT YOUR INVESTOR TYPE"}
             </div>
             <div style={{
-                display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))",
+                display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))",
                 gap: 7, marginBottom: 16,
             }}>
                 {Object.entries(HORO_TYPES).map(([k, t]) => (
-                    <button
+                    <div
                         key={k}
-                        onClick={() => { setPick(k); setAutoSourced(false); }}
-                        data-testid={`horo-type-${k}`}
                         style={{
+                            position: "relative",
                             background: pick === k ? `${T.primary}22` : T.panel2,
                             border: `1px solid ${pick === k ? T.primary : T.border}`,
-                            color: pick === k ? T.primary : T.muted,
-                            padding: 11, cursor: "pointer", textAlign: "center",
-                            fontFamily: T.fontBody, fontSize: 9, letterSpacing: 1,
                         }}
-                    >{t[lang] || t.en}</button>
+                    >
+                        <button
+                            onClick={() => setPick(k)}
+                            data-testid={`horo-type-${k}`}
+                            style={{
+                                width: "100%", background: "transparent",
+                                border: "none", color: pick === k ? T.primary : T.muted,
+                                padding: "11px 26px 11px 11px", cursor: "pointer",
+                                textAlign: "center", fontFamily: T.fontBody,
+                                fontSize: 9, letterSpacing: 1,
+                            }}
+                        >{t[lang] || t.en}</button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setDetailsKey(k); }}
+                            data-testid={`horo-type-info-${k}`}
+                            title={lang === "id" ? "Lihat detail" : "View details"}
+                            style={{
+                                position: "absolute", top: 4, right: 4,
+                                background: "transparent", border: "none",
+                                color: pick === k ? T.primary : T.muted,
+                                padding: 4, cursor: "pointer", opacity: 0.65,
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            }}
+                        >
+                            <Info size={11} strokeWidth={1.8} />
+                        </button>
+                    </div>
                 ))}
             </div>
 
@@ -746,10 +806,318 @@ function HoroscopeUI({ lang }) {
                         fontFamily: '"Georgia",serif', fontStyle: "italic",
                         color: T.amber, fontSize: 13, marginTop: 12,
                     }}>★ {reading.fort} ★</div>
+
+                    <div style={{ display: "flex", justifyContent: "center", marginTop: 14 }}>
+                        <button
+                            onClick={onExportPDF}
+                            data-testid="horo-export-pdf"
+                            style={{
+                                fontFamily: T.fontBody, fontSize: 10, letterSpacing: 1.5,
+                                padding: "9px 18px", cursor: "pointer",
+                                background: T.primary, color: T.bg, border: "none",
+                                fontWeight: 700, display: "inline-flex",
+                                alignItems: "center", gap: 7, textTransform: "uppercase",
+                            }}
+                        >
+                            <FileDown size={13} strokeWidth={2} />
+                            {lang === "id" ? "EKSPOR PDF" : "EXPORT AS PDF"}
+                        </button>
+                    </div>
                 </div>
+            )}
+
+            {detailsKey && (
+                <HoroDetailsModal
+                    typeKey={detailsKey}
+                    lang={lang}
+                    onClose={() => setDetailsKey(null)}
+                    onChoose={(k) => { setPick(k); setDetailsKey(null); }}
+                />
+            )}
+            {quizOpen && (
+                <HoroMiniQuizModal
+                    lang={lang}
+                    onClose={() => setQuizOpen(false)}
+                    onFinish={onQuizFinish}
+                />
             )}
         </section>
     );
+}
+
+// ─── Type details modal ──────────────────────────────────────────────
+function HoroDetailsModal({ typeKey, lang, onClose, onChoose }) {
+    const meta = HORO_TYPES[typeKey];
+    const d = HORO_TYPE_DETAILS[typeKey]?.[lang] || HORO_TYPE_DETAILS[typeKey]?.en;
+    if (!meta || !d) return null;
+    return (
+        <ModalShell onClose={onClose} testId="horo-details-modal">
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+                <div>
+                    <div style={{ fontSize: 8, letterSpacing: 2, color: T.primary }}>
+                        {lang === "id" ? "ARKETIPE INVESTOR" : "INVESTOR ARCHETYPE"}
+                    </div>
+                    <h3 style={{
+                        fontFamily: T.fontHeading, fontSize: 22, letterSpacing: 1,
+                        color: T.text, margin: "2px 0 0",
+                    }}>{meta[lang] || meta.en}</h3>
+                </div>
+                <button onClick={onClose} data-testid="horo-details-close" style={modalCloseStyle} aria-label="Close">
+                    <X size={14} strokeWidth={2} />
+                </button>
+            </div>
+            <div style={{
+                fontStyle: "italic", color: T.amber, fontSize: 13,
+                lineHeight: 1.5, marginBottom: 14,
+            }}>"{d.tagline}"</div>
+            <P html={d.summary} />
+            <SectionLabel>{lang === "id" ? "CIRI KHAS" : "KEY TRAITS"}</SectionLabel>
+            <ul style={{ margin: "0 0 12px", padding: 0, listStyle: "none" }}>
+                {d.traits.map((t, i) => (
+                    <li key={i} style={{ fontSize: 12, color: T.muted, lineHeight: 1.7, paddingLeft: 12, position: "relative" }}>
+                        <span style={{ position: "absolute", left: 0, color: T.primary }}>·</span>{t}
+                    </li>
+                ))}
+            </ul>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 8 }}>
+                <SectorChip lucky label={lang === "id" ? "TERBAIK UNTUK" : "BEST AT"} value={d.best} />
+                <SectorChip label={lang === "id" ? "HINDARI" : "AVOID"} value={d.worst} />
+            </div>
+            <div style={{ fontSize: 11, color: T.muted, marginTop: 10 }}>
+                <strong style={{ color: T.text }}>{lang === "id" ? "Tingkat Risiko:" : "Risk Tolerance:"}</strong> {d.risk}
+            </div>
+            <button
+                onClick={() => onChoose(typeKey)}
+                data-testid="horo-details-pick"
+                style={{ ...bgoStyle, marginTop: 18 }}
+            >
+                {lang === "id" ? "PILIH INI & LIHAT BACAAN" : "PICK THIS & SEE READING"}
+            </button>
+        </ModalShell>
+    );
+}
+
+// ─── 4-question mini-quiz modal ──────────────────────────────────────
+function HoroMiniQuizModal({ lang, onClose, onFinish }) {
+    const [step, setStep] = useState(0);
+    const [answers, setAnswers] = useState({});
+    const total = HORO_MINIQUIZ.length;
+    const q = HORO_MINIQUIZ[step];
+
+    const pick = (oi) => {
+        const next = { ...answers, [step]: oi };
+        setAnswers(next);
+        if (step + 1 < total) {
+            setStep(step + 1);
+        } else {
+            const scores = {};
+            Object.keys(next).forEach((k) => {
+                const t = HORO_MINIQUIZ[+k].opts[next[k]].t;
+                Object.keys(t).forEach((kk) => { scores[kk] = (scores[kk] || 0) + t[kk]; });
+            });
+            const winner = Object.keys(scores).sort((a, b) => scores[b] - scores[a])[0] || "strategist";
+            onFinish(winner);
+        }
+    };
+
+    return (
+        <ModalShell onClose={onClose} testId="horo-quiz-modal">
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
+                <div>
+                    <div style={{ fontSize: 8, letterSpacing: 2, color: T.primary }}>
+                        {lang === "id" ? "KUIS CEPAT 30-DETIK" : "30-SEC INVESTOR QUIZ"}
+                    </div>
+                    <div style={{ fontSize: 10, color: T.muted, marginTop: 4 }}>
+                        {lang === "id" ? "Pertanyaan" : "Question"} {step + 1} / {total}
+                    </div>
+                </div>
+                <button onClick={onClose} data-testid="horo-quiz-close" style={modalCloseStyle} aria-label="Close">
+                    <X size={14} strokeWidth={2} />
+                </button>
+            </div>
+            <div style={{
+                height: 3, background: T.panel2, marginBottom: 18,
+                position: "relative", overflow: "hidden",
+            }}>
+                <div style={{
+                    position: "absolute", inset: 0, width: `${((step + 1) / total) * 100}%`,
+                    background: T.primary, transition: "width .25s",
+                }} />
+            </div>
+            <h3 style={{
+                fontFamily: T.fontHeading, fontSize: 19, lineHeight: 1.3,
+                color: T.text, margin: "0 0 16px",
+            }}>{q[lang]?.q || q.en.q}</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {q.opts.map((opt, j) => (
+                    <button
+                        key={j}
+                        onClick={() => pick(j)}
+                        data-testid={`horo-quiz-opt-${step}-${j}`}
+                        style={{
+                            background: T.panel, border: `1px solid ${T.border}`,
+                            color: T.text, padding: "12px 14px", textAlign: "left",
+                            cursor: "pointer", fontSize: 13, lineHeight: 1.5,
+                            fontFamily: T.fontBody, display: "flex", gap: 10,
+                            alignItems: "flex-start",
+                        }}
+                    >
+                        <span style={{ fontFamily: T.fontHeading, fontSize: 13, color: T.primary, minWidth: 16 }}>
+                            {"ABCD"[j]}
+                        </span>
+                        <span>{opt[lang] || opt.en}</span>
+                    </button>
+                ))}
+            </div>
+            <div style={{ fontSize: 10, color: T.muted, marginTop: 14, opacity: 0.7, textAlign: "center" }}>
+                {lang === "id" ? "Hasil disimpan ke browser ini. " : "Result saved to this browser. "}
+                <Link to="/stockdna" style={{ color: T.primary }}>
+                    {lang === "id" ? "Kuis StockDNA penuh →" : "Full StockDNA quiz →"}
+                </Link>
+            </div>
+        </ModalShell>
+    );
+}
+
+// ─── Modal shell — used by both popups ───────────────────────────────
+function ModalShell({ children, onClose, testId }) {
+    return (
+        <div
+            onClick={onClose}
+            data-testid={testId}
+            style={{
+                position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)",
+                backdropFilter: "blur(4px)", zIndex: 100,
+                display: "grid", placeItems: "center", padding: 14,
+            }}
+        >
+            <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                    background: T.bg, border: `1px solid ${T.primary}55`,
+                    padding: 24, width: "100%", maxWidth: 460,
+                    maxHeight: "calc(100vh - 28px)", overflowY: "auto",
+                    fontFamily: T.fontBody,
+                }}
+            >
+                {children}
+            </div>
+        </div>
+    );
+}
+
+const modalCloseStyle = {
+    background: "transparent", border: `1px solid ${T.border}`,
+    color: T.muted, padding: 6, cursor: "pointer", lineHeight: 0,
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+};
+
+// ─── PDF export ──────────────────────────────────────────────────────
+function exportHoroscopePDF({ pick, reading, md, weatherEn, lang }) {
+    if (!reading || !pick) return;
+    const isE = lang !== "id";
+    const meta = HORO_TYPES[pick];
+    const details = HORO_TYPE_DETAILS[pick]?.[lang] || HORO_TYPE_DETAILS[pick]?.en;
+    const archetypeName = meta?.[lang] || meta?.en || "INVESTOR";
+    const today = new Date().toLocaleDateString(isE ? "en-US" : "id-ID",
+        { year: "numeric", month: "long", day: "numeric" });
+
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const M = 48;
+    let y = M;
+
+    const newPageIfNeeded = (need) => {
+        if (y + need > pageH - M - 24) { doc.addPage(); y = M; }
+    };
+    const writeWrapped = (text, size, opts = {}) => {
+        doc.setFontSize(size);
+        doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+        const [r, g, b] = opts.color || [20, 20, 30];
+        doc.setTextColor(r, g, b);
+        const lines = doc.splitTextToSize(stripEmoji(text), pageW - M * 2);
+        const block = lines.length * (size * 1.25);
+        newPageIfNeeded(block);
+        doc.text(lines, M, y);
+        y += block + (opts.gap ?? 6);
+    };
+    const hr = () => {
+        newPageIfNeeded(20);
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.5);
+        doc.line(M, y, pageW - M, y);
+        y += 14;
+    };
+
+    writeWrapped("StockHoroscope(TM)", 20, { bold: true, color: [197, 164, 94], gap: 4 });
+    writeWrapped(`${isE ? "by" : "oleh"} NeuLab Inc. · neulab.xyz`, 9,
+        { color: [120, 120, 130], gap: 14 });
+    writeWrapped(isE ? "YOUR DAILY MARKET READING" : "BACAAN PASAR HARIAN ANDA", 9,
+        { bold: true, color: [197, 164, 94], gap: 14 });
+    writeWrapped(archetypeName, 17, { bold: true, color: [20, 20, 30], gap: 4 });
+    if (details?.tagline) writeWrapped(`"${details.tagline}"`, 11, { color: [110, 110, 120], gap: 14 });
+
+    if (md && weatherEn) {
+        hr();
+        writeWrapped(isE ? "MARKET CONTEXT" : "KONTEKS PASAR", 9,
+            { bold: true, color: [197, 164, 94], gap: 8 });
+        const ctxBits = [`${isE ? "Weather" : "Cuaca"}: ${weatherEn}`];
+        if (md.vix != null) ctxBits.push(`VIX: ${md.vix}`);
+        if (md.sp500_5d_pct != null) ctxBits.push(`S&P 5D: ${md.sp500_5d_pct >= 0 ? "+" : ""}${md.sp500_5d_pct}%`);
+        if (md.ihsg_5d_pct != null) ctxBits.push(`IHSG 5D: ${md.ihsg_5d_pct >= 0 ? "+" : ""}${md.ihsg_5d_pct}%`);
+        writeWrapped(ctxBits.join("  ·  "), 10, { gap: 4 });
+        writeWrapped(`${isE ? "Source" : "Sumber"}: yfinance${md.as_of ? `  ·  ${isE ? "as of" : "per"} ${md.as_of}` : ""}`,
+            8, { color: [120, 120, 130], gap: 14 });
+    }
+
+    const stripHtml = (s) => String(s || "").replace(/<[^>]+>/g, "");
+    hr();
+    writeWrapped(isE ? "CELESTIAL SIGNAL" : "SINYAL CELESTIAL", 9, { bold: true, color: [197, 164, 94], gap: 6 });
+    writeWrapped(stripHtml(reading.sig), 12, { gap: 14 });
+
+    writeWrapped(isE ? "YOUR GUIDANCE" : "PANDUAN ANDA", 9, { bold: true, color: [197, 164, 94], gap: 6 });
+    writeWrapped(stripHtml(reading.guid), 11, { gap: 12 });
+
+    writeWrapped(isE ? "POWER MOVE" : "GERAKAN KEKUATAN", 9, { bold: true, color: [197, 164, 94], gap: 6 });
+    writeWrapped(stripHtml(reading.pwr), 11, { gap: 12 });
+
+    writeWrapped(isE ? "AVOID TODAY" : "HINDARI HARI INI", 9, { bold: true, color: [197, 164, 94], gap: 6 });
+    writeWrapped(stripHtml(reading.avoid), 11, { gap: 12 });
+
+    hr();
+    writeWrapped(`${isE ? "Lucky Sector" : "Sektor Beruntung"}: ${reading.lucky}`, 10, { color: [34, 197, 94], gap: 4 });
+    writeWrapped(`${isE ? "Unlucky Sector" : "Sektor Tidak Beruntung"}: ${reading.unlucky}`, 10, { color: [220, 80, 80], gap: 12 });
+
+    hr();
+    writeWrapped(isE ? "FORTUNE" : "PESAN AKHIR", 9, { bold: true, color: [197, 164, 94], gap: 6 });
+    writeWrapped(`"${stripHtml(reading.fort)}"`, 12, { color: [180, 130, 30], gap: 14 });
+
+    if (details) {
+        hr();
+        writeWrapped(isE ? "ABOUT YOUR ARCHETYPE" : "TENTANG ARKETIPE ANDA", 9, { bold: true, color: [197, 164, 94], gap: 6 });
+        writeWrapped(stripHtml(details.summary), 11, { gap: 10 });
+        writeWrapped(`${isE ? "Key Traits" : "Ciri Khas"}: ${details.traits.join(" · ")}`, 10, { color: [110, 110, 120], gap: 4 });
+        writeWrapped(`${isE ? "Best at" : "Terbaik untuk"}: ${details.best}`, 10, { color: [110, 110, 120], gap: 4 });
+        writeWrapped(`${isE ? "Avoid" : "Hindari"}: ${details.worst}`, 10, { color: [110, 110, 120], gap: 4 });
+        writeWrapped(`${isE ? "Risk Tolerance" : "Tingkat Risiko"}: ${details.risk}`, 10, { color: [110, 110, 120], gap: 14 });
+    }
+
+    const pages = doc.internal.getNumberOfPages();
+    const footerText = isE
+        ? `StockHoroscope(TM) · NeuLab Inc. · ${today}   -   Educational use only. Not financial advice.`
+        : `StockHoroscope(TM) · NeuLab Inc. · ${today}   -   Hanya untuk tujuan edukasi. Bukan nasihat keuangan.`;
+    for (let p = 1; p <= pages; p++) {
+        doc.setPage(p);
+        doc.setFontSize(8);
+        doc.setTextColor(140, 140, 150);
+        doc.text(stripEmoji(footerText), M, pageH - 24);
+        doc.text(`${p} / ${pages}`, pageW - M, pageH - 24, { align: "right" });
+    }
+
+    const safeName = archetypeName.replace(/[^a-zA-Z0-9]/g, "_");
+    const dateSlug = new Date().toISOString().slice(0, 10);
+    doc.save(`StockHoroscope_${safeName}_${dateSlug}.pdf`);
 }
 
 function SectionLabel({ children }) {

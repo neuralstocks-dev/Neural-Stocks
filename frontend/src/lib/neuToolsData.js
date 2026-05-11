@@ -448,6 +448,216 @@ export const SLANG_TERMS = [
     { t: "Rights Issue", c: "IDX", en: "When a company offers existing shareholders the right to buy newly issued shares, usually at a discount. Dilutes existing shareholders if they do not participate. Common in Indonesia for capital raising.", se: "The company needs money and is asking you first. Take it or get diluted — there is no third option." },
 ];
 
+// Concise per-archetype profile shown in the "ⓘ Details" popup on the
+// StockHoroscope page. Self-contained (not pulled from StockDNA TYPES so
+// the surfaces stay decoupled). Bilingual EN+ID.
+export const HORO_TYPE_DETAILS = {
+    visionary: {
+        en: {
+            tagline: "Sees the next decade before the crowd",
+            summary: "Visionaries place bold long-term bets on disruptive, paradigm-shifting companies and ride them through every correction. Comfort with volatility is their edge.",
+            traits: ["High conviction", "Long horizon (5–10+ yrs)", "Tolerant of drawdowns", "Theme-led"],
+            best: "Semiconductors · AI infra · Frontier tech",
+            worst: "Defensive staples · Bonds-only portfolios",
+            risk: "High",
+        },
+        id: {
+            tagline: "Melihat dekade berikutnya sebelum kerumunan",
+            summary: "Visioner menempatkan taruhan jangka panjang yang berani pada perusahaan disruptif dan menumpangi mereka melalui setiap koreksi. Toleransi volatilitas adalah keunggulan mereka.",
+            traits: ["Keyakinan tinggi", "Horizon panjang (5–10+ thn)", "Tahan drawdown", "Berbasis tema"],
+            best: "Semikonduktor · Infra AI · Teknologi frontier",
+            worst: "Kebutuhan defensif · Portofolio obligasi saja",
+            risk: "Tinggi",
+        },
+    },
+    analyst: {
+        en: {
+            tagline: "Lets the numbers — not the noise — decide",
+            summary: "Analysts wait for three data points to align before acting. They favour quality compounders bought at sensible valuations. Spreadsheet calm beats spreadsheet paralysis.",
+            traits: ["Data-led", "Patient entry", "Quality bias", "Disciplined sizing"],
+            best: "Quality compounders · Financials · BBCA/MSFT-style",
+            worst: "Story stocks · Speculative biotech",
+            risk: "Medium",
+        },
+        id: {
+            tagline: "Membiarkan angka — bukan kebisingan — yang memutuskan",
+            summary: "Analis menunggu tiga titik data sejajar sebelum bertindak. Mereka menyukai compounder berkualitas yang dibeli dengan valuasi masuk akal.",
+            traits: ["Berbasis data", "Entry sabar", "Bias kualitas", "Sizing disiplin"],
+            best: "Compounder kualitas · Keuangan · Gaya BBCA/MSFT",
+            worst: "Saham cerita · Biotek spekulatif",
+            risk: "Sedang",
+        },
+    },
+    maverick: {
+        en: {
+            tagline: "Buys when the crowd runs",
+            summary: "Mavericks turn peak fear into precision entries. They cap position sizes and demand real revenue — courage with discipline. Their edge is going first.",
+            traits: ["Contrarian", "Quick decisive entries", "Tight position caps", "High beta tolerance"],
+            best: "Crypto infra · High-beta with revenue · Post-crash beaten names",
+            worst: "Slow-growth utilities · Yield plays",
+            risk: "Very High",
+        },
+        id: {
+            tagline: "Membeli saat kerumunan lari",
+            summary: "Maverick mengubah ketakutan puncak menjadi entry presisi. Mereka membatasi ukuran posisi dan menuntut pendapatan nyata — keberanian dengan disiplin.",
+            traits: ["Kontarian", "Entry cepat & tegas", "Batas posisi ketat", "Toleransi beta tinggi"],
+            best: "Infra kripto · Beta tinggi dengan pendapatan · Nama post-crash",
+            worst: "Utilitas pertumbuhan lambat · Permainan yield",
+            risk: "Sangat Tinggi",
+        },
+    },
+    steady: {
+        en: {
+            tagline: "The tortoise that compounds",
+            summary: "Steady Hands favour dividend payers and household-name compounders. They reinvest dividends religiously and ignore most market noise. The compounding does the work.",
+            traits: ["Buy-and-hold", "Dividend reinvestment", "Low turnover", "Stress-resilient"],
+            best: "Consumer staples · Quality dividend payers · BBCA · JNJ",
+            worst: "Speculative growth · Pre-revenue tech",
+            risk: "Low–Medium",
+        },
+        id: {
+            tagline: "Kura-kura yang dikompound",
+            summary: "Tangan Kokoh menyukai pembayar dividen dan compounder nama rumah tangga. Mereka menginvestasikan kembali dividen secara religius dan mengabaikan kebanyakan kebisingan pasar.",
+            traits: ["Beli & tahan", "Reinvestasi dividen", "Turnover rendah", "Tahan stres"],
+            best: "Kebutuhan pokok · Pembayar dividen berkualitas · BBCA · JNJ",
+            worst: "Pertumbuhan spekulatif · Teknologi pre-revenue",
+            risk: "Rendah–Sedang",
+        },
+    },
+    explorer: {
+        en: {
+            tagline: "Hunts where the tourists haven't arrived",
+            summary: "Explorers seek emerging-market alpha and undiscovered themes. They are comfortable holding through periods when developed markets dominate headlines.",
+            traits: ["Geographic diversification", "Theme hunter", "Tolerance for FX risk", "Long horizon"],
+            best: "Emerging markets · LatAm/SEA fintech · Frontier ETFs",
+            worst: "US mega-cap only portfolios · Home-bias allocations",
+            risk: "Medium–High",
+        },
+        id: {
+            tagline: "Berburu di tempat wisatawan belum tiba",
+            summary: "Penjelajah mencari alpha pasar berkembang dan tema yang belum ditemukan. Mereka nyaman bertahan melalui periode di mana pasar maju mendominasi berita utama.",
+            traits: ["Diversifikasi geografis", "Pemburu tema", "Toleransi risiko FX", "Horizon panjang"],
+            best: "Pasar berkembang · Fintech LatAm/SEA · ETF frontier",
+            worst: "Hanya portofolio mega-cap AS · Alokasi bias lokal",
+            risk: "Sedang–Tinggi",
+        },
+    },
+    guardian: {
+        en: {
+            tagline: "The fortress that never falls",
+            summary: "Guardians prioritise capital preservation. They rotate to gold and bonds during VIX spikes and re-deploy at better prices. Defensive by design, opportunistic when chaos peaks.",
+            traits: ["Capital preservation", "Volatility-aware", "Counter-cyclical adds", "Hedged"],
+            best: "Gold · Investment-grade bonds · Defensive sectors",
+            worst: "High-beta growth · Leveraged ETFs",
+            risk: "Low",
+        },
+        id: {
+            tagline: "Benteng yang tidak pernah jatuh",
+            summary: "Penjaga memprioritaskan preservasi modal. Mereka berotasi ke emas dan obligasi selama lonjakan VIX dan kembali deploy pada harga yang lebih baik.",
+            traits: ["Preservasi modal", "Sadar volatilitas", "Tambahan kontra-siklus", "Lindung nilai"],
+            best: "Emas · Obligasi peringkat investasi · Sektor defensif",
+            worst: "Pertumbuhan beta tinggi · ETF leverage",
+            risk: "Rendah",
+        },
+    },
+    strategist: {
+        en: {
+            tagline: "The architect of the allocation",
+            summary: "Strategists run mechanical rebalancing across diversified ETFs. They beat emotional decisions by 1.5–2% annually with discipline alone. The system is the alpha.",
+            traits: ["Mechanical rebalancing", "Allocation-led", "ETF-heavy", "Behaviourally calm"],
+            best: "Diversified ETF cores · 60/40 variants · Factor ETFs",
+            worst: "Concentrated single-name bets",
+            risk: "Medium",
+        },
+        id: {
+            tagline: "Arsitek alokasi",
+            summary: "Ahli Strategi menjalankan penyeimbangan mekanis di seluruh ETF terdiversifikasi. Mereka mengalahkan keputusan emosional 1.5–2% per tahun dengan disiplin saja.",
+            traits: ["Penyeimbangan mekanis", "Berbasis alokasi", "Banyak ETF", "Tenang secara perilaku"],
+            best: "Inti ETF terdiversifikasi · Varian 60/40 · ETF faktor",
+            worst: "Taruhan nama tunggal terkonsentrasi",
+            risk: "Sedang",
+        },
+    },
+    timelord: {
+        en: {
+            tagline: "Today's noise is 2045's footnote",
+            summary: "Time Lords run 20-year theses on quality compounders. They read annual reports, not news. Daily volatility is invisible to their horizon.",
+            traits: ["20-year horizon", "Ignores intraday", "Reads 10-Ks", "Tax-efficient"],
+            best: "Quality compounders · AMZN/TSM/BBCA-style · Index funds",
+            worst: "Day trading · Momentum chasing",
+            risk: "Low–Medium",
+        },
+        id: {
+            tagline: "Kebisingan hari ini adalah catatan kaki tahun 2045",
+            summary: "Tuan Waktu menjalankan tesis 20 tahun pada compounder berkualitas. Mereka membaca laporan tahunan, bukan berita. Volatilitas harian tidak terlihat oleh horizon mereka.",
+            traits: ["Horizon 20 tahun", "Abaikan intraday", "Baca 10-K", "Efisien pajak"],
+            best: "Compounder kualitas · Gaya AMZN/TSM/BBCA · Reksa dana indeks",
+            worst: "Day trading · Mengejar momentum",
+            risk: "Rendah–Sedang",
+        },
+    },
+};
+
+// 4-question micro-quiz that maps to one of the 8 Horoscope archetypes.
+// Each option carries trait weights — the highest-weighted trait wins.
+// Self-contained, NOT a replacement for the full StockDNA quiz — this is
+// the fast path for users who want a reading without leaving the page.
+export const HORO_MINIQUIZ = [
+    {
+        en: { q: "How long do you plan to hold a typical investment?" },
+        id: { q: "Berapa lama Anda berencana memegang investasi tipikal?" },
+        opts: [
+            { en: "Days to weeks — I trade actively", id: "Hari ke minggu — saya trade aktif", t: { maverick: 3 } },
+            { en: "1–3 years — actionable timeframe", id: "1–3 tahun — kerangka waktu yang bisa ditindaklanjuti", t: { strategist: 2, analyst: 2 } },
+            { en: "5–10 years — long-term theses", id: "5–10 tahun — tesis jangka panjang", t: { visionary: 3, explorer: 2 } },
+            { en: "20+ years — until I retire", id: "20+ tahun — sampai saya pensiun", t: { timelord: 3, steady: 2 } },
+        ],
+    },
+    {
+        en: { q: "Your portfolio drops 25% in a month. What do you do?" },
+        id: { q: "Portofolio Anda turun 25% dalam sebulan. Apa yang Anda lakukan?" },
+        opts: [
+            { en: "Sell aggressively to preserve what's left", id: "Jual agresif untuk lindungi sisanya", t: { guardian: 3 } },
+            { en: "Hold and review allocation calmly", id: "Tahan dan tinjau alokasi dengan tenang", t: { strategist: 2, steady: 2 } },
+            { en: "Hold — my thesis hasn't changed", id: "Tahan — tesis saya tidak berubah", t: { timelord: 3, visionary: 2 } },
+            { en: "Buy more — peak fear is my signal", id: "Beli lebih — ketakutan puncak adalah sinyal saya", t: { maverick: 3 } },
+        ],
+    },
+    {
+        en: { q: "What kind of company excites you most?" },
+        id: { q: "Perusahaan seperti apa yang paling membuat Anda bersemangat?" },
+        opts: [
+            { en: "Disruptive tech reshaping a whole sector", id: "Teknologi disruptif yang membentuk ulang seluruh sektor", t: { visionary: 3 } },
+            { en: "A 30-year compounder with a wide moat", id: "Compounder 30 tahun dengan parit lebar", t: { steady: 2, timelord: 2 } },
+            { en: "An undiscovered emerging-market name", id: "Nama pasar berkembang yang belum ditemukan", t: { explorer: 3 } },
+            { en: "A quality business at a fair price, with data to back it", id: "Bisnis berkualitas dengan harga wajar, didukung data", t: { analyst: 3 } },
+        ],
+    },
+    {
+        en: { q: "Which best describes your decision style?" },
+        id: { q: "Mana yang paling menggambarkan gaya keputusan Anda?" },
+        opts: [
+            { en: "Spreadsheets first, conviction second", id: "Spreadsheet dulu, keyakinan kedua", t: { analyst: 3 } },
+            { en: "System + rebalancing — discipline over emotion", id: "Sistem + penyeimbangan — disiplin di atas emosi", t: { strategist: 3 } },
+            { en: "Capital preservation comes before upside", id: "Preservasi modal sebelum keuntungan", t: { guardian: 3 } },
+            { en: "Conviction + courage — I move first, refine later", id: "Keyakinan + keberanian — saya bergerak dulu, sempurnakan kemudian", t: { maverick: 2, visionary: 2 } },
+        ],
+    },
+];
+
+// Reverse mapping: Horoscope archetype → StockDNA archetype key (so when
+// the mini-quiz writes back to localStorage, future visits auto-pick).
+export const HORO_TO_DNA = {
+    visionary: "visionary",
+    analyst: "analyst",
+    maverick: "bold",
+    steady: "steady",
+    explorer: "explorer",
+    guardian: "conservative",
+    strategist: "balanced",
+    timelord: "patient",
+};
+
 // Tiny i18n dictionary for the toolkit's chrome / landing copy
 export const NEUTOOLS_I18N = {
     en: {
