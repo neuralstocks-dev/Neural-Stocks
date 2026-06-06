@@ -275,6 +275,8 @@ export default function LoginPage() {
                             </button>
                         </form>
 
+                        <p className="text-white/60 text-sm mt-4 text-center"><a href="/reset-password" style={{ color: "#b8994f", textDecoration: "none", fontSize: "13px" }}>Forgot password?</a></p>
+
                         <p className="text-white/60 text-sm mt-6 text-center" style={{ fontFamily: "'Outfit', sans-serif" }}>
                             New here?{" "}
                             <Link to="/signup" className="link-underline text-white font-medium" data-testid="link-to-signup">
