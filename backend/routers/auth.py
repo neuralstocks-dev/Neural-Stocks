@@ -257,3 +257,97 @@ async def set_weekly_digest_prefs(payload: dict, user=Depends(get_current_user))
     )
     return {"ok": True, "enabled": want_enabled}
 
+# ADD THIS TO THE END OF backend/routers/auth.py
+
+import secrets
+from datetime import datetime, timezone, timedelta
+from pydantic import BaseModel as _BaseModel
+
+class ForgotPasswordReq(_BaseModel):
+    email: str
+
+class ResetPasswordReq(_BaseModel):
+    token: str
+    new_password: str
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordReq):
+    """Send password reset email. Always returns 200 to avoid email enumeration."""
+    from services.email import send_password_reset_email as _send_reset_email
+    email = req.email.lower().strip()
+    user = await db.users.find_one({"email": email})
+    if user:
+        token = secrets.token_urlsafe(32)
+        expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        await db.users.update_one(
+            {"email": email},
+            {"$set": {"password_reset_token": token, "password_reset_expires": expires}}
+        )
+        await _send_reset_email(email, user.get("full_name", ""), token)
+    return {"message": "If that email exists, a reset link has been sent."}
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordReq):
+    """Verify token and set new password."""
+    from core.security import hash_password
+    user = await db.users.find_one({"password_reset_token": req.token})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+    expires = user.get("password_reset_expires")
+    if not expires or datetime.now(timezone.utc) > expires:
+        raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new one.")
+    if len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    hashed = hash_password(req.new_password)
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password": hashed}, "$unset": {"password_reset_token": "", "password_reset_expires": ""}}
+    )
+    return {"message": "Password reset successfully. You can now log in."}
+# ADD THIS TO THE END OF backend/routers/auth.py
+
+import secrets
+from datetime import datetime, timezone, timedelta
+from pydantic import BaseModel as _BaseModel
+
+class ForgotPasswordReq(_BaseModel):
+    email: str
+
+class ResetPasswordReq(_BaseModel):
+    token: str
+    new_password: str
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordReq):
+    """Send password reset email. Always returns 200 to avoid email enumeration."""
+    from services.email import send_password_reset_email as _send_reset_email
+    email = req.email.lower().strip()
+    user = await db.users.find_one({"email": email})
+    if user:
+        token = secrets.token_urlsafe(32)
+        expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        await db.users.update_one(
+            {"email": email},
+            {"$set": {"password_reset_token": token, "password_reset_expires": expires}}
+        )
+        await _send_reset_email(email, user.get("full_name", ""), token)
+    return {"message": "If that email exists, a reset link has been sent."}
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordReq):
+    """Verify token and set new password."""
+    from core.security import hash_password
+    user = await db.users.find_one({"password_reset_token": req.token})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+    expires = user.get("password_reset_expires")
+    if not expires or datetime.now(timezone.utc) > expires:
+        raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new one.")
+    if len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    hashed = hash_password(req.new_password)
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password": hashed}, "$unset": {"password_reset_token": "", "password_reset_expires": ""}}
+    )
+    return {"message": "Password reset successfully. You can now log in."}

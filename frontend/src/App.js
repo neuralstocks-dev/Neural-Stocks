@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import AppShell from "@/components/AppShell";
 import LoginPage from "@/pages/LoginPage";
 import SignupPage from "@/pages/SignupPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import DashboardPage from "@/pages/DashboardPage";
 import AnalysisReportPage from "@/pages/AnalysisReportPage";
 import PricingPage from "@/pages/PricingPage";
@@ -157,6 +158,7 @@ function AppRoutes() {
             <Route path="/" element={<RootRedirect />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/v/:shareId" element={<PublicVerdictPage />} />
             <Route path="/t/:shareId" element={<PublicTimelinePage />} />
             <Route path="/kids/preview" element={<Navigate to="/kids/preview/AAPL?age=11-13" replace />} />
