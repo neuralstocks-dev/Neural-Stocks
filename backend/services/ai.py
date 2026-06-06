@@ -463,3 +463,11 @@ async def run_timeline_analysis(ticker: str, quote: dict, history: list, fundame
     if parsed.get("recommended_timeline") not in ("short_term", "medium_term", "long_term"):
         raise HTTPException(status_code=502, detail="AI returned invalid timeline")
     return parsed
+
+
+# ── Backwards-compatibility shim ─────────────────────────────────────────────
+# services/gal.py and other modules import _run_chat_in_thread directly.
+# This shim maps the old interface to the new OpenRouter-based _run_llm.
+async def _run_chat_in_thread(system_prompt: str, session_prefix: str, user_text: str):
+    """Shim: replaces the old Emergent/LiteLLM _run_chat_in_thread with OpenRouter."""
+    return await _run_llm(system_prompt, user_text, session_prefix)
