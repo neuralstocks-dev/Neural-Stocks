@@ -18,18 +18,9 @@ import axios from "axios";
 // same-origin so each deployment talks to its own backend.
 function resolveBackendBase() {
     const envUrl = process.env.REACT_APP_BACKEND_URL;
-    if (typeof window === "undefined") return envUrl || "";
-    try {
-        const here = window.location.origin;
-        // If env URL matches current origin, just use same-origin (cleaner).
-        if (!envUrl || envUrl === here) return here;
-        // If env URL is set but points elsewhere, prefer same-origin in the
-        // browser. Backend must serve /api on the current domain (Emergent
-        // ingress does this for every deployment).
-        return here;
-    } catch {
-        return envUrl || "";
-    }
+    if (envUrl) return envUrl;
+    if (typeof window === "undefined") return "";
+    return window.location.origin;
 }
 
 const BACKEND_URL = resolveBackendBase();
