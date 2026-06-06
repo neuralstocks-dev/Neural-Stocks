@@ -1,8 +1,10 @@
 """Auth: email/password JWT + Emergent Google OAuth + login tracking."""
 import uuid
+import secrets
 import httpx
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request
-
+from pydantic import BaseModel as _BaseModel
 
 from core.db import db
 from core.models import SignupReq, LoginReq, AuthResp, GoogleSessionReq
@@ -66,7 +68,6 @@ async def register(req: SignupReq, request: Request):
     }
     await db.users.insert_one(doc)
     await _record_login(user_id, doc["email"], "email", request)
-    # Attribute any active signup-conversion experiments (reads X-Exp-* headers)
     try:
         from routers.experiments import attribute_signup_from_headers
         await attribute_signup_from_headers(user_id, request.headers)
@@ -101,8 +102,6 @@ async def magic_login(payload: dict, request: Request):
 
     user_id = await redeem_magic_token(token)
     if not user_id:
-        # Generic 401 — don't leak whether the token was wrong, expired,
-        # or already consumed. Same posture as the password login.
         raise HTTPException(status_code=401, detail="Invalid or expired link")
 
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
@@ -158,7 +157,6 @@ async def google_session(req: GoogleSessionReq, request: Request):
             "created_at": iso(now_utc()),
         }
         await db.users.insert_one(user_doc)
-        # Attribute any active signup-conversion experiments (reads X-Exp-* headers)
         try:
             from routers.experiments import attribute_signup_from_headers
             await attribute_signup_from_headers(user_id, request.headers)
@@ -172,6 +170,7 @@ async def google_session(req: GoogleSessionReq, request: Request):
 async def me(user=Depends(get_current_user)):
     return user
 
+
 @router.get("/me/auto-scan")
 async def get_auto_scan_prefs(user=Depends(get_current_user)):
     """Current state of the user's Watchlist Auto-Scan preference + last run stats."""
@@ -180,8 +179,6 @@ async def get_auto_scan_prefs(user=Depends(get_current_user)):
         {"_id": 0, "auto_scan_enabled": 1, "auto_scan_last_run_at": 1,
          "auto_scan_last_alerts_sent": 1, "telegram_chat_id": 1, "plan": 1},
     ) or {}
-    # `is_admin` is derived in auth (never persisted in DB), so always trust
-    # the in-memory user object — not the DB read.
     eligible_plan = (
         bool(user.get("is_admin"))
         or u.get("plan") in ("pro", "elite", "daypass")
@@ -204,7 +201,6 @@ async def set_auto_scan_prefs(payload: dict, user=Depends(get_current_user)):
         {"id": user["id"]},
         {"_id": 0, "plan": 1, "telegram_chat_id": 1},
     ) or {}
-    # Admin (derived from email allow-list, not DB) ALWAYS bypasses the plan gate.
     eligible_plan = (
         bool(user.get("is_admin"))
         or u.get("plan") in ("pro", "elite", "daypass")
@@ -257,18 +253,15 @@ async def set_weekly_digest_prefs(payload: dict, user=Depends(get_current_user))
     )
     return {"ok": True, "enabled": want_enabled}
 
-# ADD THIS TO THE END OF backend/routers/auth.py
-
-import secrets
-from datetime import datetime, timezone, timedelta
-from pydantic import BaseModel as _BaseModel
 
 class ForgotPasswordReq(_BaseModel):
     email: str
 
+
 class ResetPasswordReq(_BaseModel):
     token: str
     new_password: str
+
 
 @router.post("/forgot-password")
 async def forgot_password(req: ForgotPasswordReq):
@@ -278,7 +271,7 @@ async def forgot_password(req: ForgotPasswordReq):
     user = await db.users.find_one({"email": email})
     if user:
         token = secrets.token_urlsafe(32)
-        expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires = datetime.utcnow() + timedelta(hours=1)
         await db.users.update_one(
             {"email": email},
             {"$set": {"password_reset_token": token, "password_reset_expires": expires}}
@@ -286,68 +279,21 @@ async def forgot_password(req: ForgotPasswordReq):
         await _send_reset_email(email, user.get("full_name", ""), token)
     return {"message": "If that email exists, a reset link has been sent."}
 
+
 @router.post("/reset-password")
 async def reset_password(req: ResetPasswordReq):
     """Verify token and set new password."""
-    from core.security import hash_password
     user = await db.users.find_one({"password_reset_token": req.token})
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
     expires = user.get("password_reset_expires")
-    if not expires or datetime.now(timezone.utc) > expires:
+    if not expires or datetime.utcnow() > expires.replace(tzinfo=None):
         raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new one.")
     if len(req.new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
     hashed = hash_password(req.new_password)
     await db.users.update_one(
         {"_id": user["_id"]},
-        {"$set": {"password": hashed}, "$unset": {"password_reset_token": "", "password_reset_expires": ""}}
-    )
-    return {"message": "Password reset successfully. You can now log in."}
-# ADD THIS TO THE END OF backend/routers/auth.py
-
-import secrets
-from datetime import datetime, timezone, timedelta
-from pydantic import BaseModel as _BaseModel
-
-class ForgotPasswordReq(_BaseModel):
-    email: str
-
-class ResetPasswordReq(_BaseModel):
-    token: str
-    new_password: str
-
-@router.post("/forgot-password")
-async def forgot_password(req: ForgotPasswordReq):
-    """Send password reset email. Always returns 200 to avoid email enumeration."""
-    from services.email import send_password_reset_email as _send_reset_email
-    email = req.email.lower().strip()
-    user = await db.users.find_one({"email": email})
-    if user:
-        token = secrets.token_urlsafe(32)
-        expires = datetime.now(timezone.utc) + timedelta(hours=1)
-        await db.users.update_one(
-            {"email": email},
-            {"$set": {"password_reset_token": token, "password_reset_expires": expires}}
-        )
-        await _send_reset_email(email, user.get("full_name", ""), token)
-    return {"message": "If that email exists, a reset link has been sent."}
-
-@router.post("/reset-password")
-async def reset_password(req: ResetPasswordReq):
-    """Verify token and set new password."""
-    from core.security import hash_password
-    user = await db.users.find_one({"password_reset_token": req.token})
-    if not user:
-        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
-    expires = user.get("password_reset_expires")
-    if not expires or datetime.now(timezone.utc) > expires:
-        raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new one.")
-    if len(req.new_password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
-    hashed = hash_password(req.new_password)
-    await db.users.update_one(
-        {"_id": user["_id"]},
-        {"$set": {"password": hashed}, "$unset": {"password_reset_token": "", "password_reset_expires": ""}}
+        {"$set": {"password_hash": hashed}, "$unset": {"password_reset_token": "", "password_reset_expires": ""}}
     )
     return {"message": "Password reset successfully. You can now log in."}
