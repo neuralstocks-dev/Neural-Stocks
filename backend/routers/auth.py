@@ -3,7 +3,7 @@ import uuid
 import httpx
 from fastapi import APIRouter, HTTPException, Depends, Request
 
-from core.config import EMERGENT_AUTH_SESSION_URL
+
 from core.db import db
 from core.models import SignupReq, LoginReq, AuthResp, GoogleSessionReq
 from core.security import (
@@ -121,7 +121,7 @@ async def google_session(req: GoogleSessionReq, request: Request):
     try:
         async with httpx.AsyncClient(timeout=15.0) as hc:
             r = await hc.get(
-                EMERGENT_AUTH_SESSION_URL,
+                "https://disabled.invalid/emergent-auth-not-available",
                 headers={"X-Session-ID": req.session_id},
             )
     except Exception as e:
