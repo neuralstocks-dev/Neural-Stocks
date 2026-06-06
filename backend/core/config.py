@@ -9,18 +9,22 @@ load_dotenv(ROOT_DIR / ".env")
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 JWT_SECRET = os.environ["JWT_SECRET"]
-EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
-EMERGENT_AUTH_SESSION_URL = os.environ.get(
-    "EMERGENT_AUTH_SESSION_URL",
-    "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-)
+
+# OpenRouter replaces EMERGENT_LLM_KEY entirely.
+# Set OPENROUTER_API_KEY in Railway environment variables.
+OPENROUTER_API_KEY = os.environ["OPENROUTER_API_KEY"]
+
+# Backwards-compatibility shim: any code that still imports EMERGENT_LLM_KEY
+# from this module will get the OpenRouter key instead of a hard crash.
+# Remove once all references are cleaned up.
+EMERGENT_LLM_KEY = OPENROUTER_API_KEY
 
 JWT_ALG = "HS256"
 JWT_EXPIRE_HOURS = 24 * 7
 
 ADMIN_EMAILS = {
     e.strip().lower()
-    for e in os.environ.get("ADMIN_EMAILS", "jolor69@gmail.com").split(",")
+    for e in os.environ.get("ADMIN_EMAILS", "neuralstocks.dev@gmail.com").split(",")
     if e.strip()
 }
 
@@ -48,16 +52,12 @@ TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "")
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
 
 # ---------- Plans ----------
-# Default monthly prices — overridable dynamically via db.settings by admin.
 DEFAULT_PRO_PRICE = 9.0
 DEFAULT_ELITE_PRICE = 24.0
-DEFAULT_ANNUAL_DISCOUNT_PCT = 20.0  # yearly price = monthly * 12 * (1 - pct/100)
+DEFAULT_ANNUAL_DISCOUNT_PCT = 20.0
 DEFAULT_DAYPASS_PRICE = 4.99
 DEFAULT_DAYPASS_DURATION_DAYS = 7
 
-# Fair-use soft cap for Elite — displayed to the user as "Unlimited" but
-# backend enforces this ceiling to protect LLM spend from runaway usage.
-# Set to None to re-enable truly-unlimited.
 ELITE_FAIR_USE_DAILY = 50
 
 PLANS = {
@@ -90,9 +90,9 @@ PLANS = {
     "elite": {
         "name": "Elite",
         "price_usd": DEFAULT_ELITE_PRICE,
-        "watchlist_limit": 500,  # "Unlimited" UX with a sanity ceiling to prevent DB bloat
+        "watchlist_limit": 500,
         "watchlist_display": "Unlimited",
-        "analyses_per_day": ELITE_FAIR_USE_DAILY,  # displayed as "Unlimited" — see pricing service
+        "analyses_per_day": ELITE_FAIR_USE_DAILY,
         "analyses_per_day_display": "Unlimited",
         "analyses_per_week": None,
         "quick_actions": True,
@@ -102,11 +102,6 @@ PLANS = {
         "tag": "Institutional",
         "share_per_day": None,
     },
-    # One-time "Week Pass" — admin-configurable duration + quotas. NOT a
-    # recurring subscription. Paid via PayPal Orders (capture), not Billing.
-    # When user pays, backend sets user.plan="daypass" + daypass_expires_at.
-    # Auto-reverts to free when the window closes. Renamed from "Day Pass"
-    # since the effective duration is 7 days — "Week Pass" is truth-in-naming.
     "daypass": {
         "name": "Week Pass",
         "price_usd": DEFAULT_DAYPASS_PRICE,
@@ -123,7 +118,6 @@ PLANS = {
     },
 }
 
-# Admin-assignable test-unlock durations (seconds). None = forever.
 UNLOCK_DURATIONS = {
     "1h": 60 * 60,
     "2h": 2 * 60 * 60,
