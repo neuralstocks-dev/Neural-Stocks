@@ -3,12 +3,12 @@
 One concise message giving each admin a daily operational pulse without
 requiring them to open the admin panel:
 
-    Yesterday — Apr 30
+    Yesterday — Jun 6
     📊 Verdicts: 47
     ⚡ 30s-goal: 78% (n=12)
-    🔁 Fallback: 12% (gemini ×6)
+    🔁 Fallback: 12% (deepseek/deepseek-v4-flash ×6)
     ⚠️ Top failure: ChatError ×3
-    🧠 Universal Key: 99.43
+    💳 OpenRouter Credits: 99.43
 
 Audience: ONLY users in `ADMIN_EMAILS` who have already linked Telegram.
 Free users / non-admins NEVER receive this digest. Sending lives on a
@@ -196,7 +196,7 @@ def _format_digest(metrics: dict) -> str:
     if metrics.get("top_failure_reason"):
         lines.append(f"⚠️ <b>Top failure</b>: {metrics['top_failure_reason']}")
     if metrics.get("universal_key_balance") is not None:
-        lines.append(f"🧠 <b>Universal Key</b>: {metrics['universal_key_balance']}")
+        lines.append(f"💳 <b>OpenRouter Credits</b>: {metrics['universal_key_balance']}")
 
     lines.append("")
     lines.append(
