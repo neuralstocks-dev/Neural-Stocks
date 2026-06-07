@@ -1292,7 +1292,7 @@ histogram  = MACD_line − signal`}
                         broker-flow at entry confirmation.
                     </p>
 
-                    <p
+                   <p
                         className="mt-5 text-[12px] inline-block"
                         style={{
                             color: "hsl(var(--text-muted))",
