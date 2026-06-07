@@ -34,27 +34,16 @@ import RightRailTOC from "@/components/RightRailTOC";
 export default function TechnicalPage() {
     const loc = useLocation();
     const [rfMeta, setRfMeta] = useState(null);
-    // Determine admin status to gate cost-economics cells from public view.
-    // Cost-per-verdict is operational data — useful for the operator, but
-    // showing it publicly leaks margin info to competitors and primes
-    // users to think in per-call terms ("this click costs you 3¢"), which
-    // is the wrong mental model for a subscription product. Reactive via
-    // useAuth so the cell appears as soon as /auth/me resolves.
     const auth = useAuth();
     const isAdmin = !!auth?.user?.is_admin;
-    // Live capacity telemetry — drives the "How Neulab handles load" section.
-    // Polls /analysis/queue/status every 5s, also measures the client-side
-    // round-trip latency so the "queue endpoint" cell reports the actual
-    // observed p95 instead of a hardcoded promise. Trust signal: visitors
-    // see real numbers update in their browser.
     const [capacity, setCapacity] = useState({
         capacity: null,
         running: null,
         queued: null,
         avg_duration_s: null,
         is_busy: false,
-        rt_ms: null,    // client-measured round-trip in ms
-        rt_p95: null,   // simple rolling p95 over last ~12 polls (60s window)
+        rt_ms: null,
+        rt_p95: null,
         last_updated: null,
     });
     useEffect(() => {
@@ -65,7 +54,7 @@ export default function TechnicalPage() {
     useEffect(() => {
         let cancelled = false;
         let timer = null;
-        const samples = []; // last 12 round-trip measurements
+        const samples = [];
 
         const tick = async () => {
             const t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
@@ -99,8 +88,6 @@ export default function TechnicalPage() {
             if (timer) clearTimeout(timer);
         };
     }, []);
-    // Smooth-scroll to the section pointed to by the URL hash (e.g. /technical#rsi)
-    // so deep-links from the verdict page land on the right spot.
     useEffect(() => {
         if (!loc.hash) return;
         const id = loc.hash.slice(1);
@@ -108,7 +95,6 @@ export default function TechnicalPage() {
             const el = document.getElementById(id);
             if (el) {
                 el.scrollIntoView({ behavior: "smooth", block: "start" });
-                // Brief highlight so the landing target is obvious
                 el.classList.add("ring-flash");
                 setTimeout(() => el.classList.remove("ring-flash"), 1600);
             } else if (n < 6) {
@@ -200,8 +186,8 @@ export default function TechnicalPage() {
                             We DO use
                         </p>
                         <ul className="space-y-3 text-sm">
-                            <MythLi positive reason="State-of-the-art reasoning model that weighs technicals, fundamentals, and news the way a senior analyst would — and explains every step in plain English so you can challenge it.">
-                                Claude Sonnet 4.5 (Anthropic LLM) for verdict reasoning
+                            <MythLi positive reason="State-of-the-art reasoning model that weighs technicals, fundamentals, and news the way a senior analyst would — and explains every step in plain English so you can challenge it. Falls back automatically to DeepSeek V4 Flash, then free models, if the primary is unavailable.">
+                                DeepSeek V4 Pro via OpenRouter for verdict reasoning
                             </MythLi>
                             <MythLi positive reason="Published 1970s-era formulas (Wilder, Appel, etc.) — the same numbers every Bloomberg terminal computes. Same inputs always produce the same outputs, replicable in Excel.">
                                 Deterministic technical indicators (RSI, SMA, EMA, MACD)
@@ -313,7 +299,8 @@ export default function TechnicalPage() {
                         body={
                             <>
                                 A structured prompt is built containing all signals from stages 01-06 plus
-                                plan-specific mode (Standard / Candlestick / Hybrid). Claude Sonnet 4.5
+                                plan-specific mode (Standard / Candlestick / Hybrid). DeepSeek V4 Pro
+                                (via OpenRouter, with automatic fallback to V4 Flash and free models)
                                 reasons over the bundle and returns a strict JSON response:
                                 recommendation (BUY/SELL/HOLD), confidence_score (0–100),
                                 price_target (floating point in quote currency), stop_loss, executive_summary
@@ -325,7 +312,7 @@ export default function TechnicalPage() {
                     <StageRow
                         n="08"
                         title="Verdict persistence and alerting"
-                        body="Verdict stored in MongoDB with full signal provenance (indicators, patterns, news payload, raw LLM response) for audit. If confidence ≥ 75 and recommendation is BUY/SELL, a Telegram alert is dispatched to users who've linked @neulab_bot."
+                        body="Verdict stored in MongoDB with full signal provenance (indicators, patterns, news payload, raw LLM response, model used in cascade) for audit. If confidence ≥ 75 and recommendation is BUY/SELL, a Telegram alert is dispatched to users who've linked @neulab_bot."
                     />
                 </ol>
 
@@ -334,12 +321,12 @@ export default function TechnicalPage() {
                     icon={Gauge}
                     overline="Confidence"
                     title="What the confidence % actually means."
-                    subtitle="It is not a probability. It is an explicit signal-agreement score produced by Claude."
+                    subtitle="It is not a probability. It is an explicit signal-agreement score produced by the LLM."
                 />
 
                 <div id="confidence" className="mt-8 module p-6 md:p-10" data-testid="tech-confidence">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
-                        The LLM prompt instructs Claude to set <code>confidence_score</code> on a 0–100 scale
+                        The LLM prompt instructs DeepSeek to set <code>confidence_score</code> on a 0–100 scale
                         based on the agreement between four input families. When every family leans the same
                         way (bullish or bearish), confidence sits above 75. When signals contradict, it drops
                         toward 40–60. When the price action is genuinely directionless, it falls below 40
@@ -388,12 +375,11 @@ export default function TechnicalPage() {
                         it's best understood as <strong style={{ color: "hsl(var(--text-primary))" }}>internal consistency of the thesis</strong> — not a statistical probability of the price moving in the predicted direction.
                     </p>
 
-                    {/* Verdict Accuracy v2 — confidence calibration */}
                     <h4 className="font-serif mt-10 mb-3" style={{ fontSize: "1.3rem" }} id="confidence-calibration">
                         Post-LLM confidence calibration
                     </h4>
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        After Claude returns its raw verdict, two deterministic rules run before
+                        After the LLM returns its raw verdict, two deterministic rules run before
                         the number is shown to you. Both rules leave a visible breadcrumb under
                         the verdict ring — we never quietly hand-tune scores.
                     </p>
@@ -430,12 +416,12 @@ export default function TechnicalPage() {
                             <p className="text-sm mt-2 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                                 Our independent <strong>Random-Forest model</strong> (trained on 5 years of
                                 daily price + 19 engineered features across 344 tickers) outputs its own
-                                BUY/SELL/HOLD opinion every verdict. When it disagrees with Claude with{" "}
+                                BUY/SELL/HOLD opinion every verdict. When it disagrees with the LLM with{" "}
                                 <strong>moderate</strong> or <strong>strong</strong> edge, the AI's
-                                confidence is reduced (12 points for strong, ~8 for moderate). Claude's
+                                confidence is reduced (12 points for strong, ~8 for moderate). The LLM's
                                 recommendation is NOT overridden — but the disagreement is reflected in
                                 the verdict ring so you see the model uncertainty. Empirical: RF disagrees
-                                ~12% of the time and historical win-rate on Claude-only verdicts in those
+                                ~12% of the time and historical win-rate on LLM-only verdicts in those
                                 cases drops by ~9pp.
                             </p>
                         </div>
@@ -548,12 +534,10 @@ histogram  = MACD_line − signal`}
                     icon={Trees}
                     overline="Secondary opinion"
                     title="The Random Forest layer."
-                    subtitle="An independent probability estimate that runs alongside Claude — never instead of it. Honest numbers, warts and all."
+                    subtitle="An independent probability estimate that runs alongside the LLM — never instead of it. Honest numbers, warts and all."
                 />
 
                 <div id="random-forest" className="mt-8 module p-6 md:p-10 scroll-mt-24" data-testid="tech-random-forest">
-                    {/* Beginner-friendly intro: what RF is in 90 seconds + why
-                        it's the right model for stock probability. */}
                     <div
                         className="mb-8 p-5 md:p-6"
                         style={{
@@ -828,7 +812,7 @@ histogram  = MACD_line − signal`}
                     </h4>
                     <ul className="space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
                         <TLi>
-                            Each analysis ships with both the Claude verdict <em>and</em> the RF probability as separate,
+                            Each analysis ships with both the LLM verdict <em>and</em> the RF probability as separate,
                             independent signals. Neither suppresses the other.
                         </TLi>
                         <TLi>
@@ -836,7 +820,7 @@ histogram  = MACD_line − signal`}
                             "No meaningful edge" rather than a fake number.
                         </TLi>
                         <TLi>
-                            When the RF <em>disagrees</em> with a high-confidence Claude verdict, the UI shows a
+                            When the RF <em>disagrees</em> with a high-confidence LLM verdict, the UI shows a
                             red "Disagrees" chip. This is a prompt to re-examine the reasoning before acting.
                         </TLi>
                         <TLi>
@@ -1075,10 +1059,6 @@ histogram  = MACD_line − signal`}
                         </TLi>
                     </ul>
 
-                    {/* Derived signals layered on raw filings — merged from the
-                        former "IDX accuracy upgrade" section so the bandarmology
-                        methodology reads as one coherent story, not two separate
-                        feature drops. */}
                     <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
                         Derived signals layered on top of the raw filings
                     </h4>
@@ -1129,9 +1109,6 @@ histogram  = MACD_line − signal`}
                         ))}
                     </div>
 
-                    {/* What we chose NOT to ship in v1 — transparency on user-requested signals.
-                        Admin-only: this is internal product reasoning that distracts public readers
-                        from the actual methodology. */}
                     {isAdmin && (
                     <>
                     <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
@@ -1191,11 +1168,6 @@ histogram  = MACD_line − signal`}
                     </>
                     )}
 
-                    {/* Intraday tip — reframed from "Phase 2 companion tools" to a clear,
-                        on-brand intraday-trading tip. We do NOT plan to compete with intraday
-                        broker-flow tools; per the Honest Limits section above, Neural Stock
-                        Intelligence™ is a swing/position tool on daily candles. If you trade
-                        intraday, these third-party tools are the right fit. */}
                     <h4 className="font-serif mt-10 mb-3" style={{ fontSize: "1.3rem" }}>
                         Intraday trading tip — pair Neural with a dedicated broker-flow tool
                     </h4>
@@ -1242,13 +1214,7 @@ histogram  = MACD_line − signal`}
                     </p>
                 </div>
 
-                {/* Best-fit IDX use cases — closes the loop on "what is this app
-                    actually FOR?" The previous Intraday-tip section directs
-                    intraday traders to third-party tools; this callout explains
-                    where Neural's T+5 insider data + daily-candle stack genuinely
-                    out-performs those intraday tools. Tonally green/buy-coloured
-                    to mirror the red Honest Limits below — "use it for these,
-                    not for those". */}
+                {/* Best-fit IDX use cases */}
                 <div
                     id="idx-best-fit"
                     className="mt-8 module p-6 md:p-10 scroll-mt-24"
@@ -1326,10 +1292,6 @@ histogram  = MACD_line − signal`}
                         broker-flow at entry confirmation.
                     </p>
 
-                    {/* Reciprocal cross-link to the red-bordered Honest Limits
-                        section below — gives readers the "but here are the
-                        limits we don't hide" perspective so they get the full
-                        what-it's-for / what-it's-not-for picture either way. */}
                     <p
                         className="mt-5 text-[12px] inline-block"
                         style={{
@@ -1340,7 +1302,7 @@ histogram  = MACD_line − signal`}
                         data-testid="tech-bestfit-limits-link"
                     >
                         ↳ See the limits we don't hide —{" "}
-                        <a
+                        
                             href="#honest-limits"
                             className="link-underline"
                             style={{ color: "hsl(var(--sell))" }}
@@ -1385,7 +1347,7 @@ histogram  = MACD_line − signal`}
                             <Tr s="Next earnings" src="Finnhub.io" cov="US only (free tier)" cache="1-hr cache" />
                             <Tr s="Candlestick patterns" src="NeuLab Inc. in-house engine" cov="Any ticker with OHLC" cache="Computed per analysis" />
                             <Tr s="Intrinsic-value anchor (Graham + RIM)" src="NeuLab Inc. in-house · yfinance fundamentals input" cov="Any ticker with EPS + bookValue" cache="Computed per analysis" />
-                            <Tr s="Verdict + reasoning" src="Anthropic Claude Sonnet 4.5" cov="All tickers" cache="Persisted in MongoDB" />
+                            <Tr s="Verdict + reasoning" src="OpenRouter · DeepSeek V4 Pro (primary) with automatic fallback cascade" cov="All tickers" cache="Persisted in MongoDB" />
                         </tbody>
                     </table>
                 </div>
@@ -1442,10 +1404,6 @@ histogram  = MACD_line − signal`}
                         borderColor: "hsl(var(--sell))",
                     }}
                 >
-                    {/* Reciprocal cross-link to the green-bordered Best-fit
-                        callout above — gives readers the "but here's what Neural
-                        IS good for" perspective without making them scroll back
-                        blindly. Subtle inline pill, not a full callout. */}
                     <p
                         className="mb-5 text-[12px] inline-block"
                         style={{
@@ -1456,7 +1414,7 @@ histogram  = MACD_line − signal`}
                         data-testid="tech-limits-bestfit-link"
                     >
                         ↳ See what Neural <em>can</em> do well —{" "}
-                        <a
+                        
                             href="#idx-best-fit"
                             className="link-underline"
                             style={{ color: "hsl(var(--buy))" }}
@@ -1504,8 +1462,8 @@ histogram  = MACD_line − signal`}
                         </LimitLi>
                         <LimitLi>
                             <strong>Equities only — no options, futures, forex, or crypto.</strong> Today the pipeline
-                            is single-asset-class by design (US + IDX equities). Multi-asset support via Polygon.io
-                            is on the long-term roadmap but not an active build — if you trade derivatives or crypto,
+                            is single-asset-class by design (US + IDX equities). Multi-asset support is on the long-term
+                            roadmap but not an active build — if you trade derivatives or crypto,
                             this isn't the right tool for those positions yet.
                         </LimitLi>
                         <LimitLi>
@@ -1516,12 +1474,12 @@ histogram  = MACD_line − signal`}
                             per-ticker thesis that informs them.
                         </LimitLi>
                         <LimitLi>
-                            <strong>Claude is not infallible — but it has guardrails.</strong> LLM reasoning can still
+                            <strong>The LLM is not infallible — but it has guardrails.</strong> LLM reasoning can still
                             miss context, especially around sector-specific regulatory events or macro shifts that move
                             faster than news feeds. We mitigate via three disciplined layers: (1) the <em>Earnings-Proximity
                             Gate</em> caps confidence at 65 within 7 days of earnings; (2) the <em>Random-Forest disagreement
                             penalty</em> reduces displayed confidence when our independent statistical model disagrees with
-                            Claude's direction; (3) an <em>LLM circuit breaker</em> fast-fails new analyses when the
+                            the LLM's direction; (3) an <em>LLM circuit breaker</em> fast-fails new analyses when the
                             upstream is degraded so you don't burn your turn on a doomed call. Use Neural alongside your
                             own judgment, not instead of it.
                         </LimitLi>
@@ -1537,11 +1495,6 @@ histogram  = MACD_line − signal`}
                     </ul>
                 </div>
 
-                {/* How Neulab handles load — capacity transparency for the
-                    informed user. Pairs with the AnalysisQueueChip on the
-                    dashboard so they see the same numbers in real time.
-                    Admin-only: capacity / cost details are operational
-                    transparency for the operator, not consumer-facing copy. */}
                 {isAdmin && (
                 <>
                 <SectionHeader
@@ -1562,17 +1515,17 @@ histogram  = MACD_line − signal`}
                 >
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                         Each verdict involves a 20-day daily price fetch, a Random-Forest
-                        scoring pass, and a full Claude Sonnet 4.5 round-trip — totalling
+                        scoring pass, and a full LLM round-trip via OpenRouter — totalling
                         <strong style={{ color: "hsl(var(--text-primary))" }}> ~45 seconds </strong>
                         of wall-clock work per analysis.
                         {isAdmin && (
                             <>
-                                {" "}LLM cost ≈{" "}
+                                {" "}LLM cost varies by model in cascade —{" "}
                                 <strong style={{ color: "hsl(var(--text-primary))" }}>
-                                    $0.027 / verdict
+                                    DeepSeek V4 Pro primary
                                 </strong>{" "}
-                                (~3,300–4,000 input tokens to Claude, ~1,750 output) — see{" "}
-                                <a
+                                (~3,300–4,000 input tokens, ~1,750 output) — see{" "}
+                                
                                     href="/admin/cost"
                                     className="link-underline"
                                     style={{ color: "hsl(var(--text-primary))" }}
@@ -1585,7 +1538,7 @@ histogram  = MACD_line − signal`}
                         {" "}To keep the system responsive when traffic spikes, Neural Stock Intelligence™ caps in-flight
                         analyses at <strong style={{ color: "hsl(var(--text-primary))" }}>4 concurrent</strong>{" "}
                         per backend worker via a global asyncio semaphore. Excess requests <em>queue</em> rather than
-                        slowing every other endpoint to a crawl. The Claude calls themselves run inside isolated OS
+                        slowing every other endpoint to a crawl. The LLM calls themselves run inside isolated OS
                         threads so the main API loop stays free for trivial reads (your watchlist, alerts, login)
                         even while several heavy analyses are mid-flight.
                     </p>
@@ -1637,14 +1590,11 @@ histogram  = MACD_line − signal`}
                                 note: "wall-clock per verdict",
                                 live: capacity.avg_duration_s != null,
                             },
-                            // Cost cell is admin-only — see commentary at the
-                            // top of TechnicalPage for the rationale (margin
-                            // disclosure + wrong mental model for users).
                             ...(isAdmin
                                 ? [{
                                     label: "LLM cost",
-                                    value: "~$0.027",
-                                    note: "Claude Sonnet 4.5 / verdict",
+                                    value: "variable",
+                                    note: "DeepSeek V4 Pro primary / verdict",
                                     live: false,
                                     adminOnly: true,
                                 }]
@@ -1707,9 +1657,6 @@ histogram  = MACD_line − signal`}
                             </div>
                         ))}
                     </div>
-                    {/* Live "Right now" line — turns the static promise into
-                        a live receipt visitors can verify in their own
-                        browser. Polled every 5s alongside the cells above. */}
                     {capacity.capacity != null && (
                         <div
                             className="mt-4 px-4 py-3 flex items-center justify-between gap-3 flex-wrap"
@@ -1775,8 +1722,8 @@ histogram  = MACD_line − signal`}
                     >{`Frontend         React 18 + TailwindCSS + shadcn/ui · Recharts for price charts
 Backend          FastAPI (Python 3.11) · Uvicorn · async httpx for outbound I/O
 Database         MongoDB (Motor async driver)
-Auth             JWT (email/password) + Emergent Google OAuth
-LLM              Anthropic Claude Sonnet 4.5 via Emergent LLM key
+Auth             JWT (email/password)
+LLM              OpenRouter · DeepSeek V4 Pro (verdict) → V4 Flash (fast) → Kimi K2.6 / Nemotron (free fallback)
 Market data      yfinance (public) + Finnhub.io (REST, US) + RapidAPI IDX (Indonesia)
 IDX news         CNBC Indonesia + Detik Finance RSS scraper
 IDX smart-money  Bandarmology — insider filings parsed from RapidAPI IDX /emiten/{sym}/insider
@@ -1784,8 +1731,8 @@ PDF              ReportLab (server-side, zero client dependencies)
 Payments         PayPal REST v1 (Subscriptions) + v2 (Orders for Week Pass)
 Email            Resend (receipts, password reset)
 Alerts           Telegram Bot API (@neulab_bot)
-Hosting          Kubernetes container on Emergent · Supervisord-managed services
-Observability    Structured logs to /var/log/supervisor · per-request correlation IDs`}
+Hosting          Railway (Python 3.11 · Uvicorn · 1 replica)
+Observability    Structured logs · per-request correlation IDs`}
                     </pre>
                 </div>
 
@@ -1794,7 +1741,7 @@ Observability    Structured logs to /var/log/supervisor · per-request correlati
                     style={{ color: "hsl(var(--text-muted))", fontSize: "0.62rem" }}
                 >
                     <ShieldCheck size={10} className="inline mr-1" strokeWidth={1.5} />
-                    Last updated April 2026. This page is versioned with the product — any future switch to
+                    Last updated June 2026. This page is versioned with the product — any future switch to
                     trained ML (e.g., FinBERT for sentiment) will be disclosed here with a dated changelog entry.
                 </p>
             </div>
@@ -1804,12 +1751,6 @@ Observability    Structured logs to /var/log/supervisor · per-request correlati
 
 /* ---------- Building blocks ---------- */
 
-/**
- * TechTOC — thin wrapper that delegates to the shared <RightRailTOC />
- * component. We keep this as a named local wrapper because the section
- * list depends on `isAdmin` (Capacity is admin-only), and isolating that
- * here keeps the page render call site clean.
- */
 function TechTOC({ isAdmin }) {
     const sections = React.useMemo(() => {
         const base = [
