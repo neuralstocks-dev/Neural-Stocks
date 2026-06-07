@@ -200,8 +200,8 @@ export default function TechnicalPage() {
                             We DO use
                         </p>
                         <ul className="space-y-3 text-sm">
-                            <MythLi positive reason="State-of-the-art reasoning model that weighs technicals, fundamentals, and news the way a senior analyst would — and explains every step in plain English so you can challenge it.">
-                                Claude Sonnet 4.5 (Anthropic LLM) for verdict reasoning
+                            <MythLi positive reason="State-of-the-art reasoning model that weighs technicals, fundamentals, and news the way a senior analyst would — and explains every step in plain English so you can challenge it. Falls back automatically to DeepSeek V4 Flash, then free models, if the primary is unavailable.">
+                                DeepSeek V4 Pro via OpenRouter for verdict reasoning
                             </MythLi>
                             <MythLi positive reason="Published 1970s-era formulas (Wilder, Appel, etc.) — the same numbers every Bloomberg terminal computes. Same inputs always produce the same outputs, replicable in Excel.">
                                 Deterministic technical indicators (RSI, SMA, EMA, MACD)
@@ -313,7 +313,7 @@ export default function TechnicalPage() {
                         body={
                             <>
                                 A structured prompt is built containing all signals from stages 01-06 plus
-                                plan-specific mode (Standard / Candlestick / Hybrid). Claude Sonnet 4.5
+                                plan-specific mode (Standard / Candlestick / Hybrid). DeepSeek V4 Pro (via OpenRouter, with automatic fallback to V4 Flash and free models)
                                 reasons over the bundle and returns a strict JSON response:
                                 recommendation (BUY/SELL/HOLD), confidence_score (0–100),
                                 price_target (floating point in quote currency), stop_loss, executive_summary
@@ -1385,7 +1385,7 @@ histogram  = MACD_line − signal`}
                             <Tr s="Next earnings" src="Finnhub.io" cov="US only (free tier)" cache="1-hr cache" />
                             <Tr s="Candlestick patterns" src="NeuLab Inc. in-house engine" cov="Any ticker with OHLC" cache="Computed per analysis" />
                             <Tr s="Intrinsic-value anchor (Graham + RIM)" src="NeuLab Inc. in-house · yfinance fundamentals input" cov="Any ticker with EPS + bookValue" cache="Computed per analysis" />
-                            <Tr s="Verdict + reasoning" src="Anthropic Claude Sonnet 4.5" cov="All tickers" cache="Persisted in MongoDB" />
+                            <Tr s="Verdict + reasoning" src="OpenRouter · DeepSeek V4 Pro (primary) with automatic fallback cascade" cov="All tickers" cache="Persisted in MongoDB" />
                         </tbody>
                     </table>
                 </div>
@@ -1562,7 +1562,7 @@ histogram  = MACD_line − signal`}
                 >
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                         Each verdict involves a 20-day daily price fetch, a Random-Forest
-                        scoring pass, and a full Claude Sonnet 4.5 round-trip — totalling
+                        scoring pass, and a full DeepSeek V4 Pro (OpenRouter) round-trip — totalling
                         <strong style={{ color: "hsl(var(--text-primary))" }}> ~45 seconds </strong>
                         of wall-clock work per analysis.
                         {isAdmin && (
@@ -1644,7 +1644,7 @@ histogram  = MACD_line − signal`}
                                 ? [{
                                     label: "LLM cost",
                                     value: "~$0.027",
-                                    note: "Claude Sonnet 4.5 / verdict",
+                                    note: "DeepSeek V4 Pro primary / verdict",
                                     live: false,
                                     adminOnly: true,
                                 }]
@@ -1775,8 +1775,8 @@ histogram  = MACD_line − signal`}
                     >{`Frontend         React 18 + TailwindCSS + shadcn/ui · Recharts for price charts
 Backend          FastAPI (Python 3.11) · Uvicorn · async httpx for outbound I/O
 Database         MongoDB (Motor async driver)
-Auth             JWT (email/password) + Emergent Google OAuth
-LLM              Anthropic Claude Sonnet 4.5 via Emergent LLM key
+Auth             JWT (email/password)
+LLM              OpenRouter · DeepSeek V4 Pro (verdict) → V4 Flash (fast) → Kimi K2.6 / Nemotron (free fallback)
 Market data      yfinance (public) + Finnhub.io (REST, US) + RapidAPI IDX (Indonesia)
 IDX news         CNBC Indonesia + Detik Finance RSS scraper
 IDX smart-money  Bandarmology — insider filings parsed from RapidAPI IDX /emiten/{sym}/insider
