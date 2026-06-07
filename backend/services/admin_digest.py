@@ -200,8 +200,8 @@ def _format_digest(metrics: dict) -> str:
 
     lines.append("")
     lines.append(
-        "<i>Open </i><a href=\"" + (_PUBLIC_APP_URL or "/admin") +
-        "/admin\"><i>admin panel</i></a> for details."
+        "<i>Open </i><a href=\"https://stock.neulab.xyz/admin\"><i>admin panel</i></a> for details."
+        
     )
     return "\n".join(lines)
 
