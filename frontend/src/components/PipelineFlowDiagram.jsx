@@ -578,7 +578,7 @@ const ALL_STAGES_MOBILE = [
         Icon: l.icon,
         target: l.target,
     })),
-    { key: "llm", color: "violet", overline: "07", label: "Claude Sonnet 4.5", sub: "LLM reasoning", Icon: Sparkles, target: '[data-testid="pipeline-stage-07"]' },
+    { key: "llm", color: "violet", overline: "07", label: "DeepSeek V4 Pro", sub: "LLM reasoning", Icon: Sparkles, target: '[data-testid="pipeline-stage-07"]' },
     { key: "output", color: "green", overline: "08", label: "Verdict + outputs", sub: "Web · PDF · Telegram", Icon: FileText, target: '[data-testid="pipeline-stage-08"]' },
 ];
 
