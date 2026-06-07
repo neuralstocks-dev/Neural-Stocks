@@ -1569,9 +1569,9 @@ histogram  = MACD_line − signal`}
                             <>
                                 {" "}LLM cost ≈{" "}
                                 <strong style={{ color: "hsl(var(--text-primary))" }}>
-                                    $0.027 / verdict
+                                    variable
                                 </strong>{" "}
-                                (~3,300–4,000 input tokens to Claude, ~1,750 output) — see{" "}
+                                (~3,300–4,000 input tokens, ~1,750 output) — see{" "}
                                 <a
                                     href="/admin/cost"
                                     className="link-underline"
@@ -1585,7 +1585,7 @@ histogram  = MACD_line − signal`}
                         {" "}To keep the system responsive when traffic spikes, Neural Stock Intelligence™ caps in-flight
                         analyses at <strong style={{ color: "hsl(var(--text-primary))" }}>4 concurrent</strong>{" "}
                         per backend worker via a global asyncio semaphore. Excess requests <em>queue</em> rather than
-                        slowing every other endpoint to a crawl. The Claude calls themselves run inside isolated OS
+                        The LLM calls themselves run inside isolated OS
                         threads so the main API loop stays free for trivial reads (your watchlist, alerts, login)
                         even while several heavy analyses are mid-flight.
                     </p>
@@ -1784,7 +1784,7 @@ PDF              ReportLab (server-side, zero client dependencies)
 Payments         PayPal REST v1 (Subscriptions) + v2 (Orders for Week Pass)
 Email            Resend (receipts, password reset)
 Alerts           Telegram Bot API (@neulab_bot)
-Hosting          Kubernetes container on Emergent · Supervisord-managed services
+Hosting          Railway (Python 3.11 · Uvicorn · 1 replica) · Supervisord-managed services
 Observability    Structured logs to /var/log/supervisor · per-request correlation IDs`}
                     </pre>
                 </div>
@@ -1794,7 +1794,7 @@ Observability    Structured logs to /var/log/supervisor · per-request correlati
                     style={{ color: "hsl(var(--text-muted))", fontSize: "0.62rem" }}
                 >
                     <ShieldCheck size={10} className="inline mr-1" strokeWidth={1.5} />
-                    Last updated April 2026. This page is versioned with the product — any future switch to
+                    Last updated June 2026. This page is versioned with the product — any future switch to
                     trained ML (e.g., FinBERT for sentiment) will be disclosed here with a dated changelog entry.
                 </p>
             </div>
