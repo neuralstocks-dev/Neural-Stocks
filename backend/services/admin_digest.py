@@ -90,7 +90,7 @@ async def _aggregate_admin_metrics(window_hours: int = 24) -> dict:
         total = sum(by_provider.values())
         metrics["verdicts"] = total
         if total > 0:
-            fb = sum(n for p, n in by_provider.items() if p not in ("anthropic", None, "unknown"))
+            fb = sum(n for p, n in by_provider.items() if p not in ("openrouter", None, "unknown"))
             metrics["fallback_rate_pct"] = round(100 * fb / total, 1)
             # Find the top fallback provider (excluding the primary). If
             # nothing fell back, leave None — the message hides the line.
