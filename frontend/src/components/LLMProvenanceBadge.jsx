@@ -28,7 +28,7 @@ import { Activity } from "lucide-react";
  *             tight layouts (e.g. the share card)
  */
 const PROVIDER_LABELS = {
-    anthropic: { display: "Claude Sonnet 4.5", primary: true },
+    anthropic: { display: "AI (primary)", primary: true },
     gemini: { display: "Gemini 2.5 Pro", primary: false },
     openai: { display: "OpenAI", primary: false },
 };

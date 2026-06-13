@@ -307,7 +307,7 @@ function Step2Run({ picks, onComplete, onError }) {
                 // analysis is genuinely about to land. Two key lessons
                 // from the May 2026 production incident
                 // (rhendamukti@googlemail.com, screenshot timestamp
-                // 8:49pm Sun 3 May): (a) when Anthropic is degraded,
+                // 8:49pm Sun 3 May): (a) when the AI provider is degraded,
                 // ONE failed attempt eats ~60s before the chain rotates
                 // to Gemini; (b) Gemini then takes another ~30s for the
                 // actual response, so a HEALTHY run during a degraded
@@ -321,7 +321,7 @@ function Step2Run({ picks, onComplete, onError }) {
                 const WIZARD_HARD_STOP_S = 210;
                 const WIZARD_SOFT_NOTICE_S = 90;
                 const startedAt = Date.now();
-                const phases = ["Fetching market data", "Running candlestick scan", "Asking Claude", "Composing verdict"];
+                const phases = ["Fetching market data", "Running candlestick scan", "Asking AI", "Composing verdict"];
                 let phaseIdx = 0;
                 let softNoticeShown = false;
                 let consecutiveErrors = 0;

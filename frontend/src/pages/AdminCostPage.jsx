@@ -380,7 +380,7 @@ export default function AdminCostPage() {
                     >
                         Estimated burn at{" "}
                         <strong>${data?.cost_per_verdict_usd?.toFixed(3) || "0.027"}</strong>{" "}
-                        per Claude Sonnet 4.5 verdict ·{" "}
+                        per AI verdict ·{" "}
                         <strong>{data?.cost_per_verdict_credits?.toFixed(1) || "2.7"}</strong>{" "}
                         Universal Key credits each.
                     </p>

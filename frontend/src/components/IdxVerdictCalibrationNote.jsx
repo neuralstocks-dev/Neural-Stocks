@@ -23,7 +23,7 @@ import { AlertTriangle, Info } from "lucide-react";
  * as additional context for the user to weigh.
  *
  * Educational framing only. Does NOT override the verdict, just flags that
- * Claude and bandarmology are looking at different time horizons / evidence.
+ * AI and bandarmology are looking at different time horizons / evidence.
  */
 
 const BULL_PERSISTENCE = new Set(["persistent_accumulation", "mild_accumulation"]);

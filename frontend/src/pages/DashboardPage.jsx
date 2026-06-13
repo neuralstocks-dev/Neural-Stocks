@@ -832,7 +832,7 @@ export default function DashboardPage() {
                     >
                         Three positions, reasoned verdicts, signal-grade alerts. Tap{" "}
                         <span className="font-mono text-[hsl(var(--text-primary))]">Analyze&nbsp;Now</span>{" "}
-                        on any row, or let Claude sweep your movers with
+                        on any row, or let AI sweep your movers with
                         <span className="font-mono text-[hsl(var(--text-primary))]"> Top/Bottom 3</span>.
                     </p>
                     <p

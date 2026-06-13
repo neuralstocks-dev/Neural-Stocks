@@ -138,7 +138,7 @@ export default function AnonTryResetCard() {
                     <AlertTriangle size={14} strokeWidth={1.8} style={{ color: "hsl(var(--sell))", flexShrink: 0, marginTop: 2 }} />
                     <div className="flex-1 min-w-0">
                         <p className="text-sm" style={{ color: "hsl(var(--text-primary))" }}>
-                            <strong>Testing use only.</strong> After reset, any IP can trigger a fresh free analysis (cost: 1 Claude + RapidAPI call per distinct ticker). Your own browser's "already used today" state clears too.
+                            <strong>Testing use only.</strong> After reset, any IP can trigger a fresh free analysis (cost: 1 AI + RapidAPI call per distinct ticker). Your own browser's "already used today" state clears too.
                         </p>
                     </div>
                     {!confirming ? (

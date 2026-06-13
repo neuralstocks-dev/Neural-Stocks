@@ -58,7 +58,7 @@ export default function LlmHealthBadge({ inline = false, showWhenHealthy = false
                 if (!cancelled) setHealth(r.data);
             } catch {
                 // Network errors should NOT mark the upstream as down — the
-                // user's connection might be flaky while Anthropic is fine.
+                // user's connection might be flaky while the AI provider is fine.
                 // Leave the previous state in place.
             }
         };

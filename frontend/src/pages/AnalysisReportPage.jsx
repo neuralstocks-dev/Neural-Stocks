@@ -507,7 +507,7 @@ export default function AnalysisReportPage() {
                                     {id}. Replaces the opaque "Thinking…"
                                     spinner with a transparent receipt so
                                     users see WHICH part of the pipeline is
-                                    working (data fetch / patterns / Claude
+                                    working (data fetch / patterns / AI
                                     / RF / calibration) right now. */}
                                 {analyzing && progress && (
                                     <AnalysisProgressStepper
@@ -587,7 +587,7 @@ export default function AnalysisReportPage() {
                                     </em>
                                 </h2>
                                 <p className="mt-3 text-sm max-w-md mx-auto" style={{ color: "hsl(var(--text-secondary))" }}>
-                                    Claude will synthesize price action, technicals, and fundamentals into one
+                                    AI will synthesize price action, technicals, and fundamentals into one
                                     decisive call.
                                 </p>
                                 <button
@@ -913,7 +913,7 @@ export default function AnalysisReportPage() {
                                                 {" "}Company news: <strong>CNBC Indonesia</strong> + <strong>Detik Finance</strong> RSS (ticker &amp; Bahasa alias matched).
                                                 {" "}News sentiment: NSI keyword heuristic (English + Bahasa Indonesia).
                                                 {" "}Candlestick pattern detection: NSI in-house deterministic engine (15 patterns, daily + weekly).
-                                                {" "}AI reasoning &amp; verdict synthesis: <strong>Anthropic Claude Sonnet 4.5</strong>.
+                                                {" "}AI reasoning &amp; verdict synthesis: <strong>Neural Stock Intelligence™</strong>.
                                             </>
                                         ) : (
                                             <>
@@ -921,7 +921,7 @@ export default function AnalysisReportPage() {
                                                 {" "}Company news, analyst consensus &amp; earnings calendar: <strong>Finnhub.io</strong>.
                                                 {" "}News sentiment: NSI keyword heuristic over headlines.
                                                 {" "}Candlestick pattern detection: NSI in-house deterministic engine (15 patterns, daily + weekly).
-                                                {" "}AI reasoning &amp; verdict synthesis: <strong>Anthropic Claude Sonnet 4.5</strong>.
+                                                {" "}AI reasoning &amp; verdict synthesis: <strong>Neural Stock Intelligence™</strong>.
                                             </>
                                         )}
                                     </p>

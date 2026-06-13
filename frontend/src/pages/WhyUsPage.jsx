@@ -45,7 +45,7 @@ const MODULES = [
         icon: Layers,
         title: "Candlestick Strategy",
         status: "available",
-        body: "Three analyzer modes on every tier — Standard AI (fundamentals + technicals), Candlestick (15 pattern detectors on daily + weekly timeframes), and Hybrid (AI + Candlestick). Claude weighs patterns as primary, confirmation, or rejection signals and explains every verdict. Even the free tier gets all three modes.",
+        body: "Three analyzer modes on every tier — Standard AI (fundamentals + technicals), Candlestick (15 pattern detectors on daily + weekly timeframes), and Hybrid (AI + Candlestick). AI weighs patterns as primary, confirmation, or rejection signals and explains every verdict. Even the free tier gets all three modes.",
     },
     {
         icon: MessageSquareText,
@@ -562,7 +562,7 @@ export default function WhyUsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-6 mt-8">
                         {[
                             { step: "01", title: "Ingest", body: "Price, volume, fundamentals, technical indicators, and sentiment — gathered across exchanges in real time." },
-                            { step: "02", title: "Score & rank", body: "Claude-powered AI models weigh multi-factor data and produce BUY / SELL / HOLD signals with composite Score Card ratings." },
+                            { step: "02", title: "Score & rank", body: "AI models weigh multi-factor data and produce BUY / SELL / HOLD signals with composite Score Card ratings." },
                             { step: "03", title: "Explain", body: "Every signal comes with cited reasoning, confidence context, strengths, and risks — so you understand the thesis before acting." },
                         ].map((s) => (
                             <div
@@ -1025,7 +1025,7 @@ export default function WhyUsPage() {
                             That's why we built{" "}
                             <strong style={{ color: "hsl(var(--gold))" }}>KidStocks</strong> — the
                             kid-safe layer over the same Neural Stock Intelligence engine you trust
-                            for yourself. Same Claude + Gemini reasoning. Same real-market data.{" "}
+                            for yourself. Same AI reasoning. Same real-market data.{" "}
                             <em style={{ color: "hsl(var(--text-primary))" }}>Translated</em> into
                             language an 8-year-old can actually understand.
                         </p>

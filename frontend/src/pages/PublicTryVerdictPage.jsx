@@ -656,7 +656,7 @@ const STAGES = [
     { offset: 6,  label: "Detecting candlestick patterns across daily + weekly" },
     { offset: 12, label: "Running Random Forest model · 20-day horizon" },
     { offset: 18, label: "Gathering market context · news · peer signals" },
-    { offset: 26, label: "Synthesising verdict with Anthropic Claude" },
+    { offset: 26, label: "Synthesising verdict with AI" },
 ];
 
 function ProgressIndicator({ progress }) {

@@ -518,7 +518,7 @@ export default function UserManualPage() {
                             anchorId="glossary-random-forest"
                             term="Random Forest (RF)"
                             techAnchor="random-forest"
-                            plain="A statistical classifier we run as a second opinion alongside Claude. RF says BUY/SELL with its own probability — disagreements with the AI calibrate the displayed confidence downward."
+                            plain="A statistical classifier we run as a second opinion alongside the AI. RF says BUY/SELL with its own probability — disagreements with the AI calibrate the displayed confidence downward."
                         />
                         <GlossaryRow
                             anchorId="glossary-intrinsic-value"
@@ -542,7 +542,7 @@ export default function UserManualPage() {
                             anchorId="glossary-confidence-calibration"
                             term="Confidence calibration"
                             techAnchor="confidence"
-                            plain="The displayed confidence is post-processed by two rules: capped at 65 within 7 days of earnings, and reduced when RF disagrees with Claude's direction. Both adjustments are shown transparently."
+                            plain="The displayed confidence is post-processed by two rules: capped at 65 within 7 days of earnings, and reduced when RF disagrees with the AI direction. Both adjustments are shown transparently."
                         />
                         <GlossaryRow
                             anchorId="glossary-pattern-scan"
@@ -702,7 +702,7 @@ export default function UserManualPage() {
                     </Step>
                     <Step n={7} title="Random-Forest opinion">
                         Independent statistical model showing P(up) and P(down). When RF disagrees
-                        with Claude, the badge turns amber and the calibration chip in step 3 fires.
+                        with the AI, the badge turns amber and the calibration chip in step 3 fires.
                     </Step>
                     <Step n={8} title="Intrinsic-value anchor">
                         Graham Number or Residual Income Model estimate (depending on sector). Tells
@@ -1057,7 +1057,7 @@ export default function UserManualPage() {
                     </p>
                     <div className="mt-4">
                         <FAQItem q="My analysis is stuck on 'LLM verdict' for 60+ seconds — what's happening?">
-                            Anthropic's Claude API occasionally has slow responses. Our backend retries
+                            The AI provider occasionally has slow responses. Our backend retries
                             transient errors automatically up to 2 times. If a verdict still hasn't landed
                             after 240 seconds, the row will turn red with a "Tap to retry" pill — that's
                             your cue. The retry doesn't consume an extra quota slot.

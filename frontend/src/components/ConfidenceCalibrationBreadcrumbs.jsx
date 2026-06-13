@@ -173,7 +173,7 @@ export default function ConfidenceCalibrationBreadcrumbs({ analysis }) {
                     style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.5 }}
                 >
                     Earnings-proximity gate and RF-disagreement penalty both ran clean —
-                    confidence shown is Claude&apos;s raw output.
+                    confidence shown is the AI raw output.
                 </p>
             )}
         </div>
@@ -197,7 +197,7 @@ function RFDisagreementExplainer({ analysis, delta }) {
                 className="mt-2 text-xs leading-relaxed"
                 style={{ color: "hsl(var(--text-secondary))" }}
             >
-                Claude said{" "}
+                AI said{" "}
                 <strong style={{ color: "hsl(var(--text-primary))" }}>
                     {analysis.recommendation}
                 </strong>
@@ -211,7 +211,7 @@ function RFDisagreementExplainer({ analysis, delta }) {
                 {" / "}
                 <strong style={{ color: "hsl(var(--text-primary))" }}>{downPct}% down</strong>{" "}
                 over a {analysis.rf_opinion?.horizon_days || 20}-day forward window. Direction{" "}
-                <em>disagrees</em> with Claude on a{" "}
+                <em>disagrees</em> with the AI on a{" "}
                 <strong style={{ color: "hsl(var(--sell))" }}>
                     {analysis.rf_opinion?.edge}
                 </strong>{" "}

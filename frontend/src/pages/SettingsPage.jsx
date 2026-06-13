@@ -745,7 +745,7 @@ export default function SettingsPage() {
                             <p className="mt-3 text-sm max-w-xl" style={{ color: "hsl(var(--text-secondary))" }}>
                                 Once a day, Neural Stock Intelligence™ runs the Random-Forest model over every ticker on your watchlist.
                                 If the model shows <strong>strong conviction</strong> (|P − 50%| &gt; 15pp), you'll get
-                                a push on Telegram. This is an <em>RF-only</em> alert — not a full Claude verdict. Tap
+                                a push on Telegram. This is an <em>RF-only</em> alert — not a full AI verdict. Tap
                                 Analyze in the app for the multi-lens report before acting.
                             </p>
                         </div>
@@ -878,7 +878,7 @@ export default function SettingsPage() {
                                 <strong>{digest?.is_paid ? "top 5" : "top 3"}</strong>{" "}
                                 strongest BUY/SELL edges the Random-Forest model sees on
                                 your watchlist — no Telegram required. Tap any ticker to
-                                pull the full Claude verdict.
+                                pull the full AI verdict.
                                 {!digest?.is_paid && (
                                     <>
                                         {" "}Want daily pushes instead of weekly?{" "}

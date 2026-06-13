@@ -314,7 +314,7 @@ export default function AdminLLMHealthPanel() {
                 </div>
             ) : (
                 <p className="mt-3 text-xs" style={{ color: "hsl(var(--text-muted))" }}>
-                    No LLM failures in the last 24 hours — Claude is steady.
+                    No LLM failures in the last 24 hours — AI provider is steady.
                 </p>
             )}
 
@@ -328,7 +328,7 @@ export default function AdminLLMHealthPanel() {
 
             {/* Fallback-verdict-rate tile · last 24h. Counts FINAL verdicts
                 persisted to the analyses collection that came from a
-                non-primary provider (i.e. Anthropic was demoted/skipped
+                non-primary provider (i.e. primary provider was demoted/skipped
                 and Gemini ended up answering). Pairs with the user-facing
                 <LLMProvenanceBadge> — same signal, different audience.
                 Distinct from the provider strip above (which counts raw
@@ -647,7 +647,7 @@ function FallbackRateTile({ data }) {
                 borderLeft: `3px solid ${color}`,
             }}
             data-testid="admin-fallback-rate-tile"
-            title="Counts FINAL verdicts in the analyses collection that came from a non-primary provider (Gemini after Anthropic was demoted/skipped). Distinct from the provider-attempt strip above which counts raw attempts including retries."
+            title="Counts FINAL verdicts in the analyses collection that came from a non-primary provider (Gemini after primary provider was demoted/skipped). Distinct from the provider-attempt strip above which counts raw attempts including retries."
         >
             <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
@@ -863,10 +863,10 @@ export function buildEscalationEmail(r) {
     lines.push("");
     lines.push("Hi Emergent Support,");
     lines.push("");
-    lines.push("My Universal LLM Key (Claude Sonnet 4.5) has been intermittently socket-hanging");
+    lines.push("The AI provider has been intermittently socket-hanging");
     lines.push("at the upstream proxy layer. My application correctly applies a 240s timeout +");
     lines.push("tenacity retries; the failures classify as `llm_socket_hang` with elapsed_s ≈ budget,");
-    lines.push("indicating the issue is upstream of my code (Universal-Key proxy / Anthropic).");
+    lines.push("indicating the issue is upstream of my code (AI provider).");
     lines.push("");
     lines.push("[FILL IN]");
     lines.push("- My Emergent Job ID: <click ℹ️ in chat top-right and paste it here>");
@@ -910,7 +910,7 @@ export function buildEscalationEmail(r) {
         lines.push("");
     });
     lines.push("Could you please:");
-    lines.push("  1) Investigate the Universal-Key proxy / Anthropic upstream reliability for these timestamps");
+    lines.push("  1) Investigate the AI provider upstream reliability for these timestamps");
     lines.push("  2) Confirm whether these failed completions were billable, and");
     lines.push("  3) Recoup the wasted credits if they were.");
     lines.push("");

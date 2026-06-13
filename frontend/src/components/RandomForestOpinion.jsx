@@ -4,7 +4,7 @@
  * Shown alongside the LLM verdict to give users an independent
  * probability estimate. Honest UX:
  *   - When edge="none" we say "No meaningful edge" rather than fake a number
- *   - When edge="strong" + disagrees with Claude, we highlight it prominently
+ *   - When edge="strong" + disagrees with the AI, we highlight it prominently
  *   - Deep-links to /technical#random-forest for the full methodology
  */
 import React from "react";

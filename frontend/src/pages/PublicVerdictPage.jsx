@@ -727,7 +727,7 @@ function PublicCalibrationBlock({ analysis }) {
                     style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.55 }}
                 >
                     Earnings-proximity gate and RF-disagreement penalty both ran clean. Confidence shown
-                    is Claude&apos;s raw output — no adjustment applied.
+                    is the AI&apos;s raw output — no adjustment applied.
                 </p>
             )}
         </section>

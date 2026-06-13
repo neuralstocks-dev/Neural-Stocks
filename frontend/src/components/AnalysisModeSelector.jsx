@@ -24,7 +24,7 @@ const MODES = [
         label: "Hybrid",
         shortLabel: "Hybrid",
         icon: Layers,
-        description: "AI + Candlestick combined. Claude weighs fundamentals & technicals, then uses candlestick patterns for confirmation and timing. Recommended.",
+        description: "AI + Candlestick combined. AI weighs fundamentals & technicals, then uses candlestick patterns for confirmation and timing. Recommended.",
         pro: false,
         recommended: true,
     },
