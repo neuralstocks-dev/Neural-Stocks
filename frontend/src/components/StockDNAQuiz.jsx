@@ -194,7 +194,7 @@ export default function StockDNAQuiz({ theme }) {
             doc.setPage(p);
             doc.setFontSize(8);
             doc.setTextColor(140, 140, 150);
-            doc.text(stripEmoji(`StockDNA(TM) · NeuLab Inc. · neulab.xyz · kidstocks.net   —   ${T.disclaimer}`), M, pageH - 24);
+            doc.text(stripEmoji(`StockDNA(TM) · NeuLab Inc. · stock.neulab.xyz · kidstocks.net   —   ${T.disclaimer}`), M, pageH - 24);
             doc.text(`${p} / ${pages}`, pageW - M, pageH - 24, { align: "right" });
         }
         const fileName = `StockDNA_${stripEmoji(isE ? result.ne : result.ni).replace(/\s+/g, "_")}_${market}.pdf`;
@@ -251,7 +251,7 @@ export default function StockDNAQuiz({ theme }) {
         });
         lines.push("");
         lines.push("=".repeat(60));
-        lines.push(`Discover yours: neulab.xyz/stockdna · kidstocks.net/kids/stockdna`);
+        lines.push(`Discover yours: stock.neulab.xyz/stockdna · kidstocks.net/kids/stockdna`);
         lines.push(T.disclaimer);
         lines.push("=".repeat(60));
         await navigator.clipboard.writeText(lines.join("\n"));
@@ -663,11 +663,11 @@ function ResultScreen({ theme, T, lang, market, result, comment, setComment, sav
                 <h3 style={{ fontFamily: theme.fontHeading, fontSize: "clamp(18px,3vw,26px)", fontWeight: 800, color: theme.text, marginBottom: 8, lineHeight: 1.2 }}>{T.cta_headline}</h3>
                 <p style={{ fontSize: 12, color: theme.muted, lineHeight: 1.75, marginBottom: 20, maxWidth: 540 }} dangerouslySetInnerHTML={{ __html: T.cta_sub.replace(/<strong>/g, `<strong style="color:${theme.text}">`) }} />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                    <a href="https://neulab.xyz" target="_blank" rel="noopener noreferrer" data-testid="stockdna-cta-adult" style={{ background: theme.panel, border: `1px solid ${theme.border}`, padding: 18, borderRadius: theme.radius, textDecoration: "none", display: "block", color: theme.text }}>
+                    <a href="https://stock.neulab.xyz" target="_blank" rel="noopener noreferrer" data-testid="stockdna-cta-adult" style={{ background: theme.panel, border: `1px solid ${theme.border}`, padding: 18, borderRadius: theme.radius, textDecoration: "none", display: "block", color: theme.text }}>
                         <div style={{ fontSize: 8, letterSpacing: 2, textTransform: "uppercase", color: theme.muted, marginBottom: 7 }}>{T.for_adults}</div>
                         <div style={{ fontSize: 26, marginBottom: 7 }}>📊</div>
                         <div style={{ fontFamily: theme.fontHeading, fontSize: 14, fontWeight: 800, color: theme.text, marginBottom: 3 }}>NeuLab Stock Analyser</div>
-                        <div style={{ fontSize: 10, color: theme.primary, marginBottom: 7 }}>neulab.xyz</div>
+                        <div style={{ fontSize: 10, color: theme.primary, marginBottom: 7 }}>stock.neulab.xyz</div>
                         <div style={{ fontSize: 11, color: theme.muted, lineHeight: 1.6 }}>{T.adult_desc}</div>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 12, fontFamily: theme.fontHeading, fontSize: 10, fontWeight: 700, color: theme.primary, letterSpacing: 1, textTransform: "uppercase" }}>
                             {T.analyse_now} <ArrowRight size={11} />
@@ -741,8 +741,8 @@ function ResultScreen({ theme, T, lang, market, result, comment, setComment, sav
             </div>
 
             <p style={{ fontSize: 9, color: theme.muted, textAlign: "center", marginTop: 44, paddingTop: 18, borderTop: `1px solid ${theme.border}`, letterSpacing: 1, lineHeight: 2.2 }}>
-                <strong style={{ color: theme.primary, fontFamily: theme.fontHeading }}>StockDNA™</strong> — {T.powered_by} <a href="https://neulab.xyz" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary, textDecoration: "none" }}>NeuLab Inc.</a><br />
-                <a href="https://neulab.xyz" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary, textDecoration: "none" }}>neulab.xyz</a> · <a href="https://kidstocks.net" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary, textDecoration: "none" }}>kidstocks.net</a><br />
+                <strong style={{ color: theme.primary, fontFamily: theme.fontHeading }}>StockDNA™</strong> — {T.powered_by} <a href="https://stock.neulab.xyz" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary, textDecoration: "none" }}>NeuLab Inc.</a><br />
+                <a href="https://stock.neulab.xyz" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary, textDecoration: "none" }}>stock.neulab.xyz</a> · <a href="https://kidstocks.net" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary, textDecoration: "none" }}>kidstocks.net</a><br />
                 <span>{T.disclaimer}</span>
             </p>
 

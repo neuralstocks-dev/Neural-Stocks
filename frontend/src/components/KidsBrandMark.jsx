@@ -27,7 +27,7 @@
  *   color           — text color (default "currentColor")
  *   taglineOpacity  — 0..1 (default 0.6; pass 0.7 on dark bg)
  *   linkTo          — internal route for logo + wordmark (default "/kids/about")
- *   poweredByHref   — external href for the powered-by line (default "https://neulab.xyz")
+ *   poweredByHref   — external href for the powered-by line (default "https://stock.neulab.xyz")
  */
 import React from "react";
 import { Link } from "react-router-dom";
@@ -40,7 +40,7 @@ export default function KidsBrandMark({
     color = "currentColor",
     taglineOpacity = 0.6,
     linkTo = "/kids/about",
-    poweredByHref = "https://neulab.xyz",
+    poweredByHref = "https://stock.neulab.xyz",
 }) {
     const { lang } = useKidsLang();
 

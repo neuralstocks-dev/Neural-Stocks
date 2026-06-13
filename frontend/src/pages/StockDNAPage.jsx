@@ -24,8 +24,8 @@ const ADULT_THEME = {
     fontBody: '"IBM Plex Mono", "DM Mono", monospace',
     radius: 2,
     angled: true,
-    homeUrl: "https://neulab.xyz",
-    homeLabel: "neulab.xyz",
+    homeUrl: "https://stock.neulab.xyz",
+    homeLabel: "stock.neulab.xyz",
     brandSuffix: "by NeuLab Inc.",
 };
 

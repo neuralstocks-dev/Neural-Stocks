@@ -1065,7 +1065,7 @@ function exportHoroscopePDF({ pick, reading, md, weatherEn, lang }) {
     };
 
     writeWrapped("StockHoroscope(TM)", 20, { bold: true, color: [197, 164, 94], gap: 4 });
-    writeWrapped(`${isE ? "by" : "oleh"} NeuLab Inc. · neulab.xyz`, 9,
+    writeWrapped(`${isE ? "by" : "oleh"} NeuLab Inc. · stock.neulab.xyz`, 9,
         { color: [120, 120, 130], gap: 14 });
     writeWrapped(isE ? "YOUR DAILY MARKET READING" : "BACAAN PASAR HARIAN ANDA", 9,
         { bold: true, color: [197, 164, 94], gap: 14 });

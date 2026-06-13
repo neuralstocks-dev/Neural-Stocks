@@ -4,7 +4,7 @@
  *
  * Pulls strings from kidsI18n (`attr.eyebrow`, `attr.body`,
  * `attr.cta_adult`, `attr.copyright`) so it's bilingual EN/ID by
- * default. The adult-site CTA links to https://neulab.xyz (the
+ * default. The adult-site CTA links to https://stock.neulab.xyz (the
  * canonical adult production domain) in a new tab so kid users
  * never lose their KidStocks tab when curiosity sends them over to
  * the parent product.
@@ -73,7 +73,7 @@ export default function KidsFooter({ variant = "dark" }) {
                 </p>
                 <a
                     data-testid="kids-footer-adult-cta"
-                    href="https://neulab.xyz"
+                    href="https://stock.neulab.xyz"
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{

@@ -489,7 +489,7 @@ export default function WhyUsPage() {
                 {/* ------------------- Hero ------------------- */}
                 <section>
                     <p className="text-overline" style={{ color: "hsl(var(--hold))", letterSpacing: "0.16em" }}>
-                        <Sparkles size={11} className="inline mr-1" strokeWidth={1.5} /> NEULAB · neulab.xyz
+                        <Sparkles size={11} className="inline mr-1" strokeWidth={1.5} /> NEULAB · stock.neulab.xyz
                     </p>
                     <h1
                         className="font-serif mt-4 hero-number"
@@ -763,7 +763,7 @@ export default function WhyUsPage() {
                             style={{ color: "hsl(var(--text-secondary))" }}
                         >
                             <strong style={{ color: "hsl(var(--text-primary))" }}>Neural Stock Intelligence&trade;</strong> is
-                            our flagship product, available at <span className="font-mono">neulab.xyz</span>.
+                            our flagship product, available at <span className="font-mono">stock.neulab.xyz</span>.
                         </p>
                     </div>
                 </section>
