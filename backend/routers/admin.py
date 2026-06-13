@@ -232,7 +232,7 @@ async def llm_events(
 @router.get("/llm-events/recoup-summary")
 async def llm_events_recoup_summary(
     days: int = 30,
-    credit_per_verdict: float = 0.027,
+    credit_per_verdict: float = 0.003,
     _admin=Depends(admin_required),
 ):
     """Compose a "credit-recoup" report for failed LLM jobs over the last
@@ -516,7 +516,7 @@ async def trigger_admin_ops_digest(_admin=Depends(admin_required)):
 # universal format — opens in Excel/Sheets directly, emails cleanly.
 #
 # Credits-per-verdict assumption matches the recoup-summary endpoint
-# ($0.027 ≈ 2.7 credits per verdict on the Universal Key).
+# (~$0.003 per verdict via OpenRouter DeepSeek V4 Pro).
 _CREDITS_PER_VERDICT = 2.7
 
 # Estimated credits spent on REACTIVE CODE CHANGES required by the
@@ -1532,10 +1532,9 @@ async def anon_try_reset(_admin=Depends(admin_required)):
 # spend to project remaining credits. See /admin/cost dashboard.
 
 # Cost model — kept centrally so the frontend dashboard pulls the same number
-# the backend uses to compute estimates. ~3,500 input tokens at $3/1M plus
-# ~1,750 output tokens at $15/1M ≈ $0.027 per Claude Sonnet 4.5 verdict.
-# Universal Key bills 1 credit = $0.01, so cost-in-credits = USD × 100.
-COST_PER_VERDICT_USD = 0.027
+# the backend uses to compute estimates. ~3,500 input tokens at $0.27/1M plus
+# ~1,750 output tokens at $1.10/1M ≈ $0.003 per DeepSeek V4 Pro verdict via OpenRouter.
+COST_PER_VERDICT_USD = 0.003
 
 
 @router.get("/cost/summary")

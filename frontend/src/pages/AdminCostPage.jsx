@@ -4,9 +4,8 @@
  * Admin-only dashboard that surfaces the LLM-cost economics that we
  * deliberately HIDE from public users (those numbers are unhelpful at
  * best and competitive-margin disclosure at worst). Shows:
- *   - Per-day verdict count × $0.027 totals (last 30 days)
- *   - Lifetime totals (USD spent, credits burned, verdict count)
- *   - Universal Key balance anchor: admin enters their last-known top-up
+ *   - Per-day verdict count × ~$0.003 totals (last 30 days, DeepSeek V4 Pro via OpenRouter)
+ *   - Lifetime totals (USD spent, verdict count)
  *     amount, app subtracts estimated spend since the top-up to project
  *     verdicts remaining.
  *   - Sparkline of daily burn so admin can spot spikes.
@@ -372,17 +371,17 @@ export default function AdminCostPage() {
                         className="font-serif mt-2"
                         style={{ fontSize: "2rem", letterSpacing: "-0.01em" }}
                     >
-                        LLM cost &amp; Universal Key balance.
+                        LLM cost &amp; AI spend.
                     </h1>
                     <p
                         className="mt-2 text-sm"
                         style={{ color: "hsl(var(--text-secondary))" }}
                     >
                         Estimated burn at{" "}
-                        <strong>${data?.cost_per_verdict_usd?.toFixed(3) || "0.027"}</strong>{" "}
+                        <strong>${data?.cost_per_verdict_usd?.toFixed(4) || "0.003"}</strong>{" "}
                         per AI verdict ·{" "}
-                        <strong>{data?.cost_per_verdict_credits?.toFixed(1) || "2.7"}</strong>{" "}
-                        Universal Key credits each.
+                        <strong>{data?.cost_per_verdict_credits?.toFixed(1) || "0.3"}</strong>{" "}
+                        OpenRouter calls estimated.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -447,9 +446,9 @@ export default function AdminCostPage() {
                         testId="stat-usd"
                     />
                     <_StatCell
-                        label="Credits burned"
+                        label="Est. LLM calls"
                         value={data.totals.credits.toFixed(1)}
-                        note="1 credit = $0.01"
+                        note="estimated (OpenRouter)"
                         accent="hold"
                         testId="stat-credits"
                     />
