@@ -29,6 +29,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showMobileForm, setShowMobileForm] = useState(false);
 
     if (!bootstrapping && user) return <Navigate to="/dashboard" replace />;
 
@@ -66,6 +67,104 @@ export default function LoginPage() {
             />
 
             <div className="relative z-10 min-h-screen grid md:grid-cols-2">
+
+                {/* Mobile landing — shown to guests before they tap Sign in */}
+                {!showMobileForm && (
+                    <div className="flex md:hidden flex-col justify-between p-8 min-h-screen">
+                        <div className="flex items-center gap-3 text-white">
+                            <div
+                                style={{
+                                    width: 34,
+                                    height: 34,
+                                    border: "1px solid rgba(255,255,255,0.4)",
+                                    display: "grid",
+                                    placeItems: "center",
+                                }}
+                            >
+                                <LineChart size={16} strokeWidth={1.5} />
+                            </div>
+                            <div className="flex flex-col leading-none">
+                                <span className="font-serif text-xl tracking-wide" style={{ letterSpacing: "0.08em", fontWeight: 600 }}>NEULAB</span>
+                                <span className="text-overline" style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.58rem" }}>
+                                    Neural Stock Intelligence&trade;
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="text-white mt-8">
+                            <p className="text-overline mb-4" style={{ color: "rgba(255,255,255,0.55)" }}>
+                                Institutional-grade · Private preview
+                            </p>
+                            <h1
+                                className="font-serif text-white"
+                                style={{ fontSize: "clamp(2.4rem, 10vw, 3.6rem)", lineHeight: 1.05, letterSpacing: "-0.02em" }}
+                            >
+                                Intelligence<br />
+                                <em className="italic" style={{ color: tagline.render.color }}>
+                                    that shows its work.
+                                </em>
+                            </h1>
+                            <p className="mt-5 text-white/70 text-base leading-relaxed" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                Deep equity research, reasoning you can interrogate, and signal-grade
+                                alerts. Built for investors who demand the 'why' behind every call.
+                            </p>
+
+                            <div className="mt-6">
+                                <TryNowBox variant="muted" className="mb-3" />
+                                <PublicTrendingTicker variant="muted" windowDays={7} limit={8} ctaHref="/signup" ctaLabel="Sign up & run one →" />
+                            </div>
+
+                            <a
+                                href="/stockdna"
+                                className="mt-5 inline-flex items-center gap-3 px-5 py-3 transition-all w-full"
+                                style={{
+                                    background: "linear-gradient(135deg, rgba(197,164,94,0.14), rgba(124,58,237,0.10))",
+                                    border: "1px solid rgba(197,164,94,0.45)",
+                                    color: "#e8eaf6",
+                                    textDecoration: "none",
+                                    fontFamily: "'IBM Plex Mono', monospace",
+                                    fontSize: "0.78rem",
+                                    letterSpacing: "0.08em",
+                                }}
+                            >
+                                <span style={{ fontSize: "1.4rem", lineHeight: 1 }}>🧬</span>
+                                <span>
+                                    <span style={{ color: "#c5a45e", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", fontSize: "0.66rem", display: "block" }}>NEW · 5 MIN</span>
+                                    <span style={{ fontWeight: 600 }}>What's your StockDNA?</span>
+                                    <span style={{ opacity: 0.65, marginLeft: 6 }}>Discover your investor personality →</span>
+                                </span>
+                            </a>
+
+                            <div className="mt-8 flex flex-col gap-3">
+                                <button
+                                    onClick={() => setShowMobileForm(true)}
+                                    className="btn-primary w-full"
+                                    style={{ background: "#F8FAFC", color: "#0A0C10", borderColor: "#F8FAFC" }}
+                                >
+                                    Sign in
+                                </button>
+                                <Link
+                                    to="/signup"
+                                    className="w-full text-center py-3 text-sm font-medium"
+                                    style={{
+                                        color: "#fff",
+                                        border: "1px solid rgba(255,255,255,0.3)",
+                                        textDecoration: "none",
+                                        display: "block",
+                                    }}
+                                >
+                                    Create account
+                                </Link>
+                            </div>
+                        </div>
+
+                        <p className="text-overline mt-8" style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.6rem" }}>
+                            &copy; 2026 NeuLab Inc. &middot; Neural Stock Intelligence&trade; &middot; Not financial advice
+                        </p>
+                    </div>
+                )}
+
+                {/* Desktop left panel — always visible on md+ */}
                 <div className="hidden md:flex flex-col justify-between p-12 lg:p-16">
                     <div className="flex items-center gap-3 text-white">
                         <div
@@ -113,7 +212,7 @@ export default function LoginPage() {
                             style={{ fontFamily: "'Outfit', sans-serif" }}
                         >
                             Deep equity research, reasoning you can interrogate, and signal-grade
-                            alerts — all powered by Claude. Built for investors who demand the
+                            alerts — all powered by AI. Built for investors who demand the
                             'why' behind every call.
                         </p>
 
@@ -168,7 +267,8 @@ export default function LoginPage() {
                     </div>
                 </div>
 
-                <div className="flex items-center justify-center p-6 md:p-12">
+                {/* Login form — always visible on desktop, shown on mobile only after tapping Sign in */}
+                <div className={`${showMobileForm ? "flex" : "hidden md:flex"} items-center justify-center p-6 md:p-12`}>
                     <div
                         className="w-full max-w-md p-8 md:p-10"
                         style={{
@@ -179,6 +279,16 @@ export default function LoginPage() {
                         }}
                         data-testid="login-card"
                     >
+                        {/* Back button on mobile */}
+                        {showMobileForm && (
+                            <button
+                                onClick={() => setShowMobileForm(false)}
+                                className="text-white/50 text-sm mb-4 flex items-center gap-1"
+                                style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                            >
+                                ← Back
+                            </button>
+                        )}
                         <p className="text-overline mb-3" style={{ color: "#94A3B8" }}>
                             Member sign-in
                         </p>
