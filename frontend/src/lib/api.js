@@ -59,14 +59,18 @@ api.interceptors.response.use(
             err.response.data.detail = d.message || d.msg || d.detail || JSON.stringify(d);
         }
         if (err?.response?.status === 401) {
-            // Force relogin only if a token was present (i.e., session expired)
-            // Don't redirect if we're on the dashboard (new user onboarding) —
-            // let the component handle the error gracefully.
-            if (localStorage.getItem("sai_token")) {
+            // Only treat as session-expired if the 401 came from a core auth
+            // endpoint — NOT from background data calls (watchlist, quota, alerts).
+            // Background 401s should NOT clear the token because they can fire
+            // transiently during new-user onboarding before the backend has
+            // fully indexed the new account.
+            const url = err?.config?.url || "";
+            const isCoreAuth = url.includes("/auth/") || url.includes("/disclaimer") || url.includes("/analysis/");
+            if (isCoreAuth && localStorage.getItem("sai_token")) {
                 localStorage.removeItem("sai_token");
                 localStorage.removeItem("sai_user");
                 const path = window.location.pathname;
-                if (path !== "/login" && path !== "/dashboard") {
+                if (path !== "/login") {
                     window.location.assign("/login");
                 }
             }

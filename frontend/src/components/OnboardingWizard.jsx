@@ -599,6 +599,10 @@ export default function OnboardingWizard({ open, onClose, onWatchlistChanged }) 
     useEffect(() => {
         if (open) {
             track("wizard_opened", {}, sessionId);
+            // Reset error and step when wizard reopens so previous failures
+            // don't bleed into a fresh open.
+            setError("");
+            setStep(1);
         }
         // sessionId is stable per mount, intentionally only depend on open.
         // eslint-disable-next-line react-hooks/exhaustive-deps
