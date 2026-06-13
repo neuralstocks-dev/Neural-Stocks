@@ -84,7 +84,7 @@ export default function VerdictRing({ score = 0, signal = "HOLD", size = 200 }) 
                     {clamped}
                 </span>
                 <span className="text-overline" style={{ fontSize: "0.56rem", marginTop: 2 }}>
-                    Confidence · %
+                    CONFIDENCE
                 </span>
             </div>
         </div>

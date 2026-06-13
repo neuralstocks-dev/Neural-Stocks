@@ -299,7 +299,8 @@ export default function PublicTryVerdictPage() {
                             >
                                 <VerdictRing
                                     recommendation={signal}
-                                    confidence={a.confidence_score || 0}
+                                    score={a.confidence_score || 0}
+                                    signal={signal}
                                     size={140}
                                 />
                                 <div>
