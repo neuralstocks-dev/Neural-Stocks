@@ -5,6 +5,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/context/ThemeContext";
 import AppShell from "@/components/AppShell";
+import LandingPage from "@/pages/LandingPage";
 import LoginPage from "@/pages/LoginPage";
 import SignupPage from "@/pages/SignupPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
@@ -96,7 +97,8 @@ function RootRedirect() {
             </div>
         );
     }
-    return <Navigate to={user ? "/dashboard" : "/login"} replace />;
+    if (!user) return <LandingPage />;
+    return <Navigate to="/dashboard" replace />;
 }
 
 function AppRoutes() {
@@ -156,6 +158,7 @@ function AppRoutes() {
         <Routes>
             {/* Public routes */}
             <Route path="/" element={<RootRedirect />} />
+            <Route path="/landing" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
