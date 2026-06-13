@@ -1379,6 +1379,7 @@ async def paypal_webhook_diagnostics(_admin=Depends(admin_required)):
         "webhook_id_configured": bool(_CFG_WEBHOOK_ID),
         "webhook_id": _CFG_WEBHOOK_ID or None,
         "public_app_url": __import__("os").environ.get("PUBLIC_APP_URL"),
+        "backend_url": __import__("os").environ.get("RAILWAY_STATIC_URL") or __import__("os").environ.get("RAILWAY_PUBLIC_DOMAIN") or None,
         "registered": None,
         "registered_error": None,
         "available_event_types": [],

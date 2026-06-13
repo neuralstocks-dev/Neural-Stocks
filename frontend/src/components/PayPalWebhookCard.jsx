@@ -76,9 +76,12 @@ export default function PayPalWebhookCard() {
 
     const urlMismatch = useMemo(() => {
         if (!data?.registered?.url || !expectedWebhookUrl) return false;
-        const a = data.registered.url.replace(/\/+$/, "");
-        const b = expectedWebhookUrl.replace(/\/+$/, "");
-        return a !== b;
+        const registered = data.registered.url.replace(/\/+$/, "");
+        const expected = expectedWebhookUrl.replace(/\/+$/, "");
+        if (registered === expected) return false;
+        // Railway backend URL is also valid — PayPal posts to backend directly
+        if (registered.includes("railway.app")) return false;
+        return true;
     }, [data, expectedWebhookUrl]);
 
     const subscribeAll = async () => {

@@ -372,6 +372,16 @@ async def paypal_webhook(request: Request):
                 subscription_id=sub_id,
             )
 
+    elif event_type == "BILLING.SUBSCRIPTION.PAYMENT.FAILED" and sub_doc:
+        logger.warning("PayPal payment failed for subscription %s", sub_id)
+        await db.subscriptions.update_one(
+            {"subscription_id": sub_id},
+            {"$set": {"last_payment_failed_at": iso(now_utc()), "updated_at": iso(now_utc())}},
+        )
+
+    elif event_type in ("PAYMENT.CAPTURE.COMPLETED", "CHECKOUT.ORDER.APPROVED"):
+        logger.info("PayPal order event %s: %s", event_type, resource.get("id"))
+
     return {"received": True, "verified": True, "event": event_type}
 
 
