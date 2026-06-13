@@ -72,7 +72,12 @@ export default function PublicTryVerdictPage() {
                 }
                 if (jobStatus === "error") {
                     if (!cancelled) {
-                        setError(body?._job?.error || "Analysis failed. Please try another ticker.");
+                        const jobErr = body?._job?.error || "";
+                        let jobErrFriendly = "Analysis failed. Please try another ticker.";
+                        if (jobErr.includes("No data for ticker")) {
+                            jobErrFriendly = "Ticker not found. Check the symbol and try again.";
+                        }
+                        setError(jobErrFriendly);
                         setLoading(false);
                     }
                     return;
@@ -122,11 +127,19 @@ export default function PublicTryVerdictPage() {
                 }
             } catch (e) {
                 if (!cancelled) {
-                    setError(
-                        e?.response?.data?.detail ||
-                        e?.message ||
-                        "Could not run the analysis"
-                    );
+                    const rawErr = e?.response?.data?.detail || e?.message || "";
+                    // Never show raw technical errors to users
+                    let friendlyErr = "Analysis failed. Please try again.";
+                    if (rawErr.includes("No data for ticker")) {
+                        friendlyErr = "Ticker not found. Check the symbol and try again.";
+                    } else if (rawErr.includes("429") || rawErr.includes("rate limit")) {
+                        friendlyErr = "Too many requests. Please wait a moment and try again.";
+                    } else if (rawErr.includes("budget") || rawErr.includes("quota")) {
+                        friendlyErr = "Daily limit reached. Sign up for more analyses.";
+                    } else if (rawErr.includes("already used") || rawErr.includes("limit")) {
+                        friendlyErr = rawErr; // User-facing quota messages are already friendly
+                    }
+                    setError(friendlyErr);
                     setLoading(false);
                 }
             }

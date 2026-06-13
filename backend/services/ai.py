@@ -209,11 +209,25 @@ async def _run_llm(system_prompt: str, user_text: str, session_prefix: str) -> t
 
 def _parse_ai_json(raw) -> dict:
     text = raw if isinstance(raw, str) else str(raw)
+    # Try to extract JSON object — handle single quotes and trailing commas
     m = re.search(r"\{[\s\S]*\}", text)
     if not m:
         raise HTTPException(status_code=502, detail="AI did not return valid JSON")
+    candidate = m.group(0)
     try:
-        return json.loads(m.group(0))
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        pass
+    # Fallback 1: replace single quotes with double quotes
+    try:
+        fixed = candidate.replace("'", '"')
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+    # Fallback 2: strip trailing commas before } or ]
+    try:
+        fixed = re.sub(r",\s*([}\]])", r"\1", candidate)
+        return json.loads(fixed)
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"AI JSON parse error: {e}")
 
