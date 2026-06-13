@@ -10,6 +10,9 @@ import { Globe, CheckCircle2, AlertTriangle, XCircle, ExternalLink, RefreshCw } 
 export default function IdxBudgetCard() {
     const [snap, setSnap] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [syncInput, setSyncInput] = useState("");
+    const [syncing, setSyncing] = useState(false);
+    const [syncMsg, setSyncMsg] = useState(null);
 
     const fetchSnap = useCallback(async () => {
         try {
@@ -25,6 +28,27 @@ export default function IdxBudgetCard() {
     useEffect(() => {
         fetchSnap();
     }, [fetchSnap]);
+
+    const handleSync = async () => {
+        const val = parseInt(syncInput, 10);
+        if (isNaN(val) || val < 0) {
+            setSyncMsg({ ok: false, text: "Enter a valid number from RapidAPI dashboard." });
+            return;
+        }
+        setSyncing(true);
+        setSyncMsg(null);
+        try {
+            const res = await api.post("/admin/rapidapi/usage/sync", { actual_used: val });
+            setSnap(res.data);
+            setSyncInput("");
+            setSyncMsg({ ok: true, text: `Counter synced to ${val}. Remaining: ${res.data.remaining}.` });
+        } catch {
+            setSyncMsg({ ok: false, text: "Sync failed. Try again." });
+        } finally {
+            setSyncing(false);
+            setTimeout(() => setSyncMsg(null), 4000);
+        }
+    };
 
     const configured = snap?.configured;
     const count = snap?.count ?? 0;
@@ -196,7 +220,8 @@ export default function IdxBudgetCard() {
                             </li>
                             <li>
                                 Our backend stops calling the provider at <strong>950 requests</strong> and silently
-                                falls back to yfinance — the counter on this panel is the authoritative view.
+                                falls back to yfinance — use "Sync from RapidAPI" below if this counter
+                                drifts from the RapidAPI dashboard (e.g. key was added mid-month).
                             </li>
                         </ul>
                     </div>
@@ -211,7 +236,7 @@ export default function IdxBudgetCard() {
                 </p>
             ) : null}
 
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-4 flex items-center gap-3 flex-wrap">
                 <button
                     onClick={() => { setLoading(true); fetchSnap(); }}
                     disabled={loading}
@@ -221,7 +246,47 @@ export default function IdxBudgetCard() {
                     <RefreshCw size={12} strokeWidth={1.5} className={loading ? "animate-spin" : ""} />
                     Refresh
                 </button>
+
+                {/* Sync from RapidAPI dashboard */}
+                <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                        type="number"
+                        min="0"
+                        max="1000"
+                        value={syncInput}
+                        onChange={(e) => setSyncInput(e.target.value)}
+                        placeholder="Actual used (from RapidAPI)"
+                        className="font-mono px-2 py-1.5 text-xs"
+                        style={{
+                            background: "hsl(var(--bg))",
+                            border: "1px solid hsl(var(--border-default))",
+                            color: "hsl(var(--text-primary))",
+                            borderRadius: 2,
+                            width: 210,
+                        }}
+                        data-testid="idx-budget-sync-input"
+                    />
+                    <button
+                        onClick={handleSync}
+                        disabled={syncing || !syncInput}
+                        className="btn-ghost !py-2 !px-4 !text-xs flex items-center gap-2"
+                        data-testid="idx-budget-sync-button"
+                        style={{ borderColor: "hsl(var(--hold))", color: "hsl(var(--hold))" }}
+                    >
+                        {syncing ? <RefreshCw size={12} strokeWidth={1.5} className="animate-spin" /> : null}
+                        Sync from RapidAPI
+                    </button>
+                </div>
             </div>
+            {syncMsg && (
+                <p
+                    className="mt-2 font-mono text-[11px]"
+                    style={{ color: syncMsg.ok ? "hsl(var(--buy))" : "hsl(var(--sell))" }}
+                    data-testid="idx-budget-sync-msg"
+                >
+                    {syncMsg.text}
+                </p>
+            )}
         </section>
     );
 }

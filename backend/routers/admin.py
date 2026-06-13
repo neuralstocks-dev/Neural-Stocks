@@ -1306,6 +1306,31 @@ async def rapidapi_usage(_admin=Depends(admin_required)):
     return await idx_rapidapi.usage_snapshot()
 
 
+@router.post("/rapidapi/usage/sync")
+async def rapidapi_usage_sync(payload: dict, _admin=Depends(admin_required)):
+    """Seed the MongoDB counter from the authoritative RapidAPI dashboard value.
+    Use when the local counter drifts from RapidAPI (e.g. key was added mid-month).
+    Body: { "actual_used": <integer from RapidAPI dashboard> }
+    """
+    from services import idx_rapidapi
+    from datetime import datetime, timezone
+    actual = payload.get("actual_used")
+    if actual is None or not isinstance(actual, (int, float)) or int(actual) < 0:
+        raise HTTPException(status_code=400, detail="actual_used must be a non-negative integer")
+    actual = int(actual)
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    await db.rapidapi_usage.update_one(
+        {"month": month},
+        {"$set": {
+            "count": actual,
+            "synced_from_rapidapi_at": datetime.now(timezone.utc).isoformat(),
+            "synced_by": "admin",
+        }},
+        upsert=True,
+    )
+    return await idx_rapidapi.usage_snapshot()
+
+
 @router.post("/users/{user_id}/reset-quota")
 async def reset_user_quota(user_id: str, _admin=Depends(admin_required)):
     """Reset a user's daily + weekly analysis-quota window by stamping
