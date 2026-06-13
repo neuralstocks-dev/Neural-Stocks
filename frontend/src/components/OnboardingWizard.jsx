@@ -348,14 +348,14 @@ function Step2Run({ picks, onComplete, onError }) {
                         // Auth / not-found problems are real — bail out.
                         if (cancelled) return;
                         if (status === 401 || status === 403 || status === 404) {
-                            onError(e?.response?.data?.detail || e?.message || "Analysis failed");
+                            onError("Session expired. Please sign in and try again.");
                             return;
                         }
                         // Tolerate transient 5xx / network blips — the BG
                         // job keeps running on the server.
                         consecutiveErrors += 1;
                         if (consecutiveErrors >= MAX_CONSECUTIVE_POLL_ERRORS) {
-                            onError(e?.response?.data?.detail || e?.message || "Analysis failed");
+                            onError("Connection issue — your watchlist is saved. Try analyzing from the dashboard.");
                             return;
                         }
                         pollHandle = setTimeout(pollOnce, 2000);
@@ -369,7 +369,14 @@ function Step2Run({ picks, onComplete, onError }) {
                             return;
                         }
                         if (status === "failed") {
-                            throw new Error(r.data?.error || "Analysis failed");
+                            const failRaw = r.data?.error || "";
+                            let failMsg = "Analysis failed — your watchlist is saved. Try it from the dashboard.";
+                            if (failRaw.includes("JSON") || failRaw.includes("json")) {
+                                failMsg = "The AI had trouble with this ticker right now — your watchlist is saved. Try it from the dashboard tomorrow when markets open.";
+                            } else if (failRaw.includes("No data")) {
+                                failMsg = "Couldn\'t fetch market data for that ticker. Try another one from the dashboard.";
+                            }
+                            throw new Error(failMsg);
                         }
                         // Bump label every ~10s for visual liveliness.
                         const elapsed = (Date.now() - startedAt) / 1000;
@@ -401,12 +408,25 @@ function Step2Run({ picks, onComplete, onError }) {
                         }
                         pollHandle = setTimeout(pollOnce, 2000);
                     } catch (e) {
-                        if (!cancelled) { setErrored(true); onError(e?.response?.data?.detail || e?.message || "Analysis failed"); }
+                        if (!cancelled) {
+                            setErrored(true);
+                            const raw = e?.response?.data?.detail || e?.message || "";
+                            let msg = "Analysis failed — your watchlist is saved. Try again on a weekday when markets are open.";
+                            if (raw.includes("No data for ticker")) msg = "Couldn\'t fetch data for that ticker. Try a different one.";
+                            onError(msg);
+                        }
                     }
                 };
                 pollOnce();
             } catch (e) {
-                if (!cancelled) { setErrored(true); onError(e?.response?.data?.detail || e?.message || "Couldn't start onboarding"); }
+                if (!cancelled) {
+                    setErrored(true);
+                    const raw = e?.response?.data?.detail || e?.message || "";
+                    let msg = "Couldn\'t start the analysis — your watchlist is saved. You can run it manually from the dashboard.";
+                    if (raw.includes("No data for ticker")) msg = "Couldn\'t fetch data for that ticker. Try a different one from your dashboard.";
+                    if (raw.includes("JSON") || raw.includes("json")) msg = "The AI had trouble with this ticker right now — your watchlist is saved. Try analyzing it from the dashboard.";
+                    onError(msg);
+                }
             }
         };
 
