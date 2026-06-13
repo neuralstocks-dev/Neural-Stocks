@@ -60,10 +60,13 @@ api.interceptors.response.use(
         }
         if (err?.response?.status === 401) {
             // Force relogin only if a token was present (i.e., session expired)
+            // Don't redirect if we're on the dashboard (new user onboarding) —
+            // let the component handle the error gracefully.
             if (localStorage.getItem("sai_token")) {
                 localStorage.removeItem("sai_token");
                 localStorage.removeItem("sai_user");
-                if (window.location.pathname !== "/login") {
+                const path = window.location.pathname;
+                if (path !== "/login" && path !== "/dashboard") {
                     window.location.assign("/login");
                 }
             }

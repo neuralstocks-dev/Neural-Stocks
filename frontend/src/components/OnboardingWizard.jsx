@@ -270,6 +270,7 @@ function Step1Picks({ picks, setPicks, accepted, setAccepted, onNext, onClose })
 
 function Step2Run({ picks, onComplete, onError }) {
     const [progress, setProgress] = useState({ phase: "starting", label: "Adding to watchlist…" });
+    const [errored, setErrored] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -277,13 +278,24 @@ function Step2Run({ picks, onComplete, onError }) {
 
         const run = async () => {
             try {
+                // Guard: if token was cleared by a background 401, bail early
+                // with a friendly message rather than sending unauthenticated requests.
+                if (!localStorage.getItem("sai_token")) {
+                    onError("Your session expired during setup. Please sign in again.");
+                    return;
+                }
                 // 1. Add all selected tickers to watchlist (parallel — server is
                 // idempotent and rejects duplicates with a 400 we ignore).
                 setProgress({ phase: "watchlist", label: "Adding to watchlist…" });
-                await Promise.allSettled(
+                const watchlistResults = await Promise.allSettled(
                     picks.map((t) => api.post("/watchlist", { ticker: t }))
                 );
                 if (cancelled) return;
+                // Stop early on auth failure — 401 means token was cleared by interceptor
+                const authFailed = watchlistResults.some(
+                    (r) => r.status === "rejected" && r.reason?.response?.status === 401
+                );
+                if (authFailed) { setErrored(true); onError("Session expired. Please sign in again."); return; }
 
                 // 2. Start an AI analysis on the FIRST ticker — that's the one
                 // we'll show the verdict for. The other 2 stay in the watchlist
@@ -389,12 +401,12 @@ function Step2Run({ picks, onComplete, onError }) {
                         }
                         pollHandle = setTimeout(pollOnce, 2000);
                     } catch (e) {
-                        if (!cancelled) onError(e?.response?.data?.detail || e?.message || "Analysis failed");
+                        if (!cancelled) { setErrored(true); onError(e?.response?.data?.detail || e?.message || "Analysis failed"); }
                     }
                 };
                 pollOnce();
             } catch (e) {
-                if (!cancelled) onError(e?.response?.data?.detail || e?.message || "Couldn't start onboarding");
+                if (!cancelled) { setErrored(true); onError(e?.response?.data?.detail || e?.message || "Couldn't start onboarding"); }
             }
         };
 
@@ -404,6 +416,8 @@ function Step2Run({ picks, onComplete, onError }) {
             if (pollHandle) clearTimeout(pollHandle);
         };
     }, [picks, onComplete, onError]);
+
+    if (errored) return null;
 
     return (
         <div data-testid="onboarding-step-2" className="text-center py-6">
