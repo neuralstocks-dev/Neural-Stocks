@@ -5,7 +5,6 @@ import IdxBudgetCard from "@/components/IdxBudgetCard";
 import IdxCatalogCard from "@/components/IdxCatalogCard";
 import AdminLLMHealthPanel from "@/components/AdminLLMHealthPanel";
 import AdminWizardFunnelPanel from "@/components/AdminWizardFunnelPanel";
-import AdminQuickAnchorRefresh from "@/components/AdminQuickAnchorRefresh";
 import PayPalWebhookCard from "@/components/PayPalWebhookCard";
 import ExperimentsCard from "@/components/ExperimentsCard";
 import AnonTryResetCard from "@/components/AnonTryResetCard";
@@ -417,7 +416,7 @@ export default function AdminPage() {
                         style={{ borderColor: "hsl(var(--buy))" }}
                         data-testid="link-admin-cost"
                     >
-                        💸 Cost &amp; Universal Key balance →
+                        💸 Cost &amp; AI spend →
                     </Link>
                     <Link
                         to="/admin/paypal-smoke-test"
@@ -431,7 +430,6 @@ export default function AdminPage() {
 
                 <AdminLLMHealthPanel />
 
-                <AdminQuickAnchorRefresh />
 
                 <AdminWizardFunnelPanel />
 

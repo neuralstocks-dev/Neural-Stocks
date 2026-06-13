@@ -42,7 +42,6 @@ const SURFACE_LABEL = { anon: "guest", auth: "auth", quick: "quick-batch" };
 export default function AdminLLMHealthPanel() {
     const [status, setStatus] = useState(null);
     const [events, setEvents] = useState(null);
-    const [recoup, setRecoup] = useState(null);
     const [providers, setProviders] = useState(null);
     const [sources, setSources] = useState(null);
     const [fallbackRate, setFallbackRate] = useState(null);
@@ -54,7 +53,6 @@ export default function AdminLLMHealthPanel() {
     const [expandedRow, setExpandedRow] = useState(null);
     // Visual feedback for the "Copy escalation summary" button — flips to
     // "Copied ✓" for 2s after a successful clipboard write.
-    const [copyState, setCopyState] = useState("idle");
     // Track whether a manual refresh is in flight so the button can show
     // a spinning icon and disable itself for the duration. Without this,
     // tapping Refresh feels unresponsive — the inline icon doesn't change
@@ -68,7 +66,6 @@ export default function AdminLLMHealthPanel() {
             const [s, e, r, p, srcRes, fbRes] = await Promise.all([
                 api.get("/admin/llm-breaker"),
                 api.get("/admin/llm-events?limit=10&hours=24"),
-                api.get("/admin/llm-events/recoup-summary?days=30"),
                 api.get("/admin/llm-events/by-provider?hours=24"),
                 api.get("/admin/source-health?hours=24"),
                 api.get("/admin/llm-events/fallback-rate?hours=24"),
@@ -348,29 +345,7 @@ export default function AdminLLMHealthPanel() {
                 <SourceHealthStrip data={sources} />
             )}
 
-            {/* Credit-recoup tracker · last 30 days. Quantifies the cost of
-                upstream Universal-Key socket hangs and offers a one-tap
-                "Copy escalation summary" that drops a ready-to-paste support
-                email body into the clipboard. The whole point: turn every
-                future complaint to support@emergent.sh from a screenshot
-                hunt into a 30-second task with verifiable per-failure detail. */}
-            {recoup && recoup.total_failures > 0 && (
-                <RecoupTracker
-                    recoup={recoup}
-                    onCopy={async () => {
-                        try {
-                            const body = buildEscalationEmail(recoup);
-                            await navigator.clipboard.writeText(body);
-                            setCopyState("copied");
-                            setTimeout(() => setCopyState("idle"), 2000);
-                        } catch {
-                            setCopyState("error");
-                            setTimeout(() => setCopyState("idle"), 2500);
-                        }
-                    }}
-                    copyState={copyState}
-                />
-            )}
+
 
             {err && (
                 <p className="mt-2 text-xs" style={{ color: "hsl(var(--sell))" }}>
