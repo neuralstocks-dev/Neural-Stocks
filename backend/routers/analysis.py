@@ -164,6 +164,31 @@ def _is_bandarmology_stale(bandarmology: dict, threshold_days: int = 90) -> bool
     return age is not None and age > threshold_days
 
 
+def _build_catalyst_watch(market_ctx: dict | None) -> dict | None:
+    """Deterministic catalyst-monitor block built straight from the Finnhub
+    earnings-calendar payload already fetched for market_context. We do NOT
+    let the LLM transcribe dates/estimates — that risks hallucinated or
+    misremembered numbers. This is a thin, verifiable pass-through so the
+    frontend can render a "next earnings" card with zero LLM involvement.
+    Returns None when no earnings data is available (e.g. IDX tickers,
+    Finnhub not configured, or no upcoming earnings within 120 days)."""
+    if not isinstance(market_ctx, dict):
+        return None
+    earnings = market_ctx.get("earnings")
+    if not isinstance(earnings, dict) or not earnings.get("date"):
+        return None
+    hour_map = {"bmo": "before market open", "amc": "after market close", "dmh": "during market hours"}
+    return {
+        "next_earnings_date": earnings.get("date"),
+        "days_until": earnings.get("days_until"),
+        "timing": hour_map.get(earnings.get("hour"), earnings.get("hour")),
+        "quarter": earnings.get("quarter"),
+        "year": earnings.get("year"),
+        "eps_estimate": earnings.get("eps_estimate"),
+        "revenue_estimate": earnings.get("revenue_estimate"),
+    }
+
+
 def _confluence_quality(
     *,
     direction: str,
@@ -910,6 +935,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
         "intrinsic_value_anchor": intrinsic_anchor,
         "mode": mode,
         "market_context": market_ctx if isinstance(market_ctx, dict) and market_ctx.get("configured") else None,
+        "catalyst_watch": _build_catalyst_watch(market_ctx),
         **analysis,
     }
     if idx_data_source is not None:
@@ -1761,6 +1787,7 @@ def _public_view(analysis: dict) -> dict:
         "price_target": analysis.get("price_target"),
         "stop_loss": analysis.get("stop_loss"),
         "executive_summary": analysis.get("executive_summary"),
+        "business_model_primer": analysis.get("business_model_primer"),
         "reasoning": analysis.get("reasoning"),
         "technical_analysis": analysis.get("technical_analysis"),
         "fundamental_analysis": analysis.get("fundamental_analysis"),
@@ -1771,6 +1798,7 @@ def _public_view(analysis: dict) -> dict:
         "candlestick_summary": analysis.get("candlestick_summary"),
         "candlestick_findings": analysis.get("candlestick_findings"),
         "market_context": analysis.get("market_context"),
+        "catalyst_watch": analysis.get("catalyst_watch"),
         # Educational scaffolding — Feb 2026 repositioning. These fields
         # are optional (older analyses won't have them) but when present
         # they drive the "Alternative Scenarios" + "What Could Change the

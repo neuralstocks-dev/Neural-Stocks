@@ -195,6 +195,14 @@ export default function PublicVerdictPage() {
                                     >
                                         Analytical bias · classification, not a trade instruction
                                     </p>
+                                    {a.business_model_primer && (
+                                        <p
+                                            className="mt-3"
+                                            style={{ fontSize: "0.78rem", lineHeight: 1.5, color: "hsl(var(--text-secondary))" }}
+                                        >
+                                            {a.business_model_primer}
+                                        </p>
+                                    )}
                                     <p
                                         className="font-serif mt-4"
                                         style={{ fontSize: "1.5rem", lineHeight: 1.15, letterSpacing: "-0.01em" }}

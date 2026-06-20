@@ -290,6 +290,15 @@ export default function PublicTryVerdictPage() {
                                 <SharePreviewButton verdictId={a.id} />
                             )}
                         </div>
+                        {a.business_model_primer && (
+                            <p
+                                className="mt-2"
+                                style={{ fontSize: "0.82rem", lineHeight: 1.5, color: "hsl(var(--text-secondary))", maxWidth: 560 }}
+                                data-testid="try-business-model-primer"
+                            >
+                                {a.business_model_primer}
+                            </p>
+                        )}
 
                         {/* Core verdict */}
                         <section className="grid grid-cols-12 gap-1 md:gap-4 mt-8" data-testid="try-core">

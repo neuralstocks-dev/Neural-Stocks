@@ -683,6 +683,15 @@ export default function AnalysisReportPage() {
                                             >
                                                 Analytical bias · classification, not a trade instruction
                                             </p>
+                                            {analysis.business_model_primer && (
+                                                <p
+                                                    className="mt-3"
+                                                    style={{ fontSize: "0.8rem", lineHeight: 1.5, color: "hsl(var(--text-secondary))" }}
+                                                    data-testid="business-model-primer"
+                                                >
+                                                    {analysis.business_model_primer}
+                                                </p>
+                                            )}
                                             <p
                                                 className="font-serif mt-4"
                                                 style={{ fontSize: "1.6rem", lineHeight: 1.15, letterSpacing: "-0.01em" }}
@@ -857,6 +866,51 @@ export default function AnalysisReportPage() {
                                             {analysis.peer_comparison}
                                         </p>
                                     </article>
+                                    {analysis.catalyst_watch?.next_earnings_date && (
+                                        <article id="catalyst-watch" className="module p-6 scroll-mt-24" data-testid="catalyst-watch-module">
+                                            <p className="text-overline">Catalyst Watch</p>
+                                            <h3 className="font-serif text-2xl mt-2 mb-4">Next Earnings</h3>
+                                            <div className="flex items-baseline gap-2 flex-wrap">
+                                                <span className="font-mono text-lg" style={{ color: "hsl(var(--text-primary))" }}>
+                                                    {new Date(analysis.catalyst_watch.next_earnings_date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                                                </span>
+                                                {analysis.catalyst_watch.days_until != null && (
+                                                    <span className="text-overline" style={{ color: "hsl(var(--hold))" }}>
+                                                        {analysis.catalyst_watch.days_until === 0
+                                                            ? "today"
+                                                            : analysis.catalyst_watch.days_until === 1
+                                                                ? "tomorrow"
+                                                                : `in ${analysis.catalyst_watch.days_until} days`}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                                                {analysis.catalyst_watch.quarter && analysis.catalyst_watch.year
+                                                    ? `Q${analysis.catalyst_watch.quarter} FY${analysis.catalyst_watch.year}`
+                                                    : null}
+                                                {analysis.catalyst_watch.timing ? ` · reported ${analysis.catalyst_watch.timing}` : null}
+                                            </p>
+                                            {(analysis.catalyst_watch.eps_estimate != null || analysis.catalyst_watch.revenue_estimate != null) && (
+                                                <div className="flex gap-6 mt-3 font-mono text-sm">
+                                                    {analysis.catalyst_watch.eps_estimate != null && (
+                                                        <div>
+                                                            <p className="text-overline" style={{ fontSize: "0.56rem" }}>EPS est.</p>
+                                                            <p>{analysis.catalyst_watch.eps_estimate}</p>
+                                                        </div>
+                                                    )}
+                                                    {analysis.catalyst_watch.revenue_estimate != null && (
+                                                        <div>
+                                                            <p className="text-overline" style={{ fontSize: "0.56rem" }}>Revenue est.</p>
+                                                            <p>{(analysis.catalyst_watch.revenue_estimate / 1e9).toFixed(2)}B</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <p className="text-overline mt-3" style={{ fontSize: "0.54rem", color: "hsl(var(--text-muted))" }}>
+                                                Source: Finnhub earnings calendar
+                                            </p>
+                                        </article>
+                                    )}
                                 </section>
 
                                 <RisksModule
