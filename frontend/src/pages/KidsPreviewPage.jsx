@@ -82,6 +82,19 @@ export default function KidsPreviewPage() {
     // the last 14 days. Holds {job_id, stage_label, ticker} while the
     // background pipeline runs.
     const [jobState, setJobState] = useState(null);
+    // Set by the "Get a fresh take" button to force the NEXT fetch for this
+    // exact (ticker, age) pair to skip the backend's up-to-14-day cache.
+    // Format: `${ticker}|${age}|${Date.now()}`. The ticker/age prefix means
+    // a later switch to a DIFFERENT ticker via the normal picker + confirm
+    // flow naturally doesn't match and isn't forced — no explicit clearing
+    // needed for that case. The trailing timestamp exists so clicking
+    // "Get a fresh take" twice on the SAME ticker still produces a string
+    // React sees as a genuinely new value (a bare `${ticker}|${age}` would
+    // be identical to the previous click and React would correctly bail
+    // out of re-running the effect, since nothing in the dependency array
+    // actually changed) — see the prefix-match check in the fetch effect
+    // below, which deliberately checks startsWith, not exact equality.
+    const [forceFreshKey, setForceFreshKey] = useState(null);
 
     // Mark this browser as having seen KidStocks — silences the
     // dashboard cross-promo nudge.
@@ -148,8 +161,9 @@ export default function KidsPreviewPage() {
             setFeedbackSent(false);
             setShowAdult(false);
             try {
+                const forceFresh = !!forceFreshKey && forceFreshKey.startsWith(`${currentTicker}|${age}|`);
                 const r = await axios.get(
-                    `${API_BASE}/kids/preview/${currentTicker}?age=${age}&lang=${lang}`,
+                    `${API_BASE}/kids/preview/${currentTicker}?age=${age}&lang=${lang}${forceFresh ? "&force_fresh=true" : ""}`,
                     // axios treats 202 as success — we read status + body to
                     // decide whether we got a cached verdict (200) or a job
                     // handle to poll (202).
@@ -178,7 +192,7 @@ export default function KidsPreviewPage() {
             cancelled = true;
             if (pollTimer) clearTimeout(pollTimer);
         };
-    }, [currentTicker, age, hasRunOnce]);
+    }, [currentTicker, age, hasRunOnce, forceFreshKey]);
 
     // Picker chips only stage a selection now — they never navigate or
     // trigger a fetch directly. confirmRun() below is the single place
@@ -226,6 +240,21 @@ export default function KidsPreviewPage() {
         if (!pendingTicker || !pendingAge) return;
         setHasRunOnce(true);
         navigate(`/kids/preview/${pendingTicker}?age=${pendingAge}`);
+    };
+
+    /**
+     * "Get a fresh take" — forces the currently-shown ticker/age to bypass
+     * the backend's up-to-14-day cache and spawn a brand-new adult
+     * analysis + GAL translation, even though the (ticker, age) pair
+     * itself hasn't changed. Without this, confirming a fresh choice via
+     * the picker could still silently land on a DIFFERENT user's analysis
+     * from up to two weeks ago with no way to ask for a current one — see
+     * forceFreshKey's comment above for why this is keyed rather than a
+     * plain boolean/counter.
+     */
+    const getFreshTake = () => {
+        if (!currentTicker || !age) return;
+        setForceFreshKey(`${currentTicker}|${age}|${Date.now()}`);
     };
 
     /**
@@ -719,6 +748,33 @@ export default function KidsPreviewPage() {
                                     >
                                         <Calendar size={11} /> Updated {formatVerdictDate(verdictDate)}
                                     </p>
+                                )}
+                                {verdictDate && !loading && (
+                                    <div>
+                                        <button
+                                            type="button"
+                                            onClick={getFreshTake}
+                                            data-testid="kids-get-fresh-take"
+                                            title="This may be reused from an earlier check — tap for a brand-new one"
+                                            style={{
+                                                marginTop: 4,
+                                                background: "transparent",
+                                                border: "none",
+                                                color: "inherit",
+                                                opacity: 0.7,
+                                                fontSize: 11,
+                                                fontWeight: 600,
+                                                textDecoration: "underline",
+                                                cursor: "pointer",
+                                                padding: 0,
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: 4,
+                                            }}
+                                        >
+                                            <RefreshCw size={11} /> Get a fresh take
+                                        </button>
+                                    </div>
                                 )}
                                 <h1
                                     data-testid="kids-headline"

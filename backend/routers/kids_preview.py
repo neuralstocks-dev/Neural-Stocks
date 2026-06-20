@@ -202,25 +202,41 @@ async def preview_kids(
     request: Request,
     age: str = Query(default="11-13", description="Age band: 8-10, 11-13, or 14-18"),
     lang: str = Query(default="en", description="Output language: en or id"),
+    force_fresh: bool = Query(
+        default=False,
+        description=(
+            "Skip the up-to-14-day cache lookup and always spawn a brand-new "
+            "adult analysis + GAL translation, even if a recent one already "
+            "exists for this ticker. Powers the 'Get a fresh take' button — "
+            "without it, a kid confirming ticker+age via the picker can land "
+            "on a verdict from a DIFFERENT user's run up to 14 days old with "
+            "no way to ask for a current one. Still subject to the same "
+            "per-IP rate limit as any other fresh-analysis request below, so "
+            "this can't be used to bypass cost control by spamming it."
+        ),
+    ),
 ):
     """Public kid-friendly translation. Cache hit: returns kid_view inline.
-    Cache miss: spawns a background fresh-analysis job and returns 202.
+    Cache miss (or force_fresh=true): spawns a background fresh-analysis
+    job and returns 202.
     """
     ticker = _validate_ticker_shape(ticker)
     age = _coerce_age(age)
     lang = _coerce_lang(lang)
 
     # 1) Cache hit — most-recent adult analysis from any user, <14d old.
-    cutoff = (datetime.now(timezone.utc) - _MAX_CACHE_AGE).isoformat()
-    doc = await db.analyses.find_one(
-        {"ticker": ticker, "created_at": {"$gte": cutoff}},
-        sort=[("created_at", -1)],
-        projection={"_id": 0},
-    )
-    if doc:
-        return await _build_kid_response(doc, age, lang, ticker)
+    #    Skipped entirely when force_fresh=true.
+    if not force_fresh:
+        cutoff = (datetime.now(timezone.utc) - _MAX_CACHE_AGE).isoformat()
+        doc = await db.analyses.find_one(
+            {"ticker": ticker, "created_at": {"$gte": cutoff}},
+            sort=[("created_at", -1)],
+            projection={"_id": 0},
+        )
+        if doc:
+            return await _build_kid_response(doc, age, lang, ticker)
 
-    # 2) Cache miss → live analysis on demand.
+    # 2) Cache miss (or forced) → live analysis on demand.
     await _ensure_indexes()
 
     # Circuit breaker — if the LLM chain is wedged, fail fast with a
