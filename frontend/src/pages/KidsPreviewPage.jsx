@@ -35,13 +35,31 @@ const AGE_BANDS = [
 
 export default function KidsPreviewPage() {
     const { ticker } = useParams();
-    const [params, setParams] = useSearchParams();
+    const [params] = useSearchParams();
     const navigate = useNavigate();
 
     const age = AGE_BANDS.some((b) => b.value === params.get("age"))
         ? params.get("age")
         : "11-13";
     const currentTicker = (ticker || "AAPL").toUpperCase();
+
+    // Gate: should we actually fetch/show a verdict yet? A direct deep link
+    // (shared URL, bookmark, or the /kids/preview -> /kids/preview/AAPL?age=...
+    // redirect) arrives with BOTH :ticker and ?age already explicit in the
+    // URL — that's a complete, deliberate request and should run immediately,
+    // exactly as before. But the in-page picker below used to fire a fresh
+    // analysis the instant a company chip was tapped, using whatever age
+    // happened to be the URL's default (11-13) even if the user hadn't
+    // touched the age picker at all yet. Seeded ONCE on mount from whether
+    // the URL already had an explicit age param — never recalculated after,
+    // so it correctly stays "true" once a run has happened (via deep link OR
+    // via the confirm button) and the picker chips below just adjust pending
+    // selections without re-triggering anything until Get my verdict is hit.
+    const [hasRunOnce, setHasRunOnce] = useState(() => params.get("age") != null);
+    const [pendingTicker, setPendingTicker] = useState(currentTicker);
+    const [pendingAge, setPendingAge] = useState(
+        AGE_BANDS.some((b) => b.value === params.get("age")) ? params.get("age") : null
+    );
 
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -66,6 +84,16 @@ export default function KidsPreviewPage() {
     }, []);
 
     useEffect(() => {
+        // Don't fetch anything until a run has actually been confirmed —
+        // see hasRunOnce comment above. Picker-only interaction (tapping a
+        // company chip, tapping an age band) updates pendingTicker/pendingAge
+        // and the URL stays untouched, so currentTicker/age here don't even
+        // change yet — this guard is the belt to that suspenders, and also
+        // covers the very first render before any deep-link age param exists.
+        if (!hasRunOnce) {
+            setLoading(false);
+            return;
+        }
         let cancelled = false;
         let pollTimer = null;
 
@@ -144,15 +172,18 @@ export default function KidsPreviewPage() {
             cancelled = true;
             if (pollTimer) clearTimeout(pollTimer);
         };
-    }, [currentTicker, age]);
+    }, [currentTicker, age, hasRunOnce]);
 
-    const setTicker = (sym) => navigate(`/kids/preview/${sym}?age=${age}`);
-    const setAge = (a) => setParams({ age: a });
+    // Picker chips only stage a selection now — they never navigate or
+    // trigger a fetch directly. confirmRun() below is the single place
+    // that turns a confirmed (ticker + age) pair into an actual analysis.
+    const setTicker = (sym) => { setPendingTicker(sym); setTickerErr(""); };
+    const setAge = (a) => setPendingAge(a);
 
     /**
-     * Submit a free-text ticker symbol the kid (or parent) typed.
-     * Backend resolves Yahoo / IDX / global; basic shape validation here so
-     * we don't ship gibberish like "asdf!@#" through the URL.
+     * Stage a free-text ticker symbol the kid (or parent) typed. Backend
+     * resolves Yahoo / IDX / global; basic shape validation here so we
+     * don't ship gibberish like "asdf!@#" through to confirmRun.
      */
     const submitCustomTicker = (e) => {
         e?.preventDefault?.();
@@ -164,7 +195,22 @@ export default function KidsPreviewPage() {
         }
         setTickerErr("");
         setTickerInput("");
-        navigate(`/kids/preview/${cleaned}?age=${age}`);
+        setPendingTicker(cleaned);
+    };
+
+    /**
+     * The ONLY action that actually fires an analysis. Requires both a
+     * pending ticker and a pending age band to be staged first — see the
+     * "Get my verdict" button below, disabled until both are set. This is
+     * the fix for the bug where tapping a company chip alone used to run
+     * a full AI verdict immediately, using whichever age band happened to
+     * be the URL's silent default rather than one the user had actually
+     * chosen.
+     */
+    const confirmRun = () => {
+        if (!pendingTicker || !pendingAge) return;
+        setHasRunOnce(true);
+        navigate(`/kids/preview/${pendingTicker}?age=${pendingAge}`);
     };
 
     /**
@@ -396,7 +442,7 @@ export default function KidsPreviewPage() {
                     </p>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {DEMO_TICKERS.map((t) => {
-                            const active = t.symbol === currentTicker;
+                            const active = t.symbol === pendingTicker;
                             return (
                                 <button
                                     key={t.symbol}
@@ -497,7 +543,7 @@ export default function KidsPreviewPage() {
                     </p>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {AGE_BANDS.map((b) => {
-                            const active = b.value === age;
+                            const active = b.value === pendingAge;
                             return (
                                 <button
                                     key={b.value}
@@ -525,7 +571,49 @@ export default function KidsPreviewPage() {
                     </div>
                 </div>
 
-                {/* Result panel */}
+                {/* Guidance + confirm — the single gate that turns a staged
+                    (ticker, age) pair into an actual AI call. Shown whenever
+                    nothing has run yet, OR the user has changed their pending
+                    selection away from what's currently showing below, so
+                    it's always clear another tap is needed before anything
+                    new happens. */}
+                {(!hasRunOnce || pendingTicker !== currentTicker || pendingAge !== age) && (
+                    <div style={{ marginTop: 18 }} data-testid="kids-confirm-run">
+                        <p style={{ fontSize: 13, opacity: 0.7, marginBottom: 10 }}>
+                            {!pendingTicker
+                                ? "👆 Pick a company above to get started."
+                                : !pendingAge
+                                    ? `👇 Now pick your age so the AI can explain ${pendingTicker} the right way for you.`
+                                    : "Ready! Tap below to get your verdict."}
+                        </p>
+                        <button
+                            type="button"
+                            onClick={confirmRun}
+                            disabled={!pendingTicker || !pendingAge}
+                            data-testid="kids-confirm-run-button"
+                            style={{
+                                background: pendingTicker && pendingAge ? "#ff7676" : "#e5d5b8",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 16,
+                                padding: "14px 24px",
+                                fontSize: 16,
+                                fontWeight: 700,
+                                cursor: pendingTicker && pendingAge ? "pointer" : "not-allowed",
+                                width: "100%",
+                                maxWidth: 360,
+                            }}
+                        >
+                            Get my verdict →
+                        </button>
+                    </div>
+                )}
+
+                {/* Result panel — hidden entirely until a run has actually
+                    been confirmed via Get my verdict (or arrived via an
+                    explicit deep link). Avoids showing an empty 400px white
+                    placeholder card before the user has picked anything. */}
+                {hasRunOnce && (
                 <section
                     data-testid="kids-result-panel"
                     style={{
@@ -776,6 +864,7 @@ export default function KidsPreviewPage() {
                         </>
                     )}
                 </section>
+                )}
 
                 {/* Save as PDF — kid-friendly, age-aware export */}
                 {!loading && kv && !error && (
