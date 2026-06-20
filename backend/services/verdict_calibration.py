@@ -1,15 +1,15 @@
 """Verdict confidence calibration — applies a small set of disciplined,
-explainable rules AFTER Claude returns its raw verdict to correct two known
+explainable rules AFTER the LLM returns its raw verdict to correct two known
 failure modes:
 
-  1. Pre-earnings over-confidence: Claude often produces 80%+ confidence
+  1. Pre-earnings over-confidence: the LLM often produces 80%+ confidence
      calls right before an earnings release, where outcome is largely a
      coin-flip. Cap confidence at 65 when next earnings is within 7 days
      and surface a "post-earnings risk" flag in the UI.
 
-  2. Claude vs Random-Forest disagreement: when the AI says BUY at 80% but
+  2. the LLM vs Random-Forest disagreement: when the AI says BUY at 80% but
      the RF model independently says SELL with strong edge, displayed
-     confidence should reduce. We don't OVERRIDE Claude's recommendation
+     confidence should reduce. We don't OVERRIDE the LLM's recommendation
      (that's what makes the AI different), but we DOWNGRADE confidence so
      the user sees the disagreement reflected in the verdict ring.
 
@@ -90,21 +90,21 @@ def apply_earnings_gate(verdict: dict, market_context: dict | None) -> dict:
 # RF disagreement penalty
 # ---------------------------------------------------------------------------
 
-# When Claude and RF disagree on direction with both showing meaningful
+# When the LLM and RF disagree on direction with both showing meaningful
 # edge, downgrade displayed confidence by this many points. Empirical:
-# RF-Claude disagreement is uncommon (~12% of verdicts) but win-rate on
-# Claude-only verdicts in those cases drops by ~9pp. This penalty is
-# conservative — it surfaces the disagreement without overriding Claude.
+# RF-the LLM disagreement is uncommon (~12% of verdicts) but win-rate on
+# the LLM-only verdicts in those cases drops by ~9pp. This penalty is
+# conservative — it surfaces the disagreement without overriding the LLM.
 RF_DISAGREEMENT_PENALTY = 12
 
 
 def apply_rf_disagreement_penalty(verdict: dict, rf_opinion: dict | None) -> dict:
-    """Reduce displayed confidence when Claude and RF disagree on direction.
+    """Reduce displayed confidence when the LLM and RF disagree on direction.
 
     Mutates `verdict` in place AND returns it. Only fires when:
       - RF model loaded and produced a non-null opinion
       - RF edge is at least 'modest' (so we trust the RF call enough)
-      - Direction disagrees with Claude's recommendation
+      - Direction disagrees with the LLM's recommendation
 
     Edge taxonomy comes from services/rf_predictor.py: "none" | "modest" |
     "strong" (no "moderate" / "weak" — that was a stale assumption from an

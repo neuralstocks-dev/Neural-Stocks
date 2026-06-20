@@ -334,12 +334,12 @@ export default function TechnicalPage() {
                     icon={Gauge}
                     overline="Confidence"
                     title="What the confidence % actually means."
-                    subtitle="It is not a probability. It is an explicit signal-agreement score produced by Claude."
+                    subtitle="It is not a probability. It is an explicit signal-agreement score produced by the model."
                 />
 
                 <div id="confidence" className="mt-8 module p-6 md:p-10" data-testid="tech-confidence">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
-                        The LLM prompt instructs Claude to set <code>confidence_score</code> on a 0–100 scale
+                        The LLM prompt instructs the model to set <code>confidence_score</code> on a 0–100 scale
                         based on the agreement between four input families. When every family leans the same
                         way (bullish or bearish), confidence sits above 75. When signals contradict, it drops
                         toward 40–60. When the price action is genuinely directionless, it falls below 40
@@ -393,7 +393,7 @@ export default function TechnicalPage() {
                         Post-LLM confidence calibration
                     </h4>
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        After Claude returns its raw verdict, two deterministic rules run before
+                        After the model returns its raw verdict, two deterministic rules run before
                         the number is shown to you. Both rules leave a visible breadcrumb under
                         the verdict ring — we never quietly hand-tune scores.
                     </p>
@@ -430,12 +430,12 @@ export default function TechnicalPage() {
                             <p className="text-sm mt-2 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                                 Our independent <strong>Random-Forest model</strong> (trained on 5 years of
                                 daily price + 19 engineered features across 344 tickers) outputs its own
-                                BUY/SELL/HOLD opinion every verdict. When it disagrees with Claude with{" "}
+                                BUY/SELL/HOLD opinion every verdict. When it disagrees with the AI verdict with{" "}
                                 <strong>moderate</strong> or <strong>strong</strong> edge, the AI's
-                                confidence is reduced (12 points for strong, ~8 for moderate). Claude's
+                                confidence is reduced (12 points for strong, ~8 for moderate). The model's
                                 recommendation is NOT overridden — but the disagreement is reflected in
                                 the verdict ring so you see the model uncertainty. Empirical: RF disagrees
-                                ~12% of the time and historical win-rate on Claude-only verdicts in those
+                                ~12% of the time and historical win-rate on AI-only verdicts in those
                                 cases drops by ~9pp.
                             </p>
                         </div>
@@ -548,7 +548,7 @@ histogram  = MACD_line − signal`}
                     icon={Trees}
                     overline="Secondary opinion"
                     title="The Random Forest layer."
-                    subtitle="An independent probability estimate that runs alongside Claude — never instead of it. Honest numbers, warts and all."
+                    subtitle="An independent probability estimate that runs alongside the AI verdict — never instead of it. Honest numbers, warts and all."
                 />
 
                 <div id="random-forest" className="mt-8 module p-6 md:p-10 scroll-mt-24" data-testid="tech-random-forest">
@@ -828,7 +828,7 @@ histogram  = MACD_line − signal`}
                     </h4>
                     <ul className="space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
                         <TLi>
-                            Each analysis ships with both the Claude verdict <em>and</em> the RF probability as separate,
+                            Each analysis ships with both the AI verdict <em>and</em> the RF probability as separate,
                             independent signals. Neither suppresses the other.
                         </TLi>
                         <TLi>
@@ -836,7 +836,7 @@ histogram  = MACD_line − signal`}
                             "No meaningful edge" rather than a fake number.
                         </TLi>
                         <TLi>
-                            When the RF <em>disagrees</em> with a high-confidence Claude verdict, the UI shows a
+                            When the RF <em>disagrees</em> with a high-confidence AI verdict, the UI shows a
                             red "Disagrees" chip. This is a prompt to re-examine the reasoning before acting.
                         </TLi>
                         <TLi>
@@ -1516,12 +1516,12 @@ histogram  = MACD_line − signal`}
                             per-ticker thesis that informs them.
                         </LimitLi>
                         <LimitLi>
-                            <strong>Claude is not infallible — but it has guardrails.</strong> LLM reasoning can still
+                            <strong>The AI model is not infallible — but it has guardrails.</strong> LLM reasoning can still
                             miss context, especially around sector-specific regulatory events or macro shifts that move
                             faster than news feeds. We mitigate via three disciplined layers: (1) the <em>Earnings-Proximity
                             Gate</em> caps confidence at 65 within 7 days of earnings; (2) the <em>Random-Forest disagreement
                             penalty</em> reduces displayed confidence when our independent statistical model disagrees with
-                            Claude's direction; (3) an <em>LLM circuit breaker</em> fast-fails new analyses when the
+                            the AI's direction; (3) an <em>LLM circuit breaker</em> fast-fails new analyses when the
                             upstream is degraded so you don't burn your turn on a doomed call. Use Neural alongside your
                             own judgment, not instead of it.
                         </LimitLi>

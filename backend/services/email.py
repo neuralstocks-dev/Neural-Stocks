@@ -241,7 +241,7 @@ def _weekly_digest_html(full_name: str, signals: list[dict], locked_count: int,
             {len(signals)} strongest directional reads it sees — framed as
             <strong>analytical bias</strong>, not trade instructions. These
             are <strong>RF-only signals</strong> — tap any ticker to open the
-            full Claude-assisted multi-lens research view before drawing
+            full AI-assisted multi-lens research view before drawing
             conclusions.
           </p>
           {body}

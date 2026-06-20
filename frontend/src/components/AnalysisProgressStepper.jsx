@@ -12,7 +12,7 @@
  *
  * The objective: turn the opaque "Thinking…" spinner into a transparent
  * receipt so users see WHICH part of the pipeline (data fetch / patterns
- * / Claude / RF / calibration) is running RIGHT NOW.
+ * / LLM / RF / calibration) is running RIGHT NOW.
  */
 import { Loader2, Check } from "lucide-react";
 

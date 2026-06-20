@@ -6,7 +6,7 @@ watchlist and computes the Random-Forest P(up) signal on each ticker.
 
 Only fires a Telegram push when the model shows **strong** edge
 (|P − 0.5| > 0.15 — the same threshold used elsewhere in the app). No
-Claude LLM call, no candlestick scan, no executive summary. This is
+LLM LLM call, no candlestick scan, no executive summary. This is
 intentionally narrower than clicking "Analyze" — the user is told this
 clearly in the alert body and in the Settings toggle.
 
@@ -128,7 +128,7 @@ async def _scan_user(user: dict, market_df: dict) -> int:
             f"{bias_word.lower()} analytical bias over a {horizon}-day horizon "
             f"(model probability {round(prob_up*100)}%).\n\n"
             f"⚠️ This is a lightweight RF-only scan — NOT a full Neural Stock Intelligence™ research "
-            f"summary. No Claude reasoning, no candlestick verification, no "
+            f"summary. No LLM reasoning, no candlestick verification, no "
             f"scenario levels. Open the app and tap Analyze on {ticker} for the "
             f"full multi-lens research view before drawing conclusions.\n"
             f"Mode: Auto-scan (RF only){acc_line}\n\n"

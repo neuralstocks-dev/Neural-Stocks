@@ -8,7 +8,7 @@ how each alert channel reaches their Telegram chat:
   message per user once a day (13:00 UTC ≈ 9am ET)
 * `digest_weekly` — same, flushed Mondays 13:00 UTC
 
-The non-realtime path adds **zero** extra Claude / yfinance cost — it
+The non-realtime path adds **zero** extra LLM / yfinance cost — it
 just defers the Telegram send. The original alert is always written to
 `db.alerts` regardless of schedule, so the in-app /alerts feed remains
 truthful and immediate.

@@ -226,7 +226,7 @@ def _append_calibration_block(story, analysis: dict, s, currency: str):
     else:
         inner.append(Paragraph(
             "Earnings-proximity gate and RF-disagreement penalty both ran clean. "
-            "Confidence shown is Claude's raw output — no adjustment applied.",
+            "Confidence shown is the model's raw output — no adjustment applied.",
             ParagraphStyle("CalEmpty", parent=s["body"], fontSize=9.5, leading=13),
         ))
 
@@ -679,20 +679,20 @@ def generate_analysis_pdf(analysis: dict) -> bytes:
             "Company news: CNBC Indonesia &amp; Detik Finance RSS (ticker &amp; Bahasa alias matched). "
             "News sentiment: NSI keyword heuristic (English + Bahasa Indonesia). "
             "Candlestick pattern detection: NSI in-house deterministic engine (15 patterns, daily + weekly). "
-            "AI reasoning: Anthropic Claude Sonnet 4.5."
+            "AI reasoning: OpenRouter (DeepSeek V4 Pro, with automatic fallback)."
         )
     elif finnhub_on:
         data_sources_line = (
             "<b>DATA SOURCES</b> · Live quotes &amp; market context: Finnhub.io. "
             "OHLC history &amp; fundamentals: Yahoo Finance (via yfinance). "
             "Candlestick pattern detection: NSI in-house deterministic engine (15 patterns, daily + weekly). "
-            "News sentiment: NSI keyword heuristic. AI reasoning: Anthropic Claude Sonnet 4.5."
+            "News sentiment: NSI keyword heuristic. AI reasoning: OpenRouter (DeepSeek V4 Pro, with automatic fallback)."
         )
     else:
         data_sources_line = (
             "<b>DATA SOURCES</b> · Market quotes, OHLC history &amp; fundamentals: Yahoo Finance (via yfinance). "
             "Candlestick pattern detection: NSI in-house deterministic engine (15 patterns, daily + weekly). "
-            "AI reasoning: Anthropic Claude Sonnet 4.5."
+            "AI reasoning: OpenRouter (DeepSeek V4 Pro, with automatic fallback)."
         )
     story.append(Paragraph(data_sources_line, s["muted"]))
     story.append(Spacer(1, 10))
@@ -1169,7 +1169,7 @@ def generate_trade_slip_pdf(analysis: dict, share_url: str = "") -> bytes:
         else:
             story.append(Paragraph(
                 "<font color='#6b7280' size='8'>VERDICT ACCURACY V2 · </font>"
-                "<font color='#16a34a'>raw Claude output — no calibration adjustment fired</font>",
+                "<font color='#16a34a'>raw model output — no calibration adjustment fired</font>",
                 ParagraphStyle("SlipCalEmpty", parent=s["mono"], fontSize=9.5, leading=13),
             ))
         story.append(Spacer(1, 10))

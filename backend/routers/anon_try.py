@@ -250,7 +250,7 @@ async def _stage_ticker(job_id: str):
         (6,  "Detecting candlestick patterns across daily + weekly"),
         (12, "Running Random Forest model · 20-day horizon"),
         (18, "Gathering market context · news · peer signals"),
-        (26, "Synthesising verdict with Anthropic Claude"),
+        (26, "Synthesising verdict with AI"),
         (40, "Finalising · stitching reasoning · writing verdict"),
     ]
     start = 0

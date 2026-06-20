@@ -1,6 +1,6 @@
-"""LLM circuit breaker — protects users from Claude upstream outages.
+"""LLM circuit breaker — protects users from the LLM provider upstream outages.
 
-Problem: when Claude/LiteLLM hits a retry storm (transient 5xx, socket
+Problem: when the LLM provider/LiteLLM hits a retry storm (transient 5xx, socket
 hangs), individual analysis jobs still correctly time out at 180s, but
 EVERY guest/paid user who clicks "Analyze" during that window waits 3
 full minutes before seeing an error. That's wasted user patience AND
@@ -13,12 +13,12 @@ a polite message until we observe enough successes to reset.
 
 State is process-local (in-memory). Running multiple workers means each
 holds its own breaker — which is fine: each worker independently
-samples Claude health. If one worker trips, users routed there get the
+samples the LLM provider health. If one worker trips, users routed there get the
 fast-fail; users routed to a healthy worker still get analyses. No
 cross-worker synchronization needed.
 
-The breaker tracks a *single* Claude-health signal (not per-ticker or
-per-user) because Claude outages are model-provider-wide, not scoped.
+The breaker tracks a *single* the LLM provider-health signal (not per-ticker or
+per-user) because the LLM provider outages are model-provider-wide, not scoped.
 
 Thread/async safety: the underlying deque + int counters are mutated
 from inside asyncio tasks. Python's GIL makes the individual list/int
@@ -29,9 +29,9 @@ Failure-reason telemetry: each non-success outcome carries a structured
 `reason` code ("llm_timeout" / "litellm_retry_exhausted" /
 "llm_socket_hang" / "other_exception") persisted to a TTL-capped
 MongoDB collection (7 days). The admin dashboard can query this to
-distinguish one-off Claude hiccups from systemic LiteLLM config issues.
+distinguish one-off the LLM provider hiccups from systemic LiteLLM config issues.
 Persistence is best-effort: a mongo write error NEVER affects the
-breaker's in-memory decision logic — Claude health must stay available
+breaker's in-memory decision logic — the LLM provider health must stay available
 even when the ops database is degraded.
 """
 from __future__ import annotations
@@ -56,13 +56,13 @@ _TRIP_AFTER = int(os.environ.get("LLM_BREAKER_TRIP_AFTER", "3"))
 _RESET_AFTER = int(os.environ.get("LLM_BREAKER_RESET_AFTER", "2"))
 
 # How long the breaker stays tripped WITHOUT observing any outcomes.
-# Claude is often back within 2-3 min; cap at 10 min so that users who
+# the LLM provider is often back within 2-3 min; cap at 10 min so that users who
 # arrive long after the trip don't stay gated forever just because no
 # one has sent a success through to reset the counter.
 _MAX_TRIP_SECONDS = float(os.environ.get("LLM_BREAKER_MAX_TRIP_S", "600"))
 
 # Public-facing message. Kept deliberately neutral — don't name the LLM
-# provider ("Claude") to end users; frame as a transient platform issue.
+# provider ("the LLM provider") to end users; frame as a transient platform issue.
 PUBLIC_MESSAGE = (
     "Our AI provider is temporarily slow. Please try again in a few minutes."
 )
@@ -77,7 +77,7 @@ _recent: deque[dict] = deque(maxlen=20)
 # timeouts in a row (resets on any success); `_consec_ok` counts
 # successes in a row (resets on any timeout). Using consecutive counts
 # instead of a ratio keeps the breaker responsive to sharp onset/offset
-# of outages — which is how Claude's patchy days actually behave.
+# of outages — which is how the LLM provider's patchy days actually behave.
 _consec_fail = 0
 _consec_ok = 0
 
@@ -147,7 +147,7 @@ def _format_error_detail(exc: BaseException, *, with_traceback: bool = True) -> 
     The goal is to capture enough upstream signal to prove (when escalating
     socket-hang complaints to support@emergent.sh) that the failure is
     upstream of the application — typically: the HTTP status code from
-    Anthropic / liteLLM, the exception class, the first line of the error
+    OpenRouter / liteLLM, the exception class, the first line of the error
     message, and the first few traceback frames showing the call stops at
     a network-IO boundary. We deliberately cap at 1500 chars at insert
     time so giant pydantic validators don't bloat the collection.

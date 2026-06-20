@@ -36,7 +36,7 @@ import {
  * Color encoding:
  *   cyan   = ingest      (raw data lands here)
  *   gold   = compute     (deterministic transforms, no AI)
- *   violet = reasoning   (Claude — the only stochastic stop)
+ *   violet = reasoning   (LLM — the only stochastic stop)
  *   green  = output      (artifacts the user takes away)
  */
 
@@ -218,7 +218,7 @@ function FlowSVG({ activeStage }) {
                         the Data-ingest node outline) so the eye reads
                         the connector colour as a continuation of the
                         block it leaves. Compute→reason stays violet
-                        (Claude Sonnet box), reason→outputs stays green
+                        (LLM reasoning box), reason→outputs stays green
                         (output artifacts). */}
                     <linearGradient id="line-cyan" x1="0" x2="1" y1="0" y2="0">
                         <stop offset="0%" stopColor="hsl(184, 75%, 60%)" stopOpacity="0.55" />
@@ -369,7 +369,7 @@ function FlowSVG({ activeStage }) {
                     y={reasonY}
                     color="violet"
                     overline="07"
-                    label="Claude Sonnet 4.5"
+                    label="DeepSeek V4 Pro"
                     sub="LLM reasoning"
                     Icon={Sparkles}
                     width={170}
