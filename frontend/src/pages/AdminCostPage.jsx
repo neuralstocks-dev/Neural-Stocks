@@ -381,7 +381,8 @@ export default function AdminCostPage() {
                         <strong>${data?.cost_per_verdict_usd?.toFixed(4) || "0.003"}</strong>{" "}
                         per AI verdict ·{" "}
                         <strong>{data?.cost_per_verdict_credits?.toFixed(1) || "0.3"}</strong>{" "}
-                        OpenRouter calls estimated.
+                        OpenRouter calls estimated. KidStocks GAL translation calls tracked
+                        separately at ~${data?.gal_cost_per_attempt_usd?.toFixed(5) || "0.00065"} per attempt.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -431,7 +432,7 @@ export default function AdminCostPage() {
 
             {/* Lifetime/period totals */}
             {data && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
                     <_StatCell
                         label="Verdicts"
                         value={data.totals.count.toLocaleString()}
@@ -440,8 +441,12 @@ export default function AdminCostPage() {
                     />
                     <_StatCell
                         label="USD spent"
-                        value={`$${data.totals.usd.toFixed(2)}`}
-                        note="estimated"
+                        value={`$${(data.combined_totals?.usd ?? data.totals.usd).toFixed(2)}`}
+                        note={
+                            data.gal_totals?.usd > 0
+                                ? `incl. $${data.gal_totals.usd.toFixed(2)} KidStocks`
+                                : "estimated"
+                        }
                         accent="hold"
                         testId="stat-usd"
                     />
@@ -451,6 +456,12 @@ export default function AdminCostPage() {
                         note="estimated (OpenRouter)"
                         accent="hold"
                         testId="stat-credits"
+                    />
+                    <_StatCell
+                        label="KidStocks GAL"
+                        value={(data.gal_totals?.count ?? 0).toLocaleString()}
+                        note={`$${(data.gal_totals?.usd ?? 0).toFixed(4)} · last ${data.days}d`}
+                        testId="stat-gal-count"
                     />
                     <_StatCell
                         label="Avg burn"
@@ -497,7 +508,7 @@ export default function AdminCostPage() {
                         style={{ fontSize: "0.78rem" }}
                     >
                         <div
-                            className="grid grid-cols-4 gap-2 pb-2"
+                            className="grid grid-cols-5 gap-2 pb-2"
                             style={{
                                 borderBottom: "1px solid hsl(var(--border-divider))",
                                 color: "hsl(var(--text-muted))",
@@ -506,18 +517,26 @@ export default function AdminCostPage() {
                         >
                             <span>Date</span>
                             <span className="text-right">Verdicts</span>
+                            <span className="text-right">GAL calls</span>
                             <span className="text-right">USD</span>
                             <span className="text-right">Credits</span>
                         </div>
                         {[...data.daily].reverse().map((d) => (
                             <div
                                 key={d.date}
-                                className="grid grid-cols-4 gap-2 py-1.5"
+                                className="grid grid-cols-5 gap-2 py-1.5"
                                 style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
                             >
                                 <span style={{ color: "hsl(var(--text-secondary))" }}>{d.date}</span>
                                 <span className="text-right" style={{ color: "hsl(var(--text-primary))" }}>
                                     {d.count}
+                                </span>
+                                <span
+                                    className="text-right"
+                                    style={{ color: d.gal_count > 0 ? "hsl(var(--text-primary))" : "hsl(var(--text-muted))" }}
+                                    title={d.gal_count > 0 ? `$${d.gal_usd.toFixed(4)} KidStocks GAL spend` : undefined}
+                                >
+                                    {d.gal_count || 0}
                                 </span>
                                 <span className="text-right" style={{ color: "hsl(var(--text-secondary))" }}>
                                     ${d.usd.toFixed(2)}

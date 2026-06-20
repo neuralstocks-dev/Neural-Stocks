@@ -14,9 +14,15 @@ Phase Zero scope:
          - "14-18"  High school ·   full NSI reasoning, no simplification filter
     * Reuses the existing `_run_chat_in_thread` shim from `services.ai`
       so we inherit the OpenRouter (DeepSeek V4 Pro primary, with
-      automatic fallback to V4 Flash and free models) cascade, per-attempt
-      timeouts, circuit breaker, and llm_events telemetry without
-      duplicating infrastructure.
+      automatic fallback to V4 Flash and free models) cascade and
+      per-attempt timeouts without duplicating call infrastructure.
+      Note: this does NOT inherit the llm_circuit_breaker / llm_events
+      health-monitoring system — that system deliberately only persists
+      timeout/failure events, not successes, since it exists to detect
+      outage patterns, not to count billable calls. GAL has its own
+      separate `gal_calls` collection (see _record_gal_call below) for
+      cost accounting, since that needs every successful call counted,
+      which is the opposite of what llm_events is designed to store.
     * Strict JSON output — the kid frontend binds to a fixed shape.
 
 Out of scope (will ship with V1/V2):
@@ -31,6 +37,8 @@ import json
 import logging
 from typing import Literal
 
+from core.db import db
+from core.security import iso, now_utc
 from services.ai import _parse_ai_json_async, _run_chat_in_thread
 
 log = logging.getLogger(__name__)
@@ -204,6 +212,55 @@ Respond with ONLY the JSON object. No preamble, no code fences, no trailing text
     return system, user_text
 
 
+# Mirrors COST_PER_VERDICT_USD in routers/admin.py — kept as a sibling
+# constant here (not imported) to avoid a backend/routers -> backend/services
+# import direction reversal. ~1.1k input tokens (system prompt + slimmed
+# adult-verdict payload) + ~325 output tokens (short kid-language JSON) at
+# DeepSeek V4 Pro OpenRouter rates ($0.27/1M in, $1.10/1M out) ≈ $0.00065
+# per LLM round-trip. A call that needed the one retry (see translate_for_age)
+# made two round-trips, so its true cost is ~2x — recorded as such via the
+# `attempts` field below rather than silently treating every row as one
+# flat-rate call.
+GAL_COST_PER_ATTEMPT_USD = 0.00065
+
+_gal_index_ensured = False
+
+
+async def _record_gal_call(ticker: str, age_band: str, lang: str, attempts: int, degraded: bool) -> None:
+    """Best-effort log of one GAL translation request for cost accounting.
+
+    Deliberately separate from llm_circuit_breaker's `llm_events` collection
+    (see module docstring) — that system only persists failures/timeouts by
+    design, which is the opposite of what cost tracking needs: every
+    successful (billable) call counted, every retry's extra round-trip
+    counted too. Swallows all exceptions so a Mongo hiccup never breaks the
+    actual kid-facing translation response.
+
+    No TTL on this collection (unlike llm_events or kids_preview_jobs) —
+    the admin cost dashboard reads up to 365 days back, so GAL spend
+    history needs to persist exactly as long as db.analyses does.
+    """
+    global _gal_index_ensured
+    try:
+        if not _gal_index_ensured:
+            try:
+                await db.gal_calls.create_index("created_at")
+            except Exception:  # noqa: BLE001
+                pass
+            _gal_index_ensured = True
+        await db.gal_calls.insert_one({
+            "ticker": ticker,
+            "age_band": age_band,
+            "lang": lang,
+            "attempts": attempts,
+            "degraded": degraded,
+            "usd": round(attempts * GAL_COST_PER_ATTEMPT_USD, 6),
+            "created_at": iso(now_utc()),
+        })
+    except Exception as e:  # noqa: BLE001
+        log.debug("gal_calls persist skipped: %s", e)
+
+
 async def translate_for_age(adult_verdict: dict, age_band: AgeBand, ticker: str, lang: Lang = "en") -> dict:
     """Translate an adult NSI verdict into a kid-appropriate output.
 
@@ -231,6 +288,8 @@ async def translate_for_age(adult_verdict: dict, age_band: AgeBand, ticker: str,
     # majority of these without making the user wait through two full
     # fallback-and-reload cycles.
     raw, meta = await _run_chat_in_thread(system, session_prefix, user_text)
+    attempts = 1
+    degraded = False
     try:
         out = await _parse_ai_json_async(raw)
     except Exception as e:
@@ -238,6 +297,7 @@ async def translate_for_age(adult_verdict: dict, age_band: AgeBand, ticker: str,
             "GAL JSON parse failed for %s (age=%s, lang=%s), retrying once: %s",
             ticker, age_band, lang, e,
         )
+        attempts = 2
         try:
             raw, meta = await _run_chat_in_thread(system, session_prefix + "-retry", user_text)
             out = await _parse_ai_json_async(raw)
@@ -246,6 +306,7 @@ async def translate_for_age(adult_verdict: dict, age_band: AgeBand, ticker: str,
                 "GAL JSON parse failed for %s (age=%s, lang=%s) on retry too: %s",
                 ticker, age_band, lang, e2,
             )
+            degraded = True
             meta = {"provider": None, "model": None}
             if lang == "id":
                 out = {
@@ -279,4 +340,11 @@ async def translate_for_age(adult_verdict: dict, age_band: AgeBand, ticker: str,
     out["_provider"] = meta.get("provider")
     out["_model"] = meta.get("model")
     out["_lang"] = lang
+    # Cost accounting — every call counted (1 attempt = clean success,
+    # 2 = needed the retry, degraded=True if even the retry's response
+    # failed to parse and the fallback message was returned). The LLM
+    # round-trip still happened and was still billed by OpenRouter even
+    # when the final response is the degraded fallback, so this fires
+    # on the failure path too, not just on clean success.
+    await _record_gal_call(ticker, age_band, lang, attempts, degraded)
     return out

@@ -21,6 +21,7 @@ from core.security import admin_required, iso, now_utc, is_admin_email
 from services.pricing import get_pricing, set_pricing, get_tier_limits, set_tier_limits
 from services.paypal import get_plan_ids, PayPalError
 from services.quota import resolved_plan_for, test_unlock_active, count_analyses, effective_plan_key
+from services.gal import GAL_COST_PER_ATTEMPT_USD
 
 logger = logging.getLogger(__name__)
 
@@ -1545,13 +1546,24 @@ async def cost_summary(
     """Return a per-day cost breakdown for the last `days` days.
 
     Strategy: count analyses inserted per day (created_at ISO string) and
-    multiply by COST_PER_VERDICT_USD. Returns:
-      - daily: [{date, count, usd, credits}]
-      - totals: {count, usd, credits}
+    multiply by COST_PER_VERDICT_USD, PLUS sum KidStocks GAL translation
+    call costs per day from the separate gal_calls collection (a GAL call
+    isn't a verdict — it translates an already-completed adult verdict
+    into kid language — so it's tracked separately and merged in here).
+    Returns:
+      - daily: [{date, count, usd, credits, gal_count, gal_usd}]
+        (usd/credits already include the day's GAL spend rolled in;
+        gal_count/gal_usd are the GAL-only breakout for that day)
+      - totals: {count, usd, credits} — adult verdicts only
+      - gal_totals: {count, usd, credits} — GAL calls only
+      - combined_totals: {usd, credits} — totals + gal_totals
       - cost_per_verdict_usd, cost_per_verdict_credits
+      - gal_cost_per_attempt_usd
       - balance_anchor: {credits_at_top_up, top_up_at, used_credits_since,
                          estimated_remaining_credits, estimated_verdicts_remaining}
-        (null if admin hasn't set a balance anchor yet)
+        (null if admin hasn't set a balance anchor yet; note this anchor's
+        "used_credits_since" still only counts db.analyses, not GAL — see
+        the balance_anchor block below)
     """
     if days < 1 or days > 365:
         raise HTTPException(status_code=400, detail="days must be 1..365")
@@ -1570,22 +1582,75 @@ async def cost_summary(
         {"$sort": {"_id": 1}},
     ]
     cursor = db.analyses.aggregate(pipeline)
-    daily = []
+    daily_by_date: dict[str, dict] = {}
     total_count = 0
     async for row in cursor:
         c = int(row.get("count") or 0)
         total_count += c
-        daily.append({
+        daily_by_date[row["_id"]] = {
             "date": row["_id"],
             "count": c,
             "usd": round(c * COST_PER_VERDICT_USD, 4),
             "credits": round(c * COST_PER_VERDICT_USD * 100, 2),
-        })
+            "gal_count": 0,
+            "gal_usd": 0.0,
+        }
+
+    # KidStocks GAL (Grade Adaptation Layer) translation calls — a SEPARATE
+    # LLM call from the adult verdict pipeline (it runs after an adult
+    # analysis already exists/succeeded, translating it into kid-appropriate
+    # language). Kept as its own collection rather than db.analyses since
+    # it's not a verdict — see services/gal.py _record_gal_call. We sum the
+    # `usd` field directly (not count × flat rate) because a call that
+    # needed the one retry made two LLM round-trips and was billed for both,
+    # so per-row cost already varies by `attempts`.
+    gal_pipeline = [
+        {"$match": {"created_at": {"$gte": since}}},
+        {"$project": {
+            "day": {"$substr": ["$created_at", 0, 10]},
+            "usd": 1,
+        }},
+        {"$group": {"_id": "$day", "count": {"$sum": 1}, "usd": {"$sum": "$usd"}}},
+        {"$sort": {"_id": 1}},
+    ]
+    gal_cursor = db.gal_calls.aggregate(gal_pipeline)
+    gal_total_count = 0
+    gal_total_usd = 0.0
+    async for row in gal_cursor:
+        c = int(row.get("count") or 0)
+        u = round(float(row.get("usd") or 0.0), 4)
+        gal_total_count += c
+        gal_total_usd += u
+        day = row["_id"]
+        if day not in daily_by_date:
+            daily_by_date[day] = {
+                "date": day, "count": 0, "usd": 0.0, "credits": 0.0,
+                "gal_count": 0, "gal_usd": 0.0,
+            }
+        daily_by_date[day]["gal_count"] = c
+        daily_by_date[day]["gal_usd"] = u
+
+    daily = sorted(daily_by_date.values(), key=lambda r: r["date"])
+    # Roll the GAL spend into each day's headline usd/credits too, so a
+    # glance at the existing chart already reflects true total spend —
+    # the gal_count/gal_usd fields stay alongside for the breakout.
+    for row in daily:
+        row["usd"] = round(row["usd"] + row["gal_usd"], 4)
+        row["credits"] = round(row["usd"] * 100, 2)
 
     totals = {
         "count": total_count,
         "usd": round(total_count * COST_PER_VERDICT_USD, 2),
         "credits": round(total_count * COST_PER_VERDICT_USD * 100, 2),
+    }
+    gal_totals = {
+        "count": gal_total_count,
+        "usd": round(gal_total_usd, 4),
+        "credits": round(gal_total_usd * 100, 2),
+    }
+    combined_totals = {
+        "usd": round(totals["usd"] + gal_totals["usd"], 4),
+        "credits": round(totals["credits"] + gal_totals["credits"], 2),
     }
 
     # Balance anchor (admin sets this manually). Subtract credits used SINCE
@@ -1619,8 +1684,11 @@ async def cost_summary(
         "days": days,
         "daily": daily,
         "totals": totals,
+        "gal_totals": gal_totals,
+        "combined_totals": combined_totals,
         "cost_per_verdict_usd": COST_PER_VERDICT_USD,
         "cost_per_verdict_credits": round(COST_PER_VERDICT_USD * 100, 2),
+        "gal_cost_per_attempt_usd": GAL_COST_PER_ATTEMPT_USD,
         "balance_anchor": balance_anchor,
     }
 

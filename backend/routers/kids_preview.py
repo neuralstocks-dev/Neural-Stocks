@@ -133,7 +133,12 @@ def _adult_to_gal_input(doc: dict) -> dict:
 async def _build_kid_response(doc: dict, age: str, lang: str, ticker: str) -> dict:
     """Run the GAL over an `analyses` doc and shape the public response.
     Memoised by (ticker, age, analysis_id, lang) so identical hits skip the
-    ~$0.005 LLM call.
+    ~$0.0007 GAL LLM call (DeepSeek V4 Pro via OpenRouter — ~1.1k input +
+    ~325 output tokens). Note this is the translation call ONLY; if the
+    caller had to generate a brand-new adult analysis first (see
+    _run_kid_analysis_job below), add the adult pipeline's own ~$0.003 —
+    same cost as a regular Neural Stock Intelligence verdict, since it's
+    the identical _create_analysis_impl pipeline under the hood.
     """
     analysis_id = doc.get("id", "")
     memo_key = (ticker, age, analysis_id, lang)
