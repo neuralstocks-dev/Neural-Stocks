@@ -164,7 +164,17 @@ function AppRoutes() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/v/:shareId" element={<PublicVerdictPage />} />
             <Route path="/t/:shareId" element={<PublicTimelinePage />} />
-            <Route path="/kids/preview" element={<Navigate to="/kids/preview/AAPL?age=11-13" replace />} />
+            {/* Bare /kids/preview (no ticker/age at all) is NOT a deep link —
+                nobody chose AAPL or 11-13 here, there's no "see a sample"
+                promise attached to this route the way there is on the
+                KidsDiscoverNudge/KidsForParentsPage/WhyUsPage/KidsLandingPage
+                CTAs (which DO legitimately auto-run, by design, because their
+                copy explicitly promises an immediate demo before the tap).
+                Redirect to AAPL with NO age param so KidsPreviewPage's
+                hasRunOnce correctly seeds false and requires an actual
+                confirm — fixes "opened fresh, no tap, Apple just ran for
+                11-13 anyway" being indistinguishable from a real deep link. */}
+            <Route path="/kids/preview" element={<Navigate to="/kids/preview/AAPL" replace />} />
             <Route path="/kids/preview/:ticker" element={<KidsPreviewPage />} />
             <Route path="/kids/about" element={<KidsLandingPage />} />
             <Route path="/kids/for-parents" element={<KidsForParentsPage />} />

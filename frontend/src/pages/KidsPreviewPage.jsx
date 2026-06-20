@@ -43,18 +43,24 @@ export default function KidsPreviewPage() {
         : "11-13";
     const currentTicker = (ticker || "AAPL").toUpperCase();
 
-    // Gate: should we actually fetch/show a verdict yet? A direct deep link
-    // (shared URL, bookmark, or the /kids/preview -> /kids/preview/AAPL?age=...
-    // redirect) arrives with BOTH :ticker and ?age already explicit in the
-    // URL — that's a complete, deliberate request and should run immediately,
-    // exactly as before. But the in-page picker below used to fire a fresh
-    // analysis the instant a company chip was tapped, using whatever age
-    // happened to be the URL's default (11-13) even if the user hadn't
-    // touched the age picker at all yet. Seeded ONCE on mount from whether
-    // the URL already had an explicit age param — never recalculated after,
-    // so it correctly stays "true" once a run has happened (via deep link OR
-    // via the confirm button) and the picker chips below just adjust pending
-    // selections without re-triggering anything until Get my verdict is hit.
+    // Gate: should we actually fetch/show a verdict yet? A genuine deep link
+    // — the Share button's URL, or one of the deliberate "see a sample" /
+    // "try the live demo" CTAs (KidsDiscoverNudge, KidsForParentsPage,
+    // WhyUsPage, KidsLandingPage — all of which explicitly promise an
+    // immediate demo in their own copy before the tap) — arrives with BOTH
+    // :ticker and ?age already explicit in the URL, and correctly auto-runs
+    // immediately. The bare /kids/preview route (no promise attached to it
+    // anywhere) redirects to /kids/preview/AAPL with NO age param on purpose
+    // — see App.js — specifically so landing here with zero prior tap does
+    // NOT look like a deep link and does NOT auto-run. Separately, the
+    // in-page picker used to fire a fresh analysis the instant a company
+    // chip was tapped, using whatever age happened to be the URL's silent
+    // default even if the user hadn't touched the age picker at all yet.
+    // Seeded ONCE on mount from whether the URL already had an explicit
+    // age param — never recalculated after, so it correctly stays "true"
+    // once a run has happened (via deep link OR via the confirm button)
+    // and the picker chips below just adjust pending selections without
+    // re-triggering anything until Get my verdict is hit.
     const [hasRunOnce, setHasRunOnce] = useState(() => params.get("age") != null);
     const [pendingTicker, setPendingTicker] = useState(currentTicker);
     const [pendingAge, setPendingAge] = useState(
