@@ -1,6 +1,7 @@
 """yfinance quote / history / fundamentals / technicals helpers."""
 import asyncio
 import math
+import time
 import yfinance as yf
 from services.source_health import track
 
@@ -10,6 +11,36 @@ def _isnan(x) -> bool:
         return math.isnan(float(x))
     except Exception:
         return False
+
+
+def _with_retry(fn, *args, attempts: int = 3, base_delay: float = 0.6, **kwargs):
+    """Synchronous retry wrapper for yfinance calls. yfinance has no built-in
+    retry and each yf.Ticker() spins up a brand-new HTTP session — a cold
+    Railway worker firing 3-5 simultaneous fresh-session requests is exactly
+    the pattern Yahoo's edge intermittently rate-limits/drops, which is why
+    the FIRST analysis after backend idle often fails while an immediate
+    retry succeeds. This wrapper absorbs that transient failure server-side
+    instead of surfacing "AI did not return valid JSON" to the user.
+    Runs inside asyncio.to_thread, so blocking time.sleep is fine here."""
+    last_exc = None
+    last_result = None
+    for i in range(attempts):
+        try:
+            last_result = fn(*args, **kwargs)
+            # Treat an empty/falsy result the same as a transient failure so
+            # we retry on silent degraded responses (e.g. info={} on a cold
+            # first call) rather than accepting empty data as success.
+            if last_result:
+                return last_result
+            last_exc = None
+        except Exception as e:
+            last_exc = e
+            last_result = None
+        if i < attempts - 1:
+            time.sleep(base_delay * (2 ** i))
+    if last_exc is not None:
+        raise last_exc
+    return last_result
 
 
 def _yf_quote_sync(ticker: str) -> dict:
@@ -100,6 +131,15 @@ async def get_quote(ticker: str) -> dict:
         fh_data = None
     if isinstance(yf_data, Exception) or not isinstance(yf_data, dict):
         yf_data = {}
+    # Safety net: a cold yf.Ticker() session occasionally returns an empty/
+    # priceless dict on the very first call after backend idle (Yahoo's edge
+    # intermittently drops the first burst of fresh-session requests). One
+    # retry here is cheap and avoids surfacing a hard failure to the user
+    # for what's almost always resolved by trying again immediately.
+    if not yf_data.get("price"):
+        retry_data = await asyncio.to_thread(_yf_quote_sync, ticker)
+        if isinstance(retry_data, dict) and retry_data.get("price"):
+            yf_data = retry_data
     merged = dict(yf_data)
     if isinstance(fh_data, dict) and fh_data.get("price") is not None:
         # Prefer Finnhub for live market data
@@ -121,12 +161,9 @@ async def get_quote(ticker: str) -> dict:
     return merged
 
 
-def _yf_history_sync(ticker: str, period: str = "3mo", interval: str = "1d") -> list:
+def _yf_history_fetch_once(ticker: str, period: str, interval: str) -> list:
     t = yf.Ticker(ticker)
-    try:
-        hist = t.history(period=period, interval=interval)
-    except Exception:
-        return []
+    hist = t.history(period=period, interval=interval)
     if hist is None or hist.empty:
         return []
     out = []
@@ -142,12 +179,16 @@ def _yf_history_sync(ticker: str, period: str = "3mo", interval: str = "1d") -> 
     return out
 
 
-def _yf_fundamentals_sync(ticker: str) -> dict:
-    t = yf.Ticker(ticker)
+def _yf_history_sync(ticker: str, period: str = "3mo", interval: str = "1d") -> list:
     try:
-        info = t.info or {}
+        return _with_retry(_yf_history_fetch_once, ticker, period, interval)
     except Exception:
-        info = {}
+        return []
+
+
+def _yf_fundamentals_fetch_once(ticker: str) -> dict:
+    t = yf.Ticker(ticker)
+    info = t.info or {}
     keys = [
         "shortName", "longName", "sector", "industry", "marketCap",
         "trailingPE", "forwardPE", "priceToBook", "dividendYield", "beta",
@@ -158,6 +199,13 @@ def _yf_fundamentals_sync(ticker: str) -> dict:
         "recommendationKey", "targetMeanPrice", "longBusinessSummary",
     ]
     return {k: info.get(k) for k in keys}
+
+
+def _yf_fundamentals_sync(ticker: str) -> dict:
+    try:
+        return _with_retry(_yf_fundamentals_fetch_once, ticker)
+    except Exception:
+        return {}
 
 
 def compute_technicals(history: list) -> dict:
