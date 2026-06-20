@@ -76,15 +76,18 @@ export default function PublicTrendingTicker({
             data-testid="public-trending-ticker"
         >
             <span
-                className="flex items-center gap-1.5 flex-shrink-0 font-mono"
+                className="flex items-center gap-1.5 font-mono flex-wrap"
                 style={{
                     color: isMuted ? "rgba(255,200,120,1)" : "hsl(var(--accent-primary))",
                     fontSize: "0.6rem",
                     letterSpacing: "0.12em",
+                    minWidth: 0,
                 }}
             >
-                <Flame size={11} strokeWidth={1.8} />
-                {header.render.prefix} · {stats?.users} investors · {stats?.analyses} analyses · last {windowDays}d
+                <Flame size={11} strokeWidth={1.8} className="flex-shrink-0" />
+                <span style={{ wordBreak: "break-word" }}>
+                    {header.render.prefix} · {stats?.users} investors · {stats?.analyses} analyses · last {windowDays}d
+                </span>
             </span>
 
             <span

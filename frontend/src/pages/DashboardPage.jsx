@@ -137,7 +137,8 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                         <div
                             className="min-w-0"
                             style={{
-                                opacity: analyzing ? 0.4 : 1,
+                                opacity: analyzing ? 0 : 1,
+                                visibility: analyzing ? "hidden" : "visible",
                                 transition: "opacity 200ms ease-out",
                             }}
                         >
@@ -152,17 +153,18 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                         </div>
                         {analyzing && (
                             <div
-                                className="absolute inset-0 flex items-center justify-start pointer-events-none"
+                                className="absolute inset-0 flex items-center justify-start"
                                 data-testid={`refreshing-pill-${item.ticker}`}
                             >
                                 <span
-                                    className="font-mono text-[10px] inline-flex items-center gap-1.5 px-2 py-1 refreshing-pill"
+                                    className="font-mono text-[10px] inline-flex items-center gap-1.5 px-2 py-1.5 refreshing-pill"
                                     style={{
                                         background: "hsl(var(--surface-elevated))",
                                         color: "hsl(var(--hold))",
                                         border: "1px solid hsl(var(--hold))",
                                         letterSpacing: "0.12em",
                                         textTransform: "uppercase",
+                                        whiteSpace: "nowrap",
                                     }}
                                 >
                                     <Loader2 size={9} strokeWidth={2} className="animate-spin" />
@@ -174,12 +176,16 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                             successful analyze so the moment-of-done is obviously
                             visible instead of a silent state flip. Fades out with
                             CSS on the timer set by `justCompletedTicker` in the
-                            parent. Rendered above the verdict (which is slightly
-                            dimmed via opacity:0.4 in the `analyzing` branch; here
-                            the verdict is full-opacity so the pill just sits on
-                            top). Only fires on a BRAND-NEW verdict — re-renders
-                            of an existing row don't trigger it because the pill
-                            is bound to the parent's per-analysis timer. */}
+                            parent. Rendered above the verdict (which is fully
+                            hidden during the `analyzing` branch above — the old
+                            badge used to show ghosted at 0.4 opacity underneath
+                            the refreshing pill, but that caused visual overlap on
+                            narrow mobile widths, so it's now hidden outright
+                            while analyzing; here the verdict is full-opacity so
+                            the completion pill just sits on top). Only fires on
+                            a BRAND-NEW verdict — re-renders of an existing row
+                            don't trigger it because the pill is bound to the
+                            parent's per-analysis timer. */}
                         {justCompleted && !analyzing && !failed && (
                             <div
                                 className="absolute inset-0 flex items-center justify-start pointer-events-none"
@@ -288,7 +294,7 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                 )}
             </div>
 
-            <div className="col-span-3 md:col-span-1 flex items-center justify-end gap-1">
+            <div className="col-span-3 md:col-span-1 flex items-center justify-end gap-1 self-start md:self-center mt-1 md:mt-0">
                 <button
                     onClick={() => onAnalyze(item.ticker)}
                     className="btn-ghost !py-1.5 !px-2 !text-xs"
