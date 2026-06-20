@@ -12,10 +12,11 @@ Phase Zero scope:
          - "8-10"   Early primary ·  1-2 signals · analogies · yes/no questions
          - "11-13"  Middle school ·  all 4 NSI signal families introduced
          - "14-18"  High school ·   full NSI reasoning, no simplification filter
-    * Reuses the existing `_run_chat_in_thread` fallback chain from
-      `services.ai` so we inherit the Sonnet-4.5 → Gemini-2.5-Pro adaptive
-      routing, per-attempt timeouts, circuit breaker, and llm_events
-      telemetry without duplicating infrastructure.
+    * Reuses the existing `_run_chat_in_thread` shim from `services.ai`
+      so we inherit the OpenRouter (DeepSeek V4 Pro primary, with
+      automatic fallback to V4 Flash and free models) cascade, per-attempt
+      timeouts, circuit breaker, and llm_events telemetry without
+      duplicating infrastructure.
     * Strict JSON output — the kid frontend binds to a fixed shape.
 
 Out of scope (will ship with V1/V2):
@@ -219,39 +220,61 @@ async def translate_for_age(adult_verdict: dict, age_band: AgeBand, ticker: str,
     system, user_text = _build_prompt(adult_verdict, age_band, lang)
     session_prefix = f"gal-{ticker}-{age_band}-{lang}"
 
+    # One retry on a malformed/truncated response before falling back to the
+    # generic "still learning" message. The kid-translation prompt asks for
+    # a genuinely short JSON payload (one paragraph, 1-3 short cards, a
+    # couple of one-liners) so a parse failure here is almost always a
+    # transient cold/flaky LLM call rather than a token-budget problem —
+    # the same class of intermittent failure diagnosed on the adult
+    # pipeline (see services/yfinance_svc.py _with_retry for the analogous
+    # fix on the data-fetch side). A single retry resolves the large
+    # majority of these without making the user wait through two full
+    # fallback-and-reload cycles.
     raw, meta = await _run_chat_in_thread(system, session_prefix, user_text)
     try:
         out = await _parse_ai_json_async(raw)
     except Exception as e:
-        log.warning("GAL JSON parse failed for %s (age=%s, lang=%s): %s", ticker, age_band, lang, e)
-        if lang == "id":
-            out = {
-                "kid_headline": f"Kami masih belajar tentang {ticker}!",
-                "kid_explanation": (
-                    "AI agak bingung menerjemahkan yang ini. Coba saham lain dari daftar — "
-                    "atau kembali lagi beberapa menit lagi."
-                ),
-                "did_you_know": [],
-                "reflection_question": "Menurutmu kenapa AI kadang bisa bingung?",
-                "what_would_change_my_mind": "",
-                "confidence_plain_english": "Belum yakin — AI belum selesai berpikir.",
-                "emoji_mood": "🤔",
-                "_degraded": True,
-            }
-        else:
-            out = {
-                "kid_headline": f"We're still learning about {ticker}!",
-                "kid_explanation": (
-                    "The AI was a bit confused translating this one. Try another "
-                    "stock from the list — or come back in a few minutes."
-                ),
-                "did_you_know": [],
-                "reflection_question": "Why do you think the AI might get confused sometimes?",
-                "what_would_change_my_mind": "",
-                "confidence_plain_english": "Not sure — the AI didn't finish its thought.",
-                "emoji_mood": "🤔",
-                "_degraded": True,
-            }
+        log.warning(
+            "GAL JSON parse failed for %s (age=%s, lang=%s), retrying once: %s",
+            ticker, age_band, lang, e,
+        )
+        try:
+            raw, meta = await _run_chat_in_thread(system, session_prefix + "-retry", user_text)
+            out = await _parse_ai_json_async(raw)
+        except Exception as e2:
+            log.warning(
+                "GAL JSON parse failed for %s (age=%s, lang=%s) on retry too: %s",
+                ticker, age_band, lang, e2,
+            )
+            meta = {"provider": None, "model": None}
+            if lang == "id":
+                out = {
+                    "kid_headline": f"Kami masih belajar tentang {ticker}!",
+                    "kid_explanation": (
+                        "AI agak bingung menerjemahkan yang ini. Coba saham lain dari daftar — "
+                        "atau kembali lagi beberapa menit lagi."
+                    ),
+                    "did_you_know": [],
+                    "reflection_question": "Menurutmu kenapa AI kadang bisa bingung?",
+                    "what_would_change_my_mind": "",
+                    "confidence_plain_english": "Belum yakin — AI belum selesai berpikir.",
+                    "emoji_mood": "🤔",
+                    "_degraded": True,
+                }
+            else:
+                out = {
+                    "kid_headline": f"We're still learning about {ticker}!",
+                    "kid_explanation": (
+                        "The AI was a bit confused translating this one. Try another "
+                        "stock from the list — or come back in a few minutes."
+                    ),
+                    "did_you_know": [],
+                    "reflection_question": "Why do you think the AI might get confused sometimes?",
+                    "what_would_change_my_mind": "",
+                    "confidence_plain_english": "Not sure — the AI didn't finish its thought.",
+                    "emoji_mood": "🤔",
+                    "_degraded": True,
+                }
 
     out["_provider"] = meta.get("provider")
     out["_model"] = meta.get("model")
