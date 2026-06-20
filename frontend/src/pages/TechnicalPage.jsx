@@ -245,7 +245,7 @@ export default function TechnicalPage() {
                     icon={GitBranch}
                     overline="Pipeline"
                     title="The eight-stage analysis pipeline."
-                    subtitle="What happens in the 15 seconds between you clicking Analyze and the verdict appearing."
+                    subtitle="What happens in the 20-60 seconds between you clicking Analyze and the verdict appearing."
                 />
 
                 <PipelineFlowDiagram />
