@@ -880,6 +880,37 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
     await _set_job_phase(job_id, "computing_technicals")
     technicals = compute_technicals(history)
 
+    # Guard against recent IPOs / newly-listed tickers with too little
+    # price history for technical indicators to mean anything. compute_
+    # technicals() itself already degrades gracefully — under 15 closes it
+    # returns an all-None dict rather than crashing or emitting NaN — but
+    # nothing downstream of that was checking for the all-None case before
+    # handing it to the LLM. The prompt schema asks for 80-150 words of
+    # "technical_analysis" citing RSI/MA crossovers/momentum and expects
+    # technical_indicators to be real numbers it can reason about; handed
+    # a payload where every single field is null, the model has no valid
+    # way to satisfy that instruction and was producing malformed/
+    # incomplete JSON trying anyway — surfacing as "AI did not return
+    # valid JSON" with no indication of the actual underlying cause
+    # (reported: SPCX, SpaceX's real ticker, ~9 days post-IPO at the time
+    # this was diagnosed — same 404-adjacent-but-not-quite class of bug
+    # would hit ANY stock too newly listed to have 15+ trading days yet).
+    # 422 (not 404 — the ticker IS real and WAS found) so kids_preview.py's
+    # _kid_safe_error classifies this distinctly from "ticker not found"
+    # rather than incorrectly telling the user we couldn't find it.
+    valid_closes = sum(1 for h in history if h.get("close") is not None)
+    if valid_closes < 15:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{ticker} doesn't have enough trading history yet for technical "
+                f"analysis (only {valid_closes} day{'s' if valid_closes != 1 else ''} "
+                f"available — need at least 15). This usually means a recent IPO "
+                f"or newly-listed stock. Try again in a few weeks once more price "
+                f"history has built up."
+            ),
+        )
+
     candlestick_findings = None
     if mode in ("candlestick", "hybrid"):
         await _set_job_phase(job_id, "scanning_patterns")
@@ -887,7 +918,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
 
     await _set_job_phase(job_id, "llm_thinking")
     # Intrinsic-value anchor (Graham + RIM) computed BEFORE the LLM call so
-    # Claude can reference it in fundamental_analysis prose. Always returns
+    # the AI can reference it in fundamental_analysis prose. Always returns
     # a dict (never None) — `primary_anchor: "none"` when neither method
     # fits, in which case the LLM ignores it. See services/intrinsic_value.py.
     from services.intrinsic_value import compute_intrinsic_anchor

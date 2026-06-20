@@ -332,23 +332,30 @@ def _kid_safe_error(e: HTTPException, ticker: str) -> str:
 
     The adult pipeline (services/ai.py, routers/analysis.py) raises a mix
     of HTTPException shapes depending on what failed — clean 404 "no data"
-    errors, raw 502 "AI did not return valid JSON" / "AI JSON parse error"
-    strings straight from a malformed LLM response, 503 budget/upstream
-    errors (sometimes a dict with error_code+message, sometimes a plain
-    string), and a last-resort "AI provider error: {raw exception text
-    truncated to 200 chars}" that can contain near-arbitrary internal
-    detail. Before this fix, `e.detail` was used verbatim as the kid-facing
-    error whenever it happened to be a string — only non-string (dict)
-    details got a generic fallback — so the more common string-shaped
-    failures (JSON parse errors especially) leaked raw backend internals
-    straight to a child's screen. Every branch here is deliberately a
-    fixed, friendly string — nothing from `e.detail` is ever echoed back.
+    errors, a 422 "not enough trading history" for recently-IPO'd tickers
+    (added after SPCX/SpaceX, ~9 days post-IPO at the time, was producing
+    a payload of all-null technical indicators that the LLM then failed
+    to reason about cleanly — see the guard in analysis.py right after
+    compute_technicals()), raw 502 "AI did not return valid JSON" / "AI
+    JSON parse error" strings straight from a malformed LLM response, 503
+    budget/upstream errors (sometimes a dict with error_code+message,
+    sometimes a plain string), and a last-resort "AI provider error: {raw
+    exception text truncated to 200 chars}" that can contain near-
+    arbitrary internal detail. Before this fix, `e.detail` was used
+    verbatim as the kid-facing error whenever it happened to be a string —
+    only non-string (dict) details got a generic fallback — so the more
+    common string-shaped failures (JSON parse errors especially) leaked
+    raw backend internals straight to a child's screen. Every branch here
+    is deliberately a fixed, friendly string — nothing from `e.detail` is
+    ever echoed back.
     """
     detail = e.detail
     text = detail if isinstance(detail, str) else (detail or {}).get("message", "") if isinstance(detail, dict) else ""
     low = text.lower()
     if "no data for ticker" in low or e.status_code == 404:
         return f"We couldn't find {ticker} — try a different ticker from the list."
+    if "enough trading history" in low or e.status_code == 422:
+        return f"{ticker} is too new — it doesn't have enough trading days yet for the AI to read its chart. Try again in a few weeks, or pick a stock that's been public longer."
     if "json" in low or e.status_code == 502:
         return "The AI had trouble with this one — try again in a minute."
     if "budget" in low or "credits" in low or e.status_code == 503:
@@ -420,10 +427,11 @@ async def _run_kid_analysis_job(job_id: str, ticker: str, age: str, lang: str):
             }},
         )
     except HTTPException as e:
-        # Raised by the adult pipeline (404 no-data, 502 malformed-LLM-JSON,
-        # 503 budget/upstream, etc.) — sanitize before persisting since this
-        # ends up directly on a child's screen. The RAW detail still goes to
-        # the log line for debugging; only the persisted `error` field (what
+        # Raised by the adult pipeline (404 no-data, 422 insufficient-history
+        # for a recent IPO, 502 malformed-LLM-JSON, 503 budget/upstream,
+        # etc.) — sanitize before persisting since this ends up directly on
+        # a child's screen. The RAW detail still goes to the log line for
+        # debugging; only the persisted `error` field (what
         # KidsPreviewPage.jsx actually renders) is the kid-safe version.
         kid_msg = _kid_safe_error(e, ticker)
         log.info("Kid preview job %s rejected (status=%s): %s", job_id, e.status_code, e.detail)
