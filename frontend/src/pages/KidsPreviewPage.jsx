@@ -177,13 +177,23 @@ export default function KidsPreviewPage() {
     // Picker chips only stage a selection now — they never navigate or
     // trigger a fetch directly. confirmRun() below is the single place
     // that turns a confirmed (ticker + age) pair into an actual analysis.
-    const setTicker = (sym) => { setPendingTicker(sym); setTickerErr(""); };
+    const setTicker = (sym) => { setPendingTicker(sym); setTickerErr(""); setTickerInput(""); };
     const setAge = (a) => setPendingAge(a);
 
     /**
      * Stage a free-text ticker symbol the kid (or parent) typed. Backend
      * resolves Yahoo / IDX / global; basic shape validation here so we
      * don't ship gibberish like "asdf!@#" through to confirmRun.
+     *
+     * Deliberately does NOT clear tickerInput afterward (it used to) —
+     * that left the input box blank with zero trace that anything had
+     * happened, which is exactly what was reported as "Look it up does
+     * nothing": the ticker WAS staged into pendingTicker correctly, but
+     * there was no visible confirmation, and Look it up only stages —
+     * same two-step model as the chip picker, NOT an immediate result.
+     * Keeping the typed value visible plus the confirmation line below
+     * the form (rendered when pendingTicker isn't one of the demo chips)
+     * makes that staging step visible instead of silent.
      */
     const submitCustomTicker = (e) => {
         e?.preventDefault?.();
@@ -194,7 +204,6 @@ export default function KidsPreviewPage() {
             return;
         }
         setTickerErr("");
-        setTickerInput("");
         setPendingTicker(cleaned);
     };
 
@@ -473,67 +482,85 @@ export default function KidsPreviewPage() {
                     {/* Free-text ticker input — anything from Yahoo Finance.
                         Lives under the chip picker so kids can type their
                         own (Roblox = RBLX, Coca-Cola = KO, BBRI.JK etc.). */}
-                    <form
-                        onSubmit={submitCustomTicker}
-                        data-testid="kids-ticker-form"
-                        style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 8,
-                                background: "#fff",
-                                border: `2px solid ${tickerErr ? "#ff7676" : "#e5d5b8"}`,
-                                borderRadius: 16,
-                                padding: "8px 14px",
-                                flex: "1 1 240px",
-                                minWidth: 0,
-                            }}
-                        >
-                            <Search size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
-                            <input
-                                type="text"
-                                value={tickerInput}
-                                onChange={(e) => { setTickerInput(e.target.value); setTickerErr(""); }}
-                                placeholder="Type any ticker — RBLX, KO, BBRI.JK"
-                                aria-label="Custom ticker"
-                                data-testid="kids-ticker-input"
-                                maxLength={12}
-                                style={{
-                                    flex: 1,
-                                    border: "none",
-                                    outline: "none",
-                                    background: "transparent",
-                                    fontSize: 14,
-                                    fontFamily: "inherit",
-                                    color: "#1a1a2e",
-                                    minWidth: 0,
-                                }}
-                            />
-                        </div>
-                        <button
-                            type="submit"
-                            data-testid="kids-ticker-submit"
-                            disabled={!tickerInput.trim()}
-                            style={{
-                                background: tickerInput.trim() ? "#1a1a2e" : "#e5d5b8",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: 16,
-                                padding: "10px 18px",
-                                fontSize: 13,
-                                fontWeight: 700,
-                                cursor: tickerInput.trim() ? "pointer" : "not-allowed",
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            Look it up →
-                        </button>
-                    </form>
-                    {tickerErr && (
-                        <p data-testid="kids-ticker-error" style={{ marginTop: 6, fontSize: 12, color: "#ff7676" }}>{tickerErr}</p>
-                    )}
+                    {(() => {
+                        // Only the 5 hardcoded demo chips get their own
+                        // "active" highlight above — a custom ticker staged
+                        // via this form has nowhere else to show it was
+                        // registered, so we surface it explicitly here.
+                        const isPendingCustom = pendingTicker && !DEMO_TICKERS.some((t) => t.symbol === pendingTicker);
+                        return (
+                        <>
+                            <form
+                                onSubmit={submitCustomTicker}
+                                data-testid="kids-ticker-form"
+                                style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}
+                            >
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        background: "#fff",
+                                        border: `2px solid ${tickerErr ? "#ff7676" : "#e5d5b8"}`,
+                                        borderRadius: 16,
+                                        padding: "8px 14px",
+                                        flex: "1 1 240px",
+                                        minWidth: 0,
+                                    }}
+                                >
+                                    <Search size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+                                    <input
+                                        type="text"
+                                        value={tickerInput}
+                                        onChange={(e) => { setTickerInput(e.target.value); setTickerErr(""); }}
+                                        placeholder="Type any ticker — RBLX, KO, BBRI.JK"
+                                        aria-label="Custom ticker"
+                                        data-testid="kids-ticker-input"
+                                        maxLength={12}
+                                        style={{
+                                            flex: 1,
+                                            border: "none",
+                                            outline: "none",
+                                            background: "transparent",
+                                            fontSize: 14,
+                                            fontFamily: "inherit",
+                                            color: "#1a1a2e",
+                                            minWidth: 0,
+                                        }}
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    data-testid="kids-ticker-submit"
+                                    disabled={!tickerInput.trim()}
+                                    style={{
+                                        background: tickerInput.trim() ? "#1a1a2e" : "#e5d5b8",
+                                        color: "#fff",
+                                        border: "none",
+                                        borderRadius: 16,
+                                        padding: "10px 18px",
+                                        fontSize: 13,
+                                        fontWeight: 700,
+                                        cursor: tickerInput.trim() ? "pointer" : "not-allowed",
+                                        whiteSpace: "nowrap",
+                                    }}
+                                >
+                                    Look it up →
+                                </button>
+                            </form>
+                            {tickerErr && (
+                                <p data-testid="kids-ticker-error" style={{ marginTop: 6, fontSize: 12, color: "#ff7676" }}>{tickerErr}</p>
+                            )}
+                            {!tickerErr && isPendingCustom && (
+                                <p data-testid="kids-ticker-staged" style={{ marginTop: 6, fontSize: 12, color: "#2c7a4b", fontWeight: 600 }}>
+                                    {pendingAge
+                                        ? `✓ ${pendingTicker} picked — tap Get my verdict below.`
+                                        : `✓ ${pendingTicker} picked — now choose your age below.`}
+                                </p>
+                            )}
+                        </>
+                        );
+                    })()}
                 </div>
 
                 {/* Age picker */}
