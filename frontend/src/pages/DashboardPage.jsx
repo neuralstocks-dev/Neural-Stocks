@@ -123,7 +123,7 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                 <Sparkline data={sparkline} width={180} height={38} color="trend" />
             </div>
 
-            <div className={`col-span-3 md:col-span-2 min-w-0${analyzing ? "" : " overflow-hidden"}`}>
+            <div className={`col-span-8 md:col-span-2 min-w-0${analyzing ? "" : " overflow-hidden"}`}>
                 {item.latest_analysis?.recommendation ? (
                     <div
                         className="relative"
@@ -295,7 +295,7 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                 )}
             </div>
 
-            <div className="col-span-3 md:col-span-1 flex items-center justify-end gap-1 self-start md:self-center mt-1 md:mt-0">
+            <div className="col-span-4 md:col-span-1 flex items-center justify-end gap-1">
                 <button
                     onClick={() => onAnalyze(item.ticker)}
                     className="btn-ghost !py-1.5 !px-2 !text-xs"
