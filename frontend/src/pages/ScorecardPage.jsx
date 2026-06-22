@@ -362,13 +362,13 @@ export default function ScorecardPage() {
                                                             {timeAgo(v.created_at)}
                                                         </td>
                                                         <td className="py-3 px-4 font-mono">
-                                                            {formatPrice(v.price_at_analysis)}
+                                                            {formatPrice(v.price_at_analysis, v.currency)}
                                                         </td>
                                                         <td className="py-3 px-4 font-mono" style={{ color: "hsl(var(--text-secondary))" }}>
-                                                            {formatPrice(v.price_target)}
+                                                            {formatPrice(v.price_target, v.currency)}
                                                         </td>
                                                         <td className="py-3 px-4 font-mono">
-                                                            {formatPrice(v.actual_price)}
+                                                            {formatPrice(v.actual_price, v.currency)}
                                                         </td>
                                                         <td
                                                             className="py-3 px-4 font-mono flex items-center gap-1"

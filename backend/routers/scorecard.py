@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from core.db import db
 from core.security import get_current_user
 from services.yfinance_svc import get_quote
+from services.idx_news import is_idx_ticker
 
 router = APIRouter(prefix="/scorecard", tags=["scorecard"])
 
@@ -143,6 +144,7 @@ async def my_scorecard(
             "status": status,
             "created_at": a.get("created_at"),
             "time_horizon_weeks": a.get("time_horizon_weeks"),
+            "currency": "IDR" if is_idx_ticker(ticker) else "USD",
         })
 
     _finalize_summary(summary)
