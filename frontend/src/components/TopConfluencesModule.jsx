@@ -3,9 +3,6 @@ import { Link } from "react-router-dom";
 import { Loader2, Sparkles, ArrowUpRight } from "lucide-react";
 import api from "../lib/api";
 
-// Mirror of backend `_confluence_quality()` tier thresholds — kept small
-// because we already have one source of truth in `ConfluenceChip.jsx`. If a
-// third place wants the same mapping it should be hoisted into a shared util.
 const TIER_STYLE = {
     excellent: { label: "Excellent", color: "hsl(var(--buy))" },
     strong:    { label: "Strong",    color: "hsl(var(--buy))" },
@@ -33,12 +30,6 @@ function fmtPrice(value, currency) {
     return `${currency || "$"} ${Number(value).toLocaleString()}`;
 }
 
-/**
- * Active leaderboard surfacing the user's highest-conviction IDX confluences
- * across the past `days` window (default 7). Renders only when the user has
- * at least one IDX analysis with a quality_score in the period — silent
- * otherwise so US-only traders don't see an empty IDX module.
- */
 export default function TopConfluencesModule({ days = 7, limit = 3 }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -58,12 +49,9 @@ export default function TopConfluencesModule({ days = 7, limit = 3 }) {
                 if (alive) setLoading(false);
             }
         })();
-        return () => {
-            alive = false;
-        };
+        return () => { alive = false; };
     }, [days, limit]);
 
-    // Silent on no-data — avoids cluttering dashboards for US-only traders.
     if (!loading && (!data || !data.items?.length)) return null;
     if (error) return null;
 
@@ -72,6 +60,7 @@ export default function TopConfluencesModule({ days = 7, limit = 3 }) {
             className="module p-5 md:p-6 mt-4"
             data-testid="top-confluences-module"
         >
+            {/* Header */}
             <div className="flex items-baseline justify-between gap-3 flex-wrap">
                 <div>
                     <p className="text-overline flex items-center gap-2">
@@ -112,7 +101,7 @@ export default function TopConfluencesModule({ days = 7, limit = 3 }) {
                             <Link
                                 to={`/analysis/${row.ticker}`}
                                 key={row.analysis_id}
-                                className="grid grid-cols-12 items-center gap-3 px-1 py-4 hover:bg-[hsl(var(--surface-elevated))] transition-colors"
+                                className="flex flex-col gap-2 px-1 py-4 hover:bg-[hsl(var(--surface-elevated))] transition-colors"
                                 style={{
                                     borderBottom:
                                         i === data.items.length - 1
@@ -121,114 +110,118 @@ export default function TopConfluencesModule({ days = 7, limit = 3 }) {
                                 }}
                                 data-testid={`top-confluence-row-${row.ticker}`}
                             >
-                                {/* Rank chevron */}
-                                <div
-                                    className="col-span-1 font-mono text-xs"
-                                    style={{ color: "hsl(var(--text-muted))" }}
-                                >
-                                    {String(i + 1).padStart(2, "0")}
-                                </div>
+                                {/* Row 1: rank + ticker + badge + arrow */}
+                                <div className="flex items-center gap-2">
+                                    {/* Rank */}
+                                    <span
+                                        className="font-mono text-xs w-6 shrink-0"
+                                        style={{ color: "hsl(var(--text-muted))" }}
+                                    >
+                                        {String(i + 1).padStart(2, "0")}
+                                    </span>
 
-                                {/* Ticker + company */}
-                                <div className="col-span-4">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-mono font-medium">{row.ticker}</span>
-                                        <span
-                                            className="font-mono px-1.5 py-0.5"
-                                            style={{
-                                                fontSize: "0.55rem",
-                                                letterSpacing: "0.08em",
-                                                color: "hsl(var(--bg))",
-                                                background: dir.color,
-                                            }}
-                                        >
-                                            {dir.label}
-                                        </span>
-                                    </div>
+                                    {/* Ticker */}
+                                    <span className="font-mono font-medium text-sm">
+                                        {row.ticker}
+                                    </span>
+
+                                    {/* Direction badge */}
+                                    <span
+                                        className="font-mono px-1.5 py-0.5 shrink-0"
+                                        style={{
+                                            fontSize: "0.55rem",
+                                            letterSpacing: "0.08em",
+                                            color: "hsl(var(--bg))",
+                                            background: dir.color,
+                                        }}
+                                    >
+                                        {dir.label}
+                                    </span>
+
+                                    {/* Company name */}
                                     {row.company_name && (
-                                        <p
-                                            className="text-[11px] mt-0.5 line-clamp-1"
+                                        <span
+                                            className="text-[11px] truncate flex-1"
                                             style={{ color: "hsl(var(--text-muted))" }}
                                         >
                                             {row.company_name}
-                                        </p>
+                                        </span>
                                     )}
-                                </div>
 
-                                {/* Quality score (the headline number) */}
-                                <div className="col-span-3 flex flex-col items-start">
-                                    <span
-                                        className="font-mono text-overline"
-                                        style={{ fontSize: "0.55rem", color: "hsl(var(--text-muted))" }}
-                                    >
-                                        QUALITY
-                                    </span>
-                                    <div className="flex items-baseline gap-1.5">
-                                        <span
-                                            className="font-serif"
-                                            style={{
-                                                fontSize: "1.5rem",
-                                                lineHeight: 1,
-                                                color: tier.color,
-                                                fontWeight: 600,
-                                            }}
-                                        >
-                                            {row.quality_score}
-                                        </span>
-                                        <span
-                                            className="font-mono"
-                                            style={{
-                                                fontSize: "0.6rem",
-                                                color: "hsl(var(--text-muted))",
-                                            }}
-                                        >
-                                            /100
-                                        </span>
-                                        <span
-                                            className="font-mono uppercase ml-1"
-                                            style={{
-                                                fontSize: "0.55rem",
-                                                letterSpacing: "0.08em",
-                                                color: tier.color,
-                                            }}
-                                        >
-                                            {tier.label}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Insider freshness + price */}
-                                <div className="col-span-3">
-                                    <p
-                                        className="font-mono text-[10px]"
-                                        style={{ color: "hsl(var(--text-muted))" }}
-                                    >
-                                        INSIDER FILED
-                                    </p>
-                                    <p className="font-mono text-xs mt-0.5">
-                                        {ageLabel(row.freshness_age_days)}
-                                    </p>
-                                    <p
-                                        className="font-mono text-[10px] mt-1"
-                                        style={{ color: "hsl(var(--text-muted))" }}
-                                        title={`Price at analysis · analyzed ${ageLabel(
-                                            Math.floor(
-                                                (Date.now() - new Date(row.created_at).getTime()) /
-                                                    86400000,
-                                            ),
-                                        )}`}
-                                    >
-                                        {fmtPrice(row.price_at_analysis, row.currency)}
-                                    </p>
-                                </div>
-
-                                {/* Open arrow */}
-                                <div className="col-span-1 flex justify-end">
+                                    {/* Arrow */}
                                     <ArrowUpRight
                                         size={14}
                                         strokeWidth={1.5}
+                                        className="shrink-0 ml-auto"
                                         style={{ color: "hsl(var(--text-muted))" }}
                                     />
+                                </div>
+
+                                {/* Row 2: quality score + insider info side by side */}
+                                <div className="flex items-end justify-between pl-8 gap-4">
+                                    {/* Quality score */}
+                                    <div className="flex flex-col">
+                                        <span
+                                            className="font-mono text-overline"
+                                            style={{ fontSize: "0.55rem", color: "hsl(var(--text-muted))" }}
+                                        >
+                                            QUALITY
+                                        </span>
+                                        <div className="flex items-baseline gap-1">
+                                            <span
+                                                className="font-serif"
+                                                style={{
+                                                    fontSize: "1.5rem",
+                                                    lineHeight: 1,
+                                                    color: tier.color,
+                                                    fontWeight: 600,
+                                                }}
+                                            >
+                                                {row.quality_score}
+                                            </span>
+                                            <span
+                                                className="font-mono"
+                                                style={{ fontSize: "0.6rem", color: "hsl(var(--text-muted))" }}
+                                            >
+                                                /100
+                                            </span>
+                                            <span
+                                                className="font-mono uppercase ml-1"
+                                                style={{
+                                                    fontSize: "0.55rem",
+                                                    letterSpacing: "0.08em",
+                                                    color: tier.color,
+                                                }}
+                                            >
+                                                {tier.label}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Insider + price */}
+                                    <div className="flex flex-col items-end">
+                                        <span
+                                            className="font-mono text-[10px]"
+                                            style={{ color: "hsl(var(--text-muted))" }}
+                                        >
+                                            INSIDER FILED
+                                        </span>
+                                        <span className="font-mono text-xs mt-0.5">
+                                            {ageLabel(row.freshness_age_days)}
+                                        </span>
+                                        <span
+                                            className="font-mono text-[10px] mt-0.5"
+                                            style={{ color: "hsl(var(--text-muted))" }}
+                                            title={`Price at analysis · analyzed ${ageLabel(
+                                                Math.floor(
+                                                    (Date.now() - new Date(row.created_at).getTime()) /
+                                                        86400000,
+                                                ),
+                                            )}`}
+                                        >
+                                            {fmtPrice(row.price_at_analysis, row.currency)}
+                                        </span>
+                                    </div>
                                 </div>
                             </Link>
                         );
