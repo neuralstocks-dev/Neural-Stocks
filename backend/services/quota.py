@@ -129,7 +129,6 @@ async def quota_snapshot(user: dict) -> dict:
         "watchlist_limit": p["watchlist_limit"],
         "analyses_today": used_day,
         "analyses_day_limit": p["analyses_per_day"],
-        "analyses_day_display": p.get("analyses_per_day_display"),
         "analyses_this_week": used_week,
         "analyses_week_limit": p["analyses_per_week"],
         "watchlist_display": p.get("watchlist_display"),
@@ -162,15 +161,13 @@ async def enforce_analysis_quota(user: dict):
             since_day = reset_dt
         used_day = await count_analyses(user["id"], since_day)
         if used_day >= p["analyses_per_day"]:
-            # For plans advertised as "Unlimited" (e.g. Elite with a fair-use
-            # soft cap), phrase the message as a fair-use alert rather than
-            # a hard quota to keep the product promise intact.
-            display_as_unlimited = p.get("analyses_per_day_display") == "Unlimited"
-            if display_as_unlimited:
+            # Elite is the top plan — frame as fair-use ceiling, not upgrade prompt.
+            is_top_plan = p.get("name", "").lower() == "elite"
+            if is_top_plan:
                 raise HTTPException(
                     status_code=429,
                     detail=(
-                        f"You've hit our fair-use ceiling of {p['analyses_per_day']} "
+                        f"You've hit the fair-use ceiling of {p['analyses_per_day']} "
                         f"analyses in 24 hours. Try again tomorrow — or reach out to "
                         f"support@neulab.xyz if you need a higher volume allocation."
                     ),

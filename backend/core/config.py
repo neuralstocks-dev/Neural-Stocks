@@ -93,7 +93,6 @@ PLANS = {
         "watchlist_limit": 500,
         "watchlist_display": "Unlimited",
         "analyses_per_day": ELITE_FAIR_USE_DAILY,
-        "analyses_per_day_display": "Unlimited",
         "analyses_per_week": None,
         "quick_actions": True,
         "share_verdicts": True,

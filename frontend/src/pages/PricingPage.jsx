@@ -41,13 +41,6 @@ function renderValue(plan, feat) {
             </div>
         );
     }
-    // Allow individual plans to override the displayed value (e.g. Elite
-    // shows "Unlimited" even though the backend enforces a fair-use cap).
-    const overrideKey = `${feat.key.replace(/_limit$|_per_day$/, "")}_display`;
-    const override = plan[overrideKey] || plan[`${feat.key}_display`];
-    if (override) {
-        return <span className="font-mono" style={{ color: "hsl(var(--hold))" }}>{override}</span>;
-    }
     if (v === null || v === undefined) {
         return <span className="font-mono" style={{ color: "hsl(var(--hold))" }}>Unlimited</span>;
     }
@@ -436,9 +429,7 @@ export default function PricingPage() {
 
                                         <ul className="mt-6 space-y-3 flex-1">
                                             <FeatureLi>
-                                                {p.analyses_per_day_display
-                                                    ? `${p.analyses_per_day_display} analyses`
-                                                    : p.analyses_per_day === null
+                                                {p.analyses_per_day === null
                                                     ? "Unlimited analyses"
                                                     : `${p.analyses_per_day} analyses per day`}
                                             </FeatureLi>
