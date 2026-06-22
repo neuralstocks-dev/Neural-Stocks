@@ -54,6 +54,21 @@ def effective_plan_key(user: dict) -> str:
     # Auto-revert expired daypass to free for display (DB clean-up is lazy)
     if (user.get("plan") or "") == "daypass" and not daypass_active(user):
         return "free"
+    # Enforce subscription_cancels_at — if cancellation period has passed,
+    # revert to free even if webhook hasn't fired yet (belt-and-braces).
+    cancels_at = user.get("subscription_cancels_at")
+    if cancels_at and user.get("subscription_status") == "CANCELLED":
+        try:
+            dt = datetime.fromisoformat(str(cancels_at).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > dt:
+                return "free"
+        except Exception:
+            pass
+    # Revert suspended subscriptions to free (payment failed)
+    if user.get("subscription_status") in ("SUSPENDED", "PAYMENT_FAILED"):
+        return "free"
     return user.get("plan") or "free"
 
 

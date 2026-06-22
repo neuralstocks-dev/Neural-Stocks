@@ -356,6 +356,13 @@ async def paypal_webhook(request: Request):
             )
 
     elif event_type == "BILLING.SUBSCRIPTION.SUSPENDED" and sub_doc:
+        # Payment failed -> subscription suspended. Restrict access immediately.
+        # effective_plan_key() returns "free" for SUSPENDED users. Plan is NOT
+        # wiped yet — if user resolves payment, ACTIVATED fires and restores it.
+        await db.users.update_one(
+            {"id": sub_doc["user_id"]},
+            {"$set": {"subscription_status": "SUSPENDED"}},
+        )
         await db.subscriptions.update_one(
             {"subscription_id": sub_id},
             {"$set": {"status": "SUSPENDED", "updated_at": iso(now_utc())}},
@@ -377,9 +384,13 @@ async def paypal_webhook(request: Request):
 
     elif event_type == "BILLING.SUBSCRIPTION.PAYMENT.FAILED" and sub_doc:
         logger.warning("PayPal payment failed for subscription %s", sub_id)
+        await db.users.update_one(
+            {"id": sub_doc["user_id"]},
+            {"$set": {"subscription_status": "PAYMENT_FAILED", "last_payment_failed_at": iso(now_utc())}},
+        )
         await db.subscriptions.update_one(
             {"subscription_id": sub_id},
-            {"$set": {"last_payment_failed_at": iso(now_utc()), "updated_at": iso(now_utc())}},
+            {"$set": {"status": "PAYMENT_FAILED", "last_payment_failed_at": iso(now_utc()), "updated_at": iso(now_utc())}},
         )
 
     elif event_type in ("PAYMENT.CAPTURE.COMPLETED", "CHECKOUT.ORDER.APPROVED"):
