@@ -583,8 +583,12 @@ export default function PricingPage() {
                     </PayPalScriptProvider>
                 )}
 
-                {/* Week Pass — one-time purchase */}
-                {plans && billingConfig && daypass && paypalOptions && (
+                {/* Week Pass — one-time purchase.
+                    Deliberately decoupled from `paypalOptions` (which requires plan_ids
+                    for subscriptions). Daypass only needs client_id — it uses
+                    Orders v2 (capture intent), not subscriptions. If plan_ids lookup
+                    503s, daypass should still render. */}
+                {plans && billingConfig?.client_id && daypass && (
                     <PayPalScriptProvider
                         options={{
                             "client-id": billingConfig.client_id,

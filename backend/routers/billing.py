@@ -50,13 +50,16 @@ class ActivateReq(BaseModel):
 
 @router.get("/config")
 async def billing_config(user=Depends(get_current_user)):
-    """Returns client-side PayPal config — public key + live plan ids."""
+    """Returns client-side PayPal config — public key + live plan ids.
+    plan_ids lookup is best-effort: if PayPal is slow/down, we still return
+    client_id so the daypass (Orders v2) can render. Subscription buttons
+    will be absent but the one-time pass remains purchasable."""
     prices = await get_pricing()
+    plan_ids = {}
     try:
         plan_ids = await get_plan_ids(prices)
     except PayPalError as e:
-        logger.error("Plan lookup failed: %s", e)
-        raise HTTPException(status_code=503, detail=f"PayPal unavailable: {e}")
+        logger.warning("Plan ID lookup failed (non-fatal for daypass): %s", e)
     return {
         "client_id": PAYPAL_CLIENT_ID,
         "env": PAYPAL_ENV,
