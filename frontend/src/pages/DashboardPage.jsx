@@ -424,6 +424,7 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [analyzingTicker, setAnalyzingTicker] = useState(null);
+    const [wakingUp, setWakingUp] = useState(false); // Railway cold-start detection
     // Live phase label ("Fetching data" | "Technicals" | "Patterns" | "LLM
     // verdict" | "RF score" | "Calibrating") for the watchlist row pill.
     // Updated by pollAnalysisJob's onProgress callback so the user sees
@@ -558,27 +559,60 @@ export default function DashboardPage() {
             setActionError("");
             setAnalyzingTicker(ticker);
             setAnalyzingPhase(null);
+            setWakingUp(false);
             // Clear any previous row-level error for this ticker so the
             // user doesn't see a stale red pill while we're re-attempting.
             setFailedTicker((prev) => (prev === ticker ? null : prev));
-            try {
-                // Mobile-resilient poller (lib/analysisPolling.js) — budget 260s,
-                // visibility-aware elapsed tracking so backgrounded tabs don't
-                // incorrectly conclude the job timed out. Falls through to
-                // /latest with freshness validation on exhaustion.
-                // The onProgress callback drives the live phase pill in the
-                // watchlist row so users see "Analyzing… · LLM verdict"
-                // instead of a generic "Analyzing…" — same phase labels as
-                // the AnalysisProgressStepper on the Re-analyze page.
-                const finalResult = await pollAnalysisJob({
+
+            // Fix 2: Cold-start detection — Railway spins down after inactivity.
+            // If the job hasn't progressed after 4s, show "Waking up server…"
+            // so the user waits rather than thinking the product is broken.
+            const coldStartTimer = setTimeout(() => {
+                setWakingUp(true);
+                setAnalyzingPhase("Waking up server…");
+            }, 4000);
+
+            // Inner runner — shared by first attempt and auto-retry.
+            const runAnalysis = async () => {
+                return await pollAnalysisJob({
                     api,
                     ticker,
                     mode: analyzeMode,
                     onProgress: (p) => {
+                        clearTimeout(coldStartTimer);
+                        setWakingUp(false);
                         const label = WATCHLIST_PHASE_LABELS[p?.phase] || null;
                         setAnalyzingPhase(label);
                     },
                 });
+            };
+
+            // Fix 3: Silent auto-retry on first soft failure.
+            // Transient errors (cold start, LLM hiccup, network blip) are
+            // common on first attempt after login. Retry once silently with
+            // a 3s pause before ever showing the user an error.
+            let finalResult;
+            let _coldCleared = false;
+            const _clearCold = () => {
+                if (!_coldCleared) { clearTimeout(coldStartTimer); setWakingUp(false); _coldCleared = true; }
+            };
+            try {
+                try {
+                    finalResult = await runAnalysis();
+                    _clearCold();
+                } catch (firstErr) {
+                    _clearCold();
+                    // Hard failures: don't retry — surface immediately.
+                    const status = firstErr?.response?.status;
+                    if (status === 428 || status === 402 || status === 503 || status === 401 || status === 403) {
+                        throw firstErr;
+                    }
+                    // Soft fail — pause 3s then retry once silently.
+                    setAnalyzingPhase("Retrying…");
+                    await new Promise((r) => setTimeout(r, 3000));
+                    setAnalyzingPhase(null);
+                    finalResult = await runAnalysis();
+                }
 
                 const freshVerdict = finalResult
                     ? {
@@ -674,6 +708,7 @@ export default function DashboardPage() {
             } finally {
                 setAnalyzingTicker(null);
                 setAnalyzingPhase(null);
+                setWakingUp(false);
             }
         });
     };

@@ -241,17 +241,45 @@ export default function DisclaimerModal({ open, onClose, onAccepted }) {
 /** Convenience hook: provides accepted state + a wrapper that ensures
  *  the user has accepted before running a gated action. Callers pass the
  *  intended action; if not accepted, the disclaimer modal state opens and
- *  the action is re-played after acceptance. */
+ *  the action is re-played after acceptance.
+ *
+ *  localStorage fast-path: we cache acceptance per user ID under
+ *  `sai_disclaimer_{userId}` so that returning users who already accepted
+ *  start with `accepted === true` immediately — no API round-trip needed
+ *  before the first click. The server remains the source of truth; the
+ *  cache is only used to avoid the null->false race on fast clickers. */
+function _disclaimerCacheKey() {
+    try {
+        const u = JSON.parse(localStorage.getItem("sai_user") || "{}");
+        return u && u.id ? ("sai_disclaimer_" + u.id) : null;
+    } catch { return null; }
+}
+function _readDisclaimerCache() {
+    try {
+        const k = _disclaimerCacheKey();
+        return k ? localStorage.getItem(k) === "1" : false;
+    } catch { return false; }
+}
+function _writeDisclaimerCache(val) {
+    try {
+        const k = _disclaimerCacheKey();
+        if (k) { if (val) { localStorage.setItem(k, "1"); } else { localStorage.removeItem(k); } }
+    } catch { /* storage quota — silent */ }
+}
+
 export function useDisclaimer() {
-    const [accepted, setAccepted] = useState(null); // null = unknown, bool after load
+    // Seed from cache so returning users start as `true`, not `null`.
+    const [accepted, setAccepted] = useState(function() { return _readDisclaimerCache() || null; });
     const [open, setOpen] = useState(false);
     const [pendingAction, setPendingAction] = useState(null);
 
     const refresh = useCallback(async () => {
         try {
             const r = await api.get("/disclaimer");
-            setAccepted(!!r.data.accepted);
-            return !!r.data.accepted;
+            const val = !!r.data.accepted;
+            setAccepted(val);
+            _writeDisclaimerCache(val);
+            return val;
         } catch {
             setAccepted(false);
             return false;
@@ -296,6 +324,7 @@ export function useDisclaimer() {
 
     const onAccepted = useCallback(() => {
         setAccepted(true);
+        _writeDisclaimerCache(true);
         setOpen(false);
         if (pendingAction) {
             const a = pendingAction;
