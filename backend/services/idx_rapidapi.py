@@ -42,6 +42,66 @@ _CACHE_TTL_QUOTE = 10 * 60          # 10 min
 _CACHE_TTL_TECHNICAL = 30 * 60      # 30 min
 _CACHE_TTL_FUNDAMENTALS = 24 * 3600  # 24 h
 
+# ---------------------------------------------------------------------------
+# MongoDB-backed L2 cache — persists across Railway restarts so a ticker
+# analysed by User A doesn't burn a second RapidAPI call when User B or a
+# Railway redeploy analyses the same ticker within the TTL window.
+#
+# Collection: db.idx_cache
+# Document shape: {_id: "<kind>:<symbol>", data: {...}, expires_at: datetime}
+# TTL index on `expires_at` (ensured once at first write, idempotent).
+#
+# L1 (in-process dict) → L2 (MongoDB) → L3 (RapidAPI live call)
+# ---------------------------------------------------------------------------
+
+_mc_index_ensured: bool = False
+
+
+async def _mc_ensure_index() -> None:
+    global _mc_index_ensured
+    if _mc_index_ensured:
+        return
+    try:
+        await db.idx_cache.create_index("expires_at", expireAfterSeconds=0, background=True)
+        _mc_index_ensured = True
+    except Exception as exc:
+        logger.warning("idx_cache TTL index ensure failed (non-fatal): %s", exc)
+
+
+async def _mc_get(kind: str, symbol: str) -> dict | None:
+    """Read from MongoDB L2 cache. Returns None on miss or error."""
+    try:
+        doc = await db.idx_cache.find_one(
+            {"_id": f"{kind}:{symbol}"},
+            projection={"data": 1, "expires_at": 1, "_id": 0},
+        )
+        if not doc:
+            return None
+        # Belt-and-braces: honour expires_at even if TTL index hasn't fired yet.
+        exp = doc.get("expires_at")
+        if exp and datetime.now(timezone.utc) > exp:
+            return None
+        return doc.get("data")
+    except Exception as exc:
+        logger.debug("idx_cache get error (non-fatal): %s", exc)
+        return None
+
+
+async def _mc_set(kind: str, symbol: str, data: dict, ttl_seconds: int) -> None:
+    """Write to MongoDB L2 cache. Fire-and-forget — never raises."""
+    try:
+        await _mc_ensure_index()
+        expires_at = datetime.now(timezone.utc).replace(microsecond=0)
+        from datetime import timedelta as _td
+        expires_at = expires_at + _td(seconds=ttl_seconds)
+        await db.idx_cache.replace_one(
+            {"_id": f"{kind}:{symbol}"},
+            {"_id": f"{kind}:{symbol}", "data": data, "expires_at": expires_at},
+            upsert=True,
+        )
+    except Exception as exc:
+        logger.debug("idx_cache set error (non-fatal): %s", exc)
+
 # In-process rate limiter — BASIC is 1 req/sec.
 _rate_lock = asyncio.Lock()
 _last_call_ts = 0.0
@@ -410,9 +470,15 @@ async def get_quote(ticker: str) -> dict | None:
     """Return current quote snapshot (price, volume, market cap, change %).
     Uses `/api/emiten/{symbol}/info`. None on any failure."""
     symbol = _strip_jk(ticker)
+    # L1: in-process
     cached = _quote_cache.get(symbol)
     if cached and (time.time() - cached[0] < _CACHE_TTL_QUOTE):
         return cached[1]
+    # L2: MongoDB (survives restarts)
+    mc = await _mc_get("quote", symbol)
+    if mc:
+        _quote_cache[symbol] = (time.time(), mc)
+        return mc
     raw = await _call(f"/api/emiten/{symbol}/info", ticker=symbol)
     if not raw or not raw.get("success"):
         return None
@@ -453,6 +519,7 @@ async def get_quote(ticker: str) -> dict | None:
         "source": "rapidapi.idx",
     }
     _quote_cache[symbol] = (time.time(), normalised)
+    await _mc_set("quote", symbol, normalised, _CACHE_TTL_QUOTE)
     # Organic catalog growth — remembers this ticker for future searches.
     await upsert_catalog_entry(
         symbol=symbol,
@@ -472,9 +539,15 @@ async def get_key_stats(ticker: str) -> dict | None:
     We flatten it into a {name: value} dict and extract the most-useful
     ratios by name heuristic."""
     symbol = _strip_jk(ticker)
+    # L1: in-process
     cached = _fundamentals_cache.get(symbol)
     if cached and (time.time() - cached[0] < _CACHE_TTL_FUNDAMENTALS):
         return cached[1]
+    # L2: MongoDB (survives restarts)
+    mc = await _mc_get("keystats", symbol)
+    if mc:
+        _fundamentals_cache[symbol] = (time.time(), mc)
+        return mc
     raw = await _call(f"/api/emiten/{symbol}/keystats", ticker=symbol)
     if not raw or not raw.get("success"):
         return None
@@ -522,6 +595,7 @@ async def get_key_stats(ticker: str) -> dict | None:
         "raw_count": len(flat),
     }
     _fundamentals_cache[symbol] = (time.time(), normalised)
+    await _mc_set("keystats", symbol, normalised, _CACHE_TTL_FUNDAMENTALS)
     return normalised
 
 
@@ -536,9 +610,15 @@ async def get_technical(ticker: str) -> dict | None:
     We pass through the indicators dict since each has its own signal string
     (BULLISH / BEARISH / NEUTRAL) that the UI can display directly."""
     symbol = _strip_jk(ticker)
+    # L1: in-process
     cached = _technical_cache.get(symbol)
     if cached and (time.time() - cached[0] < _CACHE_TTL_TECHNICAL):
         return cached[1]
+    # L2: MongoDB (survives restarts)
+    mc = await _mc_get("technical", symbol)
+    if mc:
+        _technical_cache[symbol] = (time.time(), mc)
+        return mc
     raw = await _call(
         f"/api/analysis/technical/{symbol}?indicators=rsi,macd,sma,ema",
         ticker=symbol,
@@ -557,6 +637,7 @@ async def get_technical(ticker: str) -> dict | None:
         "source": "rapidapi.idx",
     }
     _technical_cache[symbol] = (time.time(), normalised)
+    await _mc_set("technical", symbol, normalised, _CACHE_TTL_TECHNICAL)
     return normalised
 
 
@@ -600,9 +681,15 @@ async def get_bandarmology(ticker: str) -> dict | None:
     """Compute Accumulation / Distribution / Smart-Money signals from the
     insider-flow feed. Single upstream call, computed locally."""
     symbol = _strip_jk(ticker)
+    # L1: in-process
     cached = _bandarmology_cache.get(symbol)
     if cached and (time.time() - cached[0] < _CACHE_TTL_BANDARMOLOGY):
         return cached[1]
+    # L2: MongoDB (survives restarts)
+    mc = await _mc_get("bandarmology", symbol)
+    if mc:
+        _bandarmology_cache[symbol] = (time.time(), mc)
+        return mc
     movements = await get_insider_flow(ticker)
     if movements is None:
         return None
@@ -703,6 +790,7 @@ async def get_bandarmology(ticker: str) -> dict | None:
         "_raw_movements": movements,
     }
     _bandarmology_cache[symbol] = (time.time(), result)
+    await _mc_set("bandarmology", symbol, result, _CACHE_TTL_BANDARMOLOGY)
     return result
 
 
