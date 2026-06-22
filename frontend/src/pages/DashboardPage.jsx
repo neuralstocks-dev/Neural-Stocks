@@ -99,7 +99,7 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                 </div>
             </div>
 
-            <div className="col-span-6 md:col-span-3">
+            <div className="col-span-12 md:col-span-3">
                 <div className="font-mono text-2xl md:text-[1.75rem] leading-none hero-number">
                     {q.price != null ? formatPrice(q.price, q.currency) : "—"}
                 </div>
