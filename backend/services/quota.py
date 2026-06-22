@@ -192,10 +192,13 @@ async def enforce_analysis_quota(user: dict):
 # RapidAPI IDX data source is on a 1,000 req/month BASIC free plan and each
 # IDX analysis consumes ~3 API calls. Tight per-user caps here protect the
 # shared monthly budget so one power user can't drain it.
+# Budget math: 1,000 req/month ÷ 3 calls/analysis = ~333 IDX analyses/month
+# shared across all users. Elite cap of 20/day × 30 days = 600 calls max
+# for one Elite user, leaving 400 calls for Free/Pro/Daypass users combined.
 IDX_DAILY_LIMITS = {
     "free": 3,
     "pro": 10,
-    "elite": 30,
+    "elite": 20,
     "daypass": 10,
 }
 
