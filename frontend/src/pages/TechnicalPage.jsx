@@ -1759,7 +1759,8 @@ histogram  = MACD_line − signal`}
                 </>
                 )}
 
-                {/* Stack footer */}
+                {/* Stack footer — admin only */}
+                {isAdmin && (<>
                 <SectionHeader
                     id="stack"
                     icon={BookOpen}
@@ -1797,6 +1798,7 @@ Observability    Structured logs to /var/log/supervisor · per-request correlati
                     Last updated June 2026. This page is versioned with the product — any future switch to
                     trained ML (e.g., FinBERT for sentiment) will be disclosed here with a dated changelog entry.
                 </p>
+                </>)}
             </div>
         </>
     );
