@@ -189,10 +189,12 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                             parent's per-analysis timer. */}
                         {justCompleted && !analyzing && !failed && (
                             <div
-                                className="absolute inset-0 flex items-center justify-start pointer-events-none"
+                                className="absolute inset-0 flex items-center justify-start"
                                 data-testid={`done-pill-${item.ticker}`}
+                                style={{ pointerEvents: "auto" }}
                             >
-                                <span
+                                <Link
+                                    to={`/analysis/${item.ticker}`}
                                     className="font-mono text-[10px] inline-flex items-center gap-1.5 px-2 py-1 done-pill"
                                     style={{
                                         background: "hsl(var(--surface-elevated))",
@@ -200,10 +202,12 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                                         border: "1px solid hsl(var(--buy))",
                                         letterSpacing: "0.12em",
                                         textTransform: "uppercase",
+                                        textDecoration: "none",
                                     }}
+                                    title="View full analysis report"
                                 >
-                                    ✓ Done · just now
-                                </span>
+                                    ✓ Done · View report →
+                                </Link>
                             </div>
                         )}
                         {!analyzing && failed && (
@@ -888,6 +892,55 @@ export default function DashboardPage() {
                 {/* Test-unlock banner (admin-granted) */}
                 <TestUnlockBanner quota={quota} />
 
+                {/* Payment failure banner — shown when PayPal suspended/failed */}
+                {quota && (quota.subscription_status === "SUSPENDED" || quota.subscription_status === "PAYMENT_FAILED") && (
+                    <div
+                        className="px-4 py-3 mb-4 font-mono text-sm flex items-center justify-between gap-3 flex-wrap"
+                        style={{
+                            background: "hsla(0,70%,45%,0.10)",
+                            border: "1px solid hsl(var(--sell))",
+                            color: "hsl(var(--sell))",
+                        }}
+                        data-testid="payment-failed-banner"
+                    >
+                        <span>
+                            ⚠ Your last payment failed — your account has been downgraded to Free.
+                            Update your payment method in PayPal to restore {quota.base_plan === "pro" ? "Pro" : "Elite"} access.
+                        </span>
+                        <a
+                            href="https://www.paypal.com/myaccount/autopay/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-ghost !text-xs shrink-0"
+                            style={{ color: "hsl(var(--sell))", borderColor: "hsl(var(--sell))" }}
+                        >
+                            Fix in PayPal →
+                        </a>
+                    </div>
+                )}
+
+                {/* Daypass expired banner */}
+                {quota && quota.base_plan === "daypass" && !quota.daypass_active && (
+                    <div
+                        className="px-4 py-3 mb-4 font-mono text-sm flex items-center justify-between gap-3 flex-wrap"
+                        style={{
+                            background: "hsla(38,45%,45%,0.08)",
+                            border: "1px solid hsl(var(--hold))",
+                            color: "hsl(var(--hold))",
+                        }}
+                        data-testid="daypass-expired-banner"
+                    >
+                        <span>Your 7-day pass has expired. Upgrade to Pro to keep your momentum.</span>
+                        <Link
+                            to="/pricing"
+                            className="btn-ghost !text-xs shrink-0"
+                            style={{ color: "hsl(var(--hold))", borderColor: "hsl(var(--hold))" }}
+                        >
+                            Upgrade →
+                        </Link>
+                    </div>
+                )}
+
                 {/* Cross-promo nudge — surfaces only to users who haven't visited /kids/preview */}
                 <KidsDiscoverNudge />
 
@@ -926,10 +979,22 @@ export default function DashboardPage() {
                             </div>
                             <div>
                                 <p className="text-overline" style={{ fontSize: "0.56rem" }}>Analyses · today</p>
-                                <p className="font-mono text-sm mt-1">
+                                <p
+                                    className="font-mono text-sm mt-1"
+                                    style={{
+                                        color: quota.analyses_day_limit !== null && quota.analyses_day_limit - quota.analyses_today <= 2 && quota.analyses_today < quota.analyses_day_limit
+                                            ? "hsl(var(--hold))"
+                                            : quota.analyses_day_limit !== null && quota.analyses_today >= quota.analyses_day_limit
+                                            ? "hsl(var(--sell))"
+                                            : undefined,
+                                    }}
+                                >
                                     {quota.analyses_today}
                                     {" / "}
                                     {quota.analyses_day_limit === null ? "∞" : quota.analyses_day_limit}
+                                    {quota.analyses_day_limit !== null && quota.analyses_day_limit - quota.analyses_today <= 2 && quota.analyses_today < quota.analyses_day_limit && (
+                                        <span className="ml-1" style={{ fontSize: "0.6rem", opacity: 0.8 }}>· {quota.analyses_day_limit - quota.analyses_today} left</span>
+                                    )}
                                 </p>
                             </div>
                             <div>
@@ -938,6 +1003,19 @@ export default function DashboardPage() {
                                     {quota.analyses_this_week}
                                     {" / "}
                                     {quota.analyses_week_limit === null ? "∞" : quota.analyses_week_limit}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-overline" style={{ fontSize: "0.56rem" }}>Resets</p>
+                                <p className="font-mono text-sm mt-1" style={{ color: "hsl(var(--text-muted))" }}>
+                                    {(() => {
+                                        const now = new Date();
+                                        const midnight = new Date();
+                                        midnight.setUTCHours(24, 0, 0, 0);
+                                        const diffH = Math.floor((midnight - now) / 3600000);
+                                        const diffM = Math.floor(((midnight - now) % 3600000) / 60000);
+                                        return diffH > 0 ? diffH + "h " + diffM + "m" : diffM + "m";
+                                    })()}
                                 </p>
                             </div>
                         </div>
@@ -957,8 +1035,13 @@ export default function DashboardPage() {
                     <>
                         <LLMBudgetBanner error={actionErrorRaw} />
                         {!_isBudgetError(actionErrorRaw) && (
-                            <div className="signal-sell px-4 py-3 mb-4 font-mono text-sm" data-testid="action-error">
-                                {actionError}
+                            <div className="signal-sell px-4 py-3 mb-4 font-mono text-sm flex items-center justify-between gap-3 flex-wrap" data-testid="action-error">
+                                <span>{actionError}</span>
+                                {(actionErrorRaw || "").includes("limit") || (actionErrorRaw || "").includes("quota") || (actionError || "").includes("limit") ? (
+                                    <Link to="/pricing" className="btn-ghost !text-xs shrink-0" style={{ color: "hsl(var(--sell))", borderColor: "hsl(var(--sell))" }}>
+                                        Upgrade →
+                                    </Link>
+                                ) : null}
                             </div>
                         )}
                     </>
@@ -1048,15 +1131,28 @@ export default function DashboardPage() {
                         <RefreshCw size={14} strokeWidth={1.5} className={refreshing ? "animate-spin" : ""} />
                     </button>
                     <button
-                        onClick={() => setModalOpen(true)}
+                        onClick={() => watchlistFull ? null : setModalOpen(true)}
                         className="btn-quick flex items-center justify-between"
-                        disabled={watchlistFull}
+                        disabled={false}
                         data-testid="add-stock-button"
+                        style={{ cursor: watchlistFull ? "default" : "pointer" }}
+                        title={watchlistFull ? `Watchlist full (${items.length}/${watchlistLimit}) — remove a ticker or upgrade` : "Add stock"}
                     >
                         <span>
-                            {watchlistFull ? "Watchlist Full" : "Add Stock"}
+                            {watchlistFull ? `Full · ${items.length}/${watchlistLimit}` : "Add Stock"}
                         </span>
-                        <Plus size={14} strokeWidth={1.5} />
+                        {watchlistFull ? (
+                            <Link
+                                to="/pricing"
+                                onClick={(e) => e.stopPropagation()}
+                                className="font-mono text-[10px] underline ml-1"
+                                style={{ color: "hsl(var(--hold))" }}
+                            >
+                                Upgrade
+                            </Link>
+                        ) : (
+                            <Plus size={14} strokeWidth={1.5} />
+                        )}
                     </button>
                     <IdxTopPicksDialog canUse={canQuickActions} />
                 </section>
