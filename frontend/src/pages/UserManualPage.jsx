@@ -565,16 +565,17 @@ export default function UserManualPage() {
 
                 <Section id="signup" icon={UserCheck} kicker="2.1" title="Sign up & onboarding">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Two ways to start an account:
+                        Sign up with your email and a password — takes under a minute.
                     </p>
-                    <Step n={1} title="Continue with Google">
-                        Fastest path — one tap, no password to remember. We use Emergent's managed
-                        Google OAuth, so we never see your Google credentials. Returns you straight
-                        to the dashboard.
+                    <Step n={1} title="Create your account">
+                        Enter your name, email address, and a password (minimum 6 characters).
+                        Hit <strong>Create account</strong> — no credit card or verification email required.
+                        Free tier is activated immediately.
                     </Step>
-                    <Step n={2} title="Email + password">
-                        If you prefer not to use Google, fill in your email and a password. Confirm
-                        the disclaimer checkbox and you're in. Free tier is the default.
+                    <Step n={2} title="Accept the disclaimer">
+                        Neural Stock Intelligence is a research tool, not financial advice. Tick the
+                        disclaimer checkbox on your first login to confirm you understand this. You
+                        only need to do this once.
                     </Step>
                     <p className="text-sm mt-5 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                         After your first sign-in, the <strong>Onboarding Wizard</strong> walks you
