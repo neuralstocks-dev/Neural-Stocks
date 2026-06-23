@@ -10,7 +10,7 @@ from core.security import get_current_user, iso, now_utc
 from services.yfinance_svc import get_quote, _yf_history_sync, _yf_fundamentals_sync, compute_technicals
 from services.ai import run_ai_analysis, run_timeline_analysis, run_candlestick_analysis
 from services.candlestick import scan_daily_and_weekly
-from services.finnhub import get_market_context
+from services.finnhub import get_market_context, get_history as finnhub_get_history
 from services.idx_news import get_market_context_idx, is_idx_ticker
 from services import rf_predictor
 from services.features import feature_row_for_today
@@ -899,6 +899,16 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
     # _kid_safe_error classifies this distinctly from "ticker not found"
     # rather than incorrectly telling the user we couldn't find it.
     valid_closes = sum(1 for h in history if h.get("close") is not None)
+    # Fallback: yfinance intermittently returns empty history for US tickers
+    # (Yahoo Finance API changes). If Finnhub is configured and we got
+    # fewer than 15 closes from yfinance, try Finnhub candles instead.
+    if valid_closes < 15 and not is_idx_ticker(ticker):
+        from services.finnhub import is_configured as fh_ready
+        if fh_ready():
+            fh_history = await finnhub_get_history(ticker, days=200)
+            if len(fh_history) >= 15:
+                history = fh_history
+                valid_closes = sum(1 for h in history if h.get("close") is not None)
     if valid_closes < 15:
         raise HTTPException(
             status_code=422,

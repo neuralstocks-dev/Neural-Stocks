@@ -208,19 +208,22 @@ export default function PublicTryVerdictPage() {
 
                 {!loading && error && (() => {
                     const isQuotaError = error.includes("limit") || error.includes("quota") || error.includes("Too many") || error.includes("Sign up for more");
-                    const isServerError = error.includes("taking longer") || error.includes("Lost connection") || error.includes("try again");
-                    const isTickerError = error.includes("not found") || error.includes("invalid");
+                    const isServerError = error.includes("taking longer") || error.includes("Lost connection") || error.includes("try again") || error.includes("slow right now");
+                    const isHistoryError = error.includes("trading history") || error.includes("enough history") || error.includes("recently listed") || error.includes("recent IPO");
+                    const isTickerError = (error.includes("not found") || error.includes("invalid")) && !isHistoryError;
                     return (
                         <div className="py-24 text-center max-w-sm mx-auto">
                             <AlertTriangle className="mx-auto mb-3" size={20} style={{ color: "hsl(var(--sell))" }} />
                             <p className="text-overline" style={{ color: "hsl(var(--sell))" }}>
-                                {isQuotaError ? "FREE ANALYSIS USED" : isServerError ? "ANALYSIS TIMED OUT" : isTickerError ? "TICKER NOT FOUND" : "ANALYSIS FAILED"}
+                                {isQuotaError ? "FREE ANALYSIS USED" : isServerError ? "ANALYSIS TIMED OUT" : isHistoryError ? "NOT ENOUGH HISTORY" : isTickerError ? "TICKER NOT FOUND" : "ANALYSIS FAILED"}
                             </p>
                             <p className="mt-4 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
                                 {isQuotaError
                                     ? "You've already used your free analysis today. Sign up to run 3 analyses per day — free forever."
                                     : isServerError
                                     ? "The analysis took too long. This can happen during peak load. Try again in a moment."
+                                    : isHistoryError
+                                    ? "This stock doesn't have enough price history yet for our technical analysis. It may be a recent IPO. Try a more established ticker like AAPL, BBCA.JK, or NVDA."
                                     : isTickerError
                                     ? `We couldn't find data for that ticker. Double-check the symbol (e.g. BBCA.JK for Indonesian stocks, AAPL for US stocks).`
                                     : `Something went wrong on our end — not your ticker. Try again or pick a different stock.`}

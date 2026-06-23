@@ -278,3 +278,45 @@ async def get_market_context(symbol: str) -> dict:
         "analyst_consensus": analyst if isinstance(analyst, dict) else None,
         "earnings": earnings if isinstance(earnings, dict) else None,
     }
+
+
+@track("finnhub.get_history")
+async def get_history(symbol: str, days: int = 180) -> list:
+    """Fetch daily OHLCV candles from Finnhub as a fallback when yfinance
+    returns empty history for US tickers. Returns a list of dicts compatible
+    with the yfinance history format used by compute_technicals().
+    Finnhub /stock/candle uses Unix timestamps; free tier supports daily ('D')."""
+    if not is_configured():
+        return []
+    import time as _time
+    to_ts = int(_time.time())
+    from_ts = to_ts - (days * 86400)
+    data = await _get(
+        "/stock/candle",
+        {"symbol": symbol.upper(), "resolution": "D", "from": from_ts, "to": to_ts},
+        f"candle:{symbol.upper()}:{days}",
+        ttl=3600,  # cache 1h — daily candles don't change intraday
+    )
+    if not isinstance(data, dict) or data.get("s") != "ok":
+        return []
+    closes = data.get("c") or []
+    opens = data.get("o") or []
+    highs = data.get("h") or []
+    lows = data.get("l") or []
+    volumes = data.get("v") or []
+    timestamps = data.get("t") or []
+    result = []
+    from datetime import datetime, timezone as _tz
+    for i in range(len(closes)):
+        try:
+            result.append({
+                "date": datetime.fromtimestamp(timestamps[i], tz=_tz.utc).strftime("%Y-%m-%d") if i < len(timestamps) else None,
+                "open": float(opens[i]) if i < len(opens) else None,
+                "high": float(highs[i]) if i < len(highs) else None,
+                "low": float(lows[i]) if i < len(lows) else None,
+                "close": float(closes[i]),
+                "volume": int(volumes[i]) if i < len(volumes) else None,
+            })
+        except Exception:
+            continue
+    return result
