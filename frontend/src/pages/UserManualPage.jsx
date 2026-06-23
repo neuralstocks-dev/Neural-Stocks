@@ -658,10 +658,10 @@ export default function UserManualPage() {
                         You'll automatically be taken to the verdict page. Don't panic at the
                         amount of detail — Section 2.4 walks you through what every section means.
                     </Step>
-                    <Callout tone="warn" title="Free tier — 1 analysis per day">
-                        Your first verdict consumes your daily Free quota. If you want to keep
-                        researching, you'll see a friendly upgrade hint pointing at the Week Pass
-                        ($9 for 7 days, 10 verdicts/day) or Pro plan.
+                    <Callout tone="warn" title="Free tier — 3 analyses per day">
+                        Your free quota resets every 24 hours. If you need more analyses,
+                        the Week Pass ($4.99 for 7 days, 10 verdicts/day) or Pro plan unlocks
+                        higher limits and batch features.
                     </Callout>
                 </Section>
 
@@ -999,14 +999,14 @@ export default function UserManualPage() {
                             </thead>
                             <tbody style={{ color: "hsl(var(--text-secondary))" }}>
                                 {[
-                                    ["Analyses / day", "1", "10", "20", "Unlimited"],
-                                    ["Watchlist size", "5", "10", "25", "Unlimited"],
+                                    ["Analyses / day", "3", "10", "15", "50"],
+                                    ["Watchlist size", "5", "10", "25", "500"],
                                     ["Three analysis modes", "✓", "✓", "✓", "✓"],
                                     ["Telegram alerts", "✓", "✓", "✓", "✓"],
-                                    ["Pattern Scan", "—", "✓", "✓", "✓"],
-                                    ["Top 3 / Bottom 3 sweep", "—", "✓", "✓", "✓"],
+                                    ["Pattern Scan", "—", "—", "✓", "✓"],
+                                    ["Top 3 / Bottom 3 sweep", "—", "—", "✓", "✓"],
                                     ["RF Auto-Scan", "—", "—", "✓", "✓"],
-                                    ["PDF export (full report)", "—", "✓", "✓", "✓"],
+                                    ["PDF export (full report)", "✓", "✓", "✓", "✓"],
                                     ["Trade Slip PDF", "✓", "✓", "✓", "✓"],
                                     ["Share verdict (public URL)", "✓", "✓", "✓", "✓"],
                                     ["Backtesting Lab", "—", "✓", "✓", "✓"],
