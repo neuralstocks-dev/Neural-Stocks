@@ -159,19 +159,23 @@ export default function PublicTryVerdictPage() {
                 }
             } catch (e) {
                 if (!cancelled) {
-                    const rawErr = e?.response?.data?.detail || e?.message || "";
-                    // Never show raw technical errors to users
-                    let friendlyErr = "Analysis failed. Please try again.";
-                    if (rawErr.includes("No data for ticker")) {
-                        friendlyErr = "Ticker not found. Check the symbol and try again.";
+                    const detail = e?.response?.data?.detail;
+                    const status = e?.response?.status;
+                    // detail can be a string or a structured dict
+                    const rawErr = typeof detail === "string"
+                        ? detail
+                        : (detail?.message || detail?.code || e?.message || "");
+                    // 503 circuit breaker — AI provider temporarily degraded
+                    if (status === 503) {
+                        setError("Our AI is temporarily busy. Please try again in a moment.");
                     } else if (rawErr.includes("429") || rawErr.includes("rate limit")) {
-                        friendlyErr = "Too many requests. Please wait a moment and try again.";
-                    } else if (rawErr.includes("budget") || rawErr.includes("quota")) {
-                        friendlyErr = "Daily limit reached. Sign up for more analyses.";
-                    } else if (rawErr.includes("already used") || rawErr.includes("limit")) {
-                        friendlyErr = rawErr; // User-facing quota messages are already friendly
+                        setError("Too many requests. Please wait a moment and try again.");
+                    } else if (rawErr.includes("budget") || rawErr.includes("quota") || rawErr.includes("already used") || rawErr.includes("limit")) {
+                        setError(rawErr);
+                    } else {
+                        // Pass raw error through so render-level classifier works
+                        setError(rawErr || "Analysis failed. Please try again.");
                     }
-                    setError(friendlyErr);
                     setLoading(false);
                 }
             }
