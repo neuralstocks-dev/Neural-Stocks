@@ -16,11 +16,6 @@ const BG_IMAGE =
     "https://static.prod-images.emergentagent.com/jobs/449d5842-eb76-413d-bd7e-07775c2311fa/images/da6e03e36e932405f471d2bb00616910cb10e5c8d593c7714da3cd482bc97e88.png";
 
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-function googleSignIn() {
-    const redirectUrl = window.location.origin + "/dashboard";
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-}
-
 export default function SignupPage() {
     const { user, signup, bootstrapping } = useAuth();
     const navigate = useNavigate();

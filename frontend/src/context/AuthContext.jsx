@@ -20,7 +20,6 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         if (bootstrappedRef.current) return;
         bootstrappedRef.current = true;
-        // If we're returning from Google OAuth, skip bootstrap — AuthCallback will handle it
         if (window.location.hash?.includes("session_id=")) {
             setBootstrapping(false);
             return;
@@ -116,14 +115,6 @@ export function AuthProvider({ children }) {
         return data.user;
     }, []);
 
-    const exchangeGoogleSession = useCallback(async (session_id) => {
-        const { data } = await api.post("/auth/google/session", { session_id });
-        localStorage.setItem("sai_token", data.token);
-        localStorage.setItem("sai_user", JSON.stringify(data.user));
-        setUser(data.user);
-        return data.user;
-    }, []);
-
     const refreshUser = useCallback(async () => {
         try {
             const r = await api.get("/auth/me");
@@ -142,8 +133,8 @@ export function AuthProvider({ children }) {
     }, []);
 
     const value = useMemo(
-        () => ({ user, bootstrapping, login, signup, logout, exchangeGoogleSession, refreshUser }),
-        [user, bootstrapping, login, signup, logout, exchangeGoogleSession, refreshUser]
+        () => ({ user, bootstrapping, login, signup, logout, refreshUser }),
+        [user, bootstrapping, login, signup, logout, refreshUser]
     );
 
     return (
