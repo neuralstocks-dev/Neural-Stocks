@@ -46,6 +46,10 @@ jobs:
           FINNHUB_API_KEY: ""
           MONGO_URL: "mongodb://127.0.0.1:27017"
           DB_NAME: "ci_dummy"
+          JWT_SECRET: "ci-dummy-secret-not-used-in-unit-tests"
+          OPENROUTER_API_KEY: "ci-dummy"
+          PAYPAL_LIVE_CLIENT_ID: "ci-dummy"
+          PAYPAL_LIVE_SECRET: "ci-dummy"
         run: |
           python -m pytest tests/test_finnhub_contract.py::TestFinnhubServiceUnits -v --tb=short
 
