@@ -73,9 +73,41 @@ export default function PublicTryVerdictPage() {
                 if (jobStatus === "error") {
                     if (!cancelled) {
                         const jobErr = body?._job?.error || "";
-                        let jobErrFriendly = "Analysis failed. Please try another ticker.";
-                        if (jobErr.includes("No data for ticker")) {
-                            jobErrFriendly = "Ticker not found. Check the symbol and try again.";
+                        // Pass raw jobErr as the error so the render-level
+                        // classifier (isQuotaError, isHistoryError, etc.) can
+                        // match it correctly. Only override for truly opaque errors.
+                        const jobErrFriendly = jobErr || "Analysis failed. Please try another ticker.";
+                        // Auto-retry once on soft failures (yfinance empty history,
+                        // cold-start transient) before showing an error to the user.
+                        const isSoftFail = jobErr.includes("trading history") ||
+                            jobErr.includes("slow right now") ||
+                            jobErr.includes("try again");
+                        if (isSoftFail && attempts === 0) {
+                            // Wait 3s then restart the whole analysis
+                            setTimeout(async () => {
+                                if (cancelled) return;
+                                try {
+                                    const retry = await axios.post(
+                                        `${API}/api/try/analysis/${encodeURIComponent(params.ticker)}?mode=hybrid`,
+                                        null,
+                                        { validateStatus: (s) => s === 200 || s === 202 },
+                                    );
+                                    if (retry.status === 202 && retry.data?.job_id) {
+                                        pollJob(retry.data.job_id, 1); // mark as retry so we don't loop
+                                        return;
+                                    }
+                                    if (!cancelled && retry.data) {
+                                        setData(retry.data);
+                                        setLoading(false);
+                                        setProgress(null);
+                                    }
+                                } catch {
+                                    setError(jobErrFriendly);
+                                    setLoading(false);
+                                }
+                            }, 3000);
+                            setProgress({ label: "Retrying\u2026", offset: null, attempt: 0 });
+                            return;
                         }
                         setError(jobErrFriendly);
                         setLoading(false);
