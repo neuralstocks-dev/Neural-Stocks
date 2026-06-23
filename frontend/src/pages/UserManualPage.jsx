@@ -976,45 +976,44 @@ export default function UserManualPage() {
                     readMins={5}
                 />
 
-                <Section id="plans" icon={BarChart3} kicker="5.1" title="Free · Pro · Elite · Week Pass">
+                <Section id="plans" icon={BarChart3} kicker="5.1" title="Guest · Free · Pro · Elite · Week Pass">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        All tiers get the full AI verdict, all 3 analysis modes, Telegram alerts,
-                        and the published Score Card. Higher tiers buy you <em>more of it</em> —
-                        bigger watchlist, more analyses per day, batch sweeps, PDF export. The
-                        numbers below always reflect what the backend actually enforces.
+                        You can try one analysis without creating an account. Signing up unlocks
+                        your full daily quota, watchlist, and all features. Higher tiers buy you{" "}
+                        <em>more of it</em> — bigger watchlist, more analyses per day, batch sweeps.
+                        The numbers below always reflect what the backend actually enforces.
                     </p>
-                    <div
-                        className="mt-5 overflow-x-auto"
-                        data-testid="manual-plans-table"
-                    >
+                    <div className="mt-5 overflow-x-auto" data-testid="manual-plans-table">
                         <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
                             <thead>
                                 <tr style={{ borderBottom: "1px solid hsl(var(--border-default))" }}>
-                                    <th className="text-left p-2 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>Feature</th>
-                                    <th className="text-left p-2 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>Free</th>
-                                    <th className="text-left p-2 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>Week Pass</th>
-                                    <th className="text-left p-2 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>Pro</th>
-                                    <th className="text-left p-2 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>Elite</th>
+                                    {["Feature","Guest","Free","Week Pass","Pro","Elite"].map(h => (
+                                        <th key={h} className="text-left p-2 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>{h}</th>
+                                    ))}
                                 </tr>
                             </thead>
                             <tbody style={{ color: "hsl(var(--text-secondary))" }}>
                                 {[
-                                    ["Analyses / day", "3", "10", "15", "50"],
-                                    ["Watchlist size", "5", "10", "25", "500"],
-                                    ["Three analysis modes", "✓", "✓", "✓", "✓"],
-                                    ["Telegram alerts", "✓", "✓", "✓", "✓"],
-                                    ["Pattern Scan", "—", "—", "✓", "✓"],
-                                    ["Top 3 / Bottom 3 sweep", "—", "—", "✓", "✓"],
-                                    ["RF Auto-Scan", "—", "—", "✓", "✓"],
-                                    ["PDF export (full report)", "✓", "✓", "✓", "✓"],
-                                    ["Trade Slip PDF", "✓", "✓", "✓", "✓"],
-                                    ["Share verdict (public URL)", "✓", "✓", "✓", "✓"],
-                                    ["Backtesting Lab", "—", "✓", "✓", "✓"],
-                                    ["Portfolio P&L", "✓", "✓", "✓", "✓"],
-                                ].map(([feat, f, w, p, e]) => (
+                                    ["Account required",           "No",       "\u2713", "\u2713", "\u2713", "\u2713"],
+                                    ["Analyses / day",             "1 *",      "3",       "10",      "15",      "50"],
+                                    ["Verdict detail",             "Preview",  "Full",    "Full",    "Full",    "Full"],
+                                    ["Watchlist",                  "\u2014",  "5",       "10",      "25",      "500"],
+                                    ["Three analysis modes",       "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
+                                    ["Telegram alerts",            "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
+                                    ["Pattern Scan",               "\u2014",  "\u2014", "\u2014", "\u2713", "\u2713"],
+                                    ["Top 3 / Bottom 3 sweep",    "\u2014",  "\u2014", "\u2014", "\u2713", "\u2713"],
+                                    ["RF Auto-Scan",               "\u2014",  "\u2014", "\u2014", "\u2713", "\u2713"],
+                                    ["PDF export (full report)",   "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
+                                    ["Trade Slip PDF",             "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
+                                    ["Share verdict (public URL)", "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
+                                    ["Backtesting Lab",            "\u2014",  "\u2014", "\u2713", "\u2713", "\u2713"],
+                                    ["Portfolio P&L",              "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
+                                    ["Score Card",                 "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
+                                ].map(([feat, g, fr, w, p, e]) => (
                                     <tr key={feat} style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
                                         <td className="p-2">{feat}</td>
-                                        <td className="p-2 font-mono text-[12px]">{f}</td>
+                                        <td className="p-2 font-mono text-[12px]" style={{ color: g === "\u2014" ? "hsl(var(--text-muted))" : undefined }}>{g}</td>
+                                        <td className="p-2 font-mono text-[12px]">{fr}</td>
                                         <td className="p-2 font-mono text-[12px]">{w}</td>
                                         <td className="p-2 font-mono text-[12px]">{p}</td>
                                         <td className="p-2 font-mono text-[12px]">{e}</td>
@@ -1022,20 +1021,18 @@ export default function UserManualPage() {
                                 ))}
                             </tbody>
                         </table>
+                        <p className="mt-3 font-mono text-[10px]" style={{ color: "hsl(var(--text-muted))", letterSpacing: "0.05em" }}>
+                            * Guest: 1 free analysis per IP per 24h, no account needed. Result is a preview — verdict and confidence score only. Sign up for the full report.
+                        </p>
                     </div>
                     <Callout tone="info" title="Week Pass — the no-commitment power-up">
-                        Need a full week of paid-tier power without committing to a monthly?
-                        Buy a one-time <strong>Week Pass</strong> ($9, valid 7 days) — 10 analyses
-                        per day, 10 watchlist tickers, PDF export, Backtesting access, share
-                        verdicts.
+                        Need a full week of paid-tier power without a monthly commitment?
+                        Buy a one-time <strong>Week Pass</strong> ($4.99, valid 7 days) — 10 analyses
+                        per day, 10-stock watchlist, PDF export, Backtesting access, and share verdicts.
                     </Callout>
-                    <p className="text-sm mt-4" style={{ color: "hsl(var(--text-muted))" }}>
-                        Always-current pricing &amp; full feature comparison:{" "}
-                        <Link to="/pricing" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>/pricing</Link>.
-                    </p>
                 </Section>
 
-                <Section id="settings" icon={SettingsIcon} kicker="5.2" title="Settings & account">
+                                <Section id="settings" icon={SettingsIcon} kicker="5.2" title="Settings & account">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                         Open <Link to="/settings" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>Settings</Link>{" "}
                         from the avatar in the top-right of any page. The screen is grouped into
