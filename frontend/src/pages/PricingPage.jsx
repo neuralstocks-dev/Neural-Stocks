@@ -12,7 +12,7 @@ const FEATURE_MATRIX = [
     { label: "Analyses / day", key: "analyses_per_day" },
     { label: "Analyses / week", key: "analyses_per_week" },
     { label: "Standard AI analysis", key: "__always", type: "bool" },
-    { label: "Candlestick & Hybrid (AI + Candlestick) modes", key: "quick_actions", type: "bool" },
+    { label: "Candlestick & Hybrid analysis modes", key: "__always", type: "bool" },
     { label: "Watchlist pattern scan (15 candlestick patterns)", key: "quick_actions", type: "bool" },
     { label: "Quick batch sweep (Top / Bottom 3)", key: "quick_actions", type: "bool" },
     { label: "Public share verdicts", key: "share_verdicts", type: "bool" },
@@ -445,7 +445,9 @@ export default function PricingPage() {
                                             </FeatureLi>
                                             <FeatureLi>Standard AI analysis mode</FeatureLi>
                                             <FeatureLi>Candlestick & Hybrid analysis modes</FeatureLi>
-                                            <FeatureLi>Watchlist pattern scan (15 patterns)</FeatureLi>
+                                            <FeatureLi enabled={p.quick_actions}>
+                                                Watchlist pattern scan (15 patterns)
+                                            </FeatureLi>
                                             <FeatureLi enabled={p.quick_actions}>
                                                 Quick batch sweep (Top / Bottom 3)
                                             </FeatureLi>
@@ -625,7 +627,9 @@ export default function PricingPage() {
                                     <FeatureLi>{daypass.watchlist_limit} stock watchlist</FeatureLi>
                                     <FeatureLi>Standard AI analysis mode</FeatureLi>
                                     <FeatureLi>Candlestick &amp; Hybrid analysis modes</FeatureLi>
-                                    <FeatureLi>Watchlist pattern scan (15 patterns)</FeatureLi>
+                                    <FeatureLi enabled={daypass.quick_actions}>
+                                        Watchlist pattern scan (15 patterns)
+                                    </FeatureLi>
                                     <FeatureLi>
                                         {daypass.share_per_day === null
                                             ? "Unlimited share verdicts"
