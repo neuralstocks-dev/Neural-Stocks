@@ -131,15 +131,18 @@ async def get_quote(ticker: str) -> dict:
         fh_data = None
     if isinstance(yf_data, Exception) or not isinstance(yf_data, dict):
         yf_data = {}
-    # Safety net: a cold yf.Ticker() session occasionally returns an empty/
-    # priceless dict on the very first call after backend idle (Yahoo's edge
-    # intermittently drops the first burst of fresh-session requests). One
-    # retry here is cheap and avoids surfacing a hard failure to the user
-    # for what's almost always resolved by trying again immediately.
+    # Safety net: yfinance intermittently returns empty/priceless dicts,
+    # especially after Yahoo Finance API changes (confirmed broken for US
+    # tickers mid-2025 onwards without Finnhub fallback). Retry up to 3×
+    # with a short backoff before giving up — cheap and avoids surfacing
+    # transient Yahoo rate-limit blips as hard failures to the user.
     if not yf_data.get("price"):
-        retry_data = await asyncio.to_thread(_yf_quote_sync, ticker)
-        if isinstance(retry_data, dict) and retry_data.get("price"):
-            yf_data = retry_data
+        for _attempt in range(3):
+            await asyncio.sleep(1.0 * (_attempt + 1))  # 1s, 2s, 3s backoff
+            retry_data = await asyncio.to_thread(_yf_quote_sync, ticker)
+            if isinstance(retry_data, dict) and retry_data.get("price"):
+                yf_data = retry_data
+                break
     merged = dict(yf_data)
     if isinstance(fh_data, dict) and fh_data.get("price") is not None:
         # Prefer Finnhub for live market data
