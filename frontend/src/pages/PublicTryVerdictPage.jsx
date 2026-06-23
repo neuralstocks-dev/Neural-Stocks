@@ -206,18 +206,46 @@ export default function PublicTryVerdictPage() {
                     </div>
                 )}
 
-                {!loading && error && (
-                    <div className="py-24 text-center">
-                        <AlertTriangle className="mx-auto mb-3" size={20} style={{ color: "hsl(var(--sell))" }} />
-                        <p className="text-overline" style={{ color: "hsl(var(--sell))" }}>{error}</p>
-                        <p className="mt-4 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                            The ticker may be invalid or outside our coverage. Try another one after signing up.
-                        </p>
-                        <Link to="/signup" className="btn-primary mt-6 inline-flex">
-                            Sign up to analyse any stock →
-                        </Link>
-                    </div>
-                )}
+                {!loading && error && (() => {
+                    const isQuotaError = error.includes("limit") || error.includes("quota") || error.includes("Too many") || error.includes("Sign up for more");
+                    const isServerError = error.includes("taking longer") || error.includes("Lost connection") || error.includes("try again");
+                    const isTickerError = error.includes("not found") || error.includes("invalid");
+                    return (
+                        <div className="py-24 text-center max-w-sm mx-auto">
+                            <AlertTriangle className="mx-auto mb-3" size={20} style={{ color: "hsl(var(--sell))" }} />
+                            <p className="text-overline" style={{ color: "hsl(var(--sell))" }}>
+                                {isQuotaError ? "FREE ANALYSIS USED" : isServerError ? "ANALYSIS TIMED OUT" : isTickerError ? "TICKER NOT FOUND" : "ANALYSIS FAILED"}
+                            </p>
+                            <p className="mt-4 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
+                                {isQuotaError
+                                    ? "You've already used your free analysis today. Sign up to run 3 analyses per day — free forever."
+                                    : isServerError
+                                    ? "The analysis took too long. This can happen during peak load. Try again in a moment."
+                                    : isTickerError
+                                    ? `We couldn't find data for that ticker. Double-check the symbol (e.g. BBCA.JK for Indonesian stocks, AAPL for US stocks).`
+                                    : `Something went wrong on our end — not your ticker. Try again or pick a different stock.`}
+                            </p>
+                            {isQuotaError ? (
+                                <Link to="/signup" className="btn-primary mt-6 inline-flex" data-testid="try-error-signup">
+                                    Sign up free — 3 analyses/day →
+                                </Link>
+                            ) : (
+                                <div className="mt-6 flex flex-col items-center gap-3">
+                                    <Link
+                                        to={`/try/${encodeURIComponent(params.ticker || "AAPL")}`}
+                                        onClick={() => { window.location.href = `/try/${encodeURIComponent(params.ticker || "AAPL")}`; }}
+                                        className="btn-ghost !text-xs"
+                                    >
+                                        Try {(params.ticker || "").toUpperCase()} again →
+                                    </Link>
+                                    <Link to="/signup" className="btn-primary inline-flex" data-testid="try-error-signup">
+                                        Sign up for more analyses →
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
 
                 {!loading && a && (
                     <>
