@@ -23,12 +23,13 @@
 export const RESOURCES = [
     {
         slug: "user-manual",
-        kind: "link",
+        kind: "pdf",
         title: "User Manual",
         teaser: "Complete guide to using Neural Stock Intelligence effectively — how the AI works, how to read verdicts, do's and don'ts, and what to watch out for.",
-        ctaLabel: "Read Manual",
-        url: "/manual",
-        meta: { pages: "5 parts", priceLabel: "Free · No account required" },
+        ctaLabel: "Download PDF",
+        downloadUrl: "/resources/neural-stock-intelligence-user-manual-v1.pdf",
+        downloadFilename: "Neural-Stock-Intelligence-User-Manual.pdf",
+        meta: { pages: "5 parts", size: "~176 KB", priceLabel: "Free · No email required" },
         heroQuote: "Understanding the tool makes every verdict more useful.\nThis manual explains not just what the AI says — but how it thinks.",
         body: [
             {
@@ -73,8 +74,8 @@ export const RESOURCES = [
                 type: "section",
                 heading: "Available formats",
                 items: [
-                    "In-app: Read the full manual at stock.neulab.xyz/manual with live navigation and section anchors",
-                    "Word document: Download the complete manual as a .docx file from the Resources page for offline reading or sharing",
+                    "PDF download: Download this manual as a PDF for offline reading or sharing — no email required",
+                    "In-app: Read the full interactive manual at stock.neulab.xyz/manual with live navigation and section anchors",
                 ],
             },
         ],
