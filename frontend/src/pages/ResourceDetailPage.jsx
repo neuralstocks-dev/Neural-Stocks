@@ -214,7 +214,7 @@ export default function ResourceDetailPage() {
                             style={{ color: "hsl(var(--text-muted))" }}
                         >
                             {resource.meta.priceLabel && <span>{resource.meta.priceLabel}</span>}
-                            {resource.meta.pages && <span>· {resource.meta.pages} pages</span>}
+                            {resource.meta.pages && <span>· {resource.meta.pages}</span>}
                             {resource.meta.size && <span>· {resource.meta.size}</span>}
                         </p>
                     )}

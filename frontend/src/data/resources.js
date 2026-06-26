@@ -91,7 +91,7 @@ export const RESOURCES = [
         // CRA, so the URL ends up at https://<host>/resources/<file>.
         downloadUrl: "/resources/stock-market-decoded-v1.pdf",
         downloadFilename: "The_Stock_Market_Decoded_v1.0.pdf",
-        meta: { pages: "~120", size: "~650 KB", priceLabel: "Free · No email required" },
+        meta: { pages: "~120 pages", size: "~650 KB", priceLabel: "Free · No email required" },
         // Detail-page hero quote — sits above everything else.
         heroQuote: "Most investing books teach you how to think about markets.\nThis one shows you the machine that reads them.",
         body: [
