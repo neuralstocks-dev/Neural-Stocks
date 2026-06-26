@@ -1,109 +1,47 @@
-/**
- * UserManualPage — beginner-friendly, professional walkthrough.
- *
- * Audience: someone new to stock-market analysis who opens Neural Stock
- * Intelligence™ for the first time. Goal: read this once and confidently
- * navigate every feature.
- *
- * Structure: 5 parts, 19 sections, organised from foundational concepts
- * to power features. Every section has a clear objective, plain-English
- * prose, and direct links to the screens being described. Sections in
- * Parts 1-2 require zero prior knowledge.
- */
-import React from "react";
+// NOTE: This file is intentionally long — it is the full in-app user manual.
+// Do not split into sub-components without updating the TOC anchor logic.
+
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import RightRailTOC from "@/components/RightRailTOC";
 import {
-    LineChart,
-    Sparkles,
-    Eye,
-    BellRing,
-    Briefcase,
-    Award,
-    Layers,
-    Bot,
-    AlertTriangle,
-    Info,
-    ArrowRight,
-    Check,
-    BookOpen,
-    Compass,
-    UserCheck,
-    Telescope,
-    Settings as SettingsIcon,
-    HelpCircle,
-    History,
-    Globe2,
-    GraduationCap,
-    Search,
-    BarChart3,
+    AlertTriangle, Award, BarChart3, BellRing, BookOpen, Briefcase,
+    Check, ChevronRight, Compass, GraduationCap, HelpCircle, History,
+    Info, Layers, LineChart, Search, Settings as SettingsIcon, Sparkles,
+    Eye, Telescope, UserCheck, X, TrendingUp, ShieldAlert, Lightbulb,
+    Target, Zap, Clock, AlertCircle,
 } from "lucide-react";
 
-// ---------- Section building blocks ----------
+/* ─── tiny primitives ─────────────────────────────────────────────────────── */
 
-function StepNumber({ n }) {
+function Callout({ tone = "info", title, children }) {
+    const cfg = {
+        info:  { icon: Info,         bg: "hsla(210,80%,50%,0.06)", border: "hsl(210,80%,55%)", text: "hsl(210,80%,65%)" },
+        tip:   { icon: Lightbulb,    bg: "hsla(145,60%,40%,0.06)", border: "hsl(145,55%,45%)", text: "hsl(145,55%,55%)" },
+        warn:  { icon: AlertTriangle, bg: "hsla(38,85%,50%,0.06)", border: "hsl(38,85%,55%)",  text: "hsl(38,85%,60%)"  },
+        danger:{ icon: ShieldAlert,  bg: "hsla(0,70%,50%,0.06)",  border: "hsl(0,70%,55%)",   text: "hsl(0,70%,60%)"   },
+    };
+    const { icon: Icon, bg, border, text } = cfg[tone] || cfg.info;
     return (
-        <span
-            className="inline-flex items-center justify-center font-mono text-xs"
-            style={{
-                width: 28,
-                height: 28,
-                border: "1px solid hsl(var(--hold))",
-                color: "hsl(var(--hold))",
-                borderRadius: 999,
-                flexShrink: 0,
-            }}
-            data-testid={`step-${n}`}
-        >
-            {n}
-        </span>
+        <div className="mt-5 p-4 text-sm leading-relaxed"
+            style={{ background: bg, borderLeft: `3px solid ${border}`, color: "hsl(var(--text-secondary))" }}>
+            <p className="font-semibold mb-1 flex items-center gap-2" style={{ color: text }}>
+                <Icon size={13} strokeWidth={2} />{title}
+            </p>
+            {children}
+        </div>
     );
 }
 
 function Step({ n, title, children }) {
     return (
-        <div className="flex items-start gap-4 mt-6">
-            <StepNumber n={n} />
-            <div className="min-w-0 flex-1">
-                <h4 className="font-serif text-base" style={{ letterSpacing: "-0.005em" }}>
-                    {title}
-                </h4>
-                <div
-                    className="text-sm mt-2 leading-relaxed"
-                    style={{ color: "hsl(var(--text-secondary))" }}
-                >
-                    {children}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function Callout({ tone = "info", title, children }) {
-    const color =
-        tone === "warn" ? "hsl(var(--sell))" : tone === "tip" ? "hsl(var(--buy))" : "hsl(var(--hold))";
-    const Icon = tone === "warn" ? AlertTriangle : tone === "tip" ? Check : Info;
-    return (
-        <div
-            className="mt-5 p-4"
-            style={{
-                border: `1px solid ${color}`,
-                borderLeftWidth: 4,
-                background: "hsl(var(--surface-elevated))",
-                borderRadius: 2,
-            }}
-        >
-            <p
-                className="text-overline flex items-center gap-2"
-                style={{ color, fontSize: "0.6rem" }}
-            >
-                <Icon size={12} strokeWidth={2} /> {title}
-            </p>
-            <div
-                className="text-sm mt-2 leading-relaxed"
-                style={{ color: "hsl(var(--text-secondary))" }}
-            >
-                {children}
+        <div className="mt-5 flex gap-4">
+            <span className="font-mono text-xs shrink-0 mt-0.5 w-6 h-6 flex items-center justify-center rounded-full"
+                style={{ background: "hsl(var(--surface-elevated))", color: "hsl(var(--text-muted))", border: "1px solid hsl(var(--border-default))" }}>
+                {n}
+            </span>
+            <div>
+                <p className="font-semibold text-sm mb-1" style={{ color: "hsl(var(--text-primary))" }}>{title}</p>
+                <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>{children}</p>
             </div>
         </div>
     );
@@ -111,875 +49,658 @@ function Callout({ tone = "info", title, children }) {
 
 function Section({ id, icon: Icon, title, kicker, children }) {
     return (
-        <section
-            id={id}
-            className="module p-6 md:p-8 mb-6"
-            data-testid={`manual-section-${id}`}
-            style={{ scrollMarginTop: 96 }}
-        >
-            <div className="flex items-start gap-3">
-                <Icon size={22} strokeWidth={1.5} style={{ color: "hsl(var(--hold))" }} />
-                <div>
-                    <p
-                        className="text-overline"
-                        style={{ color: "hsl(var(--text-muted))", fontSize: "0.56rem" }}
-                    >
-                        {kicker}
-                    </p>
-                    <h2
-                        className="font-serif"
-                        style={{ fontSize: "clamp(1.6rem, 3vw, 2.1rem)", letterSpacing: "-0.015em" }}
-                    >
-                        {title}
-                    </h2>
-                </div>
+        <section id={id} className="scroll-mt-24 pt-10 border-t" style={{ borderColor: "hsl(var(--border-divider))" }}>
+            <div className="flex items-center gap-2 mb-1">
+                {Icon && <Icon size={14} strokeWidth={1.5} style={{ color: "hsl(var(--accent-primary))" }} />}
+                <span className="font-mono text-[11px]" style={{ color: "hsl(var(--accent-primary))" }}>{kicker}</span>
             </div>
-            <div className="mt-4">{children}</div>
+            <h2 className="font-serif mb-5" style={{ fontSize: "1.65rem", letterSpacing: "-0.01em" }}>{title}</h2>
+            {children}
         </section>
     );
 }
 
-// Part divider — visually separates the 5 major parts of the manual.
-function PartDivider({ n, title, subtitle, readMins }) {
+function ChapterHeader({ title, subtitle }) {
     return (
-        <div className="mt-12 mb-6" data-testid={`manual-part-${n}`}>
-            <p
-                className="text-overline"
-                style={{ color: "hsl(var(--buy))", fontSize: "0.62rem" }}
-            >
-                Part {n} · {readMins} min read
-            </p>
-            <h2
-                className="font-serif mt-2"
-                style={{
-                    fontSize: "clamp(1.5rem, 2.6vw, 1.9rem)",
-                    letterSpacing: "-0.015em",
-                    color: "hsl(var(--text-primary))",
-                }}
-            >
-                {title}
-            </h2>
-            <p
-                className="mt-1 text-sm max-w-2xl"
-                style={{ color: "hsl(var(--text-muted))" }}
-            >
-                {subtitle}
-            </p>
-            <hr
-                className="mt-4"
-                style={{ borderColor: "hsl(var(--buy) / 0.3)", borderTopWidth: 2, width: 48 }}
-            />
+        <div className="pt-14 pb-2">
+            <p className="text-overline" style={{ color: "hsl(var(--accent-primary))" }}>{title}</p>
+            {subtitle && <p className="mt-1 text-sm" style={{ color: "hsl(var(--text-muted))" }}>{subtitle}</p>}
         </div>
     );
 }
 
-function GlossaryRow({ term, plain, techAnchor, anchorId }) {
+function DosDonts({ dos, donts }) {
     return (
-        <div
-            id={anchorId}
-            className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2 sm:gap-4 py-3 scroll-mt-24"
-            style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
-            data-testid={`manual-glossary-row-${anchorId?.replace(/^glossary-/, "") || ""}`}
-        >
-            <p
-                className="font-mono text-[12px]"
-                style={{ color: "hsl(var(--text-primary))", fontWeight: 500 }}
-            >
-                {term}
-            </p>
-            <div>
-                <p className="text-sm" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.6 }}>
-                    {plain}
-                </p>
-                {techAnchor && (
-                    <Link
-                        to={`/technical#${techAnchor}`}
-                        className="inline-flex items-center gap-1 mt-1.5 font-mono text-[11px] link-underline"
-                        style={{ color: "hsl(var(--hold))" }}
-                        data-testid={`manual-glossary-deepdive-${anchorId?.replace(/^glossary-/, "") || ""}`}
-                    >
-                        Deep dive — methodology <span aria-hidden>→</span>
-                    </Link>
-                )}
+        <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 text-sm" style={{ background: "hsla(145,55%,40%,0.06)", border: "1px solid hsla(145,55%,45%,0.3)" }}>
+                <p className="font-mono text-[11px] mb-3" style={{ color: "hsl(145,55%,55%)", letterSpacing: "0.08em" }}>DO</p>
+                <ul className="space-y-2">
+                    {dos.map((d, i) => (
+                        <li key={i} className="flex gap-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                            <Check size={12} strokeWidth={2} className="shrink-0 mt-0.5" style={{ color: "hsl(145,55%,55%)" }} />
+                            {d}
+                        </li>
+                    ))}
+                </ul>
+            </div>
+            <div className="p-4 text-sm" style={{ background: "hsla(0,70%,50%,0.06)", border: "1px solid hsla(0,70%,55%,0.3)" }}>
+                <p className="font-mono text-[11px] mb-3" style={{ color: "hsl(0,70%,60%)", letterSpacing: "0.08em" }}>DON'T</p>
+                <ul className="space-y-2">
+                    {donts.map((d, i) => (
+                        <li key={i} className="flex gap-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                            <X size={12} strokeWidth={2} className="shrink-0 mt-0.5" style={{ color: "hsl(0,70%,60%)" }} />
+                            {d}
+                        </li>
+                    ))}
+                </ul>
             </div>
         </div>
     );
 }
 
-function FAQItem({ q, children }) {
+function WatchOut({ items }) {
     return (
-        <details
-            className="group py-3"
-            style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
-            data-testid="manual-faq-item"
-        >
-            <summary
-                className="cursor-pointer text-sm font-medium flex items-start gap-2 list-none"
-                style={{ color: "hsl(var(--text-primary))" }}
-            >
-                <span
-                    className="text-[10px] font-mono mt-1.5 transition-transform group-open:rotate-90"
-                    style={{ color: "hsl(var(--hold))" }}
-                >
-                    ▶
-                </span>
-                <span className="flex-1">{q}</span>
-            </summary>
-            <div
-                className="text-sm mt-2 ml-5 leading-relaxed"
-                style={{ color: "hsl(var(--text-secondary))" }}
-            >
-                {children}
-            </div>
-        </details>
+        <div className="mt-5 space-y-3">
+            {items.map((item, i) => (
+                <div key={i} className="flex gap-3 p-3 text-sm" style={{ background: "hsla(38,85%,50%,0.05)", border: "1px solid hsla(38,85%,55%,0.2)" }}>
+                    <AlertCircle size={13} strokeWidth={2} className="shrink-0 mt-0.5" style={{ color: "hsl(38,85%,60%)" }} />
+                    <span style={{ color: "hsl(var(--text-secondary))" }}>{item}</span>
+                </div>
+            ))}
+        </div>
     );
 }
 
-// ---------- TOC structure (also drives the page render order via SECTIONS) ----------
+/* ─── TOC ────────────────────────────────────────────────────────────────── */
+
 const TOC = [
-    {
-        part: 1,
-        title: "Get oriented",
-        subtitle: "If you've never analysed a stock before — start here. No jargon, no assumptions.",
-        readMins: 5,
-        sections: [
-            ["welcome", "1.1 · Welcome"],
-            ["primer", "1.2 · Stock-market primer"],
-            ["glossary", "1.3 · Glossary — speak the language"],
-        ],
-    },
-    {
-        part: 2,
-        title: "Getting started",
-        subtitle: "From sign-up to your first verdict in under five minutes.",
-        readMins: 4,
-        sections: [
-            ["signup", "2.1 · Sign up &amp; onboarding"],
-            ["dashboard", "2.2 · The Dashboard tour"],
-            ["first-analysis", "2.3 · Run your first analysis"],
-            ["verdict-anatomy", "2.4 · Read the verdict page"],
-        ],
-    },
-    {
-        part: 3,
-        title: "Daily workflow",
-        subtitle: "The four screens you'll use every time you research a stock.",
-        readMins: 8,
-        sections: [
-            ["modes", "3.1 · Three analysis modes"],
-            ["watchlist", "3.2 · Watchlist &amp; batch sweeps"],
-            ["pattern-scan", "3.3 · Pattern Scan"],
-            ["alerts", "3.4 · Alerts &amp; Telegram"],
-        ],
-    },
-    {
-        part: 4,
-        title: "Power features",
-        subtitle: "Modules for tracking real positions and stress-testing the system.",
-        readMins: 6,
-        sections: [
-            ["portfolio", "4.1 · Portfolio P&amp;L"],
-            ["scorecard", "4.2 · Score Card"],
-            ["backtest", "4.3 · Backtesting Lab"],
-            ["idx", "4.4 · IDX exclusives — Bandarmology &amp; Top Picks"],
-        ],
-    },
-    {
-        part: 5,
-        title: "Reference",
-        subtitle: "Plans, settings, FAQ, and the legal bits.",
-        readMins: 5,
-        sections: [
-            ["plans", "5.1 · Free · Pro · Elite · Week Pass"],
-            ["settings", "5.2 · Settings &amp; account"],
-            ["faq", "5.3 · FAQ &amp; troubleshooting"],
-            ["disclaimer", "5.4 · Important disclaimer"],
-        ],
-    },
+    { part: "Part 1 · Understanding the App", sections: [
+        ["welcome",       "1.1 · What this app does"],
+        ["how-it-works",  "1.2 · How the AI works"],
+        ["verdicts",      "1.3 · Reading verdicts correctly"],
+        ["confidence",    "1.4 · The confidence score"],
+        ["modes",         "1.5 · Three analysis modes"],
+        ["glossary",      "1.6 · Glossary"],
+    ]},
+    { part: "Part 2 · Getting Started", sections: [
+        ["signup",        "2.1 · Sign up & onboarding"],
+        ["dashboard",     "2.2 · Dashboard tour"],
+        ["first-analysis","2.3 · Your first analysis"],
+        ["verdict-anatomy","2.4 · Anatomy of a verdict page"],
+    ]},
+    { part: "Part 3 · Daily Workflow", sections: [
+        ["watchlist",     "3.1 · Watchlist & batch sweeps"],
+        ["pattern-scan",  "3.2 · Pattern Scan"],
+        ["alerts",        "3.3 · Alerts & Telegram"],
+        ["dos-donts",     "3.4 · Do's, Don'ts & Watch-outs"],
+    ]},
+    { part: "Part 4 · Power Features", sections: [
+        ["portfolio",     "4.1 · Portfolio P&L"],
+        ["scorecard",     "4.2 · Score Card"],
+        ["backtest",      "4.3 · Backtesting Lab"],
+        ["idx",           "4.4 · IDX exclusives"],
+    ]},
+    { part: "Part 5 · Reference", sections: [
+        ["plans",         "5.1 · Plans comparison"],
+        ["settings",      "5.2 · Settings & account"],
+        ["faq",           "5.3 · FAQ & troubleshooting"],
+        ["disclaimer",    "5.4 · Important disclaimer"],
+    ]},
 ];
 
-// Flat list of all section ids in scroll order — used by the TOC search & breadcrumb logic.
-const ALL_SECTION_IDS = TOC.flatMap((p) => p.sections.map(([id]) => id));
-
-// Build the right-rail TOC config from the same TOC source-of-truth, so the
-// inline TOC and the floating rail TOC can never drift out of sync. Strips
-// the leading "1.1 · " numbering from rail labels (the numbering is already
-// implicit from the group header) so the rail stays compact.
-const RAIL_SECTIONS = TOC.map((p) => ({
-    group: `Part ${p.part} · ${p.title}`,
-    items: p.sections.map(([id, label]) => ({
-        id,
-        // Strip "1.1 · " or similar number prefix; also decode the few HTML entities
-        // (&amp;) used in the inline TOC labels.
-        label: label
-            .replace(/^\d+\.\d+\s+·\s+/, "")
-            .replace(/&amp;/g, "&"),
-    })),
-}));
-
-// ---------- Page ----------
+/* ─── Page ───────────────────────────────────────────────────────────────── */
 
 export default function UserManualPage() {
-    return (
-        <>
-            <RightRailTOC
-                sections={RAIL_SECTIONS}
-                label="On this page"
-                testid="manual-rail-toc"
-                width={220}
-            />
-            <div className="max-w-4xl mx-auto px-4 md:px-8 py-12 md:py-16">
-                {/* Hero */}
-                <header className="mb-10" data-testid="manual-hero">
-                    <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
-                        User Manual · v2 · Updated Feb 2026
-                    </p>
-                    <h1
-                        className="font-serif mt-3"
-                        style={{
-                            fontSize: "clamp(2.2rem, 4.5vw, 3.4rem)",
-                            letterSpacing: "-0.025em",
-                            lineHeight: 1.05,
-                        }}
-                    >
-                        How to actually <em style={{ color: "hsl(var(--buy))" }}>use</em> Neural Stock Intelligence™.
-                    </h1>
-                    <p
-                        className="mt-5 text-base md:text-lg max-w-2xl"
-                        style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.65 }}
-                    >
-                        A complete, beginner-first walkthrough — five parts, nineteen sections,
-                        roughly 25 minutes end-to-end. Every section has a clear objective and
-                        direct links to the screens it describes. No prior trading experience
-                        assumed.
-                    </p>
-                    <div
-                        className="mt-6 inline-flex items-center gap-2 text-[12px] font-mono"
-                        style={{ color: "hsl(var(--text-muted))" }}
-                    >
-                        <BookOpen size={14} strokeWidth={1.5} /> {ALL_SECTION_IDS.length} sections ·
-                        <Globe2 size={14} strokeWidth={1.5} /> US + IDX coverage ·
-                        <GraduationCap size={14} strokeWidth={1.5} /> No prior experience needed
-                    </div>
-                </header>
+    const [activeId, setActiveId] = useState("welcome");
+    const observerRef = useRef(null);
 
-                {/* Quick-jump TOC — five-part hierarchy */}
-                <nav
-                    className="module p-5 mb-10"
-                    aria-label="Manual table of contents"
-                    data-testid="manual-toc"
-                >
-                    <p className="text-overline" style={{ color: "hsl(var(--text-muted))", fontSize: "0.56rem" }}>
-                        On this page
+    useEffect(() => {
+        const ids = TOC.flatMap(p => p.sections.map(s => s[0]));
+        observerRef.current = new IntersectionObserver(
+            (entries) => {
+                const visible = entries.filter(e => e.isIntersecting);
+                if (visible.length) setActiveId(visible[0].target.id);
+            },
+            { rootMargin: "-20% 0px -70% 0px" }
+        );
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) observerRef.current.observe(el);
+        });
+        return () => observerRef.current?.disconnect();
+    }, []);
+
+    return (
+        <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+            {/* Sidebar TOC */}
+            <aside className="hidden lg:block lg:col-span-3 sticky top-24 self-start max-h-[calc(100vh-6rem)] overflow-y-auto pr-2">
+                {TOC.map(({ part, sections }) => (
+                    <div key={part} className="mb-5">
+                        <p className="font-mono text-[10px] mb-2" style={{ color: "hsl(var(--accent-primary))", letterSpacing: "0.08em" }}>{part}</p>
+                        {sections.map(([id, label]) => (
+                            <a key={id} href={`#${id}`}
+                                className="block py-1 text-[12px] transition-colors"
+                                style={{ color: activeId === id ? "hsl(var(--text-primary))" : "hsl(var(--text-muted))", fontWeight: activeId === id ? 500 : 400 }}>
+                                {label}
+                            </a>
+                        ))}
+                    </div>
+                ))}
+            </aside>
+
+            {/* Content */}
+            <main className="lg:col-span-9 space-y-0">
+
+                <div className="mb-8">
+                    <p className="text-overline">Neural Stock Intelligence™</p>
+                    <h1 className="font-serif mt-2" style={{ fontSize: "2.4rem", letterSpacing: "-0.02em" }}>User Manual</h1>
+                    <p className="mt-3 text-sm leading-relaxed max-w-xl" style={{ color: "hsl(var(--text-secondary))" }}>
+                        Complete guide to using the platform effectively — including what the AI actually does, how to read verdicts correctly, and what to watch out for.
                     </p>
-                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
-                        {TOC.map((p) => (
-                            <div key={p.part} data-testid={`toc-part-${p.part}`}>
-                                <p
-                                    className="text-overline mb-2"
-                                    style={{ color: "hsl(var(--buy))", fontSize: "0.58rem" }}
-                                >
-                                    Part {p.part} — {p.title} · {p.readMins} min
-                                </p>
-                                <ul className="space-y-1.5">
-                                    {p.sections.map(([id, label]) => (
-                                        <li key={id}>
-                                            <a
-                                                href={`#${id}`}
-                                                className="font-mono text-[12px] link-underline"
-                                                style={{ color: "hsl(var(--text-secondary))" }}
-                                                data-testid={`toc-${id}`}
-                                                dangerouslySetInnerHTML={{ __html: label }}
-                                            />
-                                        </li>
-                                    ))}
-                                </ul>
+                </div>
+
+                {/* ══════════════════════════════════════════════
+                    PART 1 — UNDERSTANDING THE APP
+                ══════════════════════════════════════════════ */}
+                <ChapterHeader title="Part 1 · Understanding the App" subtitle="What this tool is, how it thinks, and how to read it correctly." />
+
+                <Section id="welcome" icon={Sparkles} kicker="1.1" title="What this app does for you">
+                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                        Neural Stock Intelligence is an AI-powered research assistant. It reads price history, technical indicators, candlestick patterns, fundamentals, and (for IDX stocks) insider filing data — then produces a structured research summary with a directional bias (BUY / HOLD / SELL) and a confidence score.
+                    </p>
+                    <p className="text-sm leading-relaxed mt-3" style={{ color: "hsl(var(--text-secondary))" }}>
+                        Think of it as a junior analyst that works 24/7 and never gets tired — but one whose output you must read critically, not blindly follow. The AI gives you a structured starting point. You still make the decision.
+                    </p>
+                    <Callout tone="danger" title="This is research, not advice">
+                        Neural Stock Intelligence is an educational research tool. Nothing it produces constitutes financial advice, a buy or sell recommendation, or a guarantee of any outcome. You are solely responsible for your investment decisions.
+                    </Callout>
+                </Section>
+
+                <Section id="how-it-works" icon={Layers} kicker="1.2" title="How the AI actually works">
+                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                        When you trigger an analysis, the backend runs three parallel data pipelines simultaneously, then feeds everything into a large language model:
+                    </p>
+                    <div className="mt-4 space-y-3">
+                        {[
+                            ["Technical pipeline", "Fetches up to 6 months of daily OHLCV price data. Computes RSI, MACD, Bollinger Bands, EMA crossovers, volume trends, and ATR. Identifies support/resistance levels and trend direction."],
+                            ["Fundamental pipeline", "Pulls P/E, P/B, EPS, revenue growth, debt/equity, and analyst consensus from financial data providers. For IDX stocks, also fetches quarterly filing data."],
+                            ["Candlestick pipeline", "Scans for 15 classic candlestick patterns (Hammer, Engulfing, Doji, Shooting Star, etc.) across daily and weekly timeframes simultaneously. Counts pattern quality and directional bias."],
+                            ["Bandarmology (IDX only)", "Cross-references institutional investor net-buy/sell filing data from IDX disclosures. Detects persistent accumulation or distribution signals."],
+                            ["LLM synthesis", "All outputs are assembled into a structured prompt and sent to DeepSeek's reasoning model. It weighs the evidence across all pillars, resolves contradictions, and produces the verdict JSON."],
+                        ].map(([name, desc]) => (
+                            <div key={name} className="flex gap-3 text-sm p-3" style={{ background: "hsl(var(--surface-elevated))", border: "1px solid hsl(var(--border-default))" }}>
+                                <ChevronRight size={13} strokeWidth={2} className="shrink-0 mt-0.5" style={{ color: "hsl(var(--accent-primary))" }} />
+                                <div>
+                                    <span className="font-semibold" style={{ color: "hsl(var(--text-primary))" }}>{name} — </span>
+                                    <span style={{ color: "hsl(var(--text-secondary))" }}>{desc}</span>
+                                </div>
                             </div>
                         ))}
                     </div>
-                </nav>
-
-                {/* ============================================================ */}
-                {/*                       PART 1 — GET ORIENTED                  */}
-                {/* ============================================================ */}
-                <PartDivider
-                    n={1}
-                    title="Get oriented"
-                    subtitle="If you've never analysed a stock before, start here. No jargon, no assumptions."
-                    readMins={5}
-                />
-
-                <Section id="welcome" icon={Sparkles} kicker="1.1" title="Welcome — what this app does for you">
-                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Neural Stock Intelligence™ gives you a <strong>second opinion on any stock</strong>,
-                        written by an AI that explains its reasoning. You give it a ticker (e.g.{" "}
-                        <code>AAPL</code> for Apple, or <code>BBCA.JK</code> for Indonesia's Bank Central
-                        Asia), and within roughly 45 seconds it produces a{" "}
-                        <strong style={{ color: "hsl(var(--buy))" }}>BUY</strong>,{" "}
-                        <strong style={{ color: "hsl(var(--hold))" }}>HOLD</strong>, or{" "}
-                        <strong style={{ color: "hsl(var(--sell))" }}>SELL</strong> verdict together
-                        with a confidence score (0–100%) and a paragraph-by-paragraph explanation of
-                        the actual reasons behind it.
-                    </p>
-                    <p className="text-sm mt-3 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Everything on this platform is built around <em>explainability</em>. You'll
-                        never see a number without being able to drill into how it was computed,
-                        which means you can argue with the model when you disagree — and that's
-                        exactly the point.
-                    </p>
-                    <Callout tone="info" title="Research tool, not a robo-broker">
-                        Neural Stock Intelligence™ does not place trades. It surfaces the reasoning, you make the
-                        decision. Final orders happen at your broker, on your timeline, under your own
-                        responsibility.
-                    </Callout>
+                    <WatchOut items={[
+                        "The LLM synthesises the inputs but does not have real-time market access — prices are fetched at analysis time and may be minutes behind live trading.",
+                        "The model cannot predict future prices. It classifies the current weight of evidence as bullish, bearish, or neutral. These are not the same thing.",
+                        "Fundamental data quality varies by market. US data from Yahoo Finance and Finnhub is generally reliable. IDX fundamental data can lag by one quarter.",
+                    ]} />
                 </Section>
 
-                <Section id="primer" icon={GraduationCap} kicker="1.2" title="Stock-market primer (60-second crash course)">
+                <Section id="verdicts" icon={Target} kicker="1.3" title="Reading verdicts correctly">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Skip this section if you already trade. If you don't, here's the entire mental
-                        model in five bullets:
+                        The verdict badge (BUY / HOLD / SELL) is an <strong>analytical bias classification</strong>, not a trade instruction. Here is precisely what each means:
                     </p>
-                    <ul className="mt-4 space-y-2.5 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                        <li>
-                            <strong>A stock</strong> is a tiny piece of ownership in a company. When the
-                            company does well and people want to own it, the price goes up. When sentiment
-                            sours, the price falls.
-                        </li>
-                        <li>
-                            <strong>A ticker</strong> is the short code for a stock. <code>AAPL</code> is
-                            Apple, <code>NVDA</code> is Nvidia. Indonesian tickers append <code>.JK</code>{" "}
-                            for the Jakarta exchange — <code>BBCA.JK</code>, <code>TLKM.JK</code>.
-                        </li>
-                        <li>
-                            <strong>BUY / HOLD / SELL</strong> is research-speak for "the evidence leans
-                            up", "the evidence is mixed", or "the evidence leans down". Neural Stock Intelligence™
-                            picks one of the three based on a stack of technical, fundamental, and
-                            sentiment signals.
-                        </li>
-                        <li>
-                            <strong>Confidence (0–100%)</strong> is how strongly the model believes its
-                            own call. 82% confident BUY = strong conviction. 53% confident HOLD = "we
-                            genuinely don't know, take it as a coin-flip".
-                        </li>
-                        <li>
-                            <strong>Swing / position trading</strong> is what this app is built for —
-                            holding stocks for weeks to months. We don't do day-trading; the data we
-                            ingest is daily-cadence, not tick-level.
-                        </li>
-                    </ul>
-                    <Callout tone="tip" title="Mental model that helps">
-                        Think of every Neural verdict as a <em>research analyst's note</em>, not a trade
-                        signal. The reasoning matters more than the colour of the ring — that's where
-                        you decide whether to agree.
-                    </Callout>
+                    <div className="mt-4 space-y-3">
+                        {[
+                            ["BUY", "hsl(var(--buy))", "The weight of evidence across technical, fundamental, and candlestick inputs is predominantly bullish. The model sees more upside factors than downside at this moment. Not a guarantee of price appreciation."],
+                            ["HOLD", "hsl(var(--hold))", "Signals are mixed, insufficient, or contradictory. The model cannot form a strong directional conviction. This could mean a consolidation phase, or simply that the data does not support a clear read."],
+                            ["SELL", "hsl(var(--sell))", "The weight of evidence is predominantly bearish. More downside factors than upside detected at analysis time. Not a guaranteed decline — can be overridden by market conditions the model cannot see."],
+                        ].map(([verdict, color, desc]) => (
+                            <div key={verdict} className="flex gap-3 p-3 text-sm" style={{ border: `1px solid ${color}22`, background: `${color}0a` }}>
+                                <span className="font-mono text-xs font-bold shrink-0 px-2 py-0.5 self-start" style={{ color, border: `1px solid ${color}`, background: `${color}15` }}>{verdict}</span>
+                                <span style={{ color: "hsl(var(--text-secondary))" }}>{desc}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <DosDonts
+                        dos={[
+                            "Use the verdict as one input among several — check your own thesis against it",
+                            "Pay attention to the reasoning paragraphs, not just the badge",
+                            "Note the time horizon — a BUY may be for 2–4 weeks, not forever",
+                            "Re-analyse after major news events that change the fundamentals",
+                            "Use the Bull/Bear/Neutral scenario section to understand what could go wrong",
+                        ]}
+                        donts={[
+                            "Do not buy or sell based solely on the verdict badge",
+                            "Do not assume a BUY means the stock will go up — it means evidence leans bullish",
+                            "Do not ignore a SELL verdict on a stock you love — it is telling you something",
+                            "Do not expect every HOLD to resolve — some stocks genuinely have no edge",
+                            "Do not compare verdicts across different analysis dates without re-analysing",
+                        ]}
+                    />
                 </Section>
 
-                <Section id="glossary" icon={BookOpen} kicker="1.3" title="Glossary — speak the language">
+                <Section id="confidence" icon={Award} kicker="1.4" title="The confidence score — what it means and doesn't mean">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Throughout the verdict pages and elsewhere, you'll see these terms. This
-                        glossary is the quick plain-English reference. Each row links forward to{" "}
-                        <Link to="/technical" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>the Technical page</Link>{" "}
-                        where the full methodology lives. Bookmark this section if you want a
-                        cheat-sheet, click <strong>Deep dive →</strong> on any row when you want
-                        the maths.
+                        The confidence score (0–100) measures the <strong>model's classification strength</strong> — how aligned the input signals are with each other. It does NOT measure the probability that the price will move in the predicted direction.
                     </p>
-                    <div className="mt-5" data-testid="manual-glossary">
-                        <GlossaryRow
-                            anchorId="glossary-rsi"
-                            term="RSI"
-                            techAnchor="tech-pipeline-section"
-                            plain="Relative Strength Index. A 0–100 momentum gauge. Above 70 = stock is overheated, below 30 = stock is oversold. Useful for timing reversals."
-                        />
-                        <GlossaryRow
-                            anchorId="glossary-macd"
-                            term="MACD"
-                            techAnchor="tech-pipeline-section"
-                            plain="Moving Average Convergence Divergence. A trend-and-momentum indicator built from two moving averages. Positive crossovers = bullish, negative = bearish."
-                        />
-                        <GlossaryRow
-                            anchorId="glossary-sma-ema"
-                            term="SMA / EMA"
-                            techAnchor="tech-pipeline-section"
-                            plain="Simple / Exponential Moving Average. The smoothed price trend over N days (we use 20 and 50). Stock above its SMA-50 is broadly in an uptrend; below = downtrend."
-                        />
-                        <GlossaryRow
-                            anchorId="glossary-candlestick"
-                            term="Candlestick"
-                            techAnchor="tech-pipeline-section"
-                            plain="A daily price candle showing open, high, low, close. Patterns of consecutive candles (Hammer, Engulfing, Morning Star, Doji) signal potential reversals or continuations."
-                        />
-                        <GlossaryRow
-                            anchorId="glossary-confluence"
-                            term="Confluence"
-                            techAnchor="confidence"
-                            plain="When multiple independent signals point the same direction. A bullish candlestick on top of strong RSI on top of insider accumulation = high-confluence BUY setup."
-                        />
-                        <GlossaryRow
-                            anchorId="glossary-random-forest"
-                            term="Random Forest (RF)"
-                            techAnchor="random-forest"
-                            plain="A statistical classifier we run as a second opinion alongside the AI. RF says BUY/SELL with its own probability — disagreements with the AI calibrate the displayed confidence downward."
-                        />
-                        <GlossaryRow
-                            anchorId="glossary-intrinsic-value"
-                            term="Intrinsic value"
-                            techAnchor="intrinsic-anchor"
-                            plain="What a stock is worth based on fundamentals (earnings, book value, return on equity), regardless of today's price. We compute Graham Number for asset-heavy sectors and Residual Income Model for service / intangible-heavy ones."
-                        />
-                        <GlossaryRow
-                            anchorId="glossary-bandarmology"
-                            term="Bandarmology"
-                            techAnchor="bandarmology"
-                            plain="Indonesian-market term for tracking insider flow. We surface director / commissioner / major-shareholder buying and selling on every .JK ticker, with 30-day and 90-day persistence windows."
-                        />
-                        <GlossaryRow
-                            anchorId="glossary-verdict-ring"
-                            term="Verdict ring"
-                            techAnchor="confidence"
-                            plain="The big colour-coded circle on the analysis page. Green = BUY, amber = HOLD, red = SELL. The percentage inside is the model's confidence in its own call."
-                        />
-                        <GlossaryRow
-                            anchorId="glossary-confidence-calibration"
-                            term="Confidence calibration"
-                            techAnchor="confidence"
-                            plain="The displayed confidence is post-processed by two rules: capped at 65 within 7 days of earnings, and reduced when RF disagrees with the AI direction. Both adjustments are shown transparently."
-                        />
-                        <GlossaryRow
-                            anchorId="glossary-pattern-scan"
-                            term="Pattern Scan"
-                            techAnchor="tech-pipeline-section"
-                            plain="A batch sweep of your watchlist that detects 15 candlestick patterns on daily and weekly timeframes. Returns confidence-scored alerts when reversal/continuation patterns fire."
-                        />
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-center">
+                        {[
+                            ["0–45", "Weak", "hsl(var(--text-muted))", "Signals contradict each other. Low-conviction read. Treat with scepticism."],
+                            ["46–74", "Moderate", "hsl(var(--hold))", "Partial alignment. Some signals confirm, others diverge. Proceed with caution."],
+                            ["75–100", "High", "hsl(var(--buy))", "Strong signal alignment across multiple pillars. This triggers Alerts (≥75)."],
+                        ].map(([range, label, color, desc]) => (
+                            <div key={range} className="p-3" style={{ border: `1px solid ${color}44`, background: `${color}08` }}>
+                                <p className="font-mono text-lg font-bold" style={{ color }}>{range}</p>
+                                <p className="font-semibold mt-1 mb-2" style={{ color }}>{label}</p>
+                                <p style={{ color: "hsl(var(--text-secondary))" }}>{desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <WatchOut items={[
+                        "A 90% confidence BUY does not mean 90% chance of going up. It means the model found very aligned bullish evidence. The stock can still fall.",
+                        "Low confidence (under 45) on a HOLD is actually informative — it means the model genuinely cannot read this stock right now. That indecision is a signal itself.",
+                        "Hybrid mode typically produces higher confidence scores than Standard because it has more input pillars to draw from. Do not compare scores across modes directly.",
+                    ]} />
+                </Section>
+
+                <Section id="modes" icon={Layers} kicker="1.5" title="Three analysis modes — when to use each">
+                    <div className="mt-2 space-y-4">
+                        {[
+                            {
+                                name: "Standard",
+                                tag: "Fundamentals + Technicals",
+                                color: "hsl(var(--text-muted))",
+                                when: "Use for stocks where candlestick patterns are noisy or irrelevant — blue-chip long holds, IDX stocks with low liquidity, or when you want a purely quantitative read.",
+                                strength: "Most grounded. Least influenced by short-term price noise.",
+                                weakness: "Misses timing signals. May be slow to react to trend reversals already visible in the candlestick data.",
+                            },
+                            {
+                                name: "Candlestick",
+                                tag: "Price patterns only",
+                                color: "hsl(var(--hold))",
+                                when: "Use when you want a pure price-action read — swing trading setups, confirming entry timing, or when fundamentals are stale.",
+                                strength: "Fast and timing-sensitive. Surfaces pattern-based entry setups that Standard mode ignores.",
+                                weakness: "Ignores fundamentals entirely. A beautiful Bullish Engulfing on a company with deteriorating earnings is still dangerous.",
+                            },
+                            {
+                                name: "Hybrid",
+                                tag: "All three pillars",
+                                color: "hsl(var(--buy))",
+                                when: "Default choice for most situations. Use when you want the most complete picture before making a decision.",
+                                strength: "Highest information density. Candlestick patterns can confirm or contradict the technical/fundamental read — that tension is valuable.",
+                                weakness: "Takes longer. Confidence ceiling is ~70 without pattern confirmation, which can make Hybrid reads feel uncertain on stocks with no clear patterns.",
+                            },
+                        ].map(m => (
+                            <div key={m.name} className="p-4 text-sm" style={{ border: `1px solid hsl(var(--border-default))`, background: "hsl(var(--surface-elevated))" }}>
+                                <div className="flex items-center gap-3 mb-3">
+                                    <span className="font-mono font-bold" style={{ color: m.color }}>{m.name}</span>
+                                    <span className="font-mono text-[10px] px-2 py-0.5" style={{ background: "hsl(var(--surface))", color: "hsl(var(--text-muted))", border: "1px solid hsl(var(--border-default))" }}>{m.tag}</span>
+                                </div>
+                                <p><span className="font-semibold" style={{ color: "hsl(var(--text-primary))" }}>When to use: </span><span style={{ color: "hsl(var(--text-secondary))" }}>{m.when}</span></p>
+                                <p className="mt-2"><span className="font-semibold" style={{ color: "hsl(145,55%,55%)" }}>Strength: </span><span style={{ color: "hsl(var(--text-secondary))" }}>{m.strength}</span></p>
+                                <p className="mt-1"><span className="font-semibold" style={{ color: "hsl(38,85%,60%)" }}>Weakness: </span><span style={{ color: "hsl(var(--text-secondary))" }}>{m.weakness}</span></p>
+                            </div>
+                        ))}
                     </div>
                 </Section>
 
-                {/* ============================================================ */}
-                {/*                    PART 2 — GETTING STARTED                  */}
-                {/* ============================================================ */}
-                <PartDivider
-                    n={2}
-                    title="Getting started"
-                    subtitle="From sign-up to your first verdict in under five minutes."
-                    readMins={4}
-                />
+                <Section id="glossary" icon={BookOpen} kicker="1.6" title="Glossary — speak the language">
+                    <div className="mt-2 space-y-2 text-sm">
+                        {[
+                            ["Ticker", "The stock's short code. AAPL = Apple. BBCA.JK = Bank Central Asia on IDX. Always use the exchange suffix for IDX stocks (.JK)."],
+                            ["Verdict", "The AI's directional classification: BUY (bullish bias), HOLD (neutral/mixed), or SELL (bearish bias). Not a trade instruction."],
+                            ["Confidence score", "0–100. How aligned the input signals are. Not a probability of price movement."],
+                            ["RSI", "Relative Strength Index. Above 70 = potentially overbought. Below 30 = potentially oversold."],
+                            ["MACD", "Moving Average Convergence/Divergence. A momentum indicator. Signal-line crossovers suggest trend shifts."],
+                            ["Bollinger Bands", "Volatility bands around a moving average. Price near the upper band = extended. Near the lower = compressed."],
+                            ["Candlestick pattern", "A price action formation formed by one or more trading sessions. Hammer, Doji, Engulfing are examples. Probabilistic, not deterministic."],
+                            ["Bandarmology", "IDX-specific. Analysis of institutional (\"bandar\") net-buy/sell patterns from regulatory filings. Accumulation = institutions buying. Distribution = selling."],
+                            ["Confluence", "When multiple independent signals point the same direction. High-confluence setups have higher probability than single-signal setups."],
+                            ["Time horizon", "The period the verdict is calibrated for. Typically 2–4 weeks for Hybrid/Candlestick, longer for Standard."],
+                            ["Intrinsic value", "A rough fundamental estimate of what the stock is worth based on earnings, growth, and discount rate. Anchor, not target price."],
+                            ["Score Card", "Your personal track record. Measures how many of your past BUY/SELL verdicts were correct based on subsequent price movement."],
+                        ].map(([term, def]) => (
+                            <div key={term} className="grid grid-cols-12 gap-3 py-2" style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
+                                <span className="col-span-3 font-mono text-[11px] font-semibold self-start pt-0.5" style={{ color: "hsl(var(--text-primary))" }}>{term}</span>
+                                <span className="col-span-9" style={{ color: "hsl(var(--text-secondary))" }}>{def}</span>
+                            </div>
+                        ))}
+                    </div>
+                </Section>
+
+                {/* ══════════════════════════════════════════════
+                    PART 2 — GETTING STARTED
+                ══════════════════════════════════════════════ */}
+                <ChapterHeader title="Part 2 · Getting Started" subtitle="From zero to your first verdict in under five minutes." />
 
                 <Section id="signup" icon={UserCheck} kicker="2.1" title="Sign up & onboarding">
-                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Sign up with your email and a password — takes under a minute.
-                    </p>
                     <Step n={1} title="Create your account">
-                        Enter your name, email address, and a password (minimum 6 characters).
-                        Hit <strong>Create account</strong> — no credit card or verification email required.
-                        Free tier is activated immediately.
+                        Go to <Link to="/signup" className="underline" style={{ color: "hsl(var(--text-primary))" }}>/signup</Link>. Enter your name, email, and a password (min 6 characters). Hit <strong>Create account</strong>. No credit card required. Free tier activates immediately.
                     </Step>
                     <Step n={2} title="Accept the disclaimer">
-                        Neural Stock Intelligence is a research tool, not financial advice. Tick the
-                        disclaimer checkbox on your first login to confirm you understand this. You
-                        only need to do this once.
+                        On first login you'll see the research disclaimer. Tick it to confirm you understand this is an educational tool, not financial advice. One-time only.
                     </Step>
-                    <p className="text-sm mt-5 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        After your first sign-in, the <strong>Onboarding Wizard</strong> walks you
-                        through three quick questions:
-                    </p>
-                    <ul className="mt-3 space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                        <li>· <strong>Markets you trade</strong> — US, IDX, or both. We optimise the home feed accordingly.</li>
-                        <li>· <strong>Experience level</strong> — beginner / intermediate / advanced. Drives default tooltips and analysis-mode pre-selection.</li>
-                        <li>· <strong>Pre-fill your watchlist</strong> — pick from popular tickers (AAPL, NVDA, BBCA.JK…) so your dashboard isn't empty on day one.</li>
-                    </ul>
-                    <Callout tone="tip" title="You can change every wizard answer later">
-                        All three settings live in <Link to="/settings" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>Settings → Preferences</Link>{" "}
-                        and the watchlist is editable from the dashboard at any time.
+                    <Step n={3} title="Complete the onboarding wizard">
+                        Three quick questions: which markets you trade (US / IDX / both), your experience level, and starter watchlist picks. All three are changeable later in Settings.
+                    </Step>
+                    <Callout tone="info" title="Already have a verdict from the landing page?">
+                        Your anonymous free analysis does not transfer to your account. But signing up immediately gives you 3 fresh analyses per day — run it again on the same ticker from your dashboard.
                     </Callout>
                 </Section>
 
-                <Section id="dashboard" icon={LineChart} kicker="2.2" title="The Dashboard tour">
+                <Section id="dashboard" icon={LineChart} kicker="2.2" title="Dashboard tour">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        The <Link to="/dashboard" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>Dashboard</Link>{" "}
-                        is your daily home. From top to bottom:
+                        The dashboard is your daily home screen. Here's what each section does:
                     </p>
-                    <ul className="mt-4 space-y-3 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                        <li>
-                            <strong>Search bar.</strong> Type any ticker (e.g. <code>MSFT</code> or{" "}
-                            <code>BBRI.JK</code>) and hit <strong>Analyze</strong>. Auto-complete
-                            kicks in after 2 characters.
-                        </li>
-                        <li>
-                            <strong>Mode pills (Std · Candle · Hybrid).</strong> Selects how the AI
-                            reasons — see Section 3.1 for what each mode means. Beginners: leave on
-                            Hybrid.
-                        </li>
-                        <li>
-                            <strong>Watchlist.</strong> Each saved ticker shows its latest verdict,
-                            current price, % change today, and a sparkles button (✨) to re-analyse
-                            that single row. Drag to reorder, swipe to delete on mobile.
-                        </li>
-                        <li>
-                            <strong>Top 3 / Bottom 3 sweep buttons.</strong> Pro and Elite only —
-                            instantly analyses the strongest and weakest candidates in your watchlist
-                            so you don't have to click each one.
-                        </li>
-                        <li>
-                            <strong>Auto-Scan banner.</strong> When a watchlist sweep flags a
-                            high-conviction shift on one of your stocks, an amber banner appears
-                            here. Tap it to jump to the verdict.
-                        </li>
-                        <li>
-                            <strong>Recent signals feed.</strong> Verdicts you and other users
-                            recently generated. Click any to read the full analysis.
-                        </li>
-                        <li>
-                            <strong>Trending on Neural.</strong> The most-analysed tickers across the
-                            platform in the last 7 days. Useful when you don't know what to research.
-                        </li>
-                    </ul>
+                    <div className="mt-4 space-y-3 text-sm">
+                        {[
+                            ["Quota strip", "Top of dashboard. Shows analyses used today / weekly cap / watchlist count. Resets at midnight UTC."],
+                            ["Alerts module", "High-confidence verdicts (≥75%) that arrived since your last visit. These are the signals worth acting on first."],
+                            ["Highest-conviction setups (IDX)", "Top IDX confluence setups from the last 7 days, ranked by quality score. First stop for IDX traders."],
+                            ["Watchlist", "Your tracked tickers. Each row shows current price, change %, and the last verdict badge + confidence. Click ✦ to re-analyse."],
+                            ["Today's market stats", "Average change across your watchlist, gainers/losers count, unread alerts."],
+                        ].map(([name, desc]) => (
+                            <div key={name} className="flex gap-3 p-3" style={{ border: "1px solid hsl(var(--border-default))", background: "hsl(var(--surface-elevated))" }}>
+                                <span className="font-mono text-[11px] font-semibold shrink-0 w-44" style={{ color: "hsl(var(--text-primary))" }}>{name}</span>
+                                <span style={{ color: "hsl(var(--text-secondary))" }}>{desc}</span>
+                            </div>
+                        ))}
+                    </div>
                 </Section>
 
                 <Section id="first-analysis" icon={Sparkles} kicker="2.3" title="Run your first analysis">
-                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        An "analysis" is a single AI verdict on one stock. Your first one should
-                        take less than two minutes including reading the result.
-                    </p>
-                    <Step n={1} title="Type a ticker — e.g. AAPL">
-                        Familiar US names work well as a first analysis: <code>AAPL</code>,{" "}
-                        <code>MSFT</code>, <code>NVDA</code>, <code>TSLA</code>. For Indonesian
-                        users, <code>BBCA.JK</code> or <code>TLKM.JK</code> are good starters
-                        because they have rich Bandarmology data.
+                    <Step n={1} title="Add a ticker to your watchlist">
+                        Click <strong>Add Stock</strong> on the dashboard. Type a ticker — AAPL for Apple, BBCA.JK for Bank Central Asia. The search will confirm the company name before you add it.
                     </Step>
-                    <Step n={2} title="Leave the mode on Hybrid (default)">
-                        Hybrid balances AI reasoning with candlestick pattern checks — the most
-                        well-rounded read. You can experiment with Standard or Candlestick later.
+                    <Step n={2} title="Choose a mode">
+                        Start with <strong>Hybrid</strong> — it uses all three analysis pillars and gives the most complete picture. You can change the mode from the mode selector above the watchlist.
                     </Step>
-                    <Step n={3} title="Tap ANALYZE">
-                        A spinner appears and a phase stepper shows progress: <em>Fetching data →
-                        Computing technicals → Scanning patterns → LLM verdict → RF score →
-                        Calibrating</em>. Total wall-clock is usually 30–90 seconds.
+                    <Step n={3} title="Tap the ✦ Analyze button on the ticker row">
+                        The row enters a loading state. You'll see live phase labels as the analysis progresses: Fetching data → Technical scan → LLM synthesis → Done. Typically 15–45 seconds.
                     </Step>
                     <Step n={4} title="Read the verdict that lands">
-                        You'll automatically be taken to the verdict page. Don't panic at the
-                        amount of detail — Section 2.4 walks you through what every section means.
+                        The row now shows the verdict badge (BUY / HOLD / SELL), confidence %, and how long ago it was generated. Tap the arrow → to open the full report page.
                     </Step>
-                    <Callout tone="warn" title="Free tier — 3 analyses per day">
-                        Your free quota resets every 24 hours. If you need more analyses,
-                        the Week Pass ($4.99 for 7 days, 10 verdicts/day) or Pro plan unlocks
-                        higher limits and batch features.
+                    <Step n={5} title="Open the full report">
+                        The report page has the executive summary, confidence breakdown, scenarios, technical panels, and action bar. Read at least the executive summary and the scenarios before making any decision.
+                    </Step>
+                    <Callout tone="warn" title="Waking up server...">
+                        If the app is idle for a while, the first analysis may show "Waking up server…" for 10–15 seconds. This is normal — the backend spins down during inactivity to save costs. The second analysis will be fast.
                     </Callout>
                 </Section>
 
-                <Section id="verdict-anatomy" icon={Compass} kicker="2.4" title="Read the verdict page (anatomy)">
-                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Top of the page → bottom. Read in this order on your first few verdicts.
-                    </p>
-                    <Step n={1} title="The verdict ring">
-                        Big colour-coded circle. Green = BUY, amber = HOLD, red = SELL. The number
-                        inside is <em>confidence</em>, not a probability of profit. A "BUY at 78%"
-                        means the model is fairly sure of the BUY call given today's data — not that
-                        the stock has 78% odds of going up.
-                    </Step>
-                    <Step n={2} title="Executive summary">
-                        Two-paragraph plain-English explanation. Mentions the key drivers (e.g.
-                        "earnings beat last quarter", "RSI at 64", "bullish engulfing on the daily
-                        chart") and the main risks. <em>This is the most important block on the
-                        page.</em> If the reasoning doesn't convince you, the verdict shouldn't either.
-                    </Step>
-                    <Step n={3} title="Confidence breakdown">
-                        Below the ring you'll see chips like "Earnings gate: −10" or "RF disagrees:
-                        −5". These are calibration adjustments — the raw model said one thing, the
-                        guardrails dialled it down for transparency. Tap any chip for a tooltip
-                        explaining the rule.
-                    </Step>
-                    <Step n={4} title="Alternative scenarios (Bull / Bear / Neutral)">
-                        Three boxes showing the optimistic, pessimistic, and neutral paths the same
-                        data could support. Use these to pressure-test your own thesis from
-                        multiple angles.
-                    </Step>
-                    <Step n={5} title="Technical, fundamental, sentiment panels">
-                        Each independently scored. Click any header to see the underlying numbers
-                        (RSI value, P/E ratio, news headlines tagged with sentiment).
-                    </Step>
-                    <Step n={6} title="Pattern Scan card">
-                        Lists candlestick patterns detected on this ticker (Hammer, Doji, Three
-                        White Soldiers, etc.) with their conviction scores. Most patterns have a
-                        small "What does this mean?" link that opens a glossary modal.
-                    </Step>
-                    <Step n={7} title="Random-Forest opinion">
-                        Independent statistical model showing P(up) and P(down). When RF disagrees
-                        with the AI, the badge turns amber and the calibration chip in step 3 fires.
-                    </Step>
-                    <Step n={8} title="Intrinsic-value anchor">
-                        Graham Number or Residual Income Model estimate (depending on sector). Tells
-                        you whether today's price sits above or below the model's "fair value".
-                    </Step>
-                    <Step n={9} title="Bandarmology (IDX only)">
-                        For .JK tickers — director / commissioner / major-shareholder buying and
-                        selling, with 30-day and 90-day persistence labels. Companion-tools card
-                        below points to broker-flow apps for the intraday picture we don't capture.
-                    </Step>
-                    <Step n={10} title="Action bar — Share · Trade Slip · Export PDF · Re-analyze">
-                        <strong>Share</strong> generates a public URL anyone can open without
-                        logging in. <strong>Trade Slip</strong> is a one-page PDF you can print or
-                        screenshot for your records. <strong>Export PDF</strong> is the full report
-                        (Pro+). <strong>Re-analyze</strong> burns one quota slot to refresh the
-                        verdict with the latest data.
-                    </Step>
+                <Section id="verdict-anatomy" icon={Compass} kicker="2.4" title="Anatomy of a verdict page">
+                    <div className="mt-2 space-y-4 text-sm">
+                        {[
+                            ["1 · Verdict ring", "The large circular badge at the top. Shows BUY / HOLD / SELL with the confidence score. The ring fill represents confidence level."],
+                            ["2 · Executive summary", "The most important section. A 3–5 paragraph synthesis of what the AI found and why it landed on this verdict. Read this fully."],
+                            ["3 · Confidence breakdown", "A bar chart showing how each pillar (technical, fundamental, candlestick) contributed to the overall confidence. Identifies which signals are driving the verdict."],
+                            ["4 · Bull / Bear / Neutral scenarios", "Three explicit scenarios. Even on a high-confidence BUY, the Bear scenario tells you what conditions would make the verdict wrong. Always read this."],
+                            ["5 · Technical panel", "RSI, MACD, Bollinger, volume, trend, support/resistance levels. Expandable."],
+                            ["6 · Fundamental panel", "P/E, earnings, revenue growth, analyst consensus. Note the data freshness date — for IDX stocks this may be a quarter old."],
+                            ["7 · Candlestick panel (Hybrid/Candle modes)", "Patterns detected, their timeframe (daily/weekly), and whether they confirmed or contradicted the technical read."],
+                            ["8 · Random Forest opinion", "A machine-learning model trained on historical verdict outcomes gives its own probability estimate. Treat as a second opinion, not primary signal."],
+                            ["9 · Intrinsic value anchor", "A rough DCF-style estimate. Shows current price vs estimated fair value. A stock trading significantly above this is pricing in optimistic assumptions."],
+                            ["10 · Bandarmology card (IDX only)", "Institutional flow data. Persistent accumulation with high persistence score = smart money building a position. Reporting lag is 5–30 days."],
+                            ["11 · Action bar", "Share (public URL) · Trade Slip PDF · Export full PDF · Re-analyse. Re-analyse refreshes with fresh data without consuming a watchlist slot."],
+                        ].map(([step, desc]) => (
+                            <div key={step} className="flex gap-3">
+                                <span className="font-mono text-[11px] font-semibold shrink-0 pt-0.5" style={{ color: "hsl(var(--accent-primary))", minWidth: "11rem" }}>{step}</span>
+                                <span style={{ color: "hsl(var(--text-secondary))" }}>{desc}</span>
+                            </div>
+                        ))}
+                    </div>
                 </Section>
 
-                {/* ============================================================ */}
-                {/*                     PART 3 — DAILY WORKFLOW                  */}
-                {/* ============================================================ */}
-                <PartDivider
-                    n={3}
-                    title="Daily workflow"
-                    subtitle="The four screens you'll use every time you research a stock."
-                    readMins={8}
-                />
+                {/* ══════════════════════════════════════════════
+                    PART 3 — DAILY WORKFLOW
+                ══════════════════════════════════════════════ */}
+                <ChapterHeader title="Part 3 · Daily Workflow" subtitle="How to use the app effectively as part of your research routine." />
 
-                <Section id="modes" icon={Layers} kicker="3.1" title="Three analysis modes — Std · Candle · Hybrid">
+                <Section id="watchlist" icon={Eye} kicker="3.1" title="Watchlist & batch sweeps">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Above the analyse button is a 3-pill switcher. All three modes are
-                        free — they differ in <em>how</em> the AI reasons:
+                        Your watchlist is a <strong>research shortlist</strong>, not a portfolio tracker. Add stocks you are actively researching or considering. Remove them when they are no longer relevant.
                     </p>
-                    <ul className="mt-4 space-y-3 text-sm">
-                        <li>
-                            <strong style={{ color: "hsl(var(--text-primary))" }}>Std (Standard) — </strong>
-                            Classic equity research. The AI weighs fundamentals (earnings, P/E, ROE),
-                            technical indicators (RSI, MACD, moving averages), and momentum to deliver
-                            its verdict. Best for <em>longer-horizon</em> reads (4-8+ weeks).
-                        </li>
-                        <li>
-                            <strong style={{ color: "hsl(var(--text-primary))" }}>Candle (Candlestick) — </strong>
-                            Pure pattern strategy. The AI focuses on candlestick patterns (Hammer,
-                            Engulfing, Doji, Three Soldiers, Morning Star, etc.) on daily and weekly
-                            charts. Best for <em>timing entries and reversals</em> (1-3 weeks).
-                        </li>
-                        <li>
-                            <strong style={{ color: "hsl(var(--text-primary))" }}>Hybrid — </strong>
-                            Recommended default. The AI does the Standard reasoning first and then
-                            uses candlestick patterns as confirmation or rejection. Most balanced
-                            view — and the mode we use for the published Scorecard.
-                        </li>
-                    </ul>
-                    <Callout tone="tip" title="Beginner pick">
-                        Leave it on <strong>Hybrid</strong> until you've run a dozen analyses and
-                        feel like comparing modes on the same ticker. Most users never switch.
+                    <Step n={1} title="Keep it focused">
+                        A watchlist of 5–10 stocks you genuinely follow is more useful than 25 stocks you added once and forgot. Verdict signals age — a verdict from 2 weeks ago on a stock you haven't re-analysed is stale.
+                    </Step>
+                    <Step n={2} title="Re-analyse before acting">
+                        Always re-analyse on the day you are considering acting. Market conditions change. A BUY from last week may be a HOLD today after an earnings miss.
+                    </Step>
+                    <Step n={3} title="Use Top 3 / Bottom 3 sweep (Pro+)">
+                        The batch sweep re-analyses your three highest and three lowest performers in one tap. Run it at the start of each trading day to refresh your read without spending all your daily quota.
+                    </Step>
+                    <Callout tone="warn" title="Watchlist ≠ auto-analyse">
+                        Adding a stock to your watchlist does not trigger automatic analysis. You must manually trigger each analysis. Prices on the watchlist row are live, but the verdict badge is from your last manual analysis.
                     </Callout>
                 </Section>
 
-                <Section id="watchlist" icon={Eye} kicker="3.2" title="Watchlist & batch sweeps">
+                <Section id="pattern-scan" icon={Search} kicker="3.2" title="Pattern Scan — find setups across your watchlist">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        The watchlist is the list of tickers you care about — a passive list, not
-                        active research. Adding a stock here does <em>not</em> auto-run an analysis.
-                    </p>
-                    <Callout tone="warn" title="Watchlist ≠ Auto-analyze">
-                        Adding to watchlist saves the ticker. To get a fresh verdict you must tap
-                        the sparkles (✨) on the row, OR run a Top 3 / Bottom 3 batch sweep, OR
-                        enable Auto-Scan in Settings (Pro+) which runs a daily background scan and
-                        pushes alerts when something flips.
-                    </Callout>
-                    <Step n={1} title="Add stocks via the search box or analysis page">
-                        Tap <strong>+ Add to watchlist</strong> on any verdict, or type a ticker on
-                        the dashboard and tap the star (★). Limits: Free 5, Pro 25, Elite unlimited.
-                    </Step>
-                    <Step n={2} title="Re-analyse a single row">
-                        Tap the sparkles icon (✨) next to any row. The button shows a phase
-                        stepper while the verdict is being computed. If it fails, the row turns red
-                        with a "Tap to retry" pill.
-                    </Step>
-                    <Step n={3} title="Top 3 / Bottom 3 sweep (Pro+)">
-                        Instantly analyses the 3 most-loved and 3 most-shorted candidates in your
-                        watchlist. The dashboard updates rows in parallel — you'll see all 6
-                        verdicts within ~3 minutes.
-                    </Step>
-                    <Step n={4} title="Drag to reorder · swipe to delete">
-                        Mobile users: long-press and drag any row to reorder. Swipe left to reveal
-                        a delete action. Desktop has explicit ↑↓ arrows on hover.
-                    </Step>
-                </Section>
-
-                <Section id="pattern-scan" icon={Search} kicker="3.3" title="Pattern Scan — find setups across your watchlist">
-                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Pattern Scan is a batch detector for 15 candlestick patterns across every
-                        stock in your watchlist on both daily and weekly timeframes. It runs in
-                        seconds (no LLM call) and flags everything actionable in one pass.
+                        Pattern Scan runs a fast candlestick screen across all tickers in your watchlist simultaneously. It does not run a full AI analysis — it detects pattern formations and flags tickers worth looking at more closely.
                     </p>
                     <Step n={1} title="Run the scan">
-                        On the dashboard, tap <strong>Pattern Scan</strong>. A progress bar shows
-                        each ticker being checked. Total runtime: ~5 seconds for 25 tickers.
+                        From the dashboard, tap <strong>Pattern Scan</strong>. Takes 10–20 seconds depending on watchlist size.
                     </Step>
-                    <Step n={2} title="Filter the results">
-                        Toggle between <strong>Bullish only</strong>, <strong>Bearish only</strong>,
-                        and <strong>All</strong>. Sort by conviction score (highest first by default).
+                    <Step n={2} title="Filter by pattern type or direction">
+                        Use the filter chips to narrow to bullish-only patterns, or specific patterns like Hammer or Engulfing. Don't try to read every result — focus on the highest-quality matches (Strong / Excellent tier).
                     </Step>
-                    <Step n={3} title="Tap a result to drill into the verdict">
-                        Each detected pattern links to that ticker's full analysis page with the
-                        pattern highlighted in the Candlestick panel.
+                    <Step n={3} title="Use Pattern Scan as a triage tool">
+                        When a ticker flags with a strong pattern, <strong>then</strong> run a full Hybrid analysis on it. The scan surface candidates. The full analysis gives you conviction.
                     </Step>
-                    <Callout tone="tip" title="Pair with Hybrid mode">
-                        When Pattern Scan flags a setup AND a Hybrid-mode analysis on that ticker
-                        agrees — that's a high-conviction "double confirmation" setup. We render a
-                        chip on the verdict page when it happens.
-                    </Callout>
+                    <DosDonts
+                        dos={[
+                            "Use Pattern Scan first thing each morning to spot overnight formations",
+                            "Pair pattern hits with Hybrid analysis before acting",
+                            "Prioritise tickers where the pattern direction matches the existing trend",
+                            "Look for multiple pattern types on the same ticker — confluence is stronger",
+                        ]}
+                        donts={[
+                            "Don't trade based on Pattern Scan results alone — they are screening signals",
+                            "Don't ignore 'Weak' quality patterns — they are there for awareness, not action",
+                            "Don't assume weekly patterns are more reliable than daily — both can fail",
+                            "Don't run Pattern Scan and then not act on the results — it wastes the signal window",
+                        ]}
+                    />
                 </Section>
 
-                <Section id="alerts" icon={BellRing} kicker="3.4" title="Alerts & Telegram">
+                <Section id="alerts" icon={BellRing} kicker="3.3" title="Alerts & Telegram">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Neural Stock Intelligence™ pushes notifications the moment a high-conviction verdict
-                        fires on one of your watchlist stocks — delivered straight to{" "}
-                        <strong>@neulab_bot</strong> on Telegram. No phone number, no SMS fees.
+                        An alert fires automatically when any analysis on your watchlist produces a verdict with confidence ≥ 75%. These are the system's highest-conviction signals. They are worth stopping what you are doing to review.
                     </p>
-                    <Callout tone="warn" title="Confidence threshold: 75% and above">
-                        Alerts only fire when the AI's confidence is at least <strong>75%</strong>{" "}
-                        in either direction (BUY or SELL). Lower-conviction reads — including most
-                        HOLDs — are filtered so your phone doesn't buzz with noise. Threshold is
-                        configurable in Settings.
-                    </Callout>
-                    <Step n={1} title="Link your Telegram (one-time setup)">
-                        Open <Link to="/settings" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>Settings</Link>{" "}
-                        → tap <strong>Link Telegram</strong> → you'll get a 6-digit code → paste it
-                        into <strong>@neulab_bot</strong> on Telegram. The bot replies confirming
-                        the link.
+                    <Step n={1} title="Connect Telegram (one-time setup)">
+                        Go to Settings → Telegram. Start a chat with the bot and send the /start command. The bot will confirm your link. You will now receive push notifications for every high-confidence verdict.
                     </Step>
-                    <Step n={2} title="Pick which channels you want">
-                        In Settings → "FILTER WHAT REACHES YOUR TELEGRAM": toggle channels
-                        (AI Verdicts, Pattern Scans, RF Auto-Scan), pick the analysis modes you
-                        trust, and choose delivery rhythm (<strong>realtime</strong>,{" "}
-                        <strong>daily digest</strong>, or <strong>weekly digest</strong>) per
-                        channel.
+                    <Step n={2} title="Set quiet hours">
+                        In Settings → Alerts, configure Quiet Hours so you do not get woken up at 3am by a US pre-market alert.
                     </Step>
-                    <Step n={3} title="Set Quiet Hours">
-                        Quiet Hours queue any incoming alerts during your "do not disturb" window
-                        and deliver them all at once when the window closes. Pick your timezone
-                        (Tokyo, Jakarta, NY, etc.) and the start/end hours.
+                    <Step n={3} title="Review alerts in /alerts">
+                        The Alerts page shows a history of all high-confidence verdicts with the price at alert time. This is your signal log.
                     </Step>
-                    <Step n={4} title="Review history in /alerts">
-                        The <Link to="/alerts" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>Alerts inbox</Link>{" "}
-                        is your complete notification history — including ones filtered out of
-                        Telegram. Star, archive, mark as taken, and review past signals here.
-                    </Step>
+                    <WatchOut items={[
+                        "A high-confidence alert (≥75%) is still not a trade instruction. It means the evidence was strongly aligned at analysis time. Review the full report before acting.",
+                        "Alerts only fire for tickers in your watchlist. If a stock is not in your watchlist, you will not receive alerts for it even if you analyse it.",
+                        "Alert prices are the price at analysis time, not real-time. By the time you see a Telegram alert, the price may have moved.",
+                    ]} />
                 </Section>
 
-                {/* ============================================================ */}
-                {/*                     PART 4 — POWER FEATURES                  */}
-                {/* ============================================================ */}
-                <PartDivider
-                    n={4}
-                    title="Power features"
-                    subtitle="Modules for tracking real positions and stress-testing the system."
-                    readMins={6}
-                />
+                <Section id="dos-donts" icon={ShieldAlert} kicker="3.4" title="Master Do's, Don'ts & Watch-outs">
+                    <p className="text-sm leading-relaxed mb-4" style={{ color: "hsl(var(--text-secondary))" }}>
+                        The most common mistakes users make — and how to avoid them.
+                    </p>
+
+                    <p className="font-semibold text-sm mt-6 mb-2" style={{ color: "hsl(var(--text-primary))" }}>Using verdicts correctly</p>
+                    <DosDonts
+                        dos={[
+                            "Read the full executive summary, not just the badge",
+                            "Always check the Bear scenario — it tells you when you are wrong",
+                            "Re-analyse on the day you plan to act",
+                            "Use verdicts to confirm or challenge your own thesis",
+                            "Track your own accuracy via the Score Card",
+                        ]}
+                        donts={[
+                            "Buy or sell based solely on the BUY / SELL badge",
+                            "Assume high confidence = guaranteed outcome",
+                            "Compare verdicts from different analysis dates without re-running",
+                            "Ignore a SELL verdict on a stock you are emotionally attached to",
+                            "Use a single analysis to justify a large position",
+                        ]}
+                    />
+
+                    <p className="font-semibold text-sm mt-6 mb-2" style={{ color: "hsl(var(--text-primary))" }}>Managing your daily quota</p>
+                    <DosDonts
+                        dos={[
+                            "Use batch sweep (Pro+) at start of day to refresh top/bottom movers",
+                            "Prioritise re-analysing stocks you are considering acting on today",
+                            "Save quota for stocks where a decision is imminent",
+                            "Use Pattern Scan (no quota) to triage before deciding which tickers to analyse",
+                        ]}
+                        donts={[
+                            "Re-analyse the same stock multiple times hoping for a different verdict",
+                            "Analyse stocks you have no intention of trading just to fill the quota",
+                            "Run analyses late at night when IDX markets are closed — data will be stale",
+                        ]}
+                    />
+
+                    <p className="font-semibold text-sm mt-6 mb-2" style={{ color: "hsl(var(--text-primary))" }}>IDX-specific watch-outs</p>
+                    <WatchOut items={[
+                        "Bandarmology data lags 5–30 days behind actual transactions. A 'persistent accumulation' signal means institutions were buying in that period — not necessarily right now.",
+                        "IDX fundamental data may be one quarter stale. Always check the 'data as of' date in the fundamental panel before relying on earnings or revenue figures.",
+                        "Low-liquidity IDX stocks (thin trading volume) produce noisy candlestick signals. The model may flag patterns that are artefacts of low volume, not genuine price action.",
+                        "The IDX market opens 09:00–16:00 WIB (Jakarta time). Analyses run outside market hours use the last closing price — not a live quote.",
+                        "GOTO.JK and other recent IDX IPOs may have limited history. The model needs at least 15 trading days of data to produce a reliable technical read.",
+                    ]} />
+
+                    <p className="font-semibold text-sm mt-6 mb-2" style={{ color: "hsl(var(--text-primary))" }}>US stock watch-outs</p>
+                    <WatchOut items={[
+                        "US pre-market and after-hours moves are not captured. Analyses run before market open use the previous day's close.",
+                        "Earnings announcements can invalidate a verdict within hours. Never rely on a pre-earnings analysis after earnings have been released — re-analyse.",
+                        "Highly speculative or meme stocks (thin fundamentals, high volatility) produce low-confidence reads because the model cannot find signal in the noise. That is the correct output.",
+                        "ADRs and foreign stocks listed on US exchanges may have limited fundamental data — the model will note this in the executive summary.",
+                    ]} />
+
+                    <p className="font-semibold text-sm mt-6 mb-2" style={{ color: "hsl(var(--text-primary))" }}>Things that look like bugs but aren't</p>
+                    <WatchOut items={[
+                        "'Waking up server…' on first analysis — the backend sleeps after inactivity. Normal. Takes 10–15 seconds then works fine.",
+                        "First analysis fails, second attempt works — same reason as above, or a transient yfinance data issue. The app auto-retries once.",
+                        "HOLD at 42% confidence — this is valid output. It means the model found no clear edge. Do not force a read that isn't there.",
+                        "Verdict didn't change after re-analysis — if the underlying data has not changed significantly, the verdict should not change. Consistency is correct behaviour.",
+                        "IDX top picks showing 'Fetching data…' for a long time — Bandarmology and IDX data fetches are slower than US data. Wait up to 60 seconds on first load.",
+                    ]} />
+                </Section>
+
+                {/* ══════════════════════════════════════════════
+                    PART 4 — POWER FEATURES
+                ══════════════════════════════════════════════ */}
+                <ChapterHeader title="Part 4 · Power Features" subtitle="Modules for tracking positions and stress-testing the system." />
 
                 <Section id="portfolio" icon={Briefcase} kicker="4.1" title="Portfolio P&L">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        The <Link to="/portfolio" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>Portfolio</Link>{" "}
-                        page tracks money you've actually invested. It's separate from the
-                        watchlist (which is just a list of stocks you're <em>watching</em>). Use
-                        Portfolio to know your real P&amp;L and link each position to its latest
-                        verdict.
+                        Portfolio P&L lets you track real positions against live prices and see how Neural's verdicts align with your actual holdings. It is not connected to any brokerage — all entries are manual.
                     </p>
                     <Step n={1} title="Add a position">
-                        Tap <strong>+ Add</strong>, enter the ticker, the number of shares you
-                        bought, your average buy price, and the buy date. Neural fetches today's
-                        price and calculates your gain or loss live.
+                        Tap <strong>Add Position</strong>, enter the ticker, number of shares, and your average cost. The portfolio calculates unrealised gain/loss automatically from the live price.
                     </Step>
                     <Step n={2} title="Add multiple lots if you DCA">
-                        Bought the same stock at three different prices? Add three lots — Neural
-                        averages them. Each lot keeps its own buy date so cost basis stays
-                        accurate.
+                        If you have bought the same stock at different prices (dollar-cost averaging), add each lot separately. The portfolio blends them into a weighted average cost.
                     </Step>
-                    <Step n={3} title="Tap any row for the AI verdict">
-                        Each portfolio row links straight to the analysis — useful when one of
-                        your holdings is down and you want to know whether the AI says hold or cut
-                        losses.
+                    <Step n={3} title="Check verdict alignment">
+                        Each portfolio row shows the current Neural verdict for that position. A SELL verdict on a position you are holding is a prompt to re-examine — not necessarily to sell, but to re-examine.
                     </Step>
-                    <Step n={4} title="Read the aggregate">
-                        Top of the page: total invested, current value, absolute P&amp;L, %
-                        return, and best/worst performer. Plus a sparkline showing portfolio value
-                        over the last 90 days.
-                    </Step>
+                    <DosDonts
+                        dos={[
+                            "Use Portfolio P&L to spot when Neural's verdict diverges from a position you are holding",
+                            "Re-analyse any portfolio position showing a SELL or low-confidence HOLD",
+                            "Track your cost basis accurately — the P&L is only useful if the entry price is right",
+                        ]}
+                        donts={[
+                            "Don't use Portfolio P&L as a replacement for your brokerage platform",
+                            "Don't add positions for stocks you are just watching — use the watchlist for that",
+                            "Don't ignore a persistent SELL verdict on a losing position — that is confirmation bias territory",
+                        ]}
+                    />
                 </Section>
 
-                <Section id="scorecard" icon={Award} kicker="4.2" title="The Score Card">
+                <Section id="scorecard" icon={Award} kicker="4.2" title="Score Card — your personal track record">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        The <Link to="/scorecard" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>Score Card</Link>{" "}
-                        shows a single composite score (0–100) for your most-recently analysed stock,
-                        with a transparent breakdown of every factor that pushed the number up or
-                        down — momentum, value, sentiment, insider flow, technical confluence.
+                        The Score Card measures how accurate your past verdicts were. A verdict is marked as a "Hit" if a BUY produced ≥5% gain or a SELL produced ≥5% decline within the time horizon. HOLDs are measured for staying within a ±5% range.
                     </p>
-                    <p className="text-sm mt-3 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Below the breakdown is the <strong>Top 10 Trending IDX</strong> ranking —
-                        live composite scores for the ten most-active Indonesian equities, refreshed
-                        every 30 minutes. Tap any name and the full AI verdict runs automatically.
+                    <p className="text-sm leading-relaxed mt-3" style={{ color: "hsl(var(--text-secondary))" }}>
+                        This is your most honest feedback loop. If your hit rate is below 50% on BUY signals, something is wrong — either your stock selection or the market conditions are defeating the model's inputs.
                     </p>
-                    <Callout tone="tip" title="Use the Score Card for shortlists, not for buys">
-                        High composite score = "this is interesting, dig deeper". It is NOT a buy
-                        signal. Always read the underlying verdict before sizing any position.
+                    <Callout tone="tip" title="Use the Score Card as a calibration tool">
+                        If your BUY hit rate is high but SELL hit rate is low, you are better at spotting strength than weakness — adjust your strategy accordingly. If all your high-confidence verdicts are hitting but low-confidence ones are not, that is the model telling you something about its own reliability threshold.
                     </Callout>
+                    <WatchOut items={[
+                        "Score Card results are beta — they measure current price vs entry price, not time-horizon-end price. A future version will use exact horizon-end prices. Take the numbers as directional, not definitive.",
+                        "Verdicts younger than 7 days are marked 'Pending' and excluded from accuracy calculations — the time horizon has not elapsed yet.",
+                        "A high hit rate does not mean you are making money — it measures directional accuracy, not position sizing or timing of exits.",
+                    ]} />
                 </Section>
 
-                <Section id="backtest" icon={History} kicker="4.3" title="Backtesting Lab — does Neural's stack actually work?">
+                <Section id="backtest" icon={History} kicker="4.3" title="Backtesting Lab">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        The <Link to="/backtest" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>Backtesting Lab</Link>{" "}
-                        replays our verdicts against the last 12 months of price action so you can
-                        see how the system actually performs — hit-rate, cumulative P&amp;L,
-                        drawdown, average hold-time. Transparency is the whole point: we show our
-                        homework.
+                        The Backtesting Lab runs Neural's analysis stack against historical data to show how the model's signals have performed in the past. It is a transparency and calibration tool — not a guarantee of future performance.
                     </p>
-                    <Step n={1} title="Pick a strategy">
-                        Three preset strategies: <strong>RF Top-N</strong> (rank by RF score, hold
-                        the top N), <strong>Verdict-aligned</strong> (only act when LLM and RF
-                        agree), <strong>Naive buy-and-hold benchmark</strong>.
+                    <Step n={1} title="Pick a strategy and ticker">
+                        Select a ticker and a backtest window (3 months, 6 months, 1 year). The system re-runs the model on historical data points at weekly intervals.
                     </Step>
                     <Step n={2} title="Read the cumulative P&L chart">
-                        Strategy line vs benchmark line. The shaded area is drawdown depth — small
-                        is good. We display realistic slippage assumptions, not idealised fills.
+                        The chart shows hypothetical returns if you had followed every BUY signal and exited on every SELL signal. Compare against the SPY (S&P 500) or IDX benchmark line.
                     </Step>
-                    <Step n={3} title="Drill into the IDX Signal-Quality panel">
-                        Indonesian users only — scores how often Bandarmology persistence aligned
-                        with the verdict actually outperformed the baseline. This is the most
-                        honest view of whether our IDX-specific signals add value.
+                    <Step n={3} title="Look at the IDX Signal Quality panel">
+                        For IDX stocks, this panel shows the quality distribution of historical signals — what percentage were high-confluence vs weak, and how they performed.
                     </Step>
+                    <WatchOut items={[
+                        "Backtesting is inherently backward-looking. Past performance is not indicative of future results — this is not a cliché, it is a mathematical fact about non-stationary markets.",
+                        "The backtest assumes perfect execution at signal price. In reality, slippage, liquidity constraints, and bid-ask spread reduce actual returns.",
+                        "Stocks with limited history (recent IPOs) will have shorter backtest windows — do not draw conclusions from fewer than 20 signal events.",
+                    ]} />
                 </Section>
 
                 <Section id="idx" icon={Telescope} kicker="4.4" title="IDX exclusives — Bandarmology & Top Picks">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Two Indonesia-only modules that no other AI stock platform exposes today.
+                        IDX (Indonesia Stock Exchange) stocks get two additional analysis layers not available for US stocks:
                     </p>
-                    <ul className="mt-4 space-y-3 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                        <li>
-                            <strong style={{ color: "hsl(var(--text-primary))" }}>Bandarmology card.</strong>{" "}
-                            Live insider-flow signal computed from official IDX/KSEI filings — directors,
-                            commissioners, and major shareholders. Shows accumulation ratio, smart-money
-                            ratio, foreign net flow, and our four derived signals (volume gate, 30d/90d
-                            persistence, normalised impact tier). Appears on every <code>.JK</code> verdict.
-                        </li>
-                        <li>
-                            <strong style={{ color: "hsl(var(--text-primary))" }}>Top IDX Picks scanner.</strong>{" "}
-                            Multi-factor ranking of the most-active Indonesian equities, refreshed every 30
-                            minutes. Composite score blends momentum, fundamentals, sentiment, and Bandarmology.
-                            Tap any name to run the full verdict.
-                        </li>
-                    </ul>
+                    <div className="mt-4 space-y-4 text-sm">
+                        <div className="p-4" style={{ border: "1px solid hsl(var(--border-default))", background: "hsl(var(--surface-elevated))" }}>
+                            <p className="font-semibold mb-2" style={{ color: "hsl(var(--text-primary))" }}>Bandarmology</p>
+                            <p style={{ color: "hsl(var(--text-secondary))" }}>
+                                Cross-references institutional investor net-buy/sell data from IDX regulatory filings. The model detects "persistent accumulation" (institutions consistently buying across multiple reporting periods) or "persistent distribution" (consistently selling). This is the closest thing to seeing smart-money positioning available in public data.
+                            </p>
+                        </div>
+                        <div className="p-4" style={{ border: "1px solid hsl(var(--border-default))", background: "hsl(var(--surface-elevated))" }}>
+                            <p className="font-semibold mb-2" style={{ color: "hsl(var(--text-primary))" }}>Top IDX Confluences</p>
+                            <p style={{ color: "hsl(var(--text-secondary))" }}>
+                                The dashboard highlights the highest-conviction IDX setups from the last 7 days, ranked by a composite quality score. Each entry shows the directional bias, quality tier, insider filing age, and price at analysis. Use this as your IDX morning scan.
+                            </p>
+                        </div>
+                    </div>
+                    <DosDonts
+                        dos={[
+                            "Weight Bandarmology most heavily when persistence_label is 'persistent_accumulation' AND persistence_consistent=true",
+                            "Cross-reference Bandarmology signals with the technical verdict — alignment between smart-money buying and a bullish technical read is a high-quality setup",
+                            "Check the filing age — signals under 15 days are more actionable than signals from 30 days ago",
+                        ]}
+                        donts={[
+                            "Don't trade on Bandarmology alone — it is a confirmatory signal, not a primary one",
+                            "Don't ignore the volume gate flag — if volume_gate_tripped=true, the signal is unreliable",
+                            "Don't assume institutional accumulation means the price will rise immediately — smart money positions can take weeks or months to play out",
+                        ]}
+                    />
                     <Callout tone="warn" title="Reporting lag is real">
-                        IDX/KSEI insider filings arrive T+5 to T+30 trading days after the actual transaction.
-                        Bandarmology is a confirmatory signal, NOT a timing signal. For real-time tape, pair
-                        with Stockbit, RTI Business, or Ajaib (we list ten companion tools on every IDX
-                        verdict).
+                        IDX insider filings lag the actual transaction by 5–30 days. When you see a Bandarmology signal, the institutional activity it describes happened in the past, not today. Use it as background context, not a timing trigger.
                     </Callout>
                 </Section>
 
-                {/* ============================================================ */}
-                {/*                       PART 5 — REFERENCE                     */}
-                {/* ============================================================ */}
-                <PartDivider
-                    n={5}
-                    title="Reference"
-                    subtitle="Plans, settings, FAQ, and the legal bits."
-                    readMins={5}
-                />
+                {/* ══════════════════════════════════════════════
+                    PART 5 — REFERENCE
+                ══════════════════════════════════════════════ */}
+                <ChapterHeader title="Part 5 · Reference" subtitle="Plans, settings, FAQ, and the legal bits." />
 
                 <Section id="plans" icon={BarChart3} kicker="5.1" title="Guest · Free · Pro · Elite · Week Pass">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        You can try one analysis without creating an account. Signing up unlocks
-                        your full daily quota, watchlist, and all features. Higher tiers buy you{" "}
+                        You can try one analysis without creating an account. Signing up unlocks your full daily quota, watchlist, and all features. Higher tiers buy you{" "}
                         <em>more of it</em> — bigger watchlist, more analyses per day, batch sweeps.
                         The numbers below always reflect what the backend actually enforces.
                     </p>
@@ -994,25 +715,25 @@ export default function UserManualPage() {
                             </thead>
                             <tbody style={{ color: "hsl(var(--text-secondary))" }}>
                                 {[
-                                    ["Account required",           "No",       "\u2713", "\u2713", "\u2713", "\u2713"],
-                                    ["Analyses / day",             "1 *",      "3",       "10",      "15",      "50"],
-                                    ["Verdict detail",             "Preview",  "Full",    "Full",    "Full",    "Full"],
-                                    ["Watchlist",                  "\u2014",  "5",       "10",      "25",      "500"],
-                                    ["Three analysis modes",       "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
-                                    ["Telegram alerts",            "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
-                                    ["Pattern Scan",               "\u2014",  "\u2014", "\u2014", "\u2713", "\u2713"],
-                                    ["Top 3 / Bottom 3 sweep",    "\u2014",  "\u2014", "\u2014", "\u2713", "\u2713"],
-                                    ["RF Auto-Scan",               "\u2014",  "\u2014", "\u2014", "\u2713", "\u2713"],
-                                    ["PDF export (full report)",   "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
-                                    ["Trade Slip PDF",             "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
-                                    ["Share verdict (public URL)", "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
-                                    ["Backtesting Lab",            "\u2014",  "\u2014", "\u2713", "\u2713", "\u2713"],
-                                    ["Portfolio P&L",              "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
-                                    ["Score Card",                 "\u2014",  "\u2713", "\u2713", "\u2713", "\u2713"],
+                                    ["Account required",          "No",      "✓",    "✓",    "✓",    "✓"],
+                                    ["Analyses / day",            "1 *",     "3",    "10",   "15",   "50"],
+                                    ["Verdict detail",            "Preview", "Full", "Full", "Full", "Full"],
+                                    ["Watchlist",                 "—",       "5",    "10",   "25",   "500"],
+                                    ["Three analysis modes",      "—",       "✓",    "✓",    "✓",    "✓"],
+                                    ["Telegram alerts",           "—",       "✓",    "✓",    "✓",    "✓"],
+                                    ["Pattern Scan",              "—",       "—",    "—",    "✓",    "✓"],
+                                    ["Top 3 / Bottom 3 sweep",   "—",       "—",    "—",    "✓",    "✓"],
+                                    ["RF Auto-Scan",              "—",       "—",    "—",    "✓",    "✓"],
+                                    ["PDF export (full report)",  "—",       "✓",    "✓",    "✓",    "✓"],
+                                    ["Trade Slip PDF",            "—",       "✓",    "✓",    "✓",    "✓"],
+                                    ["Share verdict (public URL)","—",       "✓",    "✓",    "✓",    "✓"],
+                                    ["Backtesting Lab",           "—",       "—",    "✓",    "✓",    "✓"],
+                                    ["Portfolio P&L",             "—",       "✓",    "✓",    "✓",    "✓"],
+                                    ["Score Card",                "—",       "✓",    "✓",    "✓",    "✓"],
                                 ].map(([feat, g, fr, w, p, e]) => (
                                     <tr key={feat} style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
                                         <td className="p-2">{feat}</td>
-                                        <td className="p-2 font-mono text-[12px]" style={{ color: g === "\u2014" ? "hsl(var(--text-muted))" : undefined }}>{g}</td>
+                                        <td className="p-2 font-mono text-[12px]" style={{ color: g === "—" ? "hsl(var(--text-muted))" : undefined }}>{g}</td>
                                         <td className="p-2 font-mono text-[12px]">{fr}</td>
                                         <td className="p-2 font-mono text-[12px]">{w}</td>
                                         <td className="p-2 font-mono text-[12px]">{p}</td>
@@ -1032,136 +753,73 @@ export default function UserManualPage() {
                     </Callout>
                 </Section>
 
-                                <Section id="settings" icon={SettingsIcon} kicker="5.2" title="Settings & account">
-                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Open <Link to="/settings" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>Settings</Link>{" "}
-                        from the avatar in the top-right of any page. The screen is grouped into
-                        seven panels:
-                    </p>
-                    <ul className="mt-4 space-y-2.5 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                        <li>· <strong>Profile</strong> — display name, email, password reset, account deletion.</li>
-                        <li>· <strong>Preferences</strong> — markets you trade, default analysis mode, theme (dark/light).</li>
-                        <li>· <strong>Telegram</strong> — link/unlink the bot, run a test alert, manage which channels reach your phone.</li>
-                        <li>· <strong>Quiet Hours</strong> — start/end times + timezone, queues alerts during DND.</li>
-                        <li>· <strong>RF Auto-Scan</strong> — Pro+ — runs a daily background sweep and pushes alerts on flips.</li>
-                        <li>· <strong>Subscription</strong> — current plan, billing date, Manage / Cancel via PayPal.</li>
-                        <li>· <strong>Privacy</strong> — export your data, delete your account, opt-out flags.</li>
-                    </ul>
-                </Section>
-
-                <Section id="faq" icon={HelpCircle} kicker="5.3" title="FAQ & troubleshooting">
-                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        The most common questions and quick fixes. Tap any question to expand.
-                    </p>
-                    <div className="mt-4">
-                        <FAQItem q="My analysis is stuck on 'LLM verdict' for 60+ seconds — what's happening?">
-                            The AI provider occasionally has slow responses. Our backend retries
-                            transient errors automatically up to 2 times. If a verdict still hasn't landed
-                            after 240 seconds, the row will turn red with a "Tap to retry" pill — that's
-                            your cue. The retry doesn't consume an extra quota slot.
-                        </FAQItem>
-                        <FAQItem q="I added a stock to watchlist but it shows no verdict — why?">
-                            Watchlist is a list, not an auto-analyser. Tap the sparkles (✨) on the row to
-                            run the first verdict. After that, the row caches the result so you can re-open
-                            it without re-paying a quota slot.
-                        </FAQItem>
-                        <FAQItem q="My Telegram alerts stopped arriving">
-                            Three checks: (1) confirm <strong>@neulab_bot</strong> is still in your chat
-                            list and hasn't been blocked; (2) Settings → Telegram → tap{" "}
-                            <strong>Send test</strong> — if that doesn't arrive, re-link the bot;
-                            (3) check that the verdict in question crossed the 75% confidence threshold —
-                            HOLDs and low-conviction signals are filtered by design.
-                        </FAQItem>
-                        <FAQItem q="I'm on Free and the daily quota error message appears — what now?">
-                            Free is 1 analysis per day. Three options: (1) wait for the daily reset
-                            (midnight UTC), (2) buy a one-time Week Pass ($9 / 7 days, 10 analyses/day),
-                            (3) upgrade to Pro for unlimited daily flow. Past verdicts you've already run
-                            stay readable forever — only NEW analyses count against the quota.
-                        </FAQItem>
-                        <FAQItem q="The IDX ticker I want shows 'no data' — why?">
-                            Coverage gaps usually mean (a) the ticker is delisted/suspended, (b) it's
-                            outside our RapidAPI provider's coverage list, or (c) we hit our 1,000-req
-                            monthly quota and fell back to yfinance which doesn't cover that name. Try
-                            again next month, or reach out via support and we'll look into adding it.
-                        </FAQItem>
-                        <FAQItem q="Can I export my watchlist or portfolio?">
-                            CSV import/export is on the roadmap (P2 in our public backlog). Today, the
-                            cleanest workaround is to copy the watchlist URL — it's deterministic and you
-                            can share or save it. We'll surface a proper export button when CSV ships.
-                        </FAQItem>
-                        <FAQItem q="The verdict says BUY but I disagree with the reasoning. Should I trust it?">
-                            <em>Trust your reasoning, not the colour of the ring.</em> Neural is a research
-                            tool — when the explanation doesn't convince you, the verdict shouldn't either.
-                            Disagreement is a feature, not a bug. Re-read the Honest Limits section on{" "}
-                            <Link to="/technical#honest-limits" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>/technical</Link>{" "}
-                            for everything the system can't do.
-                        </FAQItem>
-                        <FAQItem q="How do I cancel my Pro / Elite subscription?">
-                            Settings → Subscription → tap <strong>Manage on PayPal</strong>. PayPal handles
-                            the cancellation and we get a webhook within minutes. Your Pro features stay
-                            active until the end of the current billing period — no proration on cancellation.
-                        </FAQItem>
-                        <FAQItem q="Where do I report a bug or request a feature?">
-                            Open Settings → Profile → <strong>Contact support</strong>. Bugs typically get
-                            replied within 24 hours; feature requests are triaged into the public backlog
-                            on <Link to="/why" className="link-underline" style={{ color: "hsl(var(--text-primary))" }}>/why</Link>.
-                        </FAQItem>
+                <Section id="settings" icon={SettingsIcon} kicker="5.2" title="Settings & account">
+                    <div className="mt-2 space-y-2 text-sm">
+                        {[
+                            ["Profile", "Update your display name and email. Change your password."],
+                            ["Markets", "Set which markets you trade (US / IDX / both). Affects dashboard feed prioritisation."],
+                            ["Experience level", "Beginner / Intermediate / Advanced. Affects default mode pre-selection and tooltip verbosity."],
+                            ["Analysis mode default", "Set the mode that pre-selects when you open the watchlist. Default is Hybrid."],
+                            ["Telegram alerts", "Link your Telegram account. Set quiet hours and which alert types you want."],
+                            ["Subscription", "View current plan, billing cycle, and next renewal date. Cancel or upgrade from here."],
+                            ["Data & privacy", "Delete your account and all associated data permanently. This cannot be undone."],
+                        ].map(([setting, desc]) => (
+                            <div key={setting} className="grid grid-cols-12 gap-3 py-2" style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
+                                <span className="col-span-3 font-mono text-[11px] font-semibold self-start pt-0.5" style={{ color: "hsl(var(--text-primary))" }}>{setting}</span>
+                                <span className="col-span-9" style={{ color: "hsl(var(--text-secondary))" }}>{desc}</span>
+                            </div>
+                        ))}
                     </div>
                 </Section>
 
-                <Section
-                    id="disclaimer"
-                    icon={AlertTriangle}
-                    kicker="5.4"
-                    title="Important — Not financial advice"
-                >
-                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Neural Stock Intelligence™ is an <strong>AI-powered research and education tool</strong>.
-                        The verdicts, scores, alerts, patterns, and PDFs we generate are{" "}
-                        <strong>not financial advice</strong>, and NeuLab Inc. is not a registered
-                        investment adviser in any jurisdiction. Markets are unpredictable; AI models —
-                        including ours — can be wrong.
-                    </p>
-                    <p className="text-sm leading-relaxed mt-3" style={{ color: "hsl(var(--text-secondary))" }}>
-                        Always do your own research before placing any trade. Never invest more than
-                        you can afford to lose. Confidence percentages describe the strength of the
-                        model's classification given the inputs — they are not forecasts of price
-                        movement and not personalised advice. If you are unsure, consult a licensed
-                        financial professional in your jurisdiction.
-                    </p>
+                <Section id="faq" icon={HelpCircle} kicker="5.3" title="FAQ & troubleshooting">
+                    <div className="mt-2 space-y-5 text-sm">
+                        {[
+                            ["Why did my analysis fail on the first attempt but work on the second?",
+                             "The backend server sleeps after inactivity (Railway cold-start). The first request wakes it up, which takes 10–15 seconds. The app auto-retries once. If it still fails on retry, there may be a data issue — try again in a minute."],
+                            ["Why does HOLD at 42% confidence look different from HOLD at 68%?",
+                             "42% means weak/contradictory signals — the model found no meaningful edge. 68% means the model sees a balanced situation with roughly equal bullish and bearish factors. Both are HOLD but for different reasons. Read the executive summary."],
+                            ["The verdict hasn't changed after re-analysis — is that a bug?",
+                             "No. If the underlying data has not changed significantly since your last analysis, the verdict should be stable. Consistency is correct behaviour. A verdict that flips between BUY and SELL on consecutive analyses would be a worse product."],
+                            ["Why is the IDX price showing in USD?",
+                             "This was a bug that has been fixed — IDX tickers now display in Rp (Rupiah). If you still see USD, refresh the page. Prices are always in the stock's native currency."],
+                            ["I got a BUY and the stock went down — is the AI broken?",
+                             "No. A BUY verdict means the evidence at analysis time leaned bullish. Markets can move for reasons the model cannot see — macro events, news breaks, insider activity post-filing. The AI classifies patterns, it does not predict the future."],
+                            ["How fresh is the data?",
+                             "Price data is fetched live at analysis time (minutes behind live trading). Fundamental data is updated periodically — for IDX stocks it may be one quarter old. Bandarmology data lags 5–30 days behind actual transactions. Check the 'data as of' dates in the fundamental panel."],
+                            ["Can I use this for crypto?",
+                             "No. The platform is designed exclusively for equities (stocks). Crypto assets are not supported."],
+                            ["Why is my Score Card hit rate low?",
+                             "Either the model is misreading the stocks you are selecting, or you are selecting stocks in conditions where the signals are unreliable (e.g., earnings-driven moves, macro-driven markets). Try filtering to only high-confidence verdicts (≥75%) and see if that cohort performs better."],
+                            ["I cancelled my Pro subscription — why am I still on Free immediately?",
+                             "Cancellation takes effect at the end of your current billing period, not immediately. You keep Pro access until the period ends. Your subscription_cancels_at date is shown in Settings → Subscription."],
+                            ["The 'Waking up server' message has been showing for over 2 minutes.",
+                             "Something went wrong beyond the normal cold-start delay. Refresh the page and try again. If it persists, the backend may be restarting after a deploy — wait 2–3 minutes."],
+                        ].map(([q, a]) => (
+                            <div key={q}>
+                                <p className="font-semibold mb-1" style={{ color: "hsl(var(--text-primary))" }}>Q: {q}</p>
+                                <p style={{ color: "hsl(var(--text-secondary))" }}>A: {a}</p>
+                            </div>
+                        ))}
+                    </div>
                 </Section>
 
-                {/* CTA */}
-                <section className="text-center mt-16" data-testid="manual-final-cta">
-                    <p className="text-overline" style={{ color: "hsl(var(--hold))" }}>
-                        You're ready
+                <Section id="disclaimer" icon={ShieldAlert} kicker="5.4" title="Important — Not financial advice">
+                    <Callout tone="danger" title="Please read this carefully">
+                        <p className="mt-2">Neural Stock Intelligence™ is an <strong>educational research tool</strong>. It is not a licensed financial advisor, broker, or investment service. Nothing produced by this platform — including all AI-generated verdicts, confidence scores, price targets, scenarios, or recommendations — constitutes financial advice, investment advice, or a recommendation to buy, sell, or hold any security.</p>
+                        <p className="mt-3">All investment decisions are your own. You are solely responsible for any trades you make and their outcomes. Past accuracy of verdicts does not guarantee future accuracy. Markets are inherently unpredictable and all investments carry risk, including the risk of total loss.</p>
+                        <p className="mt-3">The AI model has inherent limitations: it cannot access real-time news, cannot predict earnings surprises, cannot account for sudden macroeconomic shifts, and can produce incorrect outputs. Always conduct your own research and consult a qualified financial professional before making significant investment decisions.</p>
+                        <p className="mt-3 font-semibold">By using this platform you confirm that you have read, understood, and accepted these terms.</p>
+                    </Callout>
+                </Section>
+
+                <div className="pt-12 pb-6 text-center">
+                    <p className="font-mono text-[10px]" style={{ color: "hsl(var(--text-muted))", letterSpacing: "0.08em" }}>
+                        NEURAL STOCK INTELLIGENCE™ · NEULAB INC. · NOT FINANCIAL ADVICE · LAST UPDATED JUNE 2026
                     </p>
-                    <h2
-                        className="font-serif mt-3"
-                        style={{
-                            fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)",
-                            letterSpacing: "-0.02em",
-                            lineHeight: 1.05,
-                        }}
-                    >
-                        Run your first verdict.
-                    </h2>
-                    <p
-                        className="mt-4 max-w-xl mx-auto text-sm"
-                        style={{ color: "hsl(var(--text-secondary))" }}
-                    >
-                        The fastest way to learn Neural Stock Intelligence™ is to type a ticker and
-                        watch what happens.
-                    </p>
-                    <Link
-                        to="/dashboard"
-                        className="btn-primary mt-6 inline-flex"
-                        data-testid="manual-cta-dashboard"
-                    >
-                        Open Dashboard <ArrowRight size={16} strokeWidth={1.8} />
-                    </Link>
-                </section>
-            </div>
-        </>
+                </div>
+
+            </main>
+        </div>
     );
 }
