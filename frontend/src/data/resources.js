@@ -29,6 +29,8 @@ export const RESOURCES = [
         ctaLabel: "Download PDF",
         downloadUrl: "/resources/neural-stock-intelligence-user-manual-v1.pdf",
         downloadFilename: "Neural-Stock-Intelligence-User-Manual.pdf",
+        secondaryUrl: "/manual",
+        secondaryLabel: "Read in-app →",
         meta: { pages: "5 parts", size: "~176 KB", priceLabel: "Free · No email required" },
         heroQuote: "Understanding the tool makes every verdict more useful.\nThis manual explains not just what the AI says — but how it thinks.",
         body: [

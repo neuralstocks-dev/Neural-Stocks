@@ -220,6 +220,21 @@ export default function ResourceDetailPage() {
                     )}
                     <div className="mt-6">
                         <CtaButton resource={resource} testid="resource-cta-hero" />
+                        {resource.secondaryUrl && (
+                            <Link
+                                to={resource.secondaryUrl}
+                                className="inline-flex items-center gap-2 px-5 py-3 font-mono text-sm transition-colors"
+                                style={{
+                                    border: "1px solid hsl(var(--border-default))",
+                                    color: "hsl(var(--text-secondary))",
+                                    letterSpacing: "0.06em",
+                                    textTransform: "uppercase",
+                                }}
+                                data-testid="resource-cta-secondary"
+                            >
+                                {resource.secondaryLabel || "Read online"}
+                            </Link>
+                        )}
                     </div>
                 </header>
 
