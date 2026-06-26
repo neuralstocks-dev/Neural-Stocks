@@ -22,6 +22,64 @@
  */
 export const RESOURCES = [
     {
+        slug: "user-manual",
+        kind: "link",
+        title: "User Manual",
+        teaser: "Complete guide to using Neural Stock Intelligence effectively — how the AI works, how to read verdicts, do's and don'ts, and what to watch out for.",
+        ctaLabel: "Read Manual",
+        url: "/manual",
+        meta: { pages: "5 parts", priceLabel: "Free · No account required" },
+        heroQuote: "Understanding the tool makes every verdict more useful.\nThis manual explains not just what the AI says — but how it thinks.",
+        body: [
+            {
+                type: "lead",
+                text: "What this manual covers",
+            },
+            {
+                type: "section",
+                paragraph:
+                    "The User Manual is the definitive guide to getting the most out of Neural Stock Intelligence. " +
+                    "It covers how the five data pipelines work, what BUY / HOLD / SELL actually means, how to read the confidence score correctly, " +
+                    "when to use each analysis mode, and how to build an effective daily research workflow.",
+            },
+            {
+                type: "section",
+                heading: "What's inside",
+                items: [
+                    "Part 1 — Understanding the App: How the AI actually works, what each verdict means, confidence score explained, three analysis modes compared",
+                    "Part 2 — Getting Started: Sign-up, dashboard tour, your first analysis, full anatomy of a verdict page with all 11 sections explained",
+                    "Part 3 — Daily Workflow: Watchlist best practices, Pattern Scan as a triage tool, Alerts & Telegram, master do's and don'ts",
+                    "Part 4 — Power Features: Portfolio P&L, Score Card, Backtesting Lab, IDX exclusives (Bandarmology & Top Picks)",
+                    "Part 5 — Reference: Plans comparison table (Guest through Elite), settings reference, 10-question FAQ, full disclaimer",
+                ],
+            },
+            {
+                type: "section",
+                heading: "Do's, Don'ts & Watch-outs",
+                paragraph: "The most detailed section covers the most common mistakes users make:",
+                items: [
+                    "How to use verdicts correctly — reading executive summaries, checking Bear scenarios, re-analysing before acting",
+                    "Managing your daily quota effectively without wasting analyses",
+                    "IDX-specific risks — Bandarmology reporting lag, low-liquidity stocks, market hours",
+                    "US stock risks — earnings announcements, meme stocks, pre-market data gaps",
+                    "Things that look like bugs but are not — cold-start behaviour, stable verdicts, low-confidence HOLDs",
+                ],
+            },
+            {
+                type: "callout",
+                paragraph: "If you only read one thing before your first analysis, read Part 1 Section 1.3 — Reading Verdicts Correctly. It explains the single most common misunderstanding new users have.",
+            },
+            {
+                type: "section",
+                heading: "Available formats",
+                items: [
+                    "In-app: Read the full manual at stock.neulab.xyz/manual with live navigation and section anchors",
+                    "Word document: Download the complete manual as a .docx file from the Resources page for offline reading or sharing",
+                ],
+            },
+        ],
+    },
+    {
         slug: "stock-market-decoded",
         kind: "pdf",
         title: "The Stock Market Decoded",
