@@ -246,11 +246,38 @@ def compute_technicals(history: list) -> dict:
     ema12 = ema(closes, 12)
     ema26 = ema(closes, 26)
     macd = (ema12 - ema26) if (ema12 is not None and ema26 is not None) else None
+    sma20_val = sma(closes, 20)
+    sma50_val = sma(closes, 50)
+    price = closes[-1]
+
+    # Trend regime: classify the current price/MA relationship so the LLM
+    # can apply the reversal pattern confidence gate correctly.
+    # bullish  = price > SMA20 > SMA50  (confirmed uptrend)
+    # bearish  = price < SMA20 < SMA50  (confirmed downtrend)
+    # mixed    = everything else (transition / conflicted)
+    if sma20_val and sma50_val:
+        if price > sma20_val and sma20_val > sma50_val:
+            trend_regime = "bullish"
+        elif price < sma20_val and sma20_val < sma50_val:
+            trend_regime = "bearish"
+        else:
+            trend_regime = "mixed"
+        # How far is price from each MA (as %)
+        pct_from_sma20 = round((price / sma20_val - 1) * 100, 2)
+        pct_from_sma50 = round((price / sma50_val - 1) * 100, 2) if sma50_val else None
+    else:
+        trend_regime = None
+        pct_from_sma20 = None
+        pct_from_sma50 = None
+
     return {
         "rsi_14": round(rsi(closes, 14), 2) if rsi(closes, 14) is not None else None,
-        "sma_20": round(sma(closes, 20), 4) if sma(closes, 20) is not None else None,
-        "sma_50": round(sma(closes, 50), 4) if sma(closes, 50) is not None else None,
+        "sma_20": round(sma20_val, 4) if sma20_val is not None else None,
+        "sma_50": round(sma50_val, 4) if sma50_val is not None else None,
         "ema_12": round(ema12, 4) if ema12 is not None else None,
         "ema_26": round(ema26, 4) if ema26 is not None else None,
         "macd": round(macd, 4) if macd is not None else None,
+        "trend_regime": trend_regime,          # "bullish" | "bearish" | "mixed" | None
+        "pct_from_sma20": pct_from_sma20,      # e.g. -8.3 = price 8.3% below SMA20
+        "pct_from_sma50": pct_from_sma50,      # e.g. +12.1 = price 12.1% above SMA50
     }

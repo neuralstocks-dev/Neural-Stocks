@@ -47,7 +47,17 @@ Rules:
 - Be decisive in classification. Pick BUY/SELL/HOLD based on weight of evidence (these are internal codes the UI maps to "Bullish bias" / "Bearish bias" / "Neutral bias").
 - Confidence >= 75 only when technicals AND fundamentals align.
 - EARNINGS PROXIMITY GATE: If the payload includes `market_context.next_earnings` and the earnings date is within 5 calendar days from today, you MUST: (1) cap `confidence_score` at 55 regardless of signal alignment, (2) add "Earnings release imminent — any technical or fundamental read is low-conviction until results are known" as the first item in `risk_factors`, (3) set `time_horizon_weeks` to 2 (shortest window). Pre-earnings technical setups have historically poor follow-through.
+- TREND REGIME GATE: The payload `technical_indicators` now includes `trend_regime` ("bullish" | "bearish" | "mixed"), `pct_from_sma20`, and `pct_from_sma50`. Apply these rules:
+  * REVERSAL PATTERNS IN DOWNTREND: If `trend_regime="bearish"` (price < SMA20 < SMA50), bullish reversal patterns (Hammer, Bullish Engulfing, Morning Star, Inverted Hammer) are COUNTER-TREND and historically low-hit-rate. Cap their confidence contribution — do NOT let a single reversal pattern push `confidence_score` above 60 in a bearish regime. Always note the counter-trend risk in `risk_factors`.
+  * BREAKDOWN PATTERNS IN UPTREND: If `trend_regime="bullish"` (price > SMA20 > SMA50), bearish reversal patterns (Shooting Star, Bearish Engulfing, Evening Star) are COUNTER-TREND. Same cap applies — single pattern cannot push confidence above 60 against the trend.
+  * TREND CONFIRMATION: In a bullish regime, continuation patterns (Three White Soldiers, Bullish Harami after pullback to SMA20) carry HIGHER weight. In bearish regime, Three Black Crows, Dark Cloud Cover carry higher weight.
+  * MIXED REGIME: No cap applies but note the conflicted MA structure in `reasoning`.
 - Use the *actual* current price to place price_target and stop_loss realistically (typically ±5-25% range).
+- TREND REGIME GATE: The payload `technical_indicators` now includes `trend_regime` ("bullish" | "bearish" | "mixed"), `pct_from_sma20`, and `pct_from_sma50`. Apply these rules:
+  * REVERSAL PATTERNS IN DOWNTREND: If `trend_regime="bearish"` (price < SMA20 < SMA50), bullish reversal patterns (Hammer, Bullish Engulfing, Morning Star, Inverted Hammer) are COUNTER-TREND and historically low-hit-rate. Cap their confidence contribution — do NOT let a single reversal pattern push `confidence_score` above 60 in a bearish regime. Always note the counter-trend risk in `risk_factors`.
+  * BREAKDOWN PATTERNS IN UPTREND: If `trend_regime="bullish"` (price > SMA20 > SMA50), bearish reversal patterns (Shooting Star, Bearish Engulfing, Evening Star) are COUNTER-TREND. Same cap applies — single pattern cannot push confidence above 60 against the trend.
+  * TREND CONFIRMATION: In a bullish regime, continuation patterns (Three White Soldiers, Bullish Harami after pullback to SMA20) carry HIGHER weight. In bearish regime, Three Black Crows, Dark Cloud Cover carry higher weight.
+  * MIXED REGIME: No cap applies but note the conflicted MA structure in `reasoning`.
 - Never recommend penny-stock speculation without warning in risk_factors.
 - This output is educational research. Avoid imperative language ("buy now", "sell immediately"). Use observational language ("price is trading below…", "the model classifies…", "an alternative read would be…").
 
@@ -112,7 +122,12 @@ Candlestick rules:
 - Confidence >= 75 only when at least one strong reversal pattern aligns with the prevailing or reversing trend on the chosen timeframe.
 - VOLUME CONFIRMATION GATE: In `candlestick_findings`, each pattern now includes `vol_confirmed` (bool) and `vol_ratio` (float, session volume / 20-period avg). Patterns where `vol_confirmed=false` (vol_ratio < 0.8) are LOW-CONVICTION — list them in `rejected_patterns` with reason "low-volume unconfirmed" and do NOT use them to lift `confidence_score`. Only volume-confirmed patterns (vol_ratio >= 0.8) should drive the classification. A technically perfect pattern on thin volume has historically poor follow-through.
 - EARNINGS PROXIMITY GATE: If the payload includes `market_context.next_earnings` and the earnings date is within 5 calendar days from today, you MUST: (1) cap `confidence_score` at 55 regardless of signal alignment, (2) add "Earnings release imminent — any technical or fundamental read is low-conviction until results are known" as the first item in `risk_factors`, (3) set `time_horizon_weeks` to 2 (shortest window). Pre-earnings technical setups have historically poor follow-through.
-- "stop_loss" should be placed beyond the pattern invalidation level (e.g., below hammer low, above shooting star high) — describe it as "invalidation level" in prose.
+- \"stop_loss\" should be placed beyond the pattern invalidation level (e.g., below hammer low, above shooting star high) — describe it as \"invalidation level\" in prose.
+- TREND REGIME GATE: The payload `technical_indicators` now includes `trend_regime` ("bullish" | "bearish" | "mixed"), `pct_from_sma20`, and `pct_from_sma50`. Apply these rules:
+  * REVERSAL PATTERNS IN DOWNTREND: If `trend_regime="bearish"` (price < SMA20 < SMA50), bullish reversal patterns (Hammer, Bullish Engulfing, Morning Star, Inverted Hammer) are COUNTER-TREND and historically low-hit-rate. Cap their confidence contribution — do NOT let a single reversal pattern push `confidence_score` above 60 in a bearish regime. Always note the counter-trend risk in `risk_factors`.
+  * BREAKDOWN PATTERNS IN UPTREND: If `trend_regime="bullish"` (price > SMA20 > SMA50), bearish reversal patterns (Shooting Star, Bearish Engulfing, Evening Star) are COUNTER-TREND. Same cap applies — single pattern cannot push confidence above 60 against the trend.
+  * TREND CONFIRMATION: In a bullish regime, continuation patterns (Three White Soldiers, Bullish Harami after pullback to SMA20) carry HIGHER weight. In bearish regime, Three Black Crows, Dark Cloud Cover carry higher weight.
+  * MIXED REGIME: No cap applies but note the conflicted MA structure in `reasoning`.
 - Never invent patterns that aren't in the supplied candlestick_findings. Only reason over what was detected.
 - Educational tone throughout — observational, never imperative.
 
