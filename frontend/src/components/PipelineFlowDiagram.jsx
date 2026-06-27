@@ -535,7 +535,7 @@ function FlowLegend() {
             <LegendDot color="hsl(45, 92%, 55%)" label="Deterministic compute" />
             <LegendDot color="hsl(256, 92%, 70%)" label="AI reasoning (stochastic)" />
             <LegendDot color="hsl(140, 50%, 45%)" label="Output artifact" />
-            <span className="opacity-70">⏱ ≈ 12–18 s end-to-end</span>
+            <span className="opacity-70">⏱ ≈ 20–60 s end-to-end</span>
         </div>
     );
 }
@@ -602,7 +602,7 @@ function MobileFlow({ activeStage }) {
                 </li>
             ))}
             <li className="text-center pt-2 font-mono" style={{ fontSize: "10px", color: "hsl(var(--text-muted))" }}>
-                ⏱ ≈ 12–18 s end-to-end
+                ⏱ ≈ 20–60 s end-to-end
             </li>
         </ol>
     );
