@@ -300,6 +300,9 @@ export default function UserManualPage() {
                         "A 90% confidence BUY does not mean 90% chance of going up. It means the model found very aligned bullish evidence. The stock can still fall.",
                         "Low confidence (under 45) on a HOLD is actually informative — it means the model genuinely cannot read this stock right now. That indecision is a signal itself.",
                         "Hybrid mode typically produces higher confidence scores than Standard because it has more input pillars to draw from. Do not compare scores across modes directly.",
+                        "Earnings proximity gate: if earnings are within 5 days, confidence is hard-capped at 55 regardless of signal strength. Pre-earnings verdicts are structurally low-conviction.",
+                        "Volume confirmation gate: candlestick patterns on sessions with less than 0.8× average volume are flagged as unconfirmed and contribute reduced weight to confidence.",
+                        "Trend regime gate: a bullish reversal pattern in a confirmed bearish trend (price < SMA20 < SMA50) is capped at 60 confidence. Counter-trend reversals have historically lower success rates.",
                     ]} />
                 </Section>
 
@@ -579,7 +582,13 @@ export default function UserManualPage() {
                         "ADRs and foreign stocks listed on US exchanges may have limited fundamental data — the model will note this in the executive summary.",
                     ]} />
 
-                    <p className="font-semibold text-sm mt-6 mb-2" style={{ color: "hsl(var(--text-primary))" }}>Things that look like bugs but aren't</p>
+                    <p className="font-semibold text-sm mt-6 mb-2" style={{ color: "hsl(var(--text-primary))" }}>Confidence score watch-outs</p>
+                    <WatchOut items={[
+                        "A verdict showing '⚠ stale' on the watchlist means it is more than 5 trading days old — re-analyse before acting on it. Market conditions change.",
+                        "If a verdict near earnings shows confidence of 55 or lower with an earnings warning in risk_factors, that is correct behaviour — not a data problem. The model is being honest about pre-earnings uncertainty.",
+                        "A bullish pattern on thin volume (below 0.8× average) will appear in rejected_patterns on the verdict page — not in the main pattern list. This is the volume gate working correctly.",
+                        "A Hammer in a stock that is well below both SMA20 and SMA50 will produce at most 60 confidence even if the pattern is textbook-perfect. This is the trend regime gate. Counter-trend reversals succeed roughly 35% of the time — the model now reflects that.",
+                    ]} />
                     <WatchOut items={[
                         "'Waking up server…' on first analysis — the backend sleeps after inactivity. Normal. Takes 10–15 seconds then works fine.",
                         "First analysis fails, second attempt works — same reason as above, or a transient yfinance data issue. The app auto-retries once.",

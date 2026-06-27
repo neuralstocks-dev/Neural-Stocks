@@ -410,9 +410,10 @@ export default function TechnicalPage() {
                                 Rule 1 · Earnings-Proximity Gate
                             </p>
                             <p className="text-sm mt-2 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                                When the next earnings release is within <strong>7 days</strong>, displayed
-                                confidence is capped at <strong>65</strong>. Pre-earnings price action is
-                                largely event-driven — the model can't price the surprise. Cap eliminates
+                                When the next earnings release is within <strong>5 calendar days</strong>, confidence
+                                is hard-capped at <strong>55</strong> and time horizon drops to 2 weeks. An earnings
+                                warning is forced into <code>risk_factors</code>. Pre-earnings price action is
+                                largely event-driven — the model can't price the surprise. This cap eliminates
                                 an entire class of false-confident BUY/SELL calls right before binary events.
                             </p>
                         </div>
@@ -437,6 +438,68 @@ export default function TechnicalPage() {
                                 the verdict ring so you see the model uncertainty. Empirical: RF disagrees
                                 ~12% of the time and historical win-rate on AI-only verdicts in those
                                 cases drops by ~9pp.
+                            </p>
+                        </div>
+                        <div
+                            className="p-4"
+                            style={{
+                                border: "1px solid hsl(var(--border-default))",
+                                borderLeft: "3px solid hsl(var(--hold))",
+                                borderRadius: 2,
+                            }}
+                        >
+                            <p className="text-overline" style={{ color: "hsl(var(--hold))", fontSize: "0.6rem" }}>
+                                Rule 3 · Volume Confirmation Gate
+                            </p>
+                            <p className="text-sm mt-2 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                Every detected candlestick pattern is tagged with its session's <strong>volume ratio</strong>{" "}
+                                (session volume ÷ 20-period average). Patterns where <code>vol_ratio {"<"} 0.8</code> are
+                                classified as <strong>unconfirmed</strong> — they are listed in <code>rejected_patterns</code>{" "}
+                                and contribute only 50% weight to the bias score. The AI is instructed not to use
+                                unconfirmed patterns to lift confidence. A technically perfect Hammer on 0.3× average
+                                volume has historically poor follow-through; this gate removes that noise.
+                            </p>
+                        </div>
+                        <div
+                            className="p-4"
+                            style={{
+                                border: "1px solid hsl(var(--border-default))",
+                                borderLeft: "3px solid hsl(var(--hold))",
+                                borderRadius: 2,
+                            }}
+                        >
+                            <p className="text-overline" style={{ color: "hsl(var(--hold))", fontSize: "0.6rem" }}>
+                                Rule 4 · Trend Regime Gate
+                            </p>
+                            <p className="text-sm mt-2 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                <code>compute_technicals()</code> now classifies each analysis into one of three regimes:{" "}
+                                <strong>bullish</strong> (price {">"} SMA20 {">"} SMA50),{" "}
+                                <strong>bearish</strong> (price {"<"} SMA20 {"<"} SMA50), or{" "}
+                                <strong>mixed</strong>. Counter-trend reversal patterns are capped at{" "}
+                                <strong>60 confidence</strong> — a Hammer in a confirmed bearish regime cannot
+                                produce a high-conviction BUY. Trend-confirming continuation patterns (Three White
+                                Soldiers in a bullish regime, Three Black Crows in bearish) carry higher weight.
+                                Base rates: reversal patterns against trend succeed ~35% of the time vs ~58% when
+                                trend-aligned.
+                            </p>
+                        </div>
+                        <div
+                            className="p-4"
+                            style={{
+                                border: "1px solid hsl(var(--border-default))",
+                                borderLeft: "3px solid hsl(var(--hold))",
+                                borderRadius: 2,
+                            }}
+                        >
+                            <p className="text-overline" style={{ color: "hsl(var(--hold))", fontSize: "0.6rem" }}>
+                                Rule 5 · Stale Verdict Indicator
+                            </p>
+                            <p className="text-sm mt-2 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                Verdict badges older than <strong>7 calendar days</strong> (~5 trading days) are
+                                flagged with a <strong>⚠ stale</strong> indicator on the watchlist row. This is a UX
+                                accuracy measure — a verdict from 2 weeks ago on a stock that has since moved 15%
+                                is structurally unreliable regardless of its original confidence. The indicator
+                                prompts re-analysis before acting without being intrusive.
                             </p>
                         </div>
                     </div>
