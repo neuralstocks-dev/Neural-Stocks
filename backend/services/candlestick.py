@@ -327,27 +327,43 @@ def scan(history: list, lookback: int = 10, timeframe: str = "daily") -> dict:
     start_idx = len(hist) - lookback
     found: list = []
 
+    # Compute 20-candle average volume for volume confirmation gate
+    # Uses all available history up to the scan window for a stable baseline
+    vol_window = [c.get("volume") or 0 for c in hist if (c.get("volume") or 0) > 0]
+    avg_vol_20 = sum(vol_window[-20:]) / len(vol_window[-20:]) if len(vol_window) >= 5 else None
+
     for i in range(start_idx, len(hist)):
         curr = hist[i]
         trend = _trend_before(hist, i)
+        # Volume ratio for this session vs 20-period average
+        curr_vol = curr.get("volume") or 0
+        vol_ratio = round(curr_vol / avg_vol_20, 2) if avg_vol_20 and avg_vol_20 > 0 else None
+        vol_confirmed = vol_ratio is None or vol_ratio >= 0.8  # treat missing volume as confirmed
+
         # Single
         for det in (_doji(curr), _hammer_family(curr, trend)):
             if det:
-                found.append({**det, "candle_date": curr["date"]})
+                found.append({**det, "candle_date": curr["date"],
+                               "vol_ratio": vol_ratio,
+                               "vol_confirmed": vol_confirmed})
         # Two-candle
         if i >= 1:
             prev = hist[i - 1]
             for det in (_engulfing(prev, curr), _harami(prev, curr),
                         _piercing_darkcloud(prev, curr), _tweezer(prev, curr, trend)):
                 if det:
-                    found.append({**det, "candle_date": curr["date"]})
+                    found.append({**det, "candle_date": curr["date"],
+                                   "vol_ratio": vol_ratio,
+                                   "vol_confirmed": vol_confirmed})
         # Three-candle
         if i >= 2:
             c1, c2, c3 = hist[i - 2], hist[i - 1], hist[i]
             for det in (_morning_evening_star(c1, c2, c3),
                         _three_soldiers_crows(c1, c2, c3)):
                 if det:
-                    found.append({**det, "candle_date": curr["date"]})
+                    found.append({**det, "candle_date": curr["date"],
+                                   "vol_ratio": vol_ratio,
+                                   "vol_confirmed": vol_confirmed})
 
     # Dedupe: keep the strongest pattern per (pattern_name, candle_date)
     seen = {}
@@ -358,9 +374,12 @@ def scan(history: list, lookback: int = 10, timeframe: str = "daily") -> dict:
     patterns = sorted(seen.values(), key=lambda x: (x["candle_date"], -x["strength"]))
 
     # Compute net bias score (recent patterns weighted more)
+    # Patterns without volume confirmation are downweighted by 50%
     score = 0
     for p in patterns:
         w = p["strength"] / 100.0
+        if not p.get("vol_confirmed", True):
+            w *= 0.5  # halve weight for low-volume, unconfirmed patterns
         if p["bias"] == "bullish":
             score += 20 * w
         elif p["bias"] == "bearish":

@@ -149,6 +149,23 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                                 title={formatAnalysisTimestamp(item.latest_analysis.created_at, { noRelative: true })}
                             >
                                 {item.latest_analysis.confidence_score}% conf · {timeAgo(item.latest_analysis.created_at)}
+                                {(() => {
+                                    const ageMs = Date.now() - new Date(item.latest_analysis.created_at).getTime();
+                                    const ageDays = ageMs / 86400000;
+                                    // ~5 trading days ≈ 7 calendar days
+                                    if (ageDays >= 7) {
+                                        return (
+                                            <span
+                                                className="ml-1"
+                                                title="Verdict is more than 5 trading days old — re-analyse for a fresh read"
+                                                style={{ color: "hsl(var(--hold))", cursor: "help" }}
+                                            >
+                                                · ⚠ stale
+                                            </span>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                             </div>
                         </div>
                         {analyzing && (

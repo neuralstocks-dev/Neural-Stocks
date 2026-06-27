@@ -46,6 +46,7 @@ Return ONLY a valid JSON object with this exact schema — no markdown, no prose
 Rules:
 - Be decisive in classification. Pick BUY/SELL/HOLD based on weight of evidence (these are internal codes the UI maps to "Bullish bias" / "Bearish bias" / "Neutral bias").
 - Confidence >= 75 only when technicals AND fundamentals align.
+- EARNINGS PROXIMITY GATE: If the payload includes `market_context.next_earnings` and the earnings date is within 5 calendar days from today, you MUST: (1) cap `confidence_score` at 55 regardless of signal alignment, (2) add "Earnings release imminent — any technical or fundamental read is low-conviction until results are known" as the first item in `risk_factors`, (3) set `time_horizon_weeks` to 2 (shortest window). Pre-earnings technical setups have historically poor follow-through.
 - Use the *actual* current price to place price_target and stop_loss realistically (typically ±5-25% range).
 - Never recommend penny-stock speculation without warning in risk_factors.
 - This output is educational research. Avoid imperative language ("buy now", "sell immediately"). Use observational language ("price is trading below…", "the model classifies…", "an alternative read would be…").
@@ -109,6 +110,8 @@ Candlestick rules:
 - A bullish pattern during a clear downtrend is stronger than in sideways action. Same for bearish in uptrend.
 - If daily and weekly disagree, prefer the higher timeframe (weekly) for direction and use daily for timing.
 - Confidence >= 75 only when at least one strong reversal pattern aligns with the prevailing or reversing trend on the chosen timeframe.
+- VOLUME CONFIRMATION GATE: In `candlestick_findings`, each pattern now includes `vol_confirmed` (bool) and `vol_ratio` (float, session volume / 20-period avg). Patterns where `vol_confirmed=false` (vol_ratio < 0.8) are LOW-CONVICTION — list them in `rejected_patterns` with reason "low-volume unconfirmed" and do NOT use them to lift `confidence_score`. Only volume-confirmed patterns (vol_ratio >= 0.8) should drive the classification. A technically perfect pattern on thin volume has historically poor follow-through.
+- EARNINGS PROXIMITY GATE: If the payload includes `market_context.next_earnings` and the earnings date is within 5 calendar days from today, you MUST: (1) cap `confidence_score` at 55 regardless of signal alignment, (2) add "Earnings release imminent — any technical or fundamental read is low-conviction until results are known" as the first item in `risk_factors`, (3) set `time_horizon_weeks` to 2 (shortest window). Pre-earnings technical setups have historically poor follow-through.
 - "stop_loss" should be placed beyond the pattern invalidation level (e.g., below hammer low, above shooting star high) — describe it as "invalidation level" in prose.
 - Never invent patterns that aren't in the supplied candlestick_findings. Only reason over what was detected.
 - Educational tone throughout — observational, never imperative.
@@ -449,6 +452,8 @@ Return ONLY a valid JSON object with this exact schema — no markdown, no prose
 Rules:
 - Pick the timeline with the highest fit_score as recommended_timeline. Fit scores must be consistent with the recommendation.
 - Confidence >= 75 only when the best timeline materially outranks the other two.
+- VOLUME CONFIRMATION GATE: In `candlestick_findings`, each pattern now includes `vol_confirmed` (bool) and `vol_ratio` (float, session volume / 20-period avg). Patterns where `vol_confirmed=false` (vol_ratio < 0.8) are LOW-CONVICTION — list them in `rejected_patterns` with reason "low-volume unconfirmed" and do NOT use them to lift `confidence_score`. Only volume-confirmed patterns (vol_ratio >= 0.8) should drive the classification. A technically perfect pattern on thin volume has historically poor follow-through.
+- EARNINGS PROXIMITY GATE: If the payload includes `market_context.next_earnings` and the earnings date is within 5 calendar days from today, you MUST: (1) cap `confidence_score` at 55 regardless of signal alignment, (2) add "Earnings release imminent — any technical or fundamental read is low-conviction until results are known" as the first item in `risk_factors`, (3) set `time_horizon_weeks` to 2 (shortest window). Pre-earnings technical setups have historically poor follow-through.
 - Use specific numbers (PE, revenue growth, RSI, margins, debt ratios) — no hand-waving.
 - Never recommend direct buy/sell actions. Language must be informational.
 - If fundamentals are sparse, surface that in data_completeness_note and keep confidence <= 60.
