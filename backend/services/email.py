@@ -577,62 +577,14 @@ async def send_weekly_digest_email(to_email: str, full_name: str, signals: list[
     except Exception as e:
         logger.error("Weekly digest send failed: %s", e)
         return False
-# ADD THIS TO THE END OF backend/services/email.py
+
 
 async def send_password_reset_email(to_email: str, full_name: str, reset_token: str) -> bool:
+    """Send password reset email via Resend."""
     if not RESEND_API_KEY:
         logger.warning("RESEND_API_KEY not set — skipping password reset email")
         return False
-    import os as _os
-    base = _os.environ.get("APP_URL", "https://neural-stocks.pages.dev").rstrip("/")
-    reset_url = f"{base}/reset-password?token={reset_token}"
-    greeting = full_name.split(" ")[0] if full_name else "there"
-    html = f"""<!doctype html>
-<html><body style="margin:0;padding:0;background:#0b0b0b;color:#e6e6e6;font-family:Georgia,serif">
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#0b0b0b">
-    <tr><td align="center" style="padding:40px 16px">
-      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#131313;border:1px solid #2a2a2a;padding:32px">
-        <tr><td>
-          <p style="font-size:10px;letter-spacing:0.18em;color:#b8994f;text-transform:uppercase;margin:0">Neural Stock Intelligence&#8482; &middot; Password Reset</p>
-          <h1 style="font-family:'Cormorant Garamond',Georgia,serif;font-size:30px;color:#f5f5f0;margin:8px 0 0">Reset your password, {greeting}.</h1>
-          <p style="color:#a8a8a8;font-size:15px;line-height:1.65;margin-top:16px">
-            We received a request to reset your password. Click the button below &mdash; this link expires in <strong style="color:#e6e6e6">1 hour</strong>.
-          </p>
-          <p style="margin:28px 0 8px;text-align:center">
-            <a href="{reset_url}" style="display:inline-block;padding:14px 28px;background:#b8994f;color:#0b0b0b;font-family:monospace;font-size:13px;letter-spacing:0.1em;text-decoration:none;text-transform:uppercase;font-weight:700">Reset password &rarr;</a>
-          </p>
-          <p style="color:#888;font-size:12px;line-height:1.5;text-align:center;margin-top:14px">
-            If the button doesn't work, copy this URL:<br />
-            <span style="color:#a8a8a8;word-break:break-all;font-family:monospace;font-size:11px">{reset_url}</span>
-          </p>
-          <p style="color:#666;font-size:12px;text-align:center;margin-top:20px">If you didn't request this, ignore this email. Your password won't change.</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>"""
-    params = {
-        "from": f"{FROM_NAME} <{SENDER_EMAIL}>",
-        "to": [to_email],
-        "reply_to": REPLY_TO,
-        "subject": "Reset your Neural Stock Intelligence\u2122 password",
-        "html": html,
-    }
-    try:
-        result = await asyncio.to_thread(resend.Emails.send, params)
-        logger.info("Password reset email sent to %s · id=%s", to_email, result.get("id"))
-        return True
-    except Exception as e:
-        logger.error("Password reset email send failed: %s", e)
-        return False
-# ADD THIS TO THE END OF backend/services/email.py
-
-async def send_password_reset_email(to_email: str, full_name: str, reset_token: str) -> bool:
-    if not RESEND_API_KEY:
-        logger.warning("RESEND_API_KEY not set — skipping password reset email")
-        return False
-    import os as _os
-    base = _os.environ.get("APP_URL", "https://neural-stocks.pages.dev").rstrip("/")
+    base = os.environ.get("APP_URL", "https://stock.neulab.xyz").rstrip("/")
     reset_url = f"{base}/reset-password?token={reset_token}"
     greeting = full_name.split(" ")[0] if full_name else "there"
     html = f"""<!doctype html>
