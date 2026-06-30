@@ -77,7 +77,18 @@ export default function AdminLLMHealthPanel() {
             setFallbackRate(fbRes.data);
             setErr("");
         } catch (ex) {
-            setErr(ex?.response?.data?.detail || "Failed to load LLM health");
+            // TEMP DIAGNOSTIC — remove once root cause of "Failed to load LLM
+            // health" with no visible network/console error is found.
+            console.error("[AdminLLMHealthPanel] refresh() failed:", {
+                message: ex?.message,
+                name: ex?.name,
+                stack: ex?.stack,
+                isAxiosError: ex?.isAxiosError,
+                responseStatus: ex?.response?.status,
+                responseData: ex?.response?.data,
+                config: ex?.config?.url,
+            });
+            setErr(ex?.response?.data?.detail || ex?.message || "Failed to load LLM health");
         } finally {
             setRefreshing(false);
         }
