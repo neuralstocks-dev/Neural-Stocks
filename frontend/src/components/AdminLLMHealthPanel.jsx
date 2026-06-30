@@ -72,7 +72,6 @@ export default function AdminLLMHealthPanel() {
             ]);
             setStatus(s.data);
             setEvents(e.data);
-            setRecoup(r.data);
             setProviders(p.data);
             setSources(srcRes.data);
             setFallbackRate(fbRes.data);
