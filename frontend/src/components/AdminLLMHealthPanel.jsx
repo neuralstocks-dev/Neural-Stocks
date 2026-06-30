@@ -63,18 +63,18 @@ export default function AdminLLMHealthPanel() {
     const refresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            const [s, e, r, p, srcRes, fbRes] = await Promise.all([
+            const [breakerRes, eventsRes, providersRes, sourceRes, fallbackRes] = await Promise.all([
                 api.get("/admin/llm-breaker"),
                 api.get("/admin/llm-events?limit=10&hours=24"),
                 api.get("/admin/llm-events/by-provider?hours=24"),
                 api.get("/admin/source-health?hours=24"),
                 api.get("/admin/llm-events/fallback-rate?hours=24"),
             ]);
-            setStatus(s.data);
-            setEvents(e.data);
-            setProviders(p.data);
-            setSources(srcRes.data);
-            setFallbackRate(fbRes.data);
+            setStatus(breakerRes.data);
+            setEvents(eventsRes.data);
+            setProviders(providersRes.data);
+            setSources(sourceRes.data);
+            setFallbackRate(fallbackRes.data);
             setErr("");
         } catch (ex) {
             // TEMP DIAGNOSTIC — remove once root cause of "Failed to load LLM
