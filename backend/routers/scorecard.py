@@ -199,17 +199,129 @@ async def my_scorecard(user=Depends(get_current_user)):
 
 @router.get("/global")
 async def global_scorecard(_user=Depends(get_current_user)):
-    """Platform-wide stats (auth required). Response is scrubbed of user_id/email."""
-    analyses = await db.analyses.find(
-        {},
-        {"_id": 0, "user_id": 0, "id": 1, "ticker": 1, "recommendation": 1,
-         "confidence_score": 1, "confidence_score_pre_calibration": 1,
-         "resolution": 1},
-    ).sort("created_at", -1).to_list(5000)
+    """Platform-wide stats (auth required). Response is scrubbed of user_id/email.
 
+    IMPORTANT: this must NOT be a find() + Python-loop tally over the whole
+    analyses collection. An earlier version of this endpoint did exactly
+    that (first capped at to_list(2000), later carelessly bumped to
+    to_list(5000) with no load-testing) and it 503'd in production once
+    the collection grew — pulling thousands of full documents into app
+    memory on every single page load doesn't scale, and raising the cap
+    only postpones the same failure at a larger collection size.
+
+    Instead, the tally happens inside MongoDB via aggregation: group by
+    (recommendation, resolution.status, confidence band) and let the
+    database do the counting. This returns fixed-size bucket counts
+    regardless of how many analyses exist — cost scales with an index
+    scan, not with response payload size in application memory.
+    """
     summary = _empty_summary()
-    for a in analyses:
-        _tally(summary, a)
+
+    # Single aggregation pass: project a computed confidence_band and
+    # pre_calibration_band per document, then group by every dimension we
+    # need counts for. $facet runs multiple independent group-bys in one
+    # pipeline execution instead of three separate collection scans.
+    pipeline = [
+        {"$project": {
+            "recommendation": {"$toUpper": {"$ifNull": ["$recommendation", ""]}},
+            "status": {"$ifNull": ["$resolution.status", "pending"]},
+            "confidence_score": 1,
+            "confidence_score_pre_calibration": 1,
+        }},
+        {"$facet": {
+            "overall": [
+                {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+            ],
+            "by_recommendation": [
+                {"$match": {"recommendation": {"$in": ["BUY", "SELL", "HOLD"]}}},
+                {"$group": {
+                    "_id": {"rec": "$recommendation", "status": "$status"},
+                    "count": {"$sum": 1},
+                }},
+            ],
+            "by_confidence_band": [
+                {"$match": {"status": {"$in": ["hit", "miss"]}}},
+                {"$bucket": {
+                    "groupBy": "$confidence_score",
+                    "boundaries": [b[0] for b in CONFIDENCE_BANDS] + [101],
+                    "default": "unbanded",
+                    "output": {
+                        "hits": {"$sum": {"$cond": [{"$eq": ["$status", "hit"]}, 1, 0]}},
+                        "misses": {"$sum": {"$cond": [{"$eq": ["$status", "miss"]}, 1, 0]}},
+                    },
+                }},
+            ],
+            "by_confidence_band_pre_calibration": [
+                {"$match": {"status": {"$in": ["hit", "miss"]}}},
+                {"$project": {
+                    "status": 1,
+                    "pre_conf": {"$ifNull": [
+                        "$confidence_score_pre_calibration", "$confidence_score",
+                    ]},
+                }},
+                {"$bucket": {
+                    "groupBy": "$pre_conf",
+                    "boundaries": [b[0] for b in CONFIDENCE_BANDS] + [101],
+                    "default": "unbanded",
+                    "output": {
+                        "hits": {"$sum": {"$cond": [{"$eq": ["$status", "hit"]}, 1, 0]}},
+                        "misses": {"$sum": {"$cond": [{"$eq": ["$status", "miss"]}, 1, 0]}},
+                    },
+                }},
+            ],
+        }},
+    ]
+
+    result = await db.analyses.aggregate(pipeline).to_list(1)
+    facets = result[0] if result else {
+        "overall": [], "by_recommendation": [],
+        "by_confidence_band": [], "by_confidence_band_pre_calibration": [],
+    }
+
+    # --- overall ---
+    for bucket in facets.get("overall", []):
+        status, count = bucket["_id"], bucket["count"]
+        summary["total"] += count
+        if status == "pending":
+            summary["pending"] += count
+        elif status == "unresolvable":
+            summary["unresolvable"] += count
+        else:
+            summary["resolved"] += count
+            if status == "hit":
+                summary["hits"] += count
+            elif status == "miss":
+                summary["misses"] += count
+
+    # --- by_recommendation ---
+    for bucket in facets.get("by_recommendation", []):
+        rec, status = bucket["_id"]["rec"], bucket["_id"]["status"]
+        count = bucket["count"]
+        if rec not in summary["by_recommendation"]:
+            continue
+        b = summary["by_recommendation"][rec]
+        b["total"] += count
+        if status == "hit":
+            b["hits"] += count
+        elif status == "miss":
+            b["misses"] += count
+
+    # --- confidence bands (both variants share this shape) ---
+    boundary_to_label = {lo: label for lo, _, label in CONFIDENCE_BANDS}
+    for facet_key, target_key in (
+        ("by_confidence_band", "by_confidence_band"),
+        ("by_confidence_band_pre_calibration", "by_confidence_band_pre_calibration"),
+    ):
+        for bucket in facets.get(facet_key, []):
+            lo = bucket["_id"]
+            label = boundary_to_label.get(lo)
+            if not label:
+                continue  # "unbanded" bucket — missing/invalid confidence_score
+            b = summary[target_key][label]
+            b["hits"] += bucket.get("hits", 0)
+            b["misses"] += bucket.get("misses", 0)
+            b["total"] += bucket.get("hits", 0) + bucket.get("misses", 0)
+
     _finalize_summary(summary)
     summary["threshold_pct"] = HIT_THRESHOLD_PCT
     summary["methodology"] = _METHODOLOGY_NOTE

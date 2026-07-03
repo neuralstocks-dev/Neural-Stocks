@@ -101,13 +101,30 @@ export default function ScorecardPage() {
         (async () => {
             setLoading(true);
             try {
-                const [m, g] = await Promise.all([
+                // Promise.allSettled, not Promise.all: /global aggregates
+                // across the whole platform and can legitimately be slower
+                // or briefly unavailable under load. If it fails, the user
+                // should still see their own scorecard (which only needs
+                // /me) rather than a fully blank page. A partial failure
+                // here is not equivalent to a total failure.
+                const [mResult, gResult] = await Promise.allSettled([
                     api.get("/scorecard/me"),
                     api.get("/scorecard/global"),
                 ]);
                 if (cancelled) return;
-                setMe(m.data);
-                setGlobal(g.data);
+                if (mResult.status === "fulfilled") {
+                    setMe(mResult.value.data);
+                } else {
+                    console.error("[Scorecard] /scorecard/me failed:", mResult.reason);
+                }
+                if (gResult.status === "fulfilled") {
+                    setGlobal(gResult.value.data);
+                } else {
+                    console.error("[Scorecard] /scorecard/global failed:", gResult.reason);
+                    // Leave `global` as null — the benchmark section already
+                    // guards every field with `gs?.` and renders "—" when
+                    // gs is null, so this degrades visually rather than crashing.
+                }
             } finally {
                 if (!cancelled) setLoading(false);
             }
