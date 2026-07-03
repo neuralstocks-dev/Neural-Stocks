@@ -79,6 +79,7 @@ async def start_background_tasks():
     from services.digest_pusher import digest_pusher_loop
     from services.cost_reminder import cost_reminder_loop, tg_low_balance_loop
     from services.admin_digest import admin_digest_loop
+    from services.verdict_resolution import verdict_resolution_loop
     t1 = asyncio.create_task(weekly_retrain_loop())
     _BG_TASKS.add(t1)
     t1.add_done_callback(_BG_TASKS.discard)
@@ -107,6 +108,10 @@ async def start_background_tasks():
     _BG_TASKS.add(t7)
     t7.add_done_callback(_BG_TASKS.discard)
     logger.info("Started admin ops nightly digest scheduler")
+    t_resolve = asyncio.create_task(verdict_resolution_loop())
+    _BG_TASKS.add(t_resolve)
+    t_resolve.add_done_callback(_BG_TASKS.discard)
+    logger.info("Started verdict resolution scheduler")
     # Ensure TTL indexes (idempotent — no-op if already created).
     try:
         from routers.analysis import _ensure_analysis_indexes

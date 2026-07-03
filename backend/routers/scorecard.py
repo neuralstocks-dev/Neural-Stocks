@@ -1,189 +1,216 @@
-"""AI Accuracy Scorecard — per-user and global."""
-from datetime import datetime, timezone
-import asyncio
-from fastapi import APIRouter, Depends, Query
+"""AI Accuracy Scorecard — per-user and global.
+
+REWRITE NOTE (see services/verdict_resolution.py for the full rationale):
+the previous version graded every verdict against the LIVE price on every
+request, which meant a verdict's hit/miss status could flip on every page
+load, forever, with no memory of its horizon. That's not a track record.
+
+This version reads from the permanent `resolution` sub-document written
+once by verdict_resolution.py when a verdict's time_horizon_weeks has
+actually elapsed. Verdicts not yet resolved are shown as "pending" —
+never as a hit/miss. Once resolved, a grade never changes again.
+
+Two things this unlocks that didn't exist before:
+  - Confidence-bucketed hit rate: is a 90-confidence verdict actually
+    more reliable than a 50-confidence one? Before, there was no way to
+    know. Now `by_confidence_band` answers it directly.
+  - Calibration impact: services/verdict_calibration.py (V2) adjusts
+    confidence post-LLM for earnings proximity and RF disagreement, and
+    already stores confidence_score_pre_calibration. This version cross-
+    tabulates hit rate against BOTH the raw and calibrated confidence so
+    you can see whether calibration is actually improving anything —
+    something the codebase could compute but nothing was reading before.
+"""
+from fastapi import APIRouter, Depends
 
 from core.db import db
 from core.security import get_current_user
-from services.yfinance_svc import get_quote
 from services.idx_news import is_idx_ticker
 
 router = APIRouter(prefix="/scorecard", tags=["scorecard"])
 
-# Minimum % move from price_at_analysis for a BUY/SELL to count as "hit".
-# For HOLD: absolute move must stay within this tolerance.
-HIT_THRESHOLD_PCT = 5.0
-# Default minimum age for a verdict to be evaluable (days)
-DEFAULT_MIN_AGE_DAYS = 7
-# Supported evaluation horizons (days)
-ALLOWED_HORIZONS = {7, 30, 90}
+HIT_THRESHOLD_PCT = 5.0  # mirrors services/verdict_resolution.py — display only
+
+# Confidence bands for the breakdown. 75 is kept as an exact boundary
+# because it's the threshold that triggers Telegram alerts elsewhere in
+# the app — isolating it lets us check whether "alert-worthy" verdicts
+# actually earn that status.
+CONFIDENCE_BANDS = [
+    (0, 45, "0-44 (weak)"),
+    (45, 60, "45-59 (moderate)"),
+    (60, 75, "60-74 (moderate-high)"),
+    (75, 90, "75-89 (high)"),
+    (90, 101, "90-100 (very high)"),
+]
 
 
-def _parse(dt_str):
-    if not dt_str:
+def _band_label(score) -> str | None:
+    if not isinstance(score, (int, float)):
         return None
-    try:
-        d = datetime.fromisoformat(dt_str)
-        if d.tzinfo is None:
-            d = d.replace(tzinfo=timezone.utc)
-        return d
-    except Exception:
-        return None
+    for lo, hi, label in CONFIDENCE_BANDS:
+        if lo <= score < hi:
+            return label
+    return None
 
 
-def _score_one(analysis: dict, current_price: float | None, min_age_days: int):
-    """Returns (status, return_pct) where status in {pending, hit, miss, stale}."""
-    created = _parse(analysis.get("created_at"))
-    if not created:
-        return "stale", None
-    age_days = (datetime.now(timezone.utc) - created).total_seconds() / 86400.0
-    if age_days < min_age_days:
-        return "pending", None
-    p0 = analysis.get("price_at_analysis")
-    if not p0 or not current_price:
-        return "stale", None
-    change_pct = ((current_price - p0) / p0) * 100
-    rec = analysis.get("recommendation")
-    if rec == "BUY":
-        status = "hit" if change_pct >= HIT_THRESHOLD_PCT else "miss"
-    elif rec == "SELL":
-        status = "hit" if change_pct <= -HIT_THRESHOLD_PCT else "miss"
-    elif rec == "HOLD":
-        status = "hit" if abs(change_pct) <= HIT_THRESHOLD_PCT else "miss"
-    else:
-        status = "stale"
-    return status, round(change_pct, 2)
+def _empty_bucket():
+    return {"total": 0, "hits": 0, "misses": 0, "hit_rate": None}
 
 
-async def _resolve_quotes(tickers: list[str]) -> dict:
-    unique = list({t for t in tickers if t})
-    quotes = await asyncio.gather(*[get_quote(t) for t in unique], return_exceptions=True)
-    out = {}
-    for t, q in zip(unique, quotes):
-        if isinstance(q, dict):
-            out[t] = q.get("price")
-        else:
-            out[t] = None
-    return out
+def _finalize_bucket(b: dict) -> dict:
+    resolved = b["hits"] + b["misses"]
+    b["hit_rate"] = round((b["hits"] / resolved) * 100, 1) if resolved else None
+    return b
 
 
 def _empty_summary():
     return {
-        "total": 0, "pending": 0, "hits": 0, "misses": 0,
+        "total": 0,
+        "resolved": 0,
+        "pending": 0,
+        "unresolvable": 0,
+        "hits": 0,
+        "misses": 0,
         "hit_rate": None,
-        "by_recommendation": {
-            r: {"total": 0, "hits": 0, "misses": 0, "hit_rate": None}
-            for r in ("BUY", "SELL", "HOLD")
+        "by_recommendation": {r: _empty_bucket() for r in ("BUY", "SELL", "HOLD")},
+        "by_confidence_band": {label: _empty_bucket() for _, _, label in CONFIDENCE_BANDS},
+        # Same band structure, keyed on confidence_score_pre_calibration
+        # instead of the (possibly adjusted) final confidence_score. Lets
+        # the UI show whether calibration moved verdicts into more
+        # accurate bands or is just noise, side-by-side with the main table.
+        "by_confidence_band_pre_calibration": {
+            label: _empty_bucket() for _, _, label in CONFIDENCE_BANDS
         },
     }
 
 
-def _finalize_summary(s):
-    resolved = s["hits"] + s["misses"]
-    s["hit_rate"] = round((s["hits"] / resolved) * 100, 1) if resolved else None
+def _tally(summary: dict, a: dict):
+    """Apply one analysis document's resolution (or lack thereof) to the
+    running summary. Only verdicts with a terminal resolution.status of
+    'hit' or 'miss' count toward hit_rate — pending and unresolvable are
+    tracked separately and never silently folded into the rate.
+
+    `total` counters (overall + per-recommendation) increment exactly
+    once per verdict regardless of resolution state — pending verdicts
+    still count as "a verdict that exists", they just don't have a grade
+    yet. Only hits/misses/bucket tallies require a resolved status.
+    """
+    rec = (a.get("recommendation") or "").upper()
+    resolution = a.get("resolution") or {}
+    status = resolution.get("status")  # "hit" | "miss" | "unresolvable" | None (=pending)
+
+    summary["total"] += 1
+    if rec in summary["by_recommendation"]:
+        summary["by_recommendation"][rec]["total"] += 1
+
+    if status is None:
+        summary["pending"] += 1
+        return
+    if status == "unresolvable":
+        summary["unresolvable"] += 1
+        return
+
+    summary["resolved"] += 1
+    is_hit = status == "hit"
+    if is_hit:
+        summary["hits"] += 1
+    else:
+        summary["misses"] += 1
+    if rec in summary["by_recommendation"]:
+        summary["by_recommendation"][rec]["hits" if is_hit else "misses"] += 1
+
+    band = _band_label(a.get("confidence_score"))
+    if band:
+        b = summary["by_confidence_band"][band]
+        b["total"] += 1
+        b["hits" if is_hit else "misses"] += 1
+
+    # Older docs (pre-V2 calibration) have no confidence_score_pre_calibration
+    # at all — in that case pre-calibration IS the final score, since no
+    # calibration ran, so we fall back to confidence_score.
+    pre_conf = a.get("confidence_score_pre_calibration")
+    if pre_conf is None:
+        pre_conf = a.get("confidence_score")
+    pre_band = _band_label(pre_conf)
+    if pre_band:
+        b = summary["by_confidence_band_pre_calibration"][pre_band]
+        b["total"] += 1
+        b["hits" if is_hit else "misses"] += 1
+
+
+def _finalize_summary(s: dict) -> dict:
+    s["hit_rate"] = round((s["hits"] / s["resolved"]) * 100, 1) if s["resolved"] else None
     for rec in ("BUY", "SELL", "HOLD"):
-        r = s["by_recommendation"][rec]
-        res = r["hits"] + r["misses"]
-        r["hit_rate"] = round((r["hits"] / res) * 100, 1) if res else None
+        _finalize_bucket(s["by_recommendation"][rec])
+    for _, _, label in CONFIDENCE_BANDS:
+        _finalize_bucket(s["by_confidence_band"][label])
+        _finalize_bucket(s["by_confidence_band_pre_calibration"][label])
     return s
 
 
-def _normalize_horizon(timeframe: int | None) -> int:
-    """Normalize timeframe to an allowed horizon, default 7 days."""
-    if timeframe is None:
-        return DEFAULT_MIN_AGE_DAYS
-    if timeframe in ALLOWED_HORIZONS:
-        return timeframe
-    # Snap to nearest allowed value
-    return min(ALLOWED_HORIZONS, key=lambda v: abs(v - timeframe))
+_METHODOLOGY_NOTE = (
+    "Verdicts are graded once, permanently, when their own time_horizon_weeks "
+    "has elapsed — not against today's live price. A grade never changes "
+    "after it's set. Verdicts still within their horizon show as 'pending', "
+    "never as a hit or miss."
+)
 
 
 @router.get("/me")
-async def my_scorecard(
-    user=Depends(get_current_user),
-    timeframe: int | None = Query(None, description="Evaluation horizon in days: 7, 30, or 90"),
-):
-    min_age = _normalize_horizon(timeframe)
-
+async def my_scorecard(user=Depends(get_current_user)):
     analyses = await db.analyses.find(
-        {"user_id": user["id"]}, {"_id": 0}
+        {"user_id": user["id"]},
+        {"_id": 0, "id": 1, "ticker": 1, "recommendation": 1,
+         "confidence_score": 1, "confidence_score_pre_calibration": 1,
+         "calibration_version": 1, "price_at_analysis": 1, "price_target": 1,
+         "created_at": 1, "time_horizon_weeks": 1, "resolution": 1},
     ).sort("created_at", -1).to_list(500)
-
-    tickers = [a.get("ticker") for a in analyses]
-    current = await _resolve_quotes(tickers)
 
     summary = _empty_summary()
     recent = []
 
     for a in analyses:
-        ticker = a.get("ticker")
-        status, ret_pct = _score_one(a, current.get(ticker), min_age)
-        rec = a.get("recommendation")
-        summary["total"] += 1
-        if rec in summary["by_recommendation"]:
-            summary["by_recommendation"][rec]["total"] += 1
-        if status == "pending":
-            summary["pending"] += 1
-        elif status == "hit":
-            summary["hits"] += 1
-            if rec in summary["by_recommendation"]:
-                summary["by_recommendation"][rec]["hits"] += 1
-        elif status == "miss":
-            summary["misses"] += 1
-            if rec in summary["by_recommendation"]:
-                summary["by_recommendation"][rec]["misses"] += 1
+        _tally(summary, a)
+        resolution = a.get("resolution") or {}
         recent.append({
             "analysis_id": a.get("id"),
-            "ticker": ticker,
-            "recommendation": rec,
+            "ticker": a.get("ticker"),
+            "recommendation": a.get("recommendation"),
             "confidence_score": a.get("confidence_score"),
+            "confidence_score_pre_calibration": a.get("confidence_score_pre_calibration"),
+            "calibration_version": a.get("calibration_version"),
             "price_at_analysis": a.get("price_at_analysis"),
             "price_target": a.get("price_target"),
-            "actual_price": current.get(ticker),
-            "return_pct": ret_pct,
-            "status": status,
-            "created_at": a.get("created_at"),
             "time_horizon_weeks": a.get("time_horizon_weeks"),
-            "currency": "IDR" if is_idx_ticker(ticker) else "USD",
+            "created_at": a.get("created_at"),
+            "status": resolution.get("status", "pending"),
+            "resolution_price": resolution.get("resolution_price"),
+            "return_pct": resolution.get("return_pct"),
+            "resolved_at": resolution.get("resolved_at"),
+            "horizon_due_at": resolution.get("horizon_due_at"),
+            "currency": "IDR" if is_idx_ticker(a.get("ticker")) else "USD",
         })
 
     _finalize_summary(summary)
     summary["threshold_pct"] = HIT_THRESHOLD_PCT
-    summary["min_age_days"] = min_age
-    summary["timeframe"] = min_age
+    summary["methodology"] = _METHODOLOGY_NOTE
     return {"summary": summary, "verdicts": recent[:50]}
 
 
 @router.get("/global")
-async def global_scorecard(
-    _user=Depends(get_current_user),
-    timeframe: int | None = Query(None, description="Evaluation horizon in days: 7, 30, or 90"),
-):
+async def global_scorecard(_user=Depends(get_current_user)):
     """Platform-wide stats (auth required). Response is scrubbed of user_id/email."""
-    min_age = _normalize_horizon(timeframe)
+    analyses = await db.analyses.find(
+        {},
+        {"_id": 0, "user_id": 0, "id": 1, "ticker": 1, "recommendation": 1,
+         "confidence_score": 1, "confidence_score_pre_calibration": 1,
+         "resolution": 1},
+    ).sort("created_at", -1).to_list(5000)
 
-    analyses = await db.analyses.find({}, {"_id": 0, "user_id": 0}).sort("created_at", -1).to_list(2000)
-    tickers = [a.get("ticker") for a in analyses]
-    current = await _resolve_quotes(tickers)
     summary = _empty_summary()
     for a in analyses:
-        status, _ = _score_one(a, current.get(a.get("ticker")), min_age)
-        rec = a.get("recommendation")
-        summary["total"] += 1
-        if rec in summary["by_recommendation"]:
-            summary["by_recommendation"][rec]["total"] += 1
-        if status == "pending":
-            summary["pending"] += 1
-        elif status == "hit":
-            summary["hits"] += 1
-            if rec in summary["by_recommendation"]:
-                summary["by_recommendation"][rec]["hits"] += 1
-        elif status == "miss":
-            summary["misses"] += 1
-            if rec in summary["by_recommendation"]:
-                summary["by_recommendation"][rec]["misses"] += 1
+        _tally(summary, a)
     _finalize_summary(summary)
     summary["threshold_pct"] = HIT_THRESHOLD_PCT
-    summary["min_age_days"] = min_age
-    summary["timeframe"] = min_age
+    summary["methodology"] = _METHODOLOGY_NOTE
     return {"summary": summary}

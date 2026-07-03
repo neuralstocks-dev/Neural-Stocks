@@ -1827,3 +1827,14 @@ async def send_tg_alert_test(_admin=Depends(admin_required)):
     template is right."""
     from services.cost_reminder import run_tg_low_balance_check_once
     return await run_tg_low_balance_check_once(force=True)
+
+
+@router.post("/scorecard/resolve-now")
+async def trigger_verdict_resolution(_admin=Depends(admin_required)):
+    """Manually run one pass of verdict resolution immediately, instead
+    of waiting for the hourly background loop (services/verdict_resolution
+    .py). Use this to verify the scorecard fix is actually resolving
+    verdicts correctly after deploy, without waiting up to an hour."""
+    from services.verdict_resolution import resolve_due_verdicts
+    result = await resolve_due_verdicts()
+    return {"ok": True, **result}

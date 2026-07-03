@@ -332,17 +332,23 @@ class TestScorecard:
         body = r.json()
         assert "summary" in body and "verdicts" in body
         summ = body["summary"]
-        for k in ("total", "pending", "hits", "misses", "hit_rate",
-                  "by_recommendation", "threshold_pct", "min_age_days"):
+        for k in ("total", "resolved", "pending", "unresolvable", "hits", "misses",
+                  "hit_rate", "by_recommendation", "by_confidence_band",
+                  "by_confidence_band_pre_calibration", "threshold_pct", "methodology"):
             assert k in summ, f"missing {k} in scorecard summary"
         assert summ["threshold_pct"] == 5.0 or summ["threshold_pct"] == 5
-        assert summ["min_age_days"] == 7
         for rec in ("BUY", "SELL", "HOLD"):
             assert rec in summ["by_recommendation"]
             for k in ("total", "hits", "misses", "hit_rate"):
                 assert k in summ["by_recommendation"][rec]
+        # Confidence bands: 5 bands, each with hit/miss/total/hit_rate shape
+        assert len(summ["by_confidence_band"]) == 5
+        for band in summ["by_confidence_band"].values():
+            for k in ("total", "hits", "misses", "hit_rate"):
+                assert k in band
         # fresh user has no analyses
         assert summ["total"] == 0
+        assert summ["resolved"] == 0
         assert body["verdicts"] == []
 
     def test_scorecard_global_shape(self, admin_client):
@@ -356,13 +362,17 @@ class TestScorecard:
         assert "user_id" not in blob, f"global scorecard leaks user_id: {blob[:400]}"
         assert "@" not in blob or "email" not in blob, f"global scorecard leaks email"
         summ = body["summary"]
-        for k in ("total", "pending", "hits", "misses",
-                  "hit_rate", "by_recommendation", "threshold_pct", "min_age_days"):
+        for k in ("total", "resolved", "pending", "hits", "misses",
+                  "hit_rate", "by_recommendation", "by_confidence_band", "threshold_pct"):
             assert k in summ
 
     def test_scorecard_pending_after_fresh_analysis(self, admin_client):
         """Admin has elite effective plan → can create real analyses unlimited.
-        Newly-created analysis must show status=pending (age <7 days)."""
+        Newly-created analysis must show status=pending — its time_horizon_weeks
+        (minimum 2 weeks per ai.py) has not elapsed yet, so verdict_resolution.py
+        has nothing to grade. This must remain true regardless of how short the
+        horizon is, since resolution only runs from the background loop, never
+        inline during the request."""
         s = admin_client["session"]
         # Create a fresh analysis
         r = s.post(f"{API}/analysis/AAPL", timeout=LONG)
@@ -378,12 +388,15 @@ class TestScorecard:
         # Find the verdict
         v = next((x for x in sc["verdicts"] if x.get("analysis_id") == aid), None)
         assert v, f"newly created analysis {aid} not in verdicts list"
-        # Required fields
+        # Required fields — note actual_price is gone (see verdict_resolution.py
+        # docstring): resolution_price only appears once a verdict is graded,
+        # and grading happens once, permanently, not on every scorecard read.
         for k in ("analysis_id", "ticker", "recommendation", "confidence_score",
-                  "price_at_analysis", "price_target", "actual_price", "return_pct",
+                  "price_at_analysis", "price_target", "resolution_price", "return_pct",
                   "status", "created_at", "time_horizon_weeks"):
             assert k in v, f"scorecard verdict missing {k}"
-        # Fresh → pending
-        assert v["status"] == "pending", f"expected pending for <7d analysis, got {v['status']}"
+        # Fresh → pending, and no resolution price yet (nothing to resolve against)
+        assert v["status"] == "pending", f"expected pending for a just-created analysis, got {v['status']}"
+        assert v["resolution_price"] is None
         # summary pending count >=1
         assert sc["summary"]["pending"] >= 1
