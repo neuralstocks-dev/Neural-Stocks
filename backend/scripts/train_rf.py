@@ -191,13 +191,51 @@ def _build_training_set(
     horizon_days: int = 5,
     market_df: dict | None = None,
 ):
-    """For every (ticker, date) with valid features, compute label = sign(close[t+h]/close[t] − 1)."""
+    """For every (ticker, date) with valid features, compute label =
+    sign( (stock fwd return) - (SPY fwd return) ) over the same horizon.
+
+    CHANGED from absolute direction (sign(close[t+h]/close[t] - 1)):
+    that target measures whether the STOCK went up, which is dominated by
+    whatever the broad market did over the same window -- on a 20-trading-
+    day horizon, SPY's own move explains a large chunk of any individual
+    stock's move. The technical/fundamental features here (RSI, MACD,
+    volume, earnings proximity, etc.) describe THIS STOCK, not the market
+    as a whole, so they have very little power to predict a target that's
+    mostly "did the market go up" in disguise. That mismatch is the most
+    likely reason the prior model held out at ~49% -- barely above a coin
+    flip on a binary target.
+
+    Relative-to-SPY labeling removes the market-wide component: the label
+    now asks "did this stock beat the index over the same period?", which
+    is a question the per-stock features can actually plausibly answer
+    (relative momentum, relative strength, idiosyncratic setup quality).
+    This does not guarantee a better holdout score, but it targets the
+    actual, likely reason the original approach struggled, rather than
+    changing the model architecture around an unchanged, poorly-suited
+    target.
+    """
+    if market_df is None or "spy" not in market_df:
+        raise RuntimeError(
+            "market_df['spy'] is required for relative-return labeling — "
+            "cannot compute benchmark-relative labels without it."
+        )
+    spy_close = market_df["spy"]["Close"]
+    # SPY's own forward return over the identical horizon, indexed by date.
+    # Computed once, reused for every ticker's alignment below.
+    spy_fwd_ret = spy_close.pct_change(horizon_days).shift(-horizon_days)
+
     frames = []
     for ticker, df in histories.items():
         features = compute_feature_frame(df, market_df=market_df)
-        # Label = N-day forward return positive?
-        fwd_ret = df["Close"].pct_change(horizon_days).shift(-horizon_days)
-        label = (fwd_ret > 0).astype(int)
+        # This stock's N-day forward return.
+        stock_fwd_ret = df["Close"].pct_change(horizon_days).shift(-horizon_days)
+        # Align SPY's forward return onto this stock's date index. Dates
+        # that don't exist in spy_fwd_ret (holidays mismatch, etc.) become
+        # NaN and are dropped below via combined.dropna() -- same handling
+        # the old code relied on for any other NaN feature row.
+        spy_fwd_ret_aligned = spy_fwd_ret.reindex(stock_fwd_ret.index)
+        relative_fwd_ret = stock_fwd_ret - spy_fwd_ret_aligned
+        label = (relative_fwd_ret > 0).astype(int)
         combined = features.copy()
         combined["_label"] = label
         combined["_ticker"] = ticker
@@ -322,6 +360,11 @@ def main():
     training_end = str(pd.Series(dataset.index).max().date())
     meta = {
         "trained_at": datetime.now(timezone.utc).isoformat(),
+        # Read by services/rf_predictor.py as a safety gate -- output is
+        # only labeled outperform/underperform-vs-SPY when this marker is
+        # present, so an old model can never be mislabeled as the new
+        # target just because the serving code was updated.
+        "label_type": "relative_vs_spy",
         "universe_size": len(histories),
         "universe": sorted(histories.keys()),
         "years_of_history": args.years,

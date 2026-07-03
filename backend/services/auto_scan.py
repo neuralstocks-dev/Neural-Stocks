@@ -100,12 +100,15 @@ async def _scan_user(user: dict, market_df: dict) -> int:
         opinion = rf_predictor.predict_from_features(feat)
         if opinion is None:
             continue
-        prob_up = opinion["prob_up"]
+        prob_outperform = opinion["prob_outperform"]
         if opinion["edge"] != "strong":
             continue  # insufficient model conviction — stay quiet
 
-        direction = "BUY" if prob_up >= BULL_THRESHOLD else ("SELL" if prob_up <= BEAR_THRESHOLD else None)
-        if direction is None:
+        rel_direction = (
+            "outperform" if prob_outperform >= BULL_THRESHOLD
+            else ("underperform" if prob_outperform <= BEAR_THRESHOLD else None)
+        )
+        if rel_direction is None:
             continue
 
         # Look up last close so the user has concrete context
@@ -119,21 +122,25 @@ async def _scan_user(user: dict, market_df: dict) -> int:
         acc_line = f" · model hist. accuracy {round((acc or 0)*100)}%" if acc else ""
 
         # Educational framing — RF model is a research signal, not a trade
-        # instruction. We keep the BUY/SELL "direction" string for routing
-        # and color but describe it as analytical bias in the user-facing copy.
-        bias_word = {"BUY": "Bullish", "SELL": "Bearish"}.get(direction, "Neutral")
-        title = f"RF watchlist scan · {bias_word} bias · {ticker} · {round(prob_up*100)}% model probability"
+        # instruction. It predicts relative outperformance vs SPY, NOT
+        # absolute direction (see rf_predictor.py) — a stock can carry an
+        # "outperform" bias while still falling in absolute terms during a
+        # broad selloff, so this must never be relabeled Bullish/Bearish
+        # or BUY/SELL. Keep "outperform"/"underperform" throughout.
+        bias_word = {"outperform": "Outperform", "underperform": "Underperform"}.get(rel_direction, "Neutral")
+        title = f"RF watchlist scan · {bias_word} bias · {ticker} · {round(prob_outperform*100)}% model probability"
         body = (
-            f"The Random-Forest model classifies {ticker}{price_line} with a "
-            f"{bias_word.lower()} analytical bias over a {horizon}-day horizon "
-            f"(model probability {round(prob_up*100)}%).\n\n"
+            f"The Random-Forest model classifies {ticker}{price_line} with an "
+            f"{bias_word.lower()} vs. S&P 500 bias over a {horizon}-day horizon "
+            f"(model probability {round(prob_outperform*100)}%).\n\n"
             f"⚠️ This is a lightweight RF-only scan — NOT a full Neural Stock Intelligence™ research "
             f"summary. No LLM reasoning, no candlestick verification, no "
             f"scenario levels. Open the app and tap Analyze on {ticker} for the "
             f"full multi-lens research view before drawing conclusions.\n"
             f"Mode: Auto-scan (RF only){acc_line}\n\n"
             f"<i>Educational research output — model probability is classification "
-            f"strength based on the inputs, not a forecast probability. Not "
+            f"strength based on the inputs, not a forecast probability. This is a "
+            f"relative call vs. the S&P 500, not an absolute price prediction. Not "
             f"personalized financial advice.</i>"
         )
 
@@ -144,9 +151,19 @@ async def _scan_user(user: dict, market_df: dict) -> int:
             "user_id": user_id,
             "ticker": ticker,
             "type": "rf_watchlist_scan",
-            "signal": direction,
-            "prob_up": prob_up,
-            "confidence_score": round(prob_up * 100) if direction == "BUY" else round((1 - prob_up) * 100),
+            # NOTE: "signal" intentionally stays BUY/SELL here even though
+            # the underlying model now predicts relative outperformance,
+            # not absolute direction. AlertsPage.jsx hardcodes BUY/SELL
+            # for icon/color/"canTake" logic across ALL alert types (not
+            # RF-specific) -- renaming this value would silently break
+            # that UI for every RF alert (wrong color, missing action
+            # button) without erroring. The accurate outperform/
+            # underperform language lives in the title/body text above,
+            # which is what the user actually reads; "signal" is routing
+            # plumbing shared with the AI-verdict alert type.
+            "signal": "BUY" if rel_direction == "outperform" else "SELL",
+            "prob_outperform": prob_outperform,
+            "confidence_score": round(prob_outperform * 100) if rel_direction == "outperform" else round((1 - prob_outperform) * 100),
             "title": title,
             "message": body,
             "read": False,

@@ -5,11 +5,20 @@ missing (e.g. a fresh deploy that hasn't been trained) the service
 no-ops — analysis responses simply omit `rf_opinion` and the UI hides
 the Secondary Opinion module. Inference is cheap (~1 ms on a single row).
 
+TARGET (as of the retrain that fixed field names below): the model
+predicts whether a stock will OUTPERFORM SPY over the horizon, not
+whether it will go up in absolute terms. The prior absolute-direction
+target held out at ~49% accuracy — barely above chance — most likely
+because per-stock technical/fundamental features have little power to
+predict a target dominated by broad market movement. Relative-to-SPY
+labeling removes that market-wide component. See
+scripts/train_rf.py::_build_training_set for the label construction.
+
 Honesty layer:
-  * The trained model's 2025 holdout accuracy is ~49% (documented on
-    /technical#random-forest). We therefore apply an "opinion threshold":
-    when the predicted probability is close to 0.5, we return
-    edge_rating="none" so the UI won't display a misleading number.
+  * We apply an "opinion threshold": when the predicted probability is
+    close to 0.5, we return edge_rating="none" so the UI won't display
+    a misleading number. Check /technical#random-forest for the
+    current model's actual holdout accuracy before trusting this.
   * We always include the top-3 features that drove this specific
     prediction (via SHAP-like feature contribution via tree paths), so
     the user can judge reliability per-case.
@@ -129,7 +138,18 @@ def _top_contributors(bundle, feature_names: list[str], x: np.ndarray, k: int = 
 
 def predict_from_features(feature_row: dict | None) -> dict | None:
     """Returns the full opinion payload or None if the model isn't loaded
-    or features are insufficient. Never raises — all failures become None."""
+    or features are insufficient. Never raises — all failures become None.
+
+    SAFETY GATE: this code labels output as relative-outperformance-vs-SPY
+    (see module docstring). A model trained before that change predicts
+    absolute direction instead, and labeling that as "outperform" would be
+    a false claim, not a rename. meta["label_type"] == "relative_vs_spy"
+    is written only by the retrained scripts/train_rf.py. Any model
+    missing that marker (old model, unretrained) returns None here —
+    RF opinion silently disappears from the UI rather than showing a
+    correctly-formatted but wrong number. Retraining is what turns this
+    back on; no second deploy needed.
+    """
     if feature_row is None:
         return None
     bundle = _lazy_load()
@@ -138,20 +158,25 @@ def predict_from_features(feature_row: dict | None) -> dict | None:
     try:
         model = bundle["model"]
         meta = bundle["meta"]
+        if meta.get("label_type") != "relative_vs_spy":
+            return None
         feature_names = meta["feature_names"]
         x = np.array([feature_row.get(n, np.nan) for n in feature_names], dtype=float)
         if np.isnan(x).any():
             return None
         proba = model.predict_proba(x.reshape(1, -1))[0]
-        # Binary classifier: class 1 == UP
-        prob_up = float(proba[1])
-        edge = _edge_rating(prob_up)
+        # Binary classifier: class 1 == "beats SPY over the horizon"
+        # (relative-outperformance label — see scripts/train_rf.py
+        # _build_training_set docstring for why this replaced absolute
+        # up/down direction as the training target).
+        prob_outperform = float(proba[1])
+        edge = _edge_rating(prob_outperform)
         return {
-            "prob_up": round(prob_up, 4),
-            "prob_down": round(1.0 - prob_up, 4),
+            "prob_outperform": round(prob_outperform, 4),
+            "prob_underperform": round(1.0 - prob_outperform, 4),
             "edge": edge,  # "none" | "modest" | "strong"
             "horizon_days": int(meta.get("horizon_days", 5)),
-            "direction": "up" if prob_up >= 0.5 else "down",
+            "relative_direction": "outperform" if prob_outperform >= 0.5 else "underperform",
             "top_features": _top_contributors(bundle, feature_names, x, k=3),
             "model_info": {
                 "trained_at": meta.get("trained_at"),

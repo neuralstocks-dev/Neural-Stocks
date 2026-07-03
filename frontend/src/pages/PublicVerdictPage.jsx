@@ -617,8 +617,8 @@ function PublicCalibrationBlock({ analysis }) {
     const rfPen = analysis.rf_disagreement_penalty;
     const eg = analysis.earnings_gate_applied;
     const rfOp = analysis.rf_opinion || {};
-    const rfUp = rfOp.prob_up;
-    const rfDown = rfOp.prob_down;
+    const rfOutperform = rfOp.prob_outperform;
+    const rfUnderperform = rfOp.prob_underperform;
     const rfHorizon = rfOp.horizon_days || 20;
     const days = analysis.days_until_earnings;
 
@@ -699,16 +699,21 @@ function PublicCalibrationBlock({ analysis }) {
                                 lineHeight: 1.5,
                             }}
                         >
-                            {rfPen && typeof rfUp === "number" && typeof rfDown === "number" && (
+                            {/* NOTE: Krauss, Do & Huck (2017) citation below was
+                                NOT re-verified as part of this field-rename change
+                                -- same flag as in services/pdf.py. Confirm accuracy
+                                and applicability to the new relative-outperformance
+                                target before trusting it on a public-facing page. */}
+                            {rfPen && typeof rfOutperform === "number" && typeof rfUnderperform === "number" && (
                                 <p>
-                                    RF probabilities: P(up){" "}
+                                    RF probabilities (vs. S&amp;P 500): P(outperform){" "}
                                     <span style={{ color: "hsl(var(--text-primary))", fontWeight: 600 }}>
-                                        {Math.round(rfUp * 100)}%
+                                        {Math.round(rfOutperform * 100)}%
                                     </span>
                                     {" · "}
-                                    P(down){" "}
+                                    P(underperform){" "}
                                     <span style={{ color: "hsl(var(--text-primary))", fontWeight: 600 }}>
-                                        {Math.round(rfDown * 100)}%
+                                        {Math.round(rfUnderperform * 100)}%
                                     </span>{" "}
                                     over {rfHorizon}-day forward window. Penalty rule:{" "}
                                     <span className="italic">Krauss, Do &amp; Huck (2017)</span> — tree-ensemble disagreement

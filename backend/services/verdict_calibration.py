@@ -92,19 +92,32 @@ def apply_earnings_gate(verdict: dict, market_context: dict | None) -> dict:
 
 # When the LLM and RF disagree on direction with both showing meaningful
 # edge, downgrade displayed confidence by this many points. Empirical:
-# RF-the LLM disagreement is uncommon (~12% of verdicts) but win-rate on
-# the LLM-only verdicts in those cases drops by ~9pp. This penalty is
-# conservative — it surfaces the disagreement without overriding the LLM.
+# NOTE: the "~12% of verdicts / ~9pp win-rate drop" figures below were
+# measured against the OLD absolute-direction RF target. They have not
+# been re-measured since the retrain to relative-outperformance-vs-SPY
+# (see rf_predictor.py / scripts/train_rf.py). Treat RF_DISAGREEMENT_PENALTY
+# as a reasonable starting default, not a validated number, until enough
+# post-retrain verdicts have resolved (services/verdict_resolution.py) to
+# check whether this penalty is actually calibrated correctly. The
+# scorecard's by_confidence_band_pre_calibration view is the tool for
+# checking this once there's enough resolved data.
 RF_DISAGREEMENT_PENALTY = 12
 
 
 def apply_rf_disagreement_penalty(verdict: dict, rf_opinion: dict | None) -> dict:
-    """Reduce displayed confidence when the LLM and RF disagree on direction.
+    """Reduce displayed confidence when the LLM and RF disagree.
+
+    RF's target is relative outperformance vs SPY, not absolute direction
+    (see rf_predictor.py). A BUY verdict is treated as aligned with RF's
+    "outperform" prediction, SELL with "underperform" — see the matching
+    comment in routers/analysis.py where agrees_with_llm is computed for
+    the fuller rationale on why that pairing is still correct under the
+    new target.
 
     Mutates `verdict` in place AND returns it. Only fires when:
       - RF model loaded and produced a non-null opinion
       - RF edge is at least 'modest' (so we trust the RF call enough)
-      - Direction disagrees with the LLM's recommendation
+      - RF's relative_direction disagrees with the LLM's recommendation
 
     Edge taxonomy comes from services/rf_predictor.py: "none" | "modest" |
     "strong" (no "moderate" / "weak" — that was a stale assumption from an
@@ -112,12 +125,12 @@ def apply_rf_disagreement_penalty(verdict: dict, rf_opinion: dict | None) -> dic
     """
     if not isinstance(verdict, dict) or not isinstance(rf_opinion, dict):
         return verdict
-    rf_dir = rf_opinion.get("direction")  # "up" | "down" | "neutral"
-    rf_edge = rf_opinion.get("edge")      # "none" | "modest" | "strong"
-    if rf_dir not in ("up", "down") or rf_edge not in ("strong", "modest"):
+    rf_dir = rf_opinion.get("relative_direction")  # "outperform" | "underperform" | None
+    rf_edge = rf_opinion.get("edge")               # "none" | "modest" | "strong"
+    if rf_dir not in ("outperform", "underperform") or rf_edge not in ("strong", "modest"):
         return verdict
     rec = (verdict.get("recommendation") or "").upper()
-    llm_dir = "up" if rec == "BUY" else "down" if rec == "SELL" else "neutral"
+    llm_dir = "outperform" if rec == "BUY" else "underperform" if rec == "SELL" else "neutral"
     if llm_dir == "neutral" or llm_dir == rf_dir:
         return verdict  # agreement or neutral → no penalty
 
@@ -131,11 +144,11 @@ def apply_rf_disagreement_penalty(verdict: dict, rf_opinion: dict | None) -> dic
     if new_conf == int(raw_conf):
         return verdict
 
-    rf_prob = rf_opinion.get("prob_up")
+    rf_prob = rf_opinion.get("prob_outperform")
     rf_pct = (
-        f"{int(round((rf_prob or 0) * 100))}% up"
-        if isinstance(rf_prob, (int, float)) and rf_dir == "up"
-        else f"{int(round((1 - (rf_prob or 0)) * 100))}% down"
+        f"{int(round((rf_prob or 0) * 100))}% likely to outperform SPY"
+        if isinstance(rf_prob, (int, float)) and rf_dir == "outperform"
+        else f"{int(round((1 - (rf_prob or 0)) * 100))}% likely to underperform SPY"
         if isinstance(rf_prob, (int, float))
         else rf_dir
     )

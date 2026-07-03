@@ -2,8 +2,10 @@
  * RandomForestOpinion — secondary-opinion module on the verdict page.
  *
  * Shown alongside the LLM verdict to give users an independent
- * probability estimate. Honest UX:
- *   - When edge="none" we say "No meaningful edge" rather than fake a number
+ * probability estimate of whether this stock will OUTPERFORM SPY over
+ * the horizon (relative-outperformance target — not absolute up/down
+ * direction; see backend/services/rf_predictor.py for why). Honest UX:
+ *   - When edge="none" we say "Inconclusive" rather than fake a number
  *   - When edge="strong" + disagrees with the AI, we highlight it prominently
  *   - Deep-links to /technical#random-forest for the full methodology
  */
@@ -20,11 +22,11 @@ import {
 
 export default function RandomForestOpinion({ opinion }) {
     if (!opinion) return null;
-    const { prob_up, direction, edge, horizon_days, agrees_with_llm, llm_direction, top_features, model_info } = opinion;
+    const { prob_outperform, relative_direction, edge, horizon_days, agrees_with_llm, llm_relative_direction, top_features, model_info } = opinion;
 
     const isNoEdge = edge === "none";
     const isStrong = edge === "strong";
-    const isBullish = direction === "up";
+    const isOutperform = relative_direction === "outperform";
 
     // Provenance banner — honest disclosure of what this model was trained on
     const trainStartYr = model_info?.training_start_date?.slice(0, 4);
@@ -40,10 +42,10 @@ export default function RandomForestOpinion({ opinion }) {
     // Title + accent
     const accent = isNoEdge
         ? "hsl(var(--text-muted))"
-        : isBullish
+        : isOutperform
             ? "hsl(var(--buy))"
             : "hsl(var(--sell))";
-    const Arrow = isBullish ? TrendingUp : TrendingDown;
+    const Arrow = isOutperform ? TrendingUp : TrendingDown;
 
     // Agreement chip
     let agreementChip = null;
@@ -71,7 +73,7 @@ export default function RandomForestOpinion({ opinion }) {
                 <CheckCircle2 size={11} strokeWidth={1.5} /> Agrees with AI verdict
             </div>
         );
-    } else if (llm_direction !== "neutral") {
+    } else if (llm_relative_direction !== "neutral") {
         agreementChip = (
             <div
                 className="flex items-center gap-1.5 px-2 py-1 font-mono text-[10px]"
@@ -83,8 +85,8 @@ export default function RandomForestOpinion({ opinion }) {
         );
     }
 
-    const pctUp = Math.round(prob_up * 1000) / 10;
-    const pctDown = Math.round((1 - prob_up) * 1000) / 10;
+    const pctOutperform = Math.round(prob_outperform * 1000) / 10;
+    const pctUnderperform = Math.round((1 - prob_outperform) * 1000) / 10;
 
     return (
         <section
@@ -135,7 +137,7 @@ export default function RandomForestOpinion({ opinion }) {
                         ) : (
                             <>
                                 <Arrow size={22} strokeWidth={1.5} className="inline -mt-1 mr-1" />
-                                {isBullish ? "Bullish" : "Bearish"} · {horizon_days}-day horizon
+                                {isOutperform ? "Likely to outperform" : "Likely to underperform"} S&amp;P 500 · {horizon_days}-day horizon
                             </>
                         )}
                     </h3>
@@ -150,12 +152,12 @@ export default function RandomForestOpinion({ opinion }) {
                     style={{ borderRadius: 2 }}
                     data-testid="rf-prob-bar"
                 >
-                    <div style={{ width: `${pctUp}%`, background: "hsl(var(--buy))" }} />
-                    <div style={{ width: `${pctDown}%`, background: "hsl(var(--sell))" }} />
+                    <div style={{ width: `${pctOutperform}%`, background: "hsl(var(--buy))" }} />
+                    <div style={{ width: `${pctUnderperform}%`, background: "hsl(var(--sell))" }} />
                 </div>
                 <div className="flex items-center justify-between mt-2 text-[11px] font-mono">
-                    <span style={{ color: "hsl(var(--buy))" }}>↑ {pctUp}% up</span>
-                    <span style={{ color: "hsl(var(--sell))" }}>{pctDown}% down ↓</span>
+                    <span style={{ color: "hsl(var(--buy))" }}>↑ {pctOutperform}% outperform</span>
+                    <span style={{ color: "hsl(var(--sell))" }}>{pctUnderperform}% underperform ↓</span>
                 </div>
             </div>
 

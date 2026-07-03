@@ -181,10 +181,10 @@ export default function ConfidenceCalibrationBreadcrumbs({ analysis }) {
 }
 
 function RFDisagreementExplainer({ analysis, delta }) {
-    const probUp = analysis.rf_opinion?.prob_up ?? 0;
-    const probDown = analysis.rf_opinion?.prob_down ?? 1;
-    const upPct = Math.round(probUp * 100);
-    const downPct = Math.round(probDown * 100);
+    const probOutperform = analysis.rf_opinion?.prob_outperform ?? 0;
+    const probUnderperform = analysis.rf_opinion?.prob_underperform ?? 1;
+    const outperformPct = Math.round(probOutperform * 100);
+    const underperformPct = Math.round(probUnderperform * 100);
     return (
         <>
             <p
@@ -207,10 +207,10 @@ function RFDisagreementExplainer({ analysis, delta }) {
                 {String(analysis.rf_opinion?.model_info?.training_start_date || "").slice(0, 4) ||
                     "2021"}{" "}
                 — gave it{" "}
-                <strong style={{ color: "hsl(var(--text-primary))" }}>{upPct}% up</strong>
+                <strong style={{ color: "hsl(var(--text-primary))" }}>{outperformPct}% outperform</strong>
                 {" / "}
-                <strong style={{ color: "hsl(var(--text-primary))" }}>{downPct}% down</strong>{" "}
-                over a {analysis.rf_opinion?.horizon_days || 20}-day forward window. Direction{" "}
+                <strong style={{ color: "hsl(var(--text-primary))" }}>{underperformPct}% underperform</strong>{" "}
+                (vs. S&amp;P 500) over a {analysis.rf_opinion?.horizon_days || 20}-day forward window. Direction{" "}
                 <em>disagrees</em> with the AI on a{" "}
                 <strong style={{ color: "hsl(var(--sell))" }}>
                     {analysis.rf_opinion?.edge}
@@ -233,7 +233,7 @@ function RFDisagreementExplainer({ analysis, delta }) {
                 >
                     <div
                         style={{
-                            width: `${upPct}%`,
+                            width: `${outperformPct}%`,
                             height: "100%",
                             background: "hsl(var(--buy))",
                             opacity: 0.8,
@@ -241,7 +241,7 @@ function RFDisagreementExplainer({ analysis, delta }) {
                     />
                     <div
                         style={{
-                            width: `${downPct}%`,
+                            width: `${underperformPct}%`,
                             height: "100%",
                             background: "hsl(var(--sell))",
                             opacity: 0.8,
@@ -252,8 +252,8 @@ function RFDisagreementExplainer({ analysis, delta }) {
                     className="flex justify-between mt-1 font-mono"
                     style={{ fontSize: "0.6rem", color: "hsl(var(--text-muted))" }}
                 >
-                    <span>P(up) {upPct}%</span>
-                    <span>P(down) {downPct}%</span>
+                    <span>P(outperform) {outperformPct}%</span>
+                    <span>P(underperform) {underperformPct}%</span>
                 </div>
             </div>
             {Array.isArray(analysis.rf_opinion?.top_features) &&

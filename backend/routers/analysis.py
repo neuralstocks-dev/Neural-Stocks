@@ -1010,15 +1010,27 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
             if feat is not None:
                 opinion = rf_predictor.predict_from_features(feat)
                 if opinion is not None:
-                    # Flag agreement/disagreement with the LLM verdict
+                    # Flag agreement/disagreement with the LLM verdict.
+                    # RF now predicts relative outperformance vs SPY, not
+                    # absolute direction (see rf_predictor.py docstring).
+                    # BUY is treated as aligned with "outperform" and SELL
+                    # with "underperform" — a BUY is fundamentally a claim
+                    # of relative attractiveness even when phrased in
+                    # absolute terms, so this pairing is still the correct
+                    # comparison. HOLD has no clean two-class equivalent
+                    # under either the old or new target and stays "neutral".
                     llm_rec = (analysis.get("recommendation") or "").upper()
-                    llm_direction = "up" if llm_rec == "BUY" else "down" if llm_rec == "SELL" else "neutral"
+                    llm_relative = (
+                        "outperform" if llm_rec == "BUY"
+                        else "underperform" if llm_rec == "SELL"
+                        else "neutral"
+                    )
                     opinion["agrees_with_llm"] = (
                         opinion["edge"] != "none"
-                        and llm_direction != "neutral"
-                        and opinion["direction"] == llm_direction
+                        and llm_relative != "neutral"
+                        and opinion["relative_direction"] == llm_relative
                     )
-                    opinion["llm_direction"] = llm_direction
+                    opinion["llm_relative_direction"] = llm_relative
                     doc["rf_opinion"] = opinion
                     rf_opinion_for_calibration = opinion
         except Exception as e:
@@ -1867,7 +1879,7 @@ def _public_view(analysis: dict) -> dict:
         "llm_model": analysis.get("llm_model"),
         "rf_opinion": {
             k: v for k, v in (analysis.get("rf_opinion") or {}).items()
-            if k in ("prob_up", "prob_down", "horizon_days", "edge")
+            if k in ("prob_outperform", "prob_underperform", "horizon_days", "edge")
         },
         "technicals": {k: v for k, v in (analysis.get("technicals") or {}).items()
                        if k in ("rsi_14", "sma_20", "sma_50", "macd")},

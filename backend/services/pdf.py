@@ -198,13 +198,21 @@ def _append_calibration_block(story, analysis: dict, s, currency: str):
         sources = []
         if rf_pen:
             rf_op = analysis.get("rf_opinion") or {}
-            up = rf_op.get("prob_up")
-            down = rf_op.get("prob_down")
+            # NOTE: field names updated for the relative-outperformance-
+            # vs-SPY target (see backend/services/rf_predictor.py). The
+            # "Krauss, Do & Huck (2017)" citation below was NOT re-verified
+            # as part of this change -- it was written for the old
+            # absolute-direction target and its applicability to the new
+            # relative target has not been checked. Flagging, not fixing:
+            # confirm this citation is accurate and still applicable
+            # before trusting it in a customer-facing PDF.
+            outperform = rf_op.get("prob_outperform")
+            underperform = rf_op.get("prob_underperform")
             horizon_d = rf_op.get("horizon_days") or 20
-            if isinstance(up, (int, float)) and isinstance(down, (int, float)):
+            if isinstance(outperform, (int, float)) and isinstance(underperform, (int, float)):
                 sources.append(
-                    f"RF probabilities: P(up) <b>{round(up*100)}%</b> · "
-                    f"P(down) <b>{round(down*100)}%</b> over {horizon_d}-day forward window. "
+                    f"RF probabilities (vs. S&amp;P 500): P(outperform) <b>{round(outperform*100)}%</b> · "
+                    f"P(underperform) <b>{round(underperform*100)}%</b> over {horizon_d}-day forward window. "
                     f"Penalty rule: Krauss, Do &amp; Huck (2017) — tree-ensemble "
                     f"disagreement with discretionary direction calls predicts ~9pp "
                     f"lower hit-rate on equity-direction tasks."

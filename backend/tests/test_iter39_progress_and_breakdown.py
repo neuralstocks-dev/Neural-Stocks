@@ -141,7 +141,7 @@ def test_latest_includes_pre_calibration_field(auth_headers):
 def test_pre_calibration_field_set_by_calibrate_verdict():
     from services.verdict_calibration import calibrate_verdict
     v = {"recommendation": "BUY", "confidence_score": 78}
-    rf = {"direction": "down", "edge": "strong", "prob_up": 0.20}
+    rf = {"relative_direction": "underperform", "edge": "strong", "prob_outperform": 0.20}
     calibrate_verdict(v, market_context=None, rf_opinion=rf)
     assert v["confidence_score_pre_calibration"] == 78
     assert v["confidence_score"] == 78 - 12  # RF penalty applied

@@ -121,19 +121,22 @@ def _signal_row_html(sig: dict, locked: bool = False) -> str:
     """Render a single watchlist signal row. `locked=True` blurs the row
     for Free users beyond the free-tier limit.
 
-    The internal `direction` value remains BUY/SELL (used for color routing
-    + analytics), but every user-facing label here uses the educational
-    framing — "Bullish bias" / "Bearish bias" — to stay consistent with
-    the web report, PDF, share page, and Telegram alerts.
+    RF predicts relative outperformance vs SPY, not absolute direction
+    (see backend/services/rf_predictor.py). Labels here MUST say
+    "Outperform bias" / "Underperform bias" — NOT "Bullish"/"Bearish" —
+    because a stock can carry a positive relative_direction while still
+    being expected to fall in absolute terms during a market-wide
+    downturn. Conflating the two would misstate what the model claims.
     """
     ticker = sig["ticker"]
-    direction = sig["direction"]
+    rel_direction = sig["relative_direction"]
     conf = sig["confidence_pct"]
     last_close = sig.get("last_close")
     horizon = sig.get("horizon_days", 20)
 
-    dir_color = "#79d694" if direction == "BUY" else "#e26c6c"
-    bias_label = "Bullish bias" if direction == "BUY" else "Bearish bias"
+    is_outperform = rel_direction == "outperform"
+    dir_color = "#79d694" if is_outperform else "#e26c6c"
+    bias_label = "Outperform bias" if is_outperform else "Underperform bias"
     close_line = f"${last_close:.2f}" if last_close else "—"
 
     if locked:
@@ -189,7 +192,7 @@ def _weekly_digest_html(full_name: str, signals: list[dict], locked_count: int,
     else:
         rows = "".join(_signal_row_html(s) for s in signals)
         locked_rows = "".join(
-            _signal_row_html({"ticker": "·····", "direction": "BUY", "confidence_pct": 0}, locked=True)
+            _signal_row_html({"ticker": "·····", "relative_direction": "outperform", "confidence_pct": 0}, locked=True)
             for _ in range(locked_count)
         )
         body = f"""

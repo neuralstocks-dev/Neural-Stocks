@@ -1,9 +1,10 @@
 """Weekly RF Digest — "Sunday evening recap".
 
 Scans every opt-in user's watchlist once a week and emails a digest of
-the top-N RF-ranked BUY/SELL edges. Reuses the Random-Forest scoring
-pipeline from `services.auto_scan`, but delivers via email instead of
-Telegram — so it works for Free users (no Telegram link required).
+the top-N RF-ranked outperform/underperform-vs-SPY edges. Reuses the
+Random-Forest scoring pipeline from `services.auto_scan`, but delivers
+via email instead of Telegram — so it works for Free users (no Telegram
+link required).
 
 Free tier sees top 3 signals fully, top 4-5 blurred with an upgrade CTA
 to Auto-Scan (Pro/Elite) for real-time Telegram pushes instead of once
@@ -63,8 +64,8 @@ async def _rank_user_watchlist(user_id: str, market_df: dict) -> list[dict]:
         opinion = rf_predictor.predict_from_features(feat)
         if opinion is None:
             continue
-        prob_up = float(opinion["prob_up"])
-        edge = abs(prob_up - 0.5)
+        prob_outperform = float(opinion["prob_outperform"])
+        edge = abs(prob_outperform - 0.5)
         if edge < MIN_EDGE_FOR_DIGEST:
             continue
 
@@ -75,10 +76,17 @@ async def _rank_user_watchlist(user_id: str, market_df: dict) -> list[dict]:
 
         signals.append({
             "ticker": ticker,
-            "direction": "BUY" if prob_up >= 0.5 else "SELL",
-            "prob_up": prob_up,
+            # NOTE: this is a relative-outperformance-vs-SPY call, not an
+            # absolute BUY/SELL recommendation — deliberately NOT reusing
+            # "BUY"/"SELL" labels here (see rf_predictor.py) since a stock
+            # can be "likely to outperform" while still expected to fall
+            # in absolute terms during a broad selloff. The digest copy
+            # that renders this field must say "outperform"/"underperform",
+            # not "buy"/"sell".
+            "relative_direction": "outperform" if prob_outperform >= 0.5 else "underperform",
+            "prob_outperform": prob_outperform,
             "edge_pct": round(edge * 100, 1),
-            "confidence_pct": round((prob_up if prob_up >= 0.5 else (1 - prob_up)) * 100),
+            "confidence_pct": round((prob_outperform if prob_outperform >= 0.5 else (1 - prob_outperform)) * 100),
             "last_close": last_close,
             "horizon_days": opinion.get("horizon_days", 20),
         })
