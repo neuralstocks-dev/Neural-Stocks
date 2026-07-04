@@ -137,6 +137,17 @@ def _download_history(tickers: list[str], years: int, chunk_size: int = 15) -> d
     out: dict[str, pd.DataFrame] = {}
     chunks = [tickers[i:i + chunk_size] for i in range(0, len(tickers), chunk_size)]
 
+    # Minimum usable rows scales with the requested window instead of a
+    # hardcoded constant. US markets run ~252 trading days/year, so a
+    # fixed threshold of 300 (sized for the --years 5 default, ~1,260
+    # trading days) silently discarded EVERY ticker whenever --years was
+    # set to 1 or 2 for a quick test run -- data was downloading
+    # successfully the whole time; this filter just threw all of it away
+    # before it ever reached `out`. Require at least 80% of the expected
+    # trading days for the requested window, with a small floor so very
+    # short test windows don't require an impossible 0 rows.
+    min_rows = max(50, int(years * 252 * 0.8))
+
     for chunk_idx, chunk in enumerate(chunks, 1):
         raw = None
         last_err = None
@@ -177,7 +188,7 @@ def _download_history(tickers: list[str], years: int, chunk_size: int = 15) -> d
                     continue
                 df = df[["Open", "High", "Low", "Close", "Volume"]]
                 df.index = pd.to_datetime(df.index)
-                if len(df) >= 300:
+                if len(df) >= min_rows:
                     out[t] = df
                     chunk_ok += 1
             except Exception:
