@@ -144,14 +144,9 @@ export default function TechnicalPage() {
                         style={{ color: "hsl(var(--text-secondary))" }}
                     >
                         Every Neural Stock Intelligence™ verdict is the output of a deterministic data
-                        pipeline feeding a large-language-model reasoning step, with a trained
-                        Random Forest classifier as a <em>secondary</em> opinion. The RF is never
-                        authoritative — when its direction call disagrees with the LLM, we{" "}
-                        <strong>lower the displayed confidence</strong> rather than override the
-                        verdict, and its raw <code>P(up) / P(down)</code> probabilities are surfaced
-                        in the score-breakdown drawer so users can audit the math themselves. Every
+                        pipeline feeding a large-language-model reasoning step. Every
                         signal feeding a verdict — RSI, MACD, candlestick patterns, sentiment,
-                        intrinsic-value anchor, RF probabilities — is exposed in the report. The
+                        intrinsic-value anchor — is exposed in the report. The
                         verdict always shows its work.
                     </p>
                 </section>
@@ -211,9 +206,6 @@ export default function TechnicalPage() {
                             </MythLi>
                             <MythLi positive reason="Deterministic, sector-aware fair-value anchors computed from EPS, book value, ROE and beta — Benjamin Graham's classic formula for asset-heavy sectors and a 1-year Residual Income Model for intangible-heavy services. Reference numbers, never price targets.">
                                 Intrinsic-value anchors (Graham Number + Residual Income Model)
-                            </MythLi>
-                            <MythLi positive reason="An independent statistical second opinion that catches cases where the LLM's narrative disagrees with what historical data says. Disagreements visibly downgrade confidence — see V2 calibration above.">
-                                Random Forest classifier as <em>secondary</em> probability opinion
                             </MythLi>
                             <MythLi positive reason="Curated keyword lists (English + Bahasa) that you can read end-to-end. No black-box embeddings — every sentiment hit links back to the source headline.">
                                 Transparent keyword sentiment heuristic (EN + Bahasa)
@@ -426,30 +418,7 @@ export default function TechnicalPage() {
                             }}
                         >
                             <p className="text-overline" style={{ color: "hsl(var(--hold))", fontSize: "0.6rem" }}>
-                                Rule 2 · RF-Disagreement Penalty
-                            </p>
-                            <p className="text-sm mt-2 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                                Our independent <strong>Random-Forest model</strong> (trained on 5 years of
-                                daily price + 19 engineered features across 344 tickers) outputs its own
-                                BUY/SELL/HOLD opinion every verdict. When it disagrees with the AI verdict with{" "}
-                                <strong>moderate</strong> or <strong>strong</strong> edge, the AI's
-                                confidence is reduced (12 points for strong, ~8 for moderate). The model's
-                                recommendation is NOT overridden — but the disagreement is reflected in
-                                the verdict ring so you see the model uncertainty. Empirical: RF disagrees
-                                ~12% of the time and historical win-rate on AI-only verdicts in those
-                                cases drops by ~9pp.
-                            </p>
-                        </div>
-                        <div
-                            className="p-4"
-                            style={{
-                                border: "1px solid hsl(var(--border-default))",
-                                borderLeft: "3px solid hsl(var(--hold))",
-                                borderRadius: 2,
-                            }}
-                        >
-                            <p className="text-overline" style={{ color: "hsl(var(--hold))", fontSize: "0.6rem" }}>
-                                Rule 3 · Volume Confirmation Gate
+                                Rule 2 · Volume Confirmation Gate
                             </p>
                             <p className="text-sm mt-2 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                                 Every detected candlestick pattern is tagged with its session's <strong>volume ratio</strong>{" "}
@@ -469,7 +438,7 @@ export default function TechnicalPage() {
                             }}
                         >
                             <p className="text-overline" style={{ color: "hsl(var(--hold))", fontSize: "0.6rem" }}>
-                                Rule 4 · Trend Regime Gate
+                                Rule 3 · Trend Regime Gate
                             </p>
                             <p className="text-sm mt-2 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                                 <code>compute_technicals()</code> now classifies each analysis into one of three regimes:{" "}
@@ -492,7 +461,7 @@ export default function TechnicalPage() {
                             }}
                         >
                             <p className="text-overline" style={{ color: "hsl(var(--hold))", fontSize: "0.6rem" }}>
-                                Rule 5 · Stale Verdict Indicator
+                                Rule 4 · Stale Verdict Indicator
                             </p>
                             <p className="text-sm mt-2 leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
                                 Verdict badges older than <strong>7 calendar days</strong> (~5 trading days) are
@@ -609,9 +578,9 @@ histogram  = MACD_line − signal`}
                 {/* Random Forest secondary-opinion model */}
                 <SectionHeader
                     icon={Trees}
-                    overline="Secondary opinion"
+                    overline="Secondary opinion · retired"
                     title="The Random Forest layer."
-                    subtitle="An independent probability estimate that runs alongside the AI verdict — never instead of it. Honest numbers, warts and all."
+                    subtitle="We tested an independent probability model alongside the AI verdict for a while. It's currently disabled — see why below. Honest numbers, warts and all."
                 />
 
                 <div id="random-forest" className="mt-8 module p-6 md:p-10 scroll-mt-24" data-testid="tech-random-forest">
@@ -881,9 +850,41 @@ histogram  = MACD_line − signal`}
                             </p>
                         </>
                     ) : (
-                        <p className="mt-8 text-sm" style={{ color: "hsl(var(--text-muted))" }}>
-                            Random Forest model not loaded on this deploy — secondary opinion disabled.
-                        </p>
+                        <div
+                            className="mt-8 p-5"
+                            style={{
+                                background: "hsla(220,20%,50%,0.05)",
+                                border: "1px solid hsl(var(--border-divider))",
+                            }}
+                            data-testid="rf-retired-note"
+                        >
+                            <p className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
+                                Retired · not currently in production
+                            </p>
+                            <p className="mt-2 text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
+                                We tested two different prediction targets for this model — absolute
+                                N-day direction, then relative outperformance vs. the S&amp;P 500 — and neither
+                                found a learnable signal in the available technical/fundamental features.
+                                The absolute-direction version held out at <strong>50.85%</strong> accuracy
+                                (barely above chance). The relative-vs-SPY retrain, tested on a proper
+                                78,000-row walk-forward holdout (not a short or skewed window), came back at{" "}
+                                <strong style={{ color: "hsl(var(--sell))" }}>49.62%</strong> accuracy and{" "}
+                                <strong style={{ color: "hsl(var(--sell))" }}>0.4824 ROC-AUC</strong> — worse
+                                than simply guessing the majority class every time (57.89% baseline), and an
+                                AUC below 0.50 indicates no usable predictive signal at all, not noise from a
+                                small sample.
+                            </p>
+                            <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                                Rather than ship a secondary opinion that performs worse than a trivial
+                                baseline, we've disabled it. This isn't a deploy issue or a temporary gap —
+                                it's a considered decision based on two properly-tested label targets. If a
+                                genuinely different approach (different features, a longer horizon, or
+                                sector-relative rather than index-relative labeling) shows real, stable
+                                promise in the future, we'll revisit it — but re-enabling requires a
+                                deliberate decision, not an automatic flip whenever some future retrain's
+                                number happens to clear a baseline once.
+                            </p>
+                        </div>
                     )}
 
                     <h4 className="font-serif mt-10 mb-3" style={{ fontSize: "1.3rem" }}>

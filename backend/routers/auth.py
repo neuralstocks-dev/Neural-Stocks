@@ -173,7 +173,15 @@ async def me(user=Depends(get_current_user)):
 
 @router.get("/me/auto-scan")
 async def get_auto_scan_prefs(user=Depends(get_current_user)):
-    """Current state of the user's Watchlist Auto-Scan preference + last run stats."""
+    """Current state of the user's Watchlist Auto-Scan preference + last run stats.
+
+    RETIRED — see set_auto_scan_prefs docstring. `retired: True` is always
+    returned now so the frontend can show an honest notice instead of a
+    toggle that looks functional. `enabled` reflects whatever was
+    persisted before retirement (some users may still have True stored)
+    purely for transparency about their prior setting -- it does NOT mean
+    the feature is running; run_auto_scan_batch() no-ops unconditionally.
+    """
     u = await db.users.find_one(
         {"id": user["id"]},
         {"_id": 0, "auto_scan_enabled": 1, "auto_scan_last_run_at": 1,
@@ -184,6 +192,11 @@ async def get_auto_scan_prefs(user=Depends(get_current_user)):
         or u.get("plan") in ("pro", "elite", "daypass")
     )
     return {
+        "retired": True,
+        "retired_reason": (
+            "Auto-Scan's Random-Forest scoring model was retired after failing "
+            "to beat a trivial baseline on properly-tested holdout data."
+        ),
         "enabled": bool(u.get("auto_scan_enabled")),
         "telegram_linked": bool(u.get("telegram_chat_id")),
         "plan_eligible": eligible_plan,
@@ -194,37 +207,53 @@ async def get_auto_scan_prefs(user=Depends(get_current_user)):
 
 @router.post("/me/auto-scan")
 async def set_auto_scan_prefs(payload: dict, user=Depends(get_current_user)):
-    """Toggle Watchlist Auto-Scan. Requires Pro/Elite/Day-Pass/Admin plus a
-    linked Telegram chat — otherwise we won't have anywhere to push alerts."""
+    """Toggle Watchlist Auto-Scan.
+
+    RETIRED as of the Random-Forest secondary-opinion retirement (see
+    services/rf_predictor.py / scripts/train_rf.py for the full reasoning
+    -- two label targets tested on proper walk-forward holdouts, neither
+    beat a trivial always-majority baseline). Auto-Scan's entire scoring
+    mechanism was RF-based (services/auto_scan.py::run_auto_scan_batch
+    gates on rf_predictor.is_available()) -- there is no other signal
+    source behind it. Rather than accept a toggle that silently never
+    actually runs (which is what happened before this fix: the endpoint
+    would return {"ok": True, "enabled": True} while the scheduled batch
+    silently no-op'd every single run), block new enablement with an
+    honest reason. Disabling remains allowed unconditionally.
+    """
     want_enabled = bool(payload.get("enabled"))
+    if want_enabled:
+        raise HTTPException(
+            status_code=410,
+            detail=(
+                "Watchlist Auto-Scan has been retired. Its scoring relied on "
+                "our Random-Forest secondary-opinion model, which we've disabled "
+                "after two properly-tested label targets both failed to beat a "
+                "trivial baseline on holdout data. See the Technical page for "
+                "the full writeup. We're not comfortable running a paid feature "
+                "on a model that doesn't outperform guessing the majority class."
+            ),
+        )
     u = await db.users.find_one(
         {"id": user["id"]},
         {"_id": 0, "plan": 1, "telegram_chat_id": 1},
     ) or {}
-    eligible_plan = (
-        bool(user.get("is_admin"))
-        or u.get("plan") in ("pro", "elite", "daypass")
-    )
-    if want_enabled and not eligible_plan:
-        raise HTTPException(
-            status_code=402,
-            detail="Watchlist Auto-Scan is a Pro/Elite/Day-Pass feature. Upgrade to enable it.",
-        )
-    if want_enabled and not u.get("telegram_chat_id"):
-        raise HTTPException(
-            status_code=400,
-            detail="Link your Telegram bot first — Auto-Scan pushes alerts over Telegram.",
-        )
     await db.users.update_one(
         {"id": user["id"]},
-        {"$set": {"auto_scan_enabled": want_enabled}},
+        {"$set": {"auto_scan_enabled": False}},
     )
-    return {"ok": True, "enabled": want_enabled}
+    return {"ok": True, "enabled": False}
 
 
 @router.get("/me/weekly-digest")
 async def get_weekly_digest_prefs(user=Depends(get_current_user)):
-    """Current state of the user's Weekly RF Digest email preference."""
+    """Current state of the user's Weekly RF Digest email preference.
+
+    RETIRED — see set_weekly_digest_prefs docstring. Same underlying
+    cause as Auto-Scan (see /me/auto-scan): the digest's entire signal
+    source was rf_predictor.predict_from_features(), which now always
+    returns None. run_weekly_digest_batch() no-ops unconditionally.
+    """
     u = await db.users.find_one(
         {"id": user["id"]},
         {"_id": 0, "weekly_digest_enabled": 1, "weekly_digest_last_run_at": 1,
@@ -235,6 +264,11 @@ async def get_weekly_digest_prefs(user=Depends(get_current_user)):
         or u.get("plan") in ("pro", "elite", "daypass")
     )
     return {
+        "retired": True,
+        "retired_reason": (
+            "The Weekly Digest's Random-Forest scoring model was retired after "
+            "failing to beat a trivial baseline on properly-tested holdout data."
+        ),
         "enabled": bool(u.get("weekly_digest_enabled")),
         "is_paid": is_paid,
         "last_run_at": u.get("weekly_digest_last_run_at"),
@@ -244,14 +278,26 @@ async def get_weekly_digest_prefs(user=Depends(get_current_user)):
 
 @router.post("/me/weekly-digest")
 async def set_weekly_digest_prefs(payload: dict, user=Depends(get_current_user)):
-    """Opt in or out of the Sunday-evening Weekly RF Digest email. Open
-    to all plans (Free gets top 3, Pro/Elite get top 5)."""
+    """RETIRED. See get_weekly_digest_prefs docstring. Disabling remains
+    allowed unconditionally; new enablement is blocked with an honest
+    reason rather than silently accepted and never actually sent."""
     want_enabled = bool(payload.get("enabled"))
+    if want_enabled:
+        raise HTTPException(
+            status_code=410,
+            detail=(
+                "The Weekly Digest has been retired. Its scoring relied on our "
+                "Random-Forest secondary-opinion model, which we've disabled "
+                "after two properly-tested label targets both failed to beat a "
+                "trivial baseline on holdout data. See the Technical page for "
+                "the full writeup."
+            ),
+        )
     await db.users.update_one(
         {"id": user["id"]},
-        {"$set": {"weekly_digest_enabled": want_enabled}},
+        {"$set": {"weekly_digest_enabled": False}},
     )
-    return {"ok": True, "enabled": want_enabled}
+    return {"ok": True, "enabled": False}
 
 
 class ForgotPasswordReq(_BaseModel):

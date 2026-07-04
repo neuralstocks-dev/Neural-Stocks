@@ -66,7 +66,22 @@ def _lazy_load() -> dict[str, Any] | None:
 
 
 def is_available() -> bool:
-    return _lazy_load() is not None
+    """True only if a model is loaded AND functionally active (passes the
+    same label_type gate as predict_from_features()). A model can be
+    present on disk but gated off -- e.g. because it predates the current
+    label semantics, or (as of the relative-outperformance-vs-SPY retrain
+    tested against a proper walk-forward holdout) because retraining
+    failed to beat even a trivial always-majority baseline and the
+    feature was deliberately kept disabled. This must NOT report True in
+    either case -- doing so lets /technical and any other consumer render
+    a fully populated, confident-looking metrics dashboard for a model
+    that predict_from_features() will never actually return a value from,
+    which is a worse failure mode than an honest 'unavailable' state.
+    """
+    b = _lazy_load()
+    if b is None:
+        return False
+    return b["meta"].get("label_type") == "relative_vs_spy" and b["meta"].get("rf_feature_enabled") is True
 
 
 def reload() -> dict | None:
@@ -81,7 +96,13 @@ def reload() -> dict | None:
 
 def get_meta() -> dict | None:
     """Expose metadata (training date, holdout metrics, feature importance)
-    for the /technical page."""
+    for the /technical page. Returns None -- not the raw file's metadata
+    -- when the model is gated off (see is_available() docstring), so the
+    Technical page's existing 'model not loaded on this deploy' fallback
+    fires correctly instead of rendering live-looking stats for a
+    disabled feature."""
+    if not is_available():
+        return None
     b = _lazy_load()
     return None if b is None else b["meta"]
 
@@ -158,7 +179,7 @@ def predict_from_features(feature_row: dict | None) -> dict | None:
     try:
         model = bundle["model"]
         meta = bundle["meta"]
-        if meta.get("label_type") != "relative_vs_spy":
+        if meta.get("label_type") != "relative_vs_spy" or meta.get("rf_feature_enabled") is not True:
             return None
         feature_names = meta["feature_names"]
         x = np.array([feature_row.get(n, np.nan) for n in feature_names], dtype=float)

@@ -512,10 +512,10 @@ export default function BacktestPage() {
                             className="mt-4 max-w-xl text-xs leading-relaxed"
                             style={{ color: "hsl(var(--text-muted))" }}
                         >
-                            Want to see what the result looks like before you build your own
-                            history? Scroll down to the <strong>ML Backtest</strong> below — it
-                            replays the Random-Forest secondary-opinion model on the last
-                            12 months of price action and shows real win-rate numbers right now.
+                            Want to see what a walk-forward backtest looks like before you build your own
+                            history? Scroll down to the <strong>ML Backtest</strong> below — it's a
+                            frozen historical record from our former Random-Forest secondary-opinion
+                            model, kept for transparency after we retired it (see the note below for why).
                         </p>
                         <Link
                             to="/dashboard"
@@ -848,13 +848,13 @@ function MlBacktestSection({ ml }) {
                         letterSpacing: "-0.01em",
                     }}
                 >
-                    The model's honest track record.
+                    The model's honest track record — and why we retired it.
                 </h2>
                 <p
                     className="mt-3 max-w-2xl text-base"
                     style={{ color: "hsl(var(--text-secondary))" }}
                 >
-                    A separate backtest of Neural Stock Intelligence™'s Random-Forest layer against
+                    A backtest of Neural Stock Intelligence™'s former Random-Forest layer against
                     SPY. Monthly rebalance, top-{m.top_k} of {m.universe_size}{" "}
                     mega-cap names ranked by model probability, equal-weight,
                     pure-RF (no LLM). This is the same walk-forward window used
@@ -868,6 +868,24 @@ function MlBacktestSection({ ml }) {
                     </Link>
                     .
                 </p>
+
+                {ml?.model_retired && (
+                    <div
+                        className="mt-4 p-4 max-w-2xl"
+                        style={{
+                            background: "hsla(220,20%,50%,0.05)",
+                            border: "1px solid hsl(var(--border-divider))",
+                        }}
+                        data-testid="ml-backtest-retired-notice"
+                    >
+                        <p className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
+                            Frozen · model retired
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                            {ml.model_retired_note}
+                        </p>
+                    </div>
+                )}
 
                 {/* KPI */}
                 <section

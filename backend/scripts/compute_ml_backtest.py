@@ -397,6 +397,25 @@ async def main():
     meta = json.loads(META_PATH.read_text())
     cutoff_date = meta["cutoff_date"]
     feature_names = meta["feature_names"]
+
+    # SAFETY GATE — mirrors services/rf_predictor.py's predict_from_features()
+    # gate. This script loads the .joblib directly via joblib.load() rather
+    # than going through rf_predictor.py's public functions, so it was
+    # NOT covered by that gate at all until this check was added. Without
+    # it, running the admin /backtest/ml/recompute trigger would silently
+    # repopulate the PUBLIC, unauthenticated /backtest/ml endpoint with
+    # numbers derived from a model that's been deliberately disabled after
+    # failing two separate walk-forward validation attempts (see
+    # scripts/train_rf.py meta["rf_feature_enabled"] for the full reasoning).
+    if meta.get("label_type") != "relative_vs_spy" or meta.get("rf_feature_enabled") is not True:
+        log.error(
+            "RF model is gated off (label_type=%r, rf_feature_enabled=%r) — "
+            "refusing to compute a new ML backtest against a retired model. "
+            "See scripts/train_rf.py for why this feature was disabled.",
+            meta.get("label_type"), meta.get("rf_feature_enabled"),
+        )
+        raise SystemExit(1)
+
     log.info(f"RF trained_at={meta['trained_at']} cutoff={cutoff_date} horizon={meta['horizon_days']}d")
 
     bundle = joblib.load(MODEL_PATH)

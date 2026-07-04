@@ -39,7 +39,17 @@ async def my_backtest(
 async def ml_backtest():
     """Read the cached NSI-ML walk-forward backtest.
     Public (unauthenticated) so it can be embedded in marketing pages later.
-    Returns HTTP 404-shape empty-state dict if never computed."""
+    Returns HTTP 404-shape empty-state dict if never computed.
+
+    RETIRED MODEL NOTE: the Random-Forest model backing this backtest has
+    been disabled (see scripts/train_rf.py meta["rf_feature_enabled"] for
+    the full reasoning -- two label targets both failed to beat a trivial
+    baseline on proper walk-forward holdouts). scripts/compute_ml_backtest.py
+    now refuses to recompute against a gated-off model, so whatever is
+    cached here is frozen from before that decision. We surface that
+    explicitly via `model_retired: True` rather than silently keep serving
+    stale numbers with no indication anything changed.
+    """
     doc = await db.backtest_runs.find_one({"kind": "ml"}, {"_id": 0, "user_id": 0})
     if not doc:
         return {
@@ -47,6 +57,13 @@ async def ml_backtest():
             "empty": True,
             "message": "NSI-ML walk-forward has not been computed yet.",
         }
+    doc["model_retired"] = True
+    doc["model_retired_note"] = (
+        "The Random-Forest model behind this backtest has been retired after "
+        "failing to beat a trivial baseline on properly-tested holdout data. "
+        "These numbers are frozen from before that decision and will not update. "
+        "See the Technical page for the full writeup."
+    )
     return doc
 
 

@@ -9,7 +9,7 @@
  */
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { LineChart, ArrowRight, CheckCircle2, Zap, Shield, Globe, TrendingUp, BarChart2, Bell } from "lucide-react";
+import { LineChart, ArrowRight, CheckCircle2, Shield, Globe, TrendingUp, BarChart2, Bell } from "lucide-react";
 import TryNowBox from "@/components/TryNowBox";
 import PublicTrendingTicker from "@/components/PublicTrendingTicker";
 import SocialLinks from "@/components/SocialLinks";
@@ -32,11 +32,6 @@ const FEATURES = [
         icon: TrendingUp,
         title: "Three reasoning modes",
         body: "Standard (fundamentals + technicals), Candlestick (pattern-first), or Hybrid (AI confirms with candlestick timing). Same data, different emphasis.",
-    },
-    {
-        icon: Zap,
-        title: "Random Forest second opinion",
-        body: "An independent statistical model runs alongside the AI verdict. When they disagree, confidence drops visibly — you see the uncertainty.",
     },
     {
         icon: Bell,

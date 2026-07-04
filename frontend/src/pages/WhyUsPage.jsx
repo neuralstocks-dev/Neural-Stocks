@@ -57,7 +57,7 @@ const MODULES = [
         icon: Award,
         title: "Calibrated Confidence",
         status: "available",
-        body: "Every verdict's confidence score is post-processed by two disciplined rules: (1) the Earnings-Proximity Gate caps confidence at 65 when an earnings release is within 7 days — pre-earnings outcomes are largely event-driven and the model can't price the surprise; (2) the RF-Disagreement Penalty automatically reduces displayed confidence when our independent Random-Forest secondary opinion disagrees with the AI's direction, so users see model disagreement reflected in the verdict ring. Both adjustments leave a transparent breadcrumb under the ring — we don't quietly hand-tune scores, every change is shown and explained.",
+        body: "Every verdict's confidence score is post-processed by a disciplined rule: the Earnings-Proximity Gate caps confidence at 55 when an earnings release is within 5 calendar days — pre-earnings outcomes are largely event-driven and the model can't price the surprise. This adjustment leaves a transparent breadcrumb under the ring — we don't quietly hand-tune scores, every change is shown and explained.",
     },
     {
         icon: BellRing,

@@ -92,8 +92,8 @@ export default function LLMBudgetBanner({ error }) {
                             Every AI verdict makes one call to the AI provider
                             billed against your Universal Key balance. The balance is empty — so new
                             analyses are paused until you add credit. <strong style={{ color: "hsl(var(--text-primary))" }}>
-                            Existing verdicts, charts, watchlists, alerts, PDF exports, Random-Forest
-                            scans, and Telegram pushes all keep working.</strong>
+                            Existing verdicts, charts, watchlists, alerts, PDF exports,
+                            and Telegram pushes all keep working.</strong>
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
                             <a

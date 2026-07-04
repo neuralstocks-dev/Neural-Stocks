@@ -431,6 +431,23 @@ def main():
         # present, so an old model can never be mislabeled as the new
         # target just because the serving code was updated.
         "label_type": "relative_vs_spy",
+        # Deliberate kill switch, independent of label_type or metrics.
+        # Set to False after the relative-vs-SPY retrain (tested on a
+        # proper 78k-row walk-forward holdout, not a short/skewed window)
+        # came back with accuracy 0.4962 and ROC-AUC 0.4824 against an
+        # always-majority baseline of 0.5789 -- i.e. worse than guessing
+        # the majority class, on a near-balanced target. The prior
+        # absolute-direction model (accuracy 0.5085, AUC 0.5117) was also
+        # only marginally above chance. Two label targets, two failures
+        # to find a learnable signal in these 23 features at this
+        # horizon -- this is a considered decision to retire the feature,
+        # not just "score was low this run". Re-enabling requires a
+        # human to deliberately set this True after a genuinely new
+        # approach (different features, different horizon, or a
+        # different validation methodology) shows real, stable promise
+        # -- not an automatic flip whenever some future retrain's number
+        # happens to clear the baseline once.
+        "rf_feature_enabled": False,
         "universe_size": len(histories),
         "universe": sorted(histories.keys()),
         "years_of_history": args.years,

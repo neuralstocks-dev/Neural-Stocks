@@ -729,32 +729,33 @@ export default function SettingsPage() {
                     )}
                 </section>
 
-                {/* Watchlist Auto-Scan card */}
+                {/* Watchlist Auto-Scan card — RETIRED */}
                 <section className="module p-6 md:p-8 mt-4" data-testid="auto-scan-module">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div className="min-w-0">
                             <p className="text-overline flex items-center gap-2">
-                                <Radar size={12} strokeWidth={1.5} /> Watchlist Auto-Scan
+                                <Radar size={12} strokeWidth={1.5} /> Watchlist Auto-Scan · retired
                             </p>
                             <h2
                                 className="font-serif mt-2"
                                 style={{ fontSize: "1.6rem", letterSpacing: "-0.01em" }}
                             >
-                                Daily RF pre-filter · Telegram push
+                                This feature has been retired
                             </h2>
                             <p className="mt-3 text-sm max-w-xl" style={{ color: "hsl(var(--text-secondary))" }}>
-                                Once a day, Neural Stock Intelligence™ runs the Random-Forest model over every ticker on your watchlist.
-                                If the model shows <strong>strong conviction</strong> (|P − 50%| &gt; 15pp), you'll get
-                                a push on Telegram. This is an <em>RF-only</em> alert — not a full AI verdict. Tap
-                                Analyze in the app for the multi-lens report before acting.
+                                Auto-Scan's scoring relied on our Random-Forest secondary-opinion model.
+                                We tested two different prediction targets for it, and neither found a
+                                learnable signal in the available data — the most recent version performed
+                                worse than simply guessing the majority outcome every time. Rather than run
+                                a paid feature on a model that doesn't outperform a coin flip, we've
+                                disabled it. See the <Link to="/technical#random-forest" className="underline" style={{ color: "hsl(var(--text-primary))" }}>Technical page</Link> for the full numbers.
                             </p>
                         </div>
                         {effectiveAutoScan && (
                             <div className="shrink-0">
                                 <Switch
-                                    checked={!!effectiveAutoScan?.enabled}
-                                    disabled={autoScanBusy || !effectiveAutoScan?.plan_eligible || !effectiveAutoScan?.telegram_linked}
-                                    onCheckedChange={toggleAutoScan}
+                                    checked={false}
+                                    disabled={true}
                                     data-testid="auto-scan-toggle"
                                 />
                             </div>
@@ -765,35 +766,7 @@ export default function SettingsPage() {
                         <p className="mt-4 text-sm" style={{ color: "hsl(var(--text-muted))" }}>
                             <Loader2 size={14} className="animate-spin inline mr-2" /> Loading…
                         </p>
-                    ) : !effectiveAutoScan.plan_eligible ? (
-                        <div
-                            className="mt-5 p-4 flex items-start gap-3"
-                            style={{
-                                background: "hsl(var(--surface-elevated))",
-                                border: "1px solid hsl(var(--border-default))",
-                                borderRadius: 2,
-                            }}
-                            data-testid="auto-scan-plan-locked"
-                        >
-                            <Lock size={14} strokeWidth={1.5} style={{ color: "hsl(var(--hold))", marginTop: 2 }} />
-                            <div>
-                                <p className="font-mono text-xs" style={{ color: "hsl(var(--hold))" }}>
-                                    PRO / ELITE / WEEK-PASS FEATURE
-                                </p>
-                                <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
-                                    Auto-Scan is available on paid plans.{" "}
-                                    <Link
-                                        to="/pricing"
-                                        className="underline"
-                                        style={{ color: "hsl(var(--buy))" }}
-                                        data-testid="auto-scan-upgrade-link"
-                                    >
-                                        View plans →
-                                    </Link>
-                                </p>
-                            </div>
-                        </div>
-                    ) : !effectiveAutoScan.telegram_linked ? (
+                    ) : (
                         <div
                             className="mt-5 p-4"
                             style={{
@@ -801,52 +774,17 @@ export default function SettingsPage() {
                                 border: "1px solid hsl(var(--border-default))",
                                 borderRadius: 2,
                             }}
-                            data-testid="auto-scan-telegram-required"
+                            data-testid="auto-scan-retired-notice"
                         >
-                            <p className="font-mono text-xs" style={{ color: "hsl(var(--hold))" }}>
-                                ⚙︎ CONNECT TELEGRAM FIRST
+                            <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                                ⚙︎ NO LONGER RUNNING
                             </p>
                             <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
-                                Auto-Scan pushes alerts to Telegram. Link your Telegram account above to enable this
-                                feature.
+                                {effectiveAutoScan.enabled
+                                    ? "This was previously enabled on your account, but it hasn't sent alerts since the underlying model was retired."
+                                    : "This feature is currently disabled platform-wide."}
                             </p>
                         </div>
-                    ) : effectiveAutoScan.enabled ? (
-                        <div className="mt-5" data-testid="auto-scan-enabled-stats">
-                            <p className="text-overline" style={{ color: "hsl(var(--buy))" }}>
-                                <Check size={12} strokeWidth={2} className="inline mr-2" /> Active
-                            </p>
-                            <div className="mt-3 grid grid-cols-2 gap-4 max-w-md">
-                                <div>
-                                    <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
-                                        LAST SCAN
-                                    </p>
-                                    <p className="text-sm mt-1 font-mono">
-                                        {effectiveAutoScan.last_run_at
-                                            ? new Date(effectiveAutoScan.last_run_at).toLocaleString()
-                                            : "—"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
-                                        ALERTS SENT (LAST RUN)
-                                    </p>
-                                    <p className="text-sm mt-1 font-mono" data-testid="auto-scan-last-alerts">
-                                        {typeof effectiveAutoScan.last_alerts_sent === "number"
-                                            ? effectiveAutoScan.last_alerts_sent
-                                            : "—"}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <p
-                            className="mt-5 text-sm font-mono"
-                            style={{ color: "hsl(var(--text-muted))" }}
-                            data-testid="auto-scan-off-hint"
-                        >
-                            Toggle on to start receiving daily RF-only watchlist alerts.
-                        </p>
                     )}
 
                     {autoScanErr && (
@@ -865,41 +803,27 @@ export default function SettingsPage() {
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div className="min-w-0">
                             <p className="text-overline flex items-center gap-2">
-                                <Mail size={12} strokeWidth={1.5} /> Weekly Digest Email
+                                <Mail size={12} strokeWidth={1.5} /> Weekly Digest Email · retired
                             </p>
                             <h2
                                 className="font-serif mt-2"
                                 style={{ fontSize: "1.6rem", letterSpacing: "-0.01em" }}
                             >
-                                Sunday recap · Top RF edges
+                                This feature has been retired
                             </h2>
                             <p className="mt-3 text-sm max-w-xl" style={{ color: "hsl(var(--text-secondary))" }}>
-                                Every Sunday evening, we email you the{" "}
-                                <strong>{digest?.is_paid ? "top 5" : "top 3"}</strong>{" "}
-                                strongest BUY/SELL edges the Random-Forest model sees on
-                                your watchlist — no Telegram required. Tap any ticker to
-                                pull the full AI verdict.
-                                {!digest?.is_paid && (
-                                    <>
-                                        {" "}Want daily pushes instead of weekly?{" "}
-                                        <Link
-                                            to="/pricing"
-                                            className="underline"
-                                            style={{ color: "hsl(var(--buy))" }}
-                                            data-testid="weekly-digest-upgrade-link"
-                                        >
-                                            Upgrade to Pro for Auto-Scan →
-                                        </Link>
-                                    </>
-                                )}
+                                The digest's scoring relied on our Random-Forest secondary-opinion model.
+                                We tested two different prediction targets for it, and neither found a
+                                learnable signal in the available data. Rather than keep sending an email
+                                built on a model that doesn't outperform a coin flip, we've disabled it.
+                                See the <Link to="/technical#random-forest" className="underline" style={{ color: "hsl(var(--text-primary))" }}>Technical page</Link> for the full numbers.
                             </p>
                         </div>
                         {digest && (
                             <div className="shrink-0">
                                 <Switch
-                                    checked={!!digest?.enabled}
-                                    disabled={digestBusy}
-                                    onCheckedChange={toggleDigest}
+                                    checked={false}
+                                    disabled={true}
                                     data-testid="weekly-digest-toggle"
                                 />
                             </div>
@@ -910,42 +834,25 @@ export default function SettingsPage() {
                         <p className="mt-4 text-sm" style={{ color: "hsl(var(--text-muted))" }}>
                             <Loader2 size={14} className="animate-spin inline mr-2" /> Loading…
                         </p>
-                    ) : digest.enabled ? (
-                        <div className="mt-5" data-testid="weekly-digest-enabled-stats">
-                            <p className="text-overline" style={{ color: "hsl(var(--buy))" }}>
-                                <Check size={12} strokeWidth={2} className="inline mr-2" /> Active · Sunday evenings
-                            </p>
-                            <div className="mt-3 grid grid-cols-2 gap-4 max-w-md">
-                                <div>
-                                    <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
-                                        LAST DIGEST
-                                    </p>
-                                    <p className="text-sm mt-1 font-mono">
-                                        {digest.last_run_at
-                                            ? new Date(digest.last_run_at).toLocaleString()
-                                            : "—"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
-                                        SIGNALS IN LAST DIGEST
-                                    </p>
-                                    <p className="text-sm mt-1 font-mono" data-testid="weekly-digest-last-count">
-                                        {typeof digest.last_signal_count === "number"
-                                            ? digest.last_signal_count
-                                            : "—"}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
                     ) : (
-                        <p
-                            className="mt-5 text-sm font-mono"
-                            style={{ color: "hsl(var(--text-muted))" }}
-                            data-testid="weekly-digest-off-hint"
+                        <div
+                            className="mt-5 p-4"
+                            style={{
+                                background: "hsl(var(--surface-elevated))",
+                                border: "1px solid hsl(var(--border-default))",
+                                borderRadius: 2,
+                            }}
+                            data-testid="weekly-digest-retired-notice"
                         >
-                            Toggle on to get your first digest this Sunday evening.
-                        </p>
+                            <p className="font-mono text-xs" style={{ color: "hsl(var(--text-muted))" }}>
+                                ⚙︎ NO LONGER SENDING
+                            </p>
+                            <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
+                                {digest.enabled
+                                    ? "This was previously enabled on your account, but no digest has gone out since the underlying model was retired."
+                                    : "This feature is currently disabled platform-wide."}
+                            </p>
+                        </div>
                     )}
 
                     {digestErr && (
