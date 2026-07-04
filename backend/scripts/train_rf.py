@@ -106,34 +106,89 @@ DEFAULT_UNIVERSE = [
 
 
 
-def _download_history(tickers: list[str], years: int) -> dict[str, pd.DataFrame]:
-    """Batch-download OHLCV. yfinance handles threading + rate limits."""
+def _download_history(tickers: list[str], years: int, chunk_size: int = 15) -> dict[str, pd.DataFrame]:
+    """Download OHLCV in small sequential chunks with per-ticker retry.
+
+    CHANGED from a single yf.download(tickers, threads=True) call: firing
+    300+ near-simultaneous requests via yfinance's internal threadpool
+    can exceed macOS's available network threads / open file descriptors
+    on a laptop, which shows up as getaddrinfo() failures, "Could not
+    resolve host", and even SQLite "unable to open database file" errors
+    from yfinance's own local cache -- all CLIENT-side resource exhaustion,
+    not throttling from Yahoo's servers. That failure took down the ENTIRE
+    batch at once (0/353 succeeded) because it was one shared call; a
+    single ticker's transient DNS hiccup poisoned everything downstream
+    of it, not just that ticker.
+
+    This downloads `chunk_size` tickers at a time (threads=False — fully
+    sequential within a chunk too), retries each chunk up to 2 extra
+    times on failure with a short backoff, and always continues to the
+    next chunk even if one chunk fails entirely. A few genuinely-bad
+    tickers (delisted, renamed) still fail individually and are skipped
+    — that's expected and fine. What should NOT happen anymore is one
+    transient network blip zeroing out the whole 5-year training run.
+    """
+    import time as _time
+
     end = datetime.now(timezone.utc).date()
     start = end.replace(year=end.year - years)
-    print(f"▸ downloading {len(tickers)} tickers · {start}..{end}", flush=True)
-    # group_by='ticker' so we get a dict-like frame
-    raw = yf.download(
-        tickers,
-        start=str(start),
-        end=str(end),
-        interval="1d",
-        group_by="ticker",
-        auto_adjust=True,
-        progress=False,
-        threads=True,
-    )
+    print(f"▸ downloading {len(tickers)} tickers in chunks of {chunk_size} · {start}..{end}", flush=True)
+
     out: dict[str, pd.DataFrame] = {}
-    for t in tickers:
-        try:
-            df = raw[t].dropna(how="all").copy() if t in raw.columns.get_level_values(0) else None
-            if df is None or df.empty:
-                continue
-            df = df[["Open", "High", "Low", "Close", "Volume"]]
-            df.index = pd.to_datetime(df.index)
-            if len(df) >= 300:
-                out[t] = df
-        except Exception:
+    chunks = [tickers[i:i + chunk_size] for i in range(0, len(tickers), chunk_size)]
+
+    for chunk_idx, chunk in enumerate(chunks, 1):
+        raw = None
+        last_err = None
+        for attempt in range(3):  # 1 try + 2 retries per chunk
+            try:
+                raw = yf.download(
+                    chunk,
+                    start=str(start),
+                    end=str(end),
+                    interval="1d",
+                    group_by="ticker",
+                    auto_adjust=True,
+                    progress=False,
+                    threads=False,  # sequential — the actual fix
+                )
+                break
+            except Exception as e:
+                last_err = e
+                if attempt < 2:
+                    _time.sleep(2 * (attempt + 1))  # 2s, then 4s backoff
+        if raw is None:
+            print(f"  chunk {chunk_idx}/{len(chunks)} FAILED after 3 attempts "
+                  f"({chunk[0]}..{chunk[-1]}): {last_err}", flush=True)
             continue
+
+        chunk_ok = 0
+        for t in chunk:
+            try:
+                if len(chunk) == 1:
+                    # yfinance returns a flat frame (no ticker level) when
+                    # only one ticker is requested.
+                    df = raw.dropna(how="all").copy()
+                else:
+                    if t not in raw.columns.get_level_values(0):
+                        continue
+                    df = raw[t].dropna(how="all").copy()
+                if df is None or df.empty:
+                    continue
+                df = df[["Open", "High", "Low", "Close", "Volume"]]
+                df.index = pd.to_datetime(df.index)
+                if len(df) >= 300:
+                    out[t] = df
+                    chunk_ok += 1
+            except Exception:
+                continue
+
+        print(f"  chunk {chunk_idx}/{len(chunks)}: {chunk_ok}/{len(chunk)} ok "
+              f"(running total {len(out)}/{len(tickers)})", flush=True)
+        # Small pause between chunks — reduces the odds of hitting the
+        # same resource-exhaustion pattern again on the next batch.
+        _time.sleep(0.5)
+
     print(f"▸ got usable history for {len(out)}/{len(tickers)} tickers", flush=True)
     return out
 
