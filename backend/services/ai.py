@@ -217,7 +217,7 @@ async def _run_llm(system_prompt: str, user_text: str, session_prefix: str) -> t
             task_type="verdict",
             json_mode=True,
             system_prompt=system_prompt,
-            max_tokens=2048,
+            max_tokens=4096,
         )
         return result["content"], {
             "provider": "openrouter",
