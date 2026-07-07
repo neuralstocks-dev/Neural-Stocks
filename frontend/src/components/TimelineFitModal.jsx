@@ -169,13 +169,13 @@ export default function TimelineFitModal({ ticker, onClose }) {
 
     return (
         <div
-            className="fixed inset-0 grid place-items-center p-4"
+            className="fixed inset-0 grid place-items-start justify-items-center p-4 overflow-y-auto"
             style={{ background: "rgba(6,6,6,0.72)", backdropFilter: "blur(6px)", zIndex: 100 }}
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             data-testid="timeline-fit-modal"
         >
             <div
-                className="module w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+                className="module w-full max-w-3xl my-4"
                 style={{ background: "hsl(var(--surface-base))" }}
                 onClick={(e) => e.stopPropagation()}
             >
