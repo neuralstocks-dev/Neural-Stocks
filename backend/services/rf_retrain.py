@@ -41,6 +41,7 @@ LOCK_PATH = BACKEND_ROOT / "models" / "rf_signal.retrain.lock"
 # Weekly cadence — if the model is older than this, the scheduler retrains.
 RF_RETRAIN_STALE_DAYS = int(os.environ.get("RF_RETRAIN_STALE_DAYS", "7"))
 # Scheduler heartbeat — check once every N seconds.
+RF_FEATURE_ENABLED = os.environ.get("RF_FEATURE_ENABLED", "false").lower() == "true"
 RF_RETRAIN_CHECK_INTERVAL_S = int(os.environ.get("RF_RETRAIN_CHECK_INTERVAL_S", str(6 * 3600)))
 
 _process_lock = asyncio.Lock()
@@ -230,6 +231,9 @@ async def weekly_retrain_loop():
     retrain if so. Runs for the lifetime of the app."""
     # Small initial delay so the first check doesn't compete with app boot
     await asyncio.sleep(60)
+    if not RF_FEATURE_ENABLED:
+            logger.info("RF feature disabled — retrain scheduler dormant (RF_FEATURE_ENABLED != true)")
+            return
     while True:
         try:
             age = _model_age_days()
