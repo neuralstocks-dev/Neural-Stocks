@@ -229,28 +229,76 @@ async def _run_llm(system_prompt: str, user_text: str, session_prefix: str) -> t
 
 
 def _parse_ai_json(raw) -> dict:
+    """
+    Robustly extract the first valid JSON object from an LLM response.
+    Pass 1: direct json.loads on stripped string.
+    Pass 2: strip markdown fences, try again.
+    Pass 3: bracket-counter from first '{' — no greedy regex.
+    Pass 4: single-quote swap + trailing-comma strip as last resort.
+    Raises HTTPException(502) only if all four passes fail.
+    """
+    import logging
     text = raw if isinstance(raw, str) else str(raw)
-    # Try to extract JSON object — handle single quotes and trailing commas
-    m = re.search(r"\{[\s\S]*\}", text)
-    if not m:
-        raise HTTPException(status_code=502, detail="AI did not return valid JSON")
-    candidate = m.group(0)
+    text = text.strip()
+
+    # Pass 1: clean direct parse
     try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Pass 2: strip markdown fences
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+    if fence_match:
+        try:
+            return json.loads(fence_match.group(1).strip())
+        except json.JSONDecodeError:
+            pass
+
+    # Pass 3: bracket-counter — finds first complete {...} block
+    start = text.find("{")
+    if start != -1:
+        depth = 0
+        in_string = False
+        escape_next = False
+        for i, ch in enumerate(text[start:], start=start):
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == "\\" and in_string:
+                escape_next = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start:i + 1]
+                    try:
+                        return json.loads(candidate)
+                    except json.JSONDecodeError:
+                        break
+
+    # Pass 4: last-resort quote swap + trailing comma strip
+    try:
+        if start != -1:
+            end = text.rfind("}")
+            candidate = text[start:end + 1] if end != -1 else text
+        else:
+            candidate = text
+        candidate = candidate.replace("'", '"')
+        candidate = re.sub(r",\s*([}\]])", r"\1", candidate)
         return json.loads(candidate)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, Exception):
         pass
-    # Fallback 1: replace single quotes with double quotes
-    try:
-        fixed = candidate.replace("'", '"')
-        return json.loads(fixed)
-    except json.JSONDecodeError:
-        pass
-    # Fallback 2: strip trailing commas before } or ]
-    try:
-        fixed = re.sub(r",\s*([}\]])", r"\1", candidate)
-        return json.loads(fixed)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=502, detail=f"AI JSON parse error: {e}")
+
+    logging.error(f"_parse_ai_json: all passes failed. raw[:500]={text[:500]!r}")
+    raise HTTPException(status_code=502, detail="AI did not return valid JSON")
 
 
 async def _parse_ai_json_async(raw) -> dict:
