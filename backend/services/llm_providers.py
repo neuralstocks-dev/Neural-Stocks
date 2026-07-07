@@ -96,7 +96,7 @@ def _model_cascade(task_type: str) -> list[str]:
     """
     verdict = os.environ.get("LLM_MODEL_VERDICT", "deepseek/deepseek-v4-pro")
     fast = os.environ.get("LLM_MODEL_FAST", "deepseek/deepseek-v4-flash")
-    free = os.environ.get("LLM_MODEL_FREE", "moonshotai/kimi-k2.6:free")
+    free = os.environ.get("LLM_MODEL_FREE", "moonshotai/kimi-k2.6")
     free_alt = os.environ.get("LLM_MODEL_FREE_ALT", "nvidia/nemotron-3-super-120b-a12b:free")
 
     cascades = {
