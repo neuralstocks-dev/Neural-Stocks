@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Loader2, X, Clock, TrendingUp, Calendar, Target, AlertTriangle, Info, FileDown, Share2, Copy, Check, Send, MessageCircle } from "lucide-react";
 import api from "@/lib/api";
 
@@ -70,7 +70,8 @@ export default function TimelineFitModal({ ticker, onClose }) {
     const [shareError, setShareError] = useState("");
     const [shareUrl, setShareUrl] = useState("");
     const [shareCopied, setShareCopied] = useState(false);
-
+    const overlayRef = useRef(null);
+useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, []);
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -169,6 +170,7 @@ export default function TimelineFitModal({ ticker, onClose }) {
 
     return (
         <div
+            ref={overlayRef}
             className="fixed inset-0 grid place-items-start justify-items-center px-4 py-8 overflow-y-auto"
             style={{ background: "rgba(6,6,6,0.72)", backdropFilter: "blur(6px)", zIndex: 100 }}
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
