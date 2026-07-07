@@ -169,7 +169,7 @@ export default function TimelineFitModal({ ticker, onClose }) {
 
     return (
         <div
-            className="fixed inset-0 grid place-items-start justify-items-center p-4 overflow-y-auto"
+            className="fixed inset-0 grid place-items-start justify-items-center px-4 py-8 overflow-y-auto"
             style={{ background: "rgba(6,6,6,0.72)", backdropFilter: "blur(6px)", zIndex: 100 }}
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             data-testid="timeline-fit-modal"
