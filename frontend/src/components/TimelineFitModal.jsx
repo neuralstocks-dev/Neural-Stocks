@@ -344,6 +344,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                                 borderRadius: 2,
                                             }}
                                             data-testid={`timeline-card-${tl.key}`}
+                                            onClick={(e) => e.currentTarget.scrollIntoView({ behavior: "smooth", block: "start" })}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <Icon
