@@ -1,4 +1,4 @@
-mport React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Loader2, X, Clock, TrendingUp, Calendar, Target, AlertTriangle, Info, FileDown, Share2, Copy, Check, Send, MessageCircle } from "lucide-react";
 import api from "@/lib/api";
  
