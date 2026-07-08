@@ -183,7 +183,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
             >
                 {/* Header */}
                 <div
-                    className="p-5 md:p-7"
+                    className="p-5 md:p-7 pb-2 md:pb-3"
                     style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
                 >
                     <p className="text-overline flex items-center gap-2" style={{ color: "hsl(var(--hold))" }}>
