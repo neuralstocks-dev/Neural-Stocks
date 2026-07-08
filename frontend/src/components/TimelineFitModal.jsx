@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+mport React, { useEffect, useRef, useState } from "react";
 import { Loader2, X, Clock, TrendingUp, Calendar, Target, AlertTriangle, Info, FileDown, Share2, Copy, Check, Send, MessageCircle } from "lucide-react";
 import api from "@/lib/api";
-
+ 
 const SOCIAL_HANDLE = "@neuralstockintelligence";
-
+ 
 // Build a research-framed share blurb for Timeline Fit shares — mirrors the
 // `buildShareCopy` helper in ShareVerdictButton but adapted to horizon
 // recommendations (no BUY/SELL — uses the recommended_timeline label).
@@ -16,18 +16,18 @@ function buildTimelineShareCopy(timeline, shareUrl) {
     const horizon = rawHorizon.replace(/^best fit\s*[:\-—]\s*/i, "").trim() || rawHorizon;
     const rawConf = timeline?.confidence_score;
     const conf = Number.isFinite(rawConf) ? Math.round(rawConf) : null;
-
+ 
     const headline = ticker
         ? conf != null
             ? `${ticker} · AI horizon fit: ${horizon} · ${conf}% confidence`
             : `${ticker} · ${horizon}`
         : "Neural Stock Intelligence — Timeline Fit";
-
+ 
     const body = `${headline} — full reasoning + risks:`;
     const tail = `Research only. Not financial advice. ${SOCIAL_HANDLE}`;
     return { body, tail };
 }
-
+ 
 // X (formerly Twitter) glyph — clean two-stroke, matches the verdict-share
 // modal so brand recall stays consistent across share artifacts.
 function XIcon({ size = 14, strokeWidth = 1.5 }) {
@@ -49,20 +49,20 @@ function XIcon({ size = 14, strokeWidth = 1.5 }) {
         </svg>
     );
 }
-
+ 
 const TIMELINES = [
     { key: "short_term", label: "Short Term", range: "days – 3 months", icon: Clock },
     { key: "medium_term", label: "Medium Term", range: "3 months – 2 years", icon: Calendar },
     { key: "long_term", label: "Long Term", range: "2+ years", icon: Target },
 ];
-
+ 
 export default function TimelineFitModal({ ticker, onClose }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [pdfState, setPdfState] = useState("idle"); // idle | busy | done | error
     const [pdfError, setPdfError] = useState("");
-
+ 
     // Share state — separate from PDF flow so a share-link mint doesn't
     // disturb an in-progress PDF download (or vice versa).
     const [shareOpen, setShareOpen] = useState(false);
@@ -88,14 +88,14 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
         })();
         return () => { cancelled = true; };
     }, [ticker]);
-
+ 
     // Close on Escape key
     useEffect(() => {
         const onKey = (e) => { if (e.key === "Escape") onClose(); };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, [onClose]);
-
+ 
     const downloadPdf = async () => {
         setPdfState("busy");
         setPdfError("");
@@ -132,7 +132,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
             setTimeout(() => setPdfState("idle"), 4500);
         }
     };
-
+ 
     const openShare = async () => {
         setShareOpen(true);
         if (shareUrl) return; // already minted in this session
@@ -147,7 +147,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
             setShareLoading(false);
         }
     };
-
+ 
     const copyShareUrl = async () => {
         try {
             await navigator.clipboard.writeText(shareUrl);
@@ -157,7 +157,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
             console.warn("clipboard copy failed:", err?.message || err);
         }
     };
-
+ 
     const blurb = (data && shareUrl) ? buildTimelineShareCopy(data, shareUrl) : null;
     const xText = blurb ? `${blurb.body} ${shareUrl}\n\n${blurb.tail}` : shareUrl;
     const xIntent = `https://x.com/intent/post?text=${encodeURIComponent(xText)}`;
@@ -167,7 +167,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
     }`;
     const waText = blurb ? `${blurb.body} ${shareUrl}\n\n${blurb.tail}` : shareUrl;
     const waIntent = `https://wa.me/?text=${encodeURIComponent(waText)}`;
-
+ 
     return (
         <div
             ref={overlayRef}
@@ -183,87 +183,29 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
             >
                 {/* Header */}
                 <div
-                    className="p-5 md:p-7 flex items-start justify-between gap-4"
+                    className="p-5 md:p-7"
                     style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}
                 >
-                    <div>
-                        <p className="text-overline flex items-center gap-2" style={{ color: "hsl(var(--hold))" }}>
-                            <TrendingUp size={12} strokeWidth={1.5} /> Timeline Fit
-                        </p>
-                        <h2
-                            className="font-serif mt-2"
-                            style={{ fontSize: "2.2rem", letterSpacing: "-0.015em", lineHeight: 1.05 }}
-                            data-testid="timeline-ticker"
-                        >
-                            {ticker}
-                            {data?.name && (
-                                <span
-                                    className="font-sans text-base ml-3"
-                                    style={{ color: "hsl(var(--text-muted))" }}
-                                >
-                                    {data.name}
-                                </span>
-                            )}
-                        </h2>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {data && !loading && (
-                            <>
-                                <button
-                                    onClick={openShare}
-                                    className="btn-quick inline-flex items-center gap-2"
-                                    data-testid="timeline-share-button"
-                                    title="Share this Timeline Fit publicly"
-                                >
-                                    <Share2 size={14} strokeWidth={1.5} />
-                                    <span className="hidden sm:inline">Share</span>
-                                </button>
-                                <button
-                                    onClick={downloadPdf}
-                                    disabled={pdfState === "busy"}
-                                    className="btn-quick inline-flex items-center gap-2"
-                                    data-testid="timeline-export-pdf-button"
-                                    title={
-                                        pdfState === "error"
-                                            ? pdfError
-                                            : "Download this Timeline Fit report as a branded PDF"
-                                    }
-                                >
-                                    {pdfState === "busy" ? (
-                                        <>
-                                            <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
-                                            <span className="hidden sm:inline">Preparing…</span>
-                                        </>
-                                    ) : pdfState === "done" ? (
-                                        <>
-                                            <FileDown size={14} strokeWidth={1.5} />
-                                            <span className="hidden sm:inline">Downloaded</span>
-                                        </>
-                                    ) : pdfState === "error" ? (
-                                        <>
-                                            <FileDown size={14} strokeWidth={1.5} />
-                                            <span className="hidden sm:inline">Retry PDF</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <FileDown size={14} strokeWidth={1.5} />
-                                            <span className="hidden sm:inline">Export PDF</span>
-                                            <span className="sm:hidden">PDF</span>
-                                        </>
-                                    )}
-                                </button>
-                            </>
+                    <p className="text-overline flex items-center gap-2" style={{ color: "hsl(var(--hold))" }}>
+                        <TrendingUp size={12} strokeWidth={1.5} /> Timeline Fit
+                    </p>
+                    <h2
+                        className="font-serif mt-2"
+                        style={{ fontSize: "2.2rem", letterSpacing: "-0.015em", lineHeight: 1.05 }}
+                        data-testid="timeline-ticker"
+                    >
+                        {ticker}
+                        {data?.name && (
+                            <span
+                                className="font-sans text-base ml-3"
+                                style={{ color: "hsl(var(--text-muted))" }}
+                            >
+                                {data.name}
+                            </span>
                         )}
-                        <button
-                            onClick={onClose}
-                            className="btn-ghost !py-1.5 !px-2"
-                            data-testid="timeline-modal-close"
-                        >
-                            <X size={14} strokeWidth={1.5} />
-                        </button>
-                    </div>
+                    </h2>
                 </div>
-
+ 
                 {/* Body */}
                 <div className="p-5 md:p-7">
                     {loading && (
@@ -274,13 +216,13 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                             </p>
                         </div>
                     )}
-
+ 
                     {error && (
                         <div className="signal-sell px-4 py-3 font-mono text-sm" data-testid="timeline-error">
                             {error}
                         </div>
                     )}
-
+ 
                     {data && !loading && (
                         <>
                             {/* Recommendation header */}
@@ -326,7 +268,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                     )}
                                 </div>
                             </div>
-
+ 
                             {/* Timeline scorecards */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-3 mb-7">
                                 {TIMELINES.map((tl) => {
@@ -405,7 +347,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                     );
                                 })}
                             </div>
-
+ 
                             {/* Why */}
                             <section className="mb-6">
                                 <p className="text-overline mb-2">Why this timeline</p>
@@ -413,7 +355,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                     {data.explanation}
                                 </p>
                             </section>
-
+ 
                             {/* Strengths + Risks */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
                                 <section>
@@ -463,7 +405,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                     </ul>
                                 </section>
                             </div>
-
+ 
                             {/* Footer note + disclaimer */}
                             {data.data_completeness_note && (
                                 <p
@@ -474,7 +416,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                     {data.data_completeness_note}
                                 </p>
                             )}
-
+ 
                             <p
                                 className="text-overline leading-relaxed pt-4"
                                 style={{
@@ -489,9 +431,70 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                             </p>
                         </>
                     )}
+ 
+                    {/* Footer actions */}
+                    <div
+                        className="flex items-center justify-end gap-2 mt-6 pt-5"
+                        style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
+                    >
+                        {data && !loading && (
+                            <>
+                                <button
+                                    onClick={openShare}
+                                    className="btn-quick inline-flex items-center gap-2"
+                                    data-testid="timeline-share-button"
+                                    title="Share this Timeline Fit publicly"
+                                >
+                                    <Share2 size={14} strokeWidth={1.5} />
+                                    <span className="hidden sm:inline">Share</span>
+                                </button>
+                                <button
+                                    onClick={downloadPdf}
+                                    disabled={pdfState === "busy"}
+                                    className="btn-quick inline-flex items-center gap-2"
+                                    data-testid="timeline-export-pdf-button"
+                                    title={
+                                        pdfState === "error"
+                                            ? pdfError
+                                            : "Download this Timeline Fit report as a branded PDF"
+                                    }
+                                >
+                                    {pdfState === "busy" ? (
+                                        <>
+                                            <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
+                                            <span className="hidden sm:inline">Preparing…</span>
+                                        </>
+                                    ) : pdfState === "done" ? (
+                                        <>
+                                            <FileDown size={14} strokeWidth={1.5} />
+                                            <span className="hidden sm:inline">Downloaded</span>
+                                        </>
+                                    ) : pdfState === "error" ? (
+                                        <>
+                                            <FileDown size={14} strokeWidth={1.5} />
+                                            <span className="hidden sm:inline">Retry PDF</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FileDown size={14} strokeWidth={1.5} />
+                                            <span className="hidden sm:inline">Export PDF</span>
+                                            <span className="sm:hidden">PDF</span>
+                                        </>
+                                    )}
+                                </button>
+                            </>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="btn-ghost !py-1.5 !px-2"
+                            data-testid="timeline-modal-close"
+                        >
+                            <X size={14} strokeWidth={1.5} />
+                        </button>
+                    </div>
                 </div>
             </div>
-
+ 
             {/* Share submodal — minted on demand, persists for the modal lifetime */}
             {shareOpen && (
                 <div
@@ -524,7 +527,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                 <X size={16} strokeWidth={1.5} />
                             </button>
                         </div>
-
+ 
                         <div className="p-5 md:p-6">
                             {shareLoading && (
                                 <div className="py-6 text-center">
@@ -532,7 +535,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                     <p className="text-overline mt-3">Minting link…</p>
                                 </div>
                             )}
-
+ 
                             {!shareLoading && shareError && (
                                 <div
                                     className="signal-sell px-3 py-2 text-sm font-mono"
@@ -541,7 +544,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                     {shareError}
                                 </div>
                             )}
-
+ 
                             {!shareLoading && shareUrl && (
                                 <>
                                     <p className="text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
@@ -549,7 +552,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                         the three horizon scorecards, and the strengths / risks bullets
                                         (no login required). Your email and watchlist stay private.
                                     </p>
-
+ 
                                     <div
                                         className="mt-5 flex items-stretch gap-2"
                                         style={{ border: "1px solid hsl(var(--border-default))" }}
@@ -583,7 +586,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                             )}
                                         </button>
                                     </div>
-
+ 
                                     <div
                                         className="mt-5 pt-5"
                                         style={{ borderTop: "1px solid hsl(var(--border-divider))" }}
@@ -647,7 +650,7 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
                                             </a>
                                         </div>
                                     </div>
-
+ 
                                     <a
                                         href={shareUrl}
                                         target="_blank"
@@ -666,6 +669,6 @@ useEffect(() => { if (overlayRef.current) overlayRef.current.scrollTop = 0; }, [
         </div>
     );
 }
-
+ 
 // Exposed for unit tests + reuse by other share surfaces.
 export { buildTimelineShareCopy };
