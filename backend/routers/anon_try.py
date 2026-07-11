@@ -248,7 +248,7 @@ async def _stage_ticker(job_id: str):
     stages = [
         (0,  "Fetching live quote · OHLC · fundamentals"),
         (6,  "Detecting candlestick patterns across daily + weekly"),
-        (12, "Running Random Forest model · 20-day horizon"),
+        (12, "Analysing valuation anchors · EV multiples · sector context"),
         (18, "Gathering market context · news · peer signals"),
         (26, "Synthesising verdict with AI"),
         (40, "Finalising · stitching reasoning · writing verdict"),
