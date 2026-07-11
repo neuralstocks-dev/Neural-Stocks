@@ -71,6 +71,7 @@ async def watchlist_live(user=Depends(get_current_user)):
             "recommendation": {"$first": "$recommendation"},
             "confidence_score": {"$first": "$confidence_score"},
             "created_at": {"$first": "$created_at"},
+            "mode": {"$first": "$mode"},
         }},
     ]).to_list(50)
     quotes, latest_docs = await asyncio.gather(quotes_task, latest_task)
