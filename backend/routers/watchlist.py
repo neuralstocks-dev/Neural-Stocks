@@ -86,6 +86,7 @@ async def watchlist_live(user=Depends(get_current_user)):
                 "recommendation": latest["recommendation"],
                 "confidence_score": latest["confidence_score"],
                 "created_at": latest["created_at"],
+                "mode": latest.get("mode"),
             } if latest else None,
         })
     return merged
