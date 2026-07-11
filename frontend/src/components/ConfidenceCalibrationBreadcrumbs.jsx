@@ -172,8 +172,7 @@ export default function ConfidenceCalibrationBreadcrumbs({ analysis }) {
                     className="text-xs mt-2"
                     style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.5 }}
                 >
-                    Earnings-proximity gate and RF-disagreement penalty both ran clean —
-                    confidence shown is the AI raw output.
+                    Earnings-proximity gate ran clean — confidence shown is the AI raw output.
                 </p>
             )}
         </div>
