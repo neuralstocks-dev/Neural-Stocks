@@ -148,7 +148,9 @@ function WatchlistRow({ item, sparkline, onRemove, onAnalyze, onTimeline, analyz
                                 style={{ fontSize: "0.56rem" }}
                                 title={formatAnalysisTimestamp(item.latest_analysis.created_at, { noRelative: true })}
                             >
-                                {item.latest_analysis.confidence_score}% conf · {timeAgo(item.latest_analysis.created_at)}
+                                {item.latest_analysis.confidence_score}% conf · {timeAgo(item.latest_analysis.created_at)}{item.latest_analysis.mode && item.latest_analysis.mode !== "standard" && (
+                                        <span className="font-mono ml-1" style={{ fontSize: "0.6rem", color: "hsl(var(--text-muted))", letterSpacing: "0.04em" }}>{item.latest_analysis.mode === "candlestick" ? "CANDLE" : item.latest_analysis.mode === "hybrid" ? "HYBRID" : item.latest_analysis.mode.toUpperCase()}</span>
+                                    )}
                                 {(() => {
                                     const ageMs = Date.now() - new Date(item.latest_analysis.created_at).getTime();
                                     const ageDays = ageMs / 86400000;
