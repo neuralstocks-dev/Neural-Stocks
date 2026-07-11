@@ -138,6 +138,7 @@ INTRINSIC-VALUE ANCHOR — when the payload includes `intrinsic_value_anchor` an
 - If `primary_applicability` flags a low-fit (`low_fit_intangible_heavy` or `low_fit_unrepresentative_roe`), add a brief caveat.
 - NEVER convert the anchor into a candlestick "target" — it is fundamental context, not a price-action level.
 - If `primary_anchor` is "none", omit anchor language entirely.
+- `intrinsic_value_anchor.ev_multiples` contains EV/EBITDA and EV/FCF multiples benchmarked against Damodaran sector medians (January 2026). When `ev_multiples.data_quality` is "full" or "partial": state the computed multiple, sector benchmark, and premium/discount in `fundamental_analysis`. When data_quality is "insufficient" or sector is excluded, skip EV multiples entirely.
 """
 
 
@@ -201,6 +202,7 @@ INTRINSIC-VALUE ANCHOR — when the payload includes `intrinsic_value_anchor` an
 - If `primary_applicability` is "low_fit_intangible_heavy" or "low_fit_unrepresentative_roe", caveat with one sentence.
 - NEVER frame the anchor as a buy/sell trigger.
 - If `primary_anchor` is "none", omit anchor language entirely.
+- `intrinsic_value_anchor.ev_multiples` contains EV/EBITDA and EV/FCF multiples benchmarked against Damodaran sector medians (January 2026). When `ev_multiples.data_quality` is "full" or "partial": state the computed multiple, sector benchmark, and premium/discount in `fundamental_analysis`. When data_quality is "insufficient" or sector is excluded, skip EV multiples entirely.
 """
 
 
