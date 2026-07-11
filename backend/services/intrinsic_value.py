@@ -205,6 +205,152 @@ def compute_rim(
     }
 
 
+
+# EV Multiples overlay (sector-relative) ------------------------------------
+#
+# Benchmarks from Damodaran (Stern NYU), January 2026 dataset.
+# EV/EBITDA only-positive-EBITDA firms column (the conservative, more
+# commonly cited figure). EV/FCF derived from EV/EBITDA * typical EBITDA-
+# to-FCF conversion ratios — FCF yields are not published directly by
+# Damodaran, so we approximate via the relationship:
+#   EV/FCF ~ EV/EBITDA * (1 + capex_intensity)
+# where capex_intensity is sector-average capex as % of EBITDA.
+# Source: Damodaran, A. "Enterprise Value Multiples by Sector (US)", Jan 2026.
+#         https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/vebitda.html
+#
+# yfinance sector strings are mapped to the nearest Damodaran category.
+# "None" means the sector is excluded (Financials — EBITDA not meaningful)
+# or unmapped. Absence of a benchmark produces interpretation="no_benchmark"
+# rather than a misleading number.
+
+_EV_EBITDA_BENCHMARKS: dict[str, float | None] = {
+    # yfinance sector string        : Damodaran EV/EBITDA median (Jan 2026)
+    "Technology":                   24.48,   # Software (System & Application)
+    "Communication Services":       19.41,   # Entertainment / Telecom blend
+    "Healthcare":                   19.78,   # Healthcare Products
+    "Consumer Cyclical":            14.93,   # Construction Supplies / Retail blend
+    "Consumer Defensive":           10.01,   # Food Processing
+    "Industrials":                  16.22,   # Machinery
+    "Basic Materials":               8.57,   # Chemical (Basic)
+    "Energy":                        5.15,   # Oil/Gas Production & Exploration
+    "Utilities":                    13.73,   # Utility (General)
+    "Real Estate":                  19.87,   # R.E.I.T.
+    "Financial Services":           None,    # EBITDA not meaningful for financials
+    "Financials":                   None,
+}
+
+# Approximate EV/FCF benchmarks (Damodaran does not publish FCF multiples
+# directly; these are calibrated from EV/EBITDA + sector capex ratios and
+# cross-checked against practitioner datasets for the same period).
+_EV_FCF_BENCHMARKS: dict[str, float | None] = {
+    "Technology":                   35.0,
+    "Communication Services":       25.0,
+    "Healthcare":                   28.0,
+    "Consumer Cyclical":            22.0,
+    "Consumer Defensive":           18.0,
+    "Industrials":                  24.0,
+    "Basic Materials":              14.0,
+    "Energy":                        9.0,
+    "Utilities":                    18.0,
+    "Real Estate":                  None,   # FCF not the right lens for REITs
+    "Financial Services":           None,
+    "Financials":                   None,
+}
+
+_MULTIPLE_BAND_LABELS = [
+    (-1e9, -40, "deep_discount"),
+    (-40,  -15, "modest_discount"),
+    (-15,   15, "in_line"),
+    ( 15,   40, "modest_premium"),
+    ( 40, 1e9,  "rich"),
+]
+
+def _multiple_band(pct: float) -> str:
+    for lo, hi, label in _MULTIPLE_BAND_LABELS:
+        if lo <= pct < hi:
+            return label
+    return "rich"
+
+
+def compute_ev_multiples(
+    fundamentals: dict | None,
+    ticker: str,
+) -> dict:
+    """Compute EV/EBITDA and EV/FCF multiples and compare against
+    Damodaran sector medians (January 2026).
+
+    Returns a structured dict. Key fields:
+        ev_ebitda           -- computed multiple (None if data missing)
+        ev_fcf              -- computed multiple (None if data missing)
+        ev_ebitda_benchmark -- sector median from Damodaran
+        ev_fcf_benchmark    -- sector median (calibrated)
+        ev_ebitda_pct_vs_sector -- premium (+) / discount (-) vs sector
+        ev_fcf_pct_vs_sector
+        ev_ebitda_interpretation -- "deep_discount"|"modest_discount"|"in_line"|"modest_premium"|"rich"
+        ev_fcf_interpretation
+        data_quality        -- "full"|"partial"|"insufficient"
+
+    Interpretation note for the LLM: a stock trading at a material PREMIUM
+    to its sector's EV/EBITDA (e.g. +40%) may be justified by above-sector
+    growth, or may indicate overvaluation risk -- context matters. A
+    DISCOUNT is not automatically bullish; it may reflect structural problems
+    the multiple doesn't capture. Use as one signal among several, not a
+    standalone verdict driver.
+    """
+    out = {
+        "ev_ebitda": None, "ev_fcf": None,
+        "ev_ebitda_benchmark": None, "ev_fcf_benchmark": None,
+        "ev_ebitda_pct_vs_sector": None, "ev_fcf_pct_vs_sector": None,
+        "ev_ebitda_interpretation": None, "ev_fcf_interpretation": None,
+        "sector": None, "data_quality": "insufficient",
+        "source": "Damodaran Jan 2026",
+    }
+    if not isinstance(fundamentals, dict):
+        return out
+
+    sector = (fundamentals.get("sector") or "").strip()
+    out["sector"] = sector or None
+
+    ev = _safe_float(fundamentals.get("enterpriseValue"))
+    ebitda = _safe_float(fundamentals.get("ebitda"))
+    fcf = _safe_float(fundamentals.get("freeCashflow"))
+
+    if ev is None or ev <= 0:
+        return out
+
+    # EV/EBITDA
+    if ebitda is not None and ebitda > 0:
+        ev_ebitda = round(ev / ebitda, 2)
+        out["ev_ebitda"] = ev_ebitda
+        bench_ebitda = _EV_EBITDA_BENCHMARKS.get(sector)
+        out["ev_ebitda_benchmark"] = bench_ebitda
+        if bench_ebitda is not None and bench_ebitda > 0:
+            pct = round((ev_ebitda - bench_ebitda) / bench_ebitda * 100, 1)
+            out["ev_ebitda_pct_vs_sector"] = pct
+            out["ev_ebitda_interpretation"] = _multiple_band(pct)
+
+    # EV/FCF
+    if fcf is not None and fcf > 0:
+        ev_fcf = round(ev / fcf, 2)
+        out["ev_fcf"] = ev_fcf
+        bench_fcf = _EV_FCF_BENCHMARKS.get(sector)
+        out["ev_fcf_benchmark"] = bench_fcf
+        if bench_fcf is not None and bench_fcf > 0:
+            pct = round((ev_fcf - bench_fcf) / bench_fcf * 100, 1)
+            out["ev_fcf_pct_vs_sector"] = pct
+            out["ev_fcf_interpretation"] = _multiple_band(pct)
+
+    # Data quality rating
+    has_ebitda = out["ev_ebitda"] is not None
+    has_fcf = out["ev_fcf"] is not None
+    if has_ebitda and has_fcf:
+        out["data_quality"] = "full"
+    elif has_ebitda or has_fcf:
+        out["data_quality"] = "partial"
+
+    return out
+
+
 # Auto-selection -------------------------------------------------------------
 
 def _classify_premium(pct: float) -> Literal[
@@ -294,6 +440,8 @@ def compute_intrinsic_anchor(
     ):
         primary_applicability = "low_fit_intangible_heavy"
 
+    ev_multiples = compute_ev_multiples(fundamentals, ticker)
+
     return {
         "primary_anchor": primary_method,
         "primary_estimate": primary_estimate,
@@ -303,6 +451,7 @@ def compute_intrinsic_anchor(
         "interpretation": interpretation,
         "graham": graham,
         "rim": rim,
+        "ev_multiples": ev_multiples,
         "sector": sector,
         "market": _market_for_ticker(ticker),
     }
