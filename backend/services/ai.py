@@ -68,6 +68,7 @@ INTRINSIC-VALUE ANCHOR — when the payload includes `intrinsic_value_anchor` an
 - If `primary_applicability` is "low_fit_intangible_heavy" or "low_fit_unrepresentative_roe", caveat with one sentence noting the anchor method is structurally weaker for this sector (e.g. "book value undercounts intangibles for software businesses, so the Graham anchor is a loose lower bound, not a fair-value floor").
 - NEVER frame the anchor as a buy/sell trigger. It is a reference number for valuation context.
 - If `primary_anchor` is "none", omit anchor language entirely.
+- `intrinsic_value_anchor.ev_multiples` now contains EV/EBITDA and EV/FCF multiples benchmarked against Damodaran sector medians (January 2026). When `ev_multiples.data_quality` is "full" or "partial": state the computed multiple, the sector benchmark, and the premium/discount percentage in `fundamental_analysis` prose (e.g. "Apple trades at 28x EV/EBITDA versus a Technology sector median of 24.5x — a 14% premium consistent with its margin profile"). When data_quality is "insufficient" or the sector is None/excluded (Financials), skip EV multiples entirely. Do NOT treat a premium or discount as a directional signal on its own — always contextualise against the company's growth rate and margin profile.
 """
 
 # Backwards-compatibility alias
