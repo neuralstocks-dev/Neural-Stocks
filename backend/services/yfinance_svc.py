@@ -200,6 +200,8 @@ def _yf_fundamentals_fetch_once(ticker: str) -> dict:
         "bookValue",  # per-share book value — feeds Graham Number + RIM intrinsic anchors
         "revenueGrowth", "earningsGrowth", "debtToEquity",
         "recommendationKey", "targetMeanPrice", "longBusinessSummary",
+        # EV multiples — feeds compute_ev_multiples() in services/intrinsic_value.py
+        "enterpriseValue", "ebitda", "freeCashflow",
     ]
     return {k: info.get(k) for k in keys}
 
