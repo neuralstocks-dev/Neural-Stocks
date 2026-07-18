@@ -1074,6 +1074,65 @@ histogram  = MACD_line − signal`}
                     </p>
                 </div>
 
+                {/* EV multiples overlay */}
+                <div id="ev-multiples" className="module p-6 mt-6">
+                    <p className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
+                        Sector-relative valuation
+                    </p>
+                    <h3 className="font-serif mt-2" style={{ fontSize: "1.5rem" }}>
+                        EV/EBITDA and EV/FCF multiples — sector-relative, not a standalone signal.
+                    </h3>
+                    <p className="mt-3" style={{ color: "hsl(var(--text-secondary))" }}>
+                        Alongside the Graham/RIM intrinsic anchor, every verdict now computes
+                        Enterprise Value / EBITDA and Enterprise Value / Free Cash Flow, and compares
+                        both against Damodaran's January 2026 sector median multiples. A stock trading
+                        materially above its sector median is flagged as a premium; materially below,
+                        a discount — but neither is treated as automatically bullish or bearish. Premiums
+                        can reflect genuine above-sector growth; discounts can reflect real structural
+                        problems the multiple doesn't capture. It's one comparative data point, folded
+                        into the fundamental narrative alongside the intrinsic anchor, not a replacement
+                        for either.
+                    </p>
+                    <p className="mt-3 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>
+                        Source: yfinance (enterpriseValue, ebitda, freeCashflow) + Damodaran sector
+                        benchmarks. Implementation lives in{" "}
+                        <code>backend/services/intrinsic_value.py</code> (compute_ev_multiples).
+                    </p>
+                </div>
+
+                {/* Macro context layer (London Strategic Edge) */}
+                <div id="macro-context" className="module p-6 mt-6">
+                    <p className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
+                        Rate cycle &amp; inflation regime
+                    </p>
+                    <h3 className="font-serif mt-2" style={{ fontSize: "1.5rem" }}>
+                        Macro context — four live economic series, not just price action in a vacuum.
+                    </h3>
+                    <p className="mt-3" style={{ color: "hsl(var(--text-secondary))" }}>
+                        Every analysis fetches the current Fed Funds Rate, US CPI YoY, the 10-year
+                        Treasury yield, and the USD index for US tickers (Bank Indonesia's rate and
+                        Indonesia CPI YoY for IDX tickers) from London Strategic Edge's free market
+                        data API. From the last three readings, the pipeline derives whether the rate
+                        cycle is hiking, cutting, or holding, and passes that context to the AI. For
+                        rate-sensitive sectors — Utilities, REITs, Financials, Consumer Discretionary —
+                        the verdict's fundamental analysis will reference the current cycle and its
+                        sector implications. For other sectors, macro is mentioned only when it
+                        materially affects cost structure.
+                    </p>
+                    <p className="mt-3" style={{ color: "hsl(var(--text-secondary))" }}>
+                        Results are cached for 12 hours in-process — macro series don't move
+                        intraday, so hitting the API on every single analysis would be wasteful. If
+                        the London Strategic Edge API key isn't configured, macro context is silently
+                        omitted; the verdict is generated the same way it always was, just without
+                        the extra regime layer.
+                    </p>
+                    <p className="mt-3 font-mono text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>
+                        Source: London Strategic Edge (londonstrategicedge.com), free tier, one API
+                        key. Implementation lives in{" "}
+                        <code>backend/services/lse_macro.py</code> (fetch_macro_context).
+                    </p>
+                </div>
+
                 {/* Bandarmology (IDX-only differentiator) */}
                 <div
                     id="bandarmology"
@@ -1922,6 +1981,8 @@ function TechTOC({ isAdmin }) {
             { id: "confidence", label: "Confidence" },
             { id: "random-forest", label: "Random Forest" },
             { id: "intrinsic-anchor", label: "Intrinsic anchor" },
+            { id: "ev-multiples", label: "EV multiples" },
+            { id: "macro-context", label: "Macro context" },
             { id: "bandarmology", label: "Bandarmology — IDX" },
             { id: "idx-best-fit", label: "Best-fit · IDX", tone: "buy" },
             { id: "data-sources", label: "Data sources" },
