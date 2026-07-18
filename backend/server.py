@@ -80,18 +80,25 @@ async def start_background_tasks():
     from services.cost_reminder import cost_reminder_loop, tg_low_balance_loop
     from services.admin_digest import admin_digest_loop
     from services.verdict_resolution import verdict_resolution_loop
-    t1 = asyncio.create_task(weekly_retrain_loop())
-    _BG_TASKS.add(t1)
-    t1.add_done_callback(_BG_TASKS.discard)
-    logger.info("Started RF weekly retrain scheduler")
-    t2 = asyncio.create_task(auto_scan_loop())
-    _BG_TASKS.add(t2)
-    t2.add_done_callback(_BG_TASKS.discard)
-    logger.info("Started RF watchlist auto-scan scheduler")
-    t3 = asyncio.create_task(weekly_digest_loop())
-    _BG_TASKS.add(t3)
-    t3.add_done_callback(_BG_TASKS.discard)
-    logger.info("Started weekly RF digest scheduler")
+    # weekly_retrain_loop / auto_scan_loop / weekly_digest_loop DISABLED (2026-07-18):
+    # the RF secondary opinion was retired after failing to beat a trivial baseline
+    # on holdout data (rf_predictor.is_available() returns False unconditionally).
+    # These three loops were still waking on a schedule (retrain weekly, auto-scan
+    # every 4h, digest weekly) purely to discover the model is disabled and no-op --
+    # real wasted compute for zero output. Left un-deleted as reference in case RF
+    # is ever revisited with a model that actually clears the baseline.
+    # t1 = asyncio.create_task(weekly_retrain_loop())
+    # _BG_TASKS.add(t1)
+    # t1.add_done_callback(_BG_TASKS.discard)
+    # logger.info("Started RF weekly retrain scheduler")
+    # t2 = asyncio.create_task(auto_scan_loop())
+    # _BG_TASKS.add(t2)
+    # t2.add_done_callback(_BG_TASKS.discard)
+    # logger.info("Started RF watchlist auto-scan scheduler")
+    # t3 = asyncio.create_task(weekly_digest_loop())
+    # _BG_TASKS.add(t3)
+    # t3.add_done_callback(_BG_TASKS.discard)
+    # logger.info("Started weekly RF digest scheduler")
     t4 = asyncio.create_task(digest_pusher_loop())
     _BG_TASKS.add(t4)
     t4.add_done_callback(_BG_TASKS.discard)
