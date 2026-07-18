@@ -13,6 +13,7 @@ from services.candlestick import scan_daily_and_weekly
 from services.finnhub import get_market_context, get_history as finnhub_get_history
 from services.idx_news import get_market_context_idx, is_idx_ticker
 from services import rf_predictor
+from services.lse_macro import fetch_macro_context
 from services.features import feature_row_for_today
 import pandas as pd
 from services.quota import enforce_analysis_quota, plan_for, resolved_plan_for
@@ -797,6 +798,8 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
     hist_task = asyncio.to_thread(_yf_history_sync, ticker, "6mo", "1d")
     fund_task = asyncio.to_thread(_yf_fundamentals_sync, ticker)
     market_ctx_task = get_market_context_idx(ticker) if is_idx else get_market_context(ticker)
+    # LSE macro: cheap (cached 12h), sync, safe to fail -- returns None if LSE_API_KEY not set
+    macro_ctx = fetch_macro_context(is_idx=is_idx)
     # Mark "fetching_data" — the user sees this stage tick alive in the UI
     # while the parallel asyncio.gather below pulls quotes / history /
     # fundamentals / market context.
@@ -945,6 +948,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
             ticker, quote, history, fundamentals, technicals, candlestick_findings,
             intrinsic_anchor=intrinsic_anchor,
             bandarmology=idx_bandar if is_idx else None,
+            macro_context=macro_ctx,
         )
     elif mode == "hybrid":
         analysis = await run_ai_analysis(
@@ -954,6 +958,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
             weekly_history=weekly_history,
             intrinsic_anchor=intrinsic_anchor,
             bandarmology=idx_bandar if is_idx else None,
+            macro_context=macro_ctx,
         )
     else:
         analysis = await run_ai_analysis(
@@ -962,6 +967,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
             weekly_history=weekly_history,
             intrinsic_anchor=intrinsic_anchor,
             bandarmology=idx_bandar if is_idx else None,
+            macro_context=macro_ctx,
         )
 
     doc = {
