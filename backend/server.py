@@ -96,14 +96,20 @@ async def start_background_tasks():
     _BG_TASKS.add(t4)
     t4.add_done_callback(_BG_TASKS.discard)
     logger.info("Started Telegram digest pusher scheduler")
-    t5 = asyncio.create_task(cost_reminder_loop())
-    _BG_TASKS.add(t5)
-    t5.add_done_callback(_BG_TASKS.discard)
-    logger.info("Started cost-anchor reminder scheduler")
-    t6 = asyncio.create_task(tg_low_balance_loop())
-    _BG_TASKS.add(t6)
-    t6.add_done_callback(_BG_TASKS.discard)
-    logger.info("Started Telegram low-balance alert scheduler")
+    # cost_reminder_loop / tg_low_balance_loop DISABLED (2026-07-18): both were
+    # built to work around the Emergent platform not exposing a balance API
+    # (see docstring in services/cost_reminder.py). OpenRouter is now the sole
+    # LLM provider and DOES expose a real balance endpoint (GET /api/v1/credits)
+    # -- the manual "anchor" workaround these loops implement is no longer needed.
+    # Left un-deleted as reference for a future OpenRouter-native replacement.
+    # t5 = asyncio.create_task(cost_reminder_loop())
+    # _BG_TASKS.add(t5)
+    # t5.add_done_callback(_BG_TASKS.discard)
+    # logger.info("Started cost-anchor reminder scheduler")
+    # t6 = asyncio.create_task(tg_low_balance_loop())
+    # _BG_TASKS.add(t6)
+    # t6.add_done_callback(_BG_TASKS.discard)
+    # logger.info("Started Telegram low-balance alert scheduler")
     t7 = asyncio.create_task(admin_digest_loop())
     _BG_TASKS.add(t7)
     t7.add_done_callback(_BG_TASKS.discard)
