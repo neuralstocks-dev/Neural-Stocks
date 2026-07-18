@@ -4,7 +4,7 @@
  * Friendly replacement for the generic red "AI analysis temporarily
  * unavailable" error string. Surfaces:
  *   1. A clear plain-English explanation of what happened
- *   2. A primary "Top up OpenRouter credits" button (opens Emergent profile
+ *   2. A primary "Top up OpenRouter credits" button (opens OpenRouter credits page
  *      in a new tab) so the fix is one click away
  *   3. A "What does this mean?" toggle that expands to explain cost
  *      economics — only LLM verdict generation is gated; everything
@@ -106,7 +106,7 @@ export default function LLMBudgetBanner({ error }) {
                                 style={{ textDecoration: "none" }}
                             >
                                 <Wallet size={14} strokeWidth={1.7} />
-                                Top up Universal Key
+                                Top up OpenRouter credits
                                 <ExternalLink size={12} strokeWidth={1.7} style={{ opacity: 0.7 }} />
                             </a>
                             <button
@@ -193,8 +193,8 @@ export default function LLMBudgetBanner({ error }) {
                                     className="mt-4 font-mono"
                                     style={{ color: "hsl(var(--text-muted))", fontSize: "0.62rem" }}
                                 >
-                                    Quick path: Profile → Universal Key → Add Balance →
-                                    toggle Auto top-up.
+                                    Quick path: openrouter.ai/settings/credits → Add Credits.
+                                    Auto top-up can be enabled there too.
                                 </p>
                             </div>
                         )}
