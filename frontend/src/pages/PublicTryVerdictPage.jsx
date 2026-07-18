@@ -744,7 +744,7 @@ function SharePreviewButton({ verdictId }) {
 const STAGES = [
     { offset: 0,  label: "Fetching live quote · OHLC · fundamentals" },
     { offset: 6,  label: "Detecting candlestick patterns across daily + weekly" },
-    { offset: 12, label: "Running Random Forest model · 20-day horizon" },
+    { offset: 12, label: "Analysing valuation anchors · EV multiples · sector context" },
     { offset: 18, label: "Gathering market context · news · peer signals" },
     { offset: 26, label: "Synthesising verdict with AI" },
 ];
