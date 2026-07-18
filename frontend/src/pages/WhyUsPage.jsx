@@ -146,6 +146,8 @@ const FEATURES = [
     { label: "Signal-grade alerts, no promotions", values: { nsi: "full", moomoo: "partial", tiger: "partial", tradingview: "full", stashaway: "none", tradeideas: "full", dbsvickers: "none" } },
     { label: "Web-first · runs anywhere · no install", values: { nsi: "full", moomoo: "partial", tiger: "partial", tradingview: "full", stashaway: "full", tradeideas: "partial", dbsvickers: "partial" } },
     { label: "Candlestick & Hybrid analysis on the free tier", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "none" } },
+    { label: "Sector-relative EV/EBITDA + EV/FCF multiples", values: { nsi: "full", moomoo: "partial", tiger: "partial", tradingview: "partial", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
+    { label: "Live macro regime context (Fed rate, CPI, yields) in every verdict", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "partial", dbsvickers: "none" } },
     { label: "Starts at $0 · Pro $9/mo", values: { nsi: "full", moomoo: "none", tiger: "none", tradingview: "partial", stashaway: "none", tradeideas: "none", dbsvickers: "partial" } },
 ];
 
