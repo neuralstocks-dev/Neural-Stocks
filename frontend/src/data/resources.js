@@ -118,7 +118,7 @@ export const RESOURCES = [
                     "All 15 candlestick patterns NSI detects — Hammer, Bullish Engulfing, Morning Star, Evening Star, Three Black Crows and 10 more — with the geometric rules behind each",
                     "How to read a balance sheet, income statement, and cash flow statement side by side",
                     "Risk management frameworks: position sizing, the Kelly Criterion, portfolio concentration, drawdown psychology",
-                    "How AI actually reads the stock market — not marketing language, the real pipeline: deterministic indicators → candlestick scan → sentiment heuristic → intrinsic value anchor → LLM reasoning → Random Forest second opinion",
+                    "How AI actually reads the stock market — not marketing language, the real pipeline: deterministic indicators → candlestick scan → sentiment heuristic → intrinsic value anchor → EV multiples → macro context → LLM reasoning",
                 ],
             },
             {
