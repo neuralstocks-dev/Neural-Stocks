@@ -422,6 +422,15 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
     slim_bandar = _slim_bandarmology_for_prompt(bandarmology)
     if slim_bandar and slim_bandar.get("regime") and slim_bandar.get("regime") != "no_signal":
         payload["bandarmology"] = slim_bandar
+    if isinstance(macro_context, dict):
+        payload["macro_context"] = {
+            "rate_cycle": macro_context.get("rate_cycle"),
+            "policy_rate": macro_context.get("policy_rate"),
+            "cpi_yoy": macro_context.get("cpi_yoy"),
+            "yield_10y": macro_context.get("yield_10y"),
+            "rate_sensitive_note": macro_context.get("rate_sensitive_note"),
+            "market": macro_context.get("market"),
+        }
 
     try:
         system_to_use = system_prompt + (_BANDARMOLOGY_PROMPT_BLOCK if "bandarmology" in payload else "")
