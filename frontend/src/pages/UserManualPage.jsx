@@ -445,6 +445,8 @@ export default function UserManualPage() {
                             ["8 · Random Forest opinion (retired)", "Tested against two prediction targets; both failed to beat a trivial baseline on holdout data. Disabled. See the Technical page for the full writeup."],
                             ["9 · Intrinsic value anchor", "A rough DCF-style estimate. Shows current price vs estimated fair value. A stock trading significantly above this is pricing in optimistic assumptions."],
                             ["10 · Bandarmology card (IDX only)", "Institutional flow data. Persistent accumulation with high persistence score = smart money building a position. Reporting lag is 5–30 days."],
+                                ["11 · EV multiples", "Sector-relative EV/EBITDA and EV/FCF, benchmarked against Damodaran sector medians. A premium or discount to the sector isn\u2019t automatically bullish or bearish \u2014 check growth and margin context alongside it."],
+                                ["12 · Macro context", "Four live economic series (Fed Funds Rate, CPI YoY, 10Y yield, USD index for US tickers) fetched from London Strategic Edge at analysis time. Referenced in the verdict for rate-sensitive sectors \u2014 Utilities, REITs, Financials, Consumer Discretionary."],
                             ["11 · Action bar", "Share (public URL) · Trade Slip PDF · Export full PDF · Re-analyse. Re-analyse refreshes with fresh data without consuming a watchlist slot."],
                         ].map(([step, desc]) => (
                             <div key={step} className="flex gap-3">
