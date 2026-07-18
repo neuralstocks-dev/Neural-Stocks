@@ -578,7 +578,46 @@ histogram  = MACD_line − signal`}
                 {/* Random Forest secondary-opinion model */}
                 <SectionHeader
                     icon={Trees}
-                    overline="Secondary opinion · retired"
+                    overline="Macro context layer"
+                    title="Live macro regime data."
+                    subtitle="Rate cycle, inflation, and yield inputs from London Strategic Edge — fetched at analysis time, not baked in at training."
+                />
+
+                <p className="mt-6 max-w-2xl text-base" style={{ color: "hsl(var(--text-secondary))" }}>
+                    Every verdict now receives four live macro series sourced from the{" "}
+                    <a href="https://londonstrategicedge.com" target="_blank" rel="noopener noreferrer"
+                       className="underline" style={{ color: "hsl(var(--text-primary))" }}>
+                        London Strategic Edge
+                    </a>{" "}
+                    free API — the world's largest open market data archive with 133 billion ticks and
+                    14,640 macro series. These are injected into the AI prompt as structured context,
+                    not mentioned in training.
+                </p>
+
+                <div className="mt-6 grid gap-3 max-w-2xl">
+                    {[
+                        { label: "Fed Funds Rate", series: "fdtr", note: "Current monetary policy rate — sets the cost of capital floor for all US assets" },
+                        { label: "CPI Year-on-Year", series: "cpi_yoy", note: "Inflation trajectory — affects real returns and rate-cut runway" },
+                        { label: "US 10Y Treasury Yield", series: "us10y", note: "Long-rate benchmark — directly reprices bond-proxy equities (Utilities, REITs)" },
+                        { label: "BI Rate (IDX tickers)", series: "id_bi_rate", note: "Bank Indonesia policy rate, used instead of Fed Funds for Indonesian stocks" },
+                    ].map(({ label, series, note }) => (
+                        <div key={series} className="p-4" style={{ border: "1px solid hsl(var(--border-default))", borderLeft: "3px solid hsl(var(--buy))" }}>
+                            <p className="font-mono text-xs" style={{ color: "hsl(var(--buy))", fontSize: "0.6rem", letterSpacing: "0.06em" }}>{series}</p>
+                            <p className="text-sm font-medium mt-1" style={{ color: "hsl(var(--text-primary))" }}>{label}</p>
+                            <p className="text-sm mt-1" style={{ color: "hsl(var(--text-secondary))" }}>{note}</p>
+                        </div>
+                    ))}
+                </div>
+
+                <p className="mt-4 text-sm max-w-2xl" style={{ color: "hsl(var(--text-muted))" }}>
+                    Macro data is cached for 12 hours — series update weekly or less frequently, so per-analysis
+                    fetching would be wasteful. Requires <code className="font-mono">LSE_API_KEY</code> (free,
+                    no credit card) in Railway environment variables. If the key is absent the feature
+                    degrades gracefully — analyses proceed without macro context rather than failing.
+                </p>
+
+                <SectionHeader
+                    icon={Trees}
                     title="The Random Forest layer."
                     subtitle="We tested an independent probability model alongside the AI verdict for a while. It's currently disabled — see why below. Honest numbers, warts and all."
                 />
