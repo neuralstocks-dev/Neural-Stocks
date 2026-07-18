@@ -4,7 +4,7 @@
  * Friendly replacement for the generic red "AI analysis temporarily
  * unavailable" error string. Surfaces:
  *   1. A clear plain-English explanation of what happened
- *   2. A primary "Top up Universal Key" button (opens Emergent profile
+ *   2. A primary "Top up OpenRouter credits" button (opens Emergent profile
  *      in a new tab) so the fix is one click away
  *   3. A "What does this mean?" toggle that expands to explain cost
  *      economics — only LLM verdict generation is gated; everything
@@ -16,9 +16,10 @@
 import { useState } from "react";
 import { ExternalLink, AlertTriangle, Wallet } from "lucide-react";
 
-// Best-known landing for the Emergent platform profile. The user can
-// navigate from there to Universal Key → Add Balance in 2 clicks.
-const EMERGENT_PROFILE_URL = "https://app.emergent.sh/";
+// OpenRouter is the sole LLM provider (see services/llm_providers.py).
+// This is the correct top-up destination -- NOT Emergent, which this app
+// no longer uses for LLM billing.
+const OPENROUTER_CREDITS_URL = "https://openrouter.ai/settings/credits";
 
 function _looksLikeBudgetError(payload) {
     if (!payload) return false;
@@ -83,21 +84,21 @@ export default function LLMBudgetBanner({ error }) {
                             className="font-serif mt-2"
                             style={{ fontSize: "1.4rem", lineHeight: 1.15, letterSpacing: "-0.005em" }}
                         >
-                            Your Emergent Universal Key needs a top up.
+                            Your OpenRouter balance needs a top up.
                         </h3>
                         <p
                             className="mt-3 text-sm leading-relaxed"
                             style={{ color: "hsl(var(--text-secondary))" }}
                         >
                             Every AI verdict makes one call to the AI provider
-                            billed against your Universal Key balance. The balance is empty — so new
+                            billed against your OpenRouter balance. The balance is empty — so new
                             analyses are paused until you add credit. <strong style={{ color: "hsl(var(--text-primary))" }}>
                             Existing verdicts, charts, watchlists, alerts, PDF exports,
                             and Telegram pushes all keep working.</strong>
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
                             <a
-                                href={EMERGENT_PROFILE_URL}
+                                href={OPENROUTER_CREDITS_URL}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="btn-primary inline-flex items-center gap-2"
@@ -151,14 +152,14 @@ export default function LLMBudgetBanner({ error }) {
                                                 Hosting (~50 credits/month)
                                             </strong>
                                             : keeps the app, database, and background scanners alive.
-                                            Already covered by your Emergent subscription.
+                                            Already covered by your Railway hosting plan.
                                         </span>
                                     </li>
                                     <li className="flex gap-2">
                                         <span style={{ color: "hsl(var(--text-muted))" }}>·</span>
                                         <span>
                                             <strong style={{ color: "hsl(var(--text-primary))" }}>
-                                                Universal Key (~4.6 credits / $0.046 per verdict)
+                                                OpenRouter balance (~$0.05\u2013$0.15 per verdict, model-dependent)
                                             </strong>
                                             : pays the AI provider for each
                                             analysis. 1 credit = $0.01. Billed separately and only
