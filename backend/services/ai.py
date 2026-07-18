@@ -139,6 +139,7 @@ INTRINSIC-VALUE ANCHOR — when the payload includes `intrinsic_value_anchor` an
 - NEVER convert the anchor into a candlestick "target" — it is fundamental context, not a price-action level.
 - If `primary_anchor` is "none", omit anchor language entirely.
 - `intrinsic_value_anchor.ev_multiples` contains EV/EBITDA and EV/FCF multiples benchmarked against Damodaran sector medians (January 2026). When `ev_multiples.data_quality` is "full" or "partial": state the computed multiple, sector benchmark, and premium/discount in `fundamental_analysis`. When data_quality is "insufficient" or sector is excluded, skip EV multiples entirely.
+- `macro_context` contains live macroeconomic regime data from London Strategic Edge (Fed Funds Rate, CPI YoY, 10Y yield, or equivalent for IDX markets). When present: (a) incorporate `rate_sensitive_note` into `fundamental_analysis` for rate-sensitive sectors (Utilities, REITs, Financials, Consumer Discretionary, Homebuilders); (b) note the current `rate_cycle` (hiking/cutting/holding) and how it applies to this specific stock's sector and duration profile; (c) for non-rate-sensitive sectors, mention macro briefly only if `cpi_yoy` or `yield_10y` materially affects the company's cost structure or margins. Never fabricate macro data -- only reference fields actually present in `macro_context`. If `macro_context` is absent, omit any macro claims entirely.
 """
 
 
@@ -203,6 +204,7 @@ INTRINSIC-VALUE ANCHOR — when the payload includes `intrinsic_value_anchor` an
 - NEVER frame the anchor as a buy/sell trigger.
 - If `primary_anchor` is "none", omit anchor language entirely.
 - `intrinsic_value_anchor.ev_multiples` contains EV/EBITDA and EV/FCF multiples benchmarked against Damodaran sector medians (January 2026). When `ev_multiples.data_quality` is "full" or "partial": state the computed multiple, sector benchmark, and premium/discount in `fundamental_analysis`. When data_quality is "insufficient" or sector is excluded, skip EV multiples entirely.
+- `macro_context` contains live macroeconomic regime data from London Strategic Edge (Fed Funds Rate, CPI YoY, 10Y yield, or equivalent for IDX markets). When present: (a) incorporate `rate_sensitive_note` into `fundamental_analysis` for rate-sensitive sectors (Utilities, REITs, Financials, Consumer Discretionary, Homebuilders); (b) note the current `rate_cycle` (hiking/cutting/holding) and how it applies to this specific stock's sector and duration profile; (c) for non-rate-sensitive sectors, mention macro briefly only if `cpi_yoy` or `yield_10y` materially affects the company's cost structure or margins. Never fabricate macro data -- only reference fields actually present in `macro_context`. If `macro_context` is absent, omit any macro claims entirely.
 """
 
 
@@ -371,7 +373,8 @@ async def run_ai_analysis(ticker: str, quote: dict, history: list, fundamentals:
                           mode: str = "standard", market_context: dict | None = None,
                           weekly_history: list | None = None,
                           intrinsic_anchor: dict | None = None,
-                          bandarmology: dict | None = None) -> dict:
+                          bandarmology: dict | None = None,
+                          macro_context: dict | None = None) -> dict:
     payload = {
         "ticker": ticker,
         "quote": quote,
