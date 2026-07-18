@@ -58,6 +58,11 @@ const MODULES = [
         title: "Calibrated Confidence",
         status: "available",
         body: "Every verdict's confidence score is post-processed by a disciplined rule: the Earnings-Proximity Gate caps confidence at 55 when an earnings release is within 5 calendar days — pre-earnings outcomes are largely event-driven and the model can't price the surprise. This adjustment leaves a transparent breadcrumb under the ring — we don't quietly hand-tune scores, every change is shown and explained.",
+    {
+        title: "Macro regime context, not just price action",
+        status: "available",
+        body: "Every verdict receives live macroeconomic data at analysis time — Fed Funds Rate, CPI trajectory, and 10Y yield (or Bank Indonesia rate for IDX tickers), sourced from London Strategic Edge. The AI is explicitly told the current rate cycle (hiking/cutting/holding) and its implications for rate-sensitive sectors before forming its verdict. Most AI stock tools reason about a stock in an economic vacuum. We don't.",
+    },
     },
     {
         icon: BellRing,
