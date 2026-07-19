@@ -38,6 +38,24 @@ class UnlockReq(BaseModel):
     ]
 
 
+class AgentScheduleReq(BaseModel):
+    days: list[Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]] = Field(min_length=1)
+    time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    timezone: str = "America/New_York"
+
+
+class CreateAgentReq(BaseModel):
+    agent_type: Literal["relative_strength_screener"] = "relative_strength_screener"
+    schedule: AgentScheduleReq
+    deliver_telegram: bool = True
+
+
+class UpdateAgentReq(BaseModel):
+    schedule: Optional[AgentScheduleReq] = None
+    deliver_telegram: Optional[bool] = None
+    enabled: Optional[bool] = None
+
+
 class Quote(BaseModel):
     ticker: str
     name: Optional[str] = None

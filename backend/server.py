@@ -5,7 +5,7 @@ from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 
 from core.db import client
-from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry, kids_preview, kids_auth, kids_portfolio, kids_journal, kids_consent, kids_parent, neutools
+from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry, kids_preview, kids_auth, kids_portfolio, kids_journal, kids_consent, kids_parent, neutools, agents
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,6 +48,7 @@ api_router.include_router(kids_journal.router)
 api_router.include_router(kids_consent.router)
 api_router.include_router(kids_parent.router)
 api_router.include_router(neutools.router)
+api_router.include_router(agents.router)
 
 app.include_router(api_router)
 
@@ -125,6 +126,11 @@ async def start_background_tasks():
     _BG_TASKS.add(t_resolve)
     t_resolve.add_done_callback(_BG_TASKS.discard)
     logger.info("Started verdict resolution scheduler")
+    from services.scheduled_agents import scheduled_agent_loop
+    t_agents = asyncio.create_task(scheduled_agent_loop())
+    _BG_TASKS.add(t_agents)
+    t_agents.add_done_callback(_BG_TASKS.discard)
+    logger.info("Started scheduled screener agents scheduler")
     # Ensure TTL indexes (idempotent — no-op if already created).
     try:
         from routers.analysis import _ensure_analysis_indexes
@@ -164,6 +170,16 @@ async def start_background_tasks():
         logger.info("Ensured KidStocks indexes")
     except Exception as e:
         logger.warning("Failed to ensure KidStocks indexes: %s", e)
+
+    # Scheduled screener agents.
+    try:
+        from core.db import db as _db2
+        await _db2.scheduled_agents.create_index("user_id")
+        await _db2.agent_runs.create_index([("agent_id", 1), ("run_at", -1)])
+        await _db2.eps_estimate_snapshots.create_index([("symbol", 1), ("quarter_key", 1), ("snapshot_date", 1)], unique=True)
+        logger.info("Ensured scheduled-agents indexes")
+    except Exception as e:
+        logger.warning("Failed to ensure scheduled-agents indexes: %s", e)
 
     # KidStocks — nightly Telegram digest for parents.
     try:

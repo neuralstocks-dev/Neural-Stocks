@@ -21,6 +21,8 @@ import httpx
 from services.source_health import track
 
 from core.config import FINNHUB_API_KEY
+from core.db import db
+from core.security import iso, now_utc
 from services.sentiment import classify_sentiment_detailed
 
 logger = logging.getLogger(__name__)
@@ -259,6 +261,135 @@ async def get_next_earnings(symbol: str) -> dict | None:
         "eps_estimate": next_.get("epsEstimate"),
         "revenue_estimate": rev_est,
     }
+
+
+@track("finnhub.get_earnings_surprises")
+async def get_earnings_surprises(symbol: str, limit: int = 4) -> list[dict]:
+    """Actual-vs-estimate EPS for the most recent reported quarters, via the
+    free-tier `/stock/earnings` endpoint. Returns newest-first, each item:
+    {period, quarter, year, actual, estimate, beat} — `beat` is None when
+    either actual or estimate is missing (can't determine)."""
+    data = await _get("/stock/earnings", {"symbol": symbol.upper()},
+                      f"earnsurp:{symbol.upper()}", _EARNINGS_TTL)
+    if not isinstance(data, list):
+        return []
+    out = []
+    for item in data:
+        actual = item.get("actual")
+        estimate = item.get("estimate")
+        beat = (actual is not None and estimate is not None and actual > estimate)
+        out.append({
+            "period": item.get("period"),
+            "quarter": item.get("quarter"),
+            "year": item.get("year"),
+            "actual": actual,
+            "estimate": estimate,
+            "beat": beat if (actual is not None and estimate is not None) else None,
+        })
+    # Finnhub returns newest-first already, but sort defensively on period date
+    out.sort(key=lambda x: x.get("period") or "", reverse=True)
+    return out[:limit]
+
+
+@track("finnhub.get_eps_estimate")
+async def get_eps_estimate(symbol: str) -> list[dict]:
+    """Current sell-side consensus EPS estimate per forward quarter, via
+    `/stock/eps-estimate` (freq=quarterly). This endpoint is gated behind a
+    paid Finnhub "Estimates" add-on on many plans — `_get()` already returns
+    None on a non-200/403 response, so this naturally returns [] when the
+    configured key can't reach it. Each item: {quarter_key, eps_avg,
+    num_analysts}."""
+    data = await _get("/stock/eps-estimate", {"symbol": symbol.upper(), "freq": "quarterly"},
+                      f"epsest:{symbol.upper()}", _ANALYST_TTL)
+    rows = data.get("data") if isinstance(data, dict) else data
+    if not isinstance(rows, list):
+        return []
+    out = []
+    for item in rows:
+        year = item.get("year")
+        quarter = item.get("quarter")
+        if year is None or quarter is None:
+            continue
+        out.append({
+            "quarter_key": f"{year}Q{quarter}",
+            "eps_avg": item.get("epsAvg"),
+            "num_analysts": item.get("numberAnalysts"),
+        })
+    return out
+
+
+def _next_quarter_key(year, quarter) -> str | None:
+    if year is None or quarter is None:
+        return None
+    try:
+        year, quarter = int(year), int(quarter)
+    except (TypeError, ValueError):
+        return None
+    if quarter >= 4:
+        return f"{year + 1}Q1"
+    return f"{year}Q{quarter + 1}"
+
+
+async def snapshot_eps_estimate(symbol: str) -> None:
+    """Records today's forward-quarter EPS consensus for `symbol` into
+    db.eps_estimate_snapshots, one row per (symbol, quarter_key, date). This
+    is how `get_estimate_revision_beat` builds up the before/after history
+    it needs — Finnhub only exposes the CURRENT consensus, not a revision
+    history, so we accumulate our own point-in-time snapshots over
+    successive screener runs. Best-effort: failures are swallowed since this
+    is opportunistic data collection, not a request the caller is blocked on."""
+    try:
+        estimates = await get_eps_estimate(symbol)
+        if not estimates:
+            return
+        today = iso(now_utc())[:10]
+        for est in estimates:
+            if est.get("eps_avg") is None:
+                continue
+            await db.eps_estimate_snapshots.update_one(
+                {"symbol": symbol.upper(), "quarter_key": est["quarter_key"], "snapshot_date": today},
+                {"$set": {
+                    "symbol": symbol.upper(),
+                    "quarter_key": est["quarter_key"],
+                    "snapshot_date": today,
+                    "eps_avg": est["eps_avg"],
+                    "num_analysts": est.get("num_analysts"),
+                    "recorded_at": iso(now_utc()),
+                }},
+                upsert=True,
+            )
+    except Exception as e:
+        logger.info("finnhub: snapshot_eps_estimate(%s) failed: %s", symbol, e)
+
+
+async def get_estimate_revision_beat(symbol: str, earnings_period: str, quarter: int, year: int) -> bool | None:
+    """Did sell-side analysts raise their NEXT-quarter EPS estimate in the
+    days following the earnings print at `earnings_period` (an ISO date
+    string) for the given (quarter, year)? Returns:
+      - True  -- confirmed raise (later snapshot > earlier snapshot)
+      - False -- confirmed no raise (later snapshot <= earlier snapshot)
+      - None  -- unknown: no snapshot pair spans the earnings date yet.
+        This is the expected state for quarters reported before this
+        deployment started collecting snapshots, and for tickers whose
+        Finnhub plan can't reach /stock/eps-estimate at all. Callers must
+        treat None as "couldn't check", not as "no beat" -- see
+        relative_strength_screener.py's guidance_proxy_available flag."""
+    target_key = _next_quarter_key(year, quarter)
+    if not target_key or not earnings_period:
+        return None
+    rows = await db.eps_estimate_snapshots.find(
+        {"symbol": symbol.upper(), "quarter_key": target_key},
+        {"_id": 0, "snapshot_date": 1, "eps_avg": 1},
+    ).sort("snapshot_date", 1).to_list(200)
+    before = [r for r in rows if r["snapshot_date"] <= earnings_period]
+    after = [r for r in rows if r["snapshot_date"] > earnings_period]
+    if not before or not after:
+        return None
+    earliest_before = before[-1]["eps_avg"]   # closest snapshot before the print
+    earliest_after = after[0]["eps_avg"]      # closest snapshot after the print
+    if earliest_before is None or earliest_after is None:
+        return None
+    return earliest_after > earliest_before
 
 
 async def get_market_context(symbol: str) -> dict:
