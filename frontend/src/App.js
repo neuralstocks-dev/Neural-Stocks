@@ -47,6 +47,8 @@ import AlertsPage from "@/pages/AlertsPage";
 import StockDNAPage from "@/pages/StockDNAPage";
 import KidsStockDNAPage from "@/pages/KidsStockDNAPage";
 import NeuToolsPage from "@/pages/NeuToolsPage";
+import AgentsPage from "@/pages/AgentsPage";
+import AgentRunsPage from "@/pages/AgentRunsPage";
 import { Loader2 } from "lucide-react";
 
 /**
@@ -212,6 +214,8 @@ function AppRoutes() {
                 <Route path="/scorecard" element={<ScorecardPage />} />
                 <Route path="/backtest" element={<BacktestPage />} />
                 <Route path="/alerts" element={<AlertsPage />} />
+                <Route path="/agents" element={<AgentsPage />} />
+                <Route path="/agents/:id/runs" element={<AgentRunsPage />} />
                 <Route path="/why" element={<WhyUsPage />} />
                 <Route path="/manual" element={<UserManualPage />} />
                 <Route path="/technical" element={<TechnicalPage />} />
