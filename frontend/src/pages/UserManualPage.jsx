@@ -139,6 +139,7 @@ const TOC = [
         ["scorecard",     "4.2 · Score Card"],
         ["backtest",      "4.3 · Backtesting Lab"],
         ["idx",           "4.4 · IDX exclusives"],
+        ["agents",        "4.5 · Scheduled Agents"],
     ]},
     { part: "Part 5 · Reference", sections: [
         ["plans",         "5.1 · Plans comparison"],
@@ -704,6 +705,32 @@ export default function UserManualPage() {
                     </Callout>
                 </Section>
 
+                <Section id="agents" icon={Clock} kicker="4.5" title="Scheduled Agents — screens that run while you sleep">
+                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
+                        Scheduled Agents run a screener automatically on a schedule you set — no need to open the app or remember to run it yourself. Results land on the Agents page and, if you want, in your linked Telegram chat too.
+                    </p>
+                    <p className="text-sm leading-relaxed mt-3" style={{ color: "hsl(var(--text-secondary))" }}>
+                        The first screener available is the <strong>Relative Strength Screener</strong>. It looks for stocks that closed within 1% of their all-time high on a day the S&P 500 (SPY) closed down at least 0.5% — genuine relative strength, not just a stock going up on a good day for everyone. It also requires the stock to have beaten earnings expectations in at least 2 of its last 4 reported quarters, and a market cap above $10 billion.
+                    </p>
+                    <Step n={1} title="Create an agent">
+                        Go to the Agents page and tap Create agent. Pick the days it should run (a Mon–Fri preset or custom), the time and timezone, and whether you want a Telegram push in addition to the in-app result.
+                    </Step>
+                    <Step n={2} title="Let it run, or trigger it yourself">
+                        The agent fires automatically at your chosen time. You can also tap Run now at any point to trigger an immediate screen without waiting for the schedule — useful the first time, to see what it finds before trusting the schedule.
+                    </Step>
+                    <Step n={3} title="Review results in Run History">
+                        Every run — scheduled or manual — is logged. Open a run to see the full hit list: ticker, % from all-time high, how many of the last 4 quarters beat earnings, and market cap.
+                    </Step>
+                    <Callout tone="warn" title="One caveat worth knowing: the guidance-beat check can be unavailable">
+                        The full criteria the screener is designed for also checks whether analysts raised their earnings estimate in the days after each print — a "beat and raise" signal, not just a beat. That data isn't always reachable. When it isn't, a run falls back to counting earnings beats only, and says so explicitly — look for the "guidance data unavailable" flag on a run, and the * next to the quarters-beat number on each hit. It is never silently treated as a full beat-and-raise pass.
+                    </Callout>
+                    <WatchOut items={[
+                        "One active agent at a time. An agent runs every day indefinitely, whether or not you ever look at the result — the cap keeps that cost bounded. Disable your current agent before creating another.",
+                        "The screener universe is the S&P 500. It does not scan the full market, IDX tickers, or small/mid caps under the $10B floor.",
+                        "A scheduled agent only fires while your plan is Pro, Elite, or an active Week Pass. If you downgrade, it stops firing automatically rather than continuing to run for a plan that no longer covers it.",
+                    ]} />
+                </Section>
+
                 {/* ══════════════════════════════════════════════
                     PART 5 — REFERENCE
                 ══════════════════════════════════════════════ */}
@@ -741,6 +768,7 @@ export default function UserManualPage() {
                                     ["Backtesting Lab",           "—",       "—",    "✓",    "✓",    "✓"],
                                     ["Portfolio P&L",             "—",       "✓",    "✓",    "✓",    "✓"],
                                     ["Score Card",                "—",       "✓",    "✓",    "✓",    "✓"],
+                                    ["Scheduled Agents",          "—",       "—",    "✓",    "✓",    "✓"],
                                 ].map(([feat, g, fr, w, p, e]) => (
                                     <tr key={feat} style={{ borderBottom: "1px solid hsl(var(--border-divider))" }}>
                                         <td className="p-2">{feat}</td>
