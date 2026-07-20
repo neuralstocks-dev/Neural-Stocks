@@ -18,6 +18,7 @@ from services.features import feature_row_for_today
 import pandas as pd
 from services.quota import enforce_analysis_quota, plan_for, resolved_plan_for
 from services import llm_circuit_breaker
+from services.llm_providers import OpenRouterExhaustedError
 from routers.disclaimer import require_accepted
 
 router = APIRouter(tags=["analysis"])
@@ -675,6 +676,30 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
                 "error": user_msg,
                 "error_detail": detail_dict,
                 "status_code": e.status_code,
+            }},
+        )
+    except OpenRouterExhaustedError as e:
+        # Distinct from the generic Exception handler below: this means
+        # OpenRouter's own server-side fallback chain (services/llm_providers.py)
+        # ran out of models to try — a real cross-provider outage, not a
+        # single flaky model or an unrelated bug in this job. Recorded with
+        # its own reason code so the admin dashboard can tell "every LLM
+        # option failed" apart from "something else in the pipeline broke".
+        llm_circuit_breaker.record_outcome(
+            "timeout",
+            ticker=ticker,
+            reason=llm_circuit_breaker.REASON_OPENROUTER_ALL_MODELS_EXHAUSTED,
+            elapsed_s=_time.monotonic() - started,
+            surface="auth",
+            error_detail=str(e)[:1500],
+        )
+        await db.analysis_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "failed",
+                "finished_at": iso(now_utc()),
+                "error": "All AI models are currently unavailable. Please try again shortly.",
+                "error_detail": str(e)[:1500],
             }},
         )
     except Exception as e:
