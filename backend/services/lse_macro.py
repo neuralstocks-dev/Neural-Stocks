@@ -24,7 +24,11 @@ from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-LSE_BASE = "https://api.londonstrategicedge.com/v1"
+# Confirmed live against a real key on 2026-07-20 -- the base path is
+# /vault/, NOT /v1/ (the old value here 404'd on every request; this
+# integration had apparently never been exercised against a real key
+# before, since LSE_API_KEY was also unset in Railway until the same day).
+LSE_BASE = "https://api.londonstrategicedge.com/vault"
 _CACHE: dict = {}
 _CACHE_TTL_HOURS = 12
 
@@ -59,14 +63,18 @@ def _fetch_series_latest(api_key: str, series: str) -> float | None:
     try:
         with httpx.Client(timeout=8.0) as client:
             resp = client.get(
-                f"{LSE_BASE}/series/{series}",
-                params={"limit": 3, "order": "desc"},
-                headers={"X-API-Key": api_key},
+                f"{LSE_BASE}/series",
+                params={"symbol": series, "limit": 3, "order": "desc"},
+                headers={"x-api-key": api_key},
             )
             if resp.status_code != 200:
                 logger.warning(f"LSE macro: {series} returned {resp.status_code}")
                 return None
-            rows = resp.json().get("data", [])
+            # The endpoint returns a bare JSON array of {symbol, date, value}
+            # rows -- NOT {"data": [...]}. .get("data", []) on a list would
+            # AttributeError (silently caught below), which is why this
+            # always returned None even with a valid key and the right URL.
+            rows = resp.json()
             if not rows:
                 return None
             latest = float(rows[0]["value"])
@@ -85,13 +93,13 @@ def _derive_rate_cycle(series_id: str, api_key: str) -> str:
     try:
         with httpx.Client(timeout=8.0) as client:
             resp = client.get(
-                f"{LSE_BASE}/series/{series_id}",
-                params={"limit": 3, "order": "desc"},
-                headers={"X-API-Key": api_key},
+                f"{LSE_BASE}/series",
+                params={"symbol": series_id, "limit": 3, "order": "desc"},
+                headers={"x-api-key": api_key},
             )
             if resp.status_code != 200:
                 return "unknown"
-            rows = resp.json().get("data", [])
+            rows = resp.json()
             if len(rows) < 2:
                 return "unknown"
             values = [float(r["value"]) for r in rows]
@@ -133,15 +141,19 @@ def fetch_macro_context(is_idx: bool = False) -> dict | None:
     if not api_key:
         return None
 
+    # Symbols confirmed against the real /vault/catalog on 2026-07-20 --
+    # the previous idx symbols here (id_bi_rate/id_cpi_yoy/id_10y) never
+    # matched anything real; the catalog uses idbirate/idcpiy/ID10Y with no
+    # underscores. fdtr and cpi_yoy (US) were already correct.
     if is_idx:
-        rate_series = "id_bi_rate"
-        cpi_series = "id_cpi_yoy"
-        yield_series = "id_10y"
+        rate_series = "idbirate"
+        cpi_series = "idcpiy"
+        yield_series = "ID10Y"
         market = "id"
     else:
         rate_series = "fdtr"
         cpi_series = "cpi_yoy"
-        yield_series = "us10y"
+        yield_series = "US10Y"
         market = "us"
 
     policy_rate = _fetch_series_latest(api_key, rate_series)
