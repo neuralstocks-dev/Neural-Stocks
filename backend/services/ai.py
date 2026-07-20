@@ -232,20 +232,39 @@ async def _run_llm(system_prompt: str, user_text: str, session_prefix: str) -> t
     headroom, not a provider-imposed limit.
     """
     def _sync():
-        result = call_llm(
+        return call_llm(
             prompt=user_text,
             task_type="verdict",
             json_mode=True,
             system_prompt=system_prompt,
             max_tokens=8192,
         )
-        return result["content"], {
-            "provider": "openrouter",
-            "model": result["model_used"],
-            "label": result["model_used"],
-        }
 
-    return await asyncio.to_thread(_sync)
+    import time as _time
+    from services.llm_call_log import record_call
+    started = _time.monotonic()
+    try:
+        result = await asyncio.to_thread(_sync)
+    except Exception as e:
+        await record_call(
+            session=session_prefix, outcome="failure", model=None,
+            input_tokens=None, output_tokens=None, finish_reason=None,
+            elapsed_s=_time.monotonic() - started, error=str(e),
+        )
+        raise
+
+    await record_call(
+        session=session_prefix, outcome="success", model=result["model_used"],
+        input_tokens=result["input_tokens"], output_tokens=result["output_tokens"],
+        finish_reason=result["finish_reason"], elapsed_s=_time.monotonic() - started,
+    )
+    return result["content"], {
+        "provider": "openrouter",
+        "model": result["model_used"],
+        "label": result["model_used"],
+        "input_tokens": result["input_tokens"],
+        "output_tokens": result["output_tokens"],
+    }
 
 
 def _parse_ai_json(raw) -> dict:

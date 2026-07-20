@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Activity, RefreshCcw, AlertTriangle, CheckCircle2, Shuffle } from "lucide-react";
+import { Activity, RefreshCcw, AlertTriangle, CheckCircle2, Shuffle, Trash2, ListChecks } from "lucide-react";
 import api from "@/lib/api";
 
 // Colored label palette for each failure-reason bucket. Keep in sync
@@ -42,11 +42,17 @@ const SURFACE_LABEL = { anon: "guest", auth: "auth", quick: "quick-batch" };
 export default function AdminLLMHealthPanel() {
     const [status, setStatus] = useState(null);
     const [events, setEvents] = useState(null);
+    const [calls, setCalls] = useState(null);
     const [providers, setProviders] = useState(null);
     const [sources, setSources] = useState(null);
     const [fallbackRate, setFallbackRate] = useState(null);
     const [err, setErr] = useState("");
     const [busy, setBusy] = useState(false);
+    const [clearing, setClearing] = useState(false);
+    // Which row in the "Recent LLM calls" table has its error detail
+    // expanded (mirrors expandedRow below for the failures table — kept
+    // as a separate piece of state since the two tables are independent).
+    const [expandedCallRow, setExpandedCallRow] = useState(null);
     // Track which row in the "Last 10 failures" table has its detail
     // panel expanded (only one at a time to avoid the table jumping
     // around when you open multiple). null = none expanded.
@@ -63,15 +69,17 @@ export default function AdminLLMHealthPanel() {
     const refresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            const [breakerRes, eventsRes, providersRes, sourceRes, fallbackRes] = await Promise.all([
+            const [breakerRes, eventsRes, callsRes, providersRes, sourceRes, fallbackRes] = await Promise.all([
                 api.get("/admin/llm-breaker"),
                 api.get("/admin/llm-events?limit=10&hours=24"),
+                api.get("/admin/llm-calls?limit=20&hours=24"),
                 api.get("/admin/llm-events/by-provider?hours=24"),
                 api.get("/admin/source-health?hours=24"),
                 api.get("/admin/llm-events/fallback-rate?hours=24"),
             ]);
             setStatus(breakerRes.data);
             setEvents(eventsRes.data);
+            setCalls(callsRes.data);
             setProviders(providersRes.data);
             setSources(sourceRes.data);
             setFallbackRate(fallbackRes.data);
@@ -109,6 +117,26 @@ export default function AdminLLMHealthPanel() {
             setErr(ex?.response?.data?.detail || "Reset failed");
         } finally {
             setBusy(false);
+        }
+    };
+
+    // Wipes the persisted failure + call-log history (db.llm_events and
+    // db.llm_calls) so the panel starts clean. Deliberately does NOT touch
+    // the live breaker trip state — "Force reset" above is the button for
+    // that. Confirms first since this is a destructive, irreversible action
+    // on shared admin-visible history.
+    const clearLogs = async () => {
+        if (!window.confirm("Clear all LLM Health history (failures + recent calls)? This cannot be undone.")) { // eslint-disable-line no-alert
+            return;
+        }
+        setClearing(true);
+        try {
+            await api.delete("/admin/llm-events");
+            await refresh();
+        } catch (ex) {
+            setErr(ex?.response?.data?.detail || "Clear logs failed");
+        } finally {
+            setClearing(false);
         }
     };
 
@@ -179,6 +207,25 @@ export default function AdminLLMHealthPanel() {
                         className={refreshing ? "animate-spin" : ""}
                     />{" "}
                     {refreshing ? "Refreshing…" : "Refresh"}
+                </button>
+                <button
+                    type="button"
+                    onClick={clearLogs}
+                    disabled={clearing}
+                    className="text-xs inline-flex items-center gap-1.5 transition-colors px-2 py-1 rounded hover:bg-[hsl(var(--surface-hover))]"
+                    style={{
+                        color: "hsl(var(--sell))",
+                        minHeight: 28,
+                        cursor: clearing ? "wait" : "pointer",
+                        position: "relative",
+                        zIndex: 1,
+                    }}
+                    data-testid="admin-llm-health-clear-logs"
+                    aria-label="Clear LLM health logs"
+                    title="Deletes all persisted failure + call-log history. Does not affect the live breaker trip state."
+                >
+                    <Trash2 size={11} strokeWidth={1.5} />{" "}
+                    {clearing ? "Clearing…" : "Clear logs"}
                 </button>
             </div>
 
@@ -323,6 +370,15 @@ export default function AdminLLMHealthPanel() {
                 <p className="mt-3 text-xs" style={{ color: "hsl(var(--text-muted))" }}>
                     No LLM failures in the last 24 hours — AI provider is steady.
                 </p>
+            )}
+
+            {/* Recent LLM calls · last 24h. Every call_llm() invocation
+                (success AND failure) with the model that actually answered
+                and token in/out counts — general cost/ops visibility,
+                distinct from the failure-only breakdown above. Backed by
+                db.llm_calls, written from services/ai.py's _run_llm(). */}
+            {calls && calls.calls && calls.calls.length > 0 && (
+                <RecentCallsTable data={calls} expandedRow={expandedCallRow} setExpandedRow={setExpandedCallRow} />
             )}
 
             {/* Per-provider success-rate strip · last 24h. Drives operational
@@ -678,6 +734,113 @@ function FallbackRateTile({ data }) {
                     })}
                 </p>
             )}
+        </div>
+    );
+}
+
+/**
+ * Recent LLM calls table · last 24h. One row per call_llm() invocation —
+ * success AND failure — showing the ticker/mode session, which model
+ * actually answered, input/output token counts, and elapsed time. Failed
+ * rows show a "show" toggle for the truncated error string, mirroring the
+ * failures table above. Sits directly below the failure breakdown since
+ * both read from the same "how healthy is the LLM path" question, just
+ * at different granularity (aggregate failure reasons vs. per-call detail).
+ */
+function RecentCallsTable({ data, expandedRow, setExpandedRow }) {
+    const calls = data.calls || [];
+    return (
+        <div className="mt-4" data-testid="admin-llm-recent-calls">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="font-mono uppercase tracking-wider flex items-center gap-1.5" style={{ fontSize: "9px", color: "hsl(var(--text-muted))" }}>
+                    <ListChecks size={11} strokeWidth={1.5} />
+                    Recent LLM calls · last {data.window_hours}h
+                </p>
+                <p className="font-mono" style={{ fontSize: "10.5px", color: "hsl(var(--text-secondary))" }}>
+                    {data.total} calls · <span style={{ color: "hsl(var(--buy))" }}>{data.success} ok</span>
+                    {data.failure > 0 && <> · <span style={{ color: "hsl(var(--sell))" }}>{data.failure} failed</span></>}
+                </p>
+            </div>
+            <div className="mt-2 overflow-x-auto">
+                <table className="w-full font-mono text-xs" style={{ borderCollapse: "collapse" }}>
+                    <thead>
+                        <tr style={{ color: "hsl(var(--text-muted))" }}>
+                            <th className="text-left py-1" style={{ fontSize: "10px" }}>Session</th>
+                            <th className="text-left py-1" style={{ fontSize: "10px" }}>Model</th>
+                            <th className="text-right py-1" style={{ fontSize: "10px" }}>In tok</th>
+                            <th className="text-right py-1" style={{ fontSize: "10px" }}>Out tok</th>
+                            <th className="text-right py-1" style={{ fontSize: "10px" }}>Elapsed</th>
+                            <th className="text-right py-1" style={{ fontSize: "10px" }}>When</th>
+                            <th className="text-right py-1" style={{ fontSize: "10px" }}>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {calls.map((c, i) => {
+                            const ok = c.outcome === "success";
+                            const whenSec = Math.round(Date.now() / 1000 - c.ts);
+                            const whenLabel = whenSec < 60 ? `${whenSec}s ago` : whenSec < 3600 ? `${Math.round(whenSec / 60)}m ago` : `${Math.round(whenSec / 3600)}h ago`;
+                            const hasDetail = !ok && !!c.error;
+                            return (
+                                <React.Fragment key={i}>
+                                    <tr style={{ borderTop: "1px solid hsl(var(--border-divider))" }}>
+                                        <td className="py-1" style={{ color: "hsl(var(--text-primary))" }}>{c.session || "—"}</td>
+                                        <td className="py-1" style={{ color: ok ? "hsl(var(--text-secondary))" : "hsl(var(--sell))" }}>
+                                            {c.model || (ok ? "—" : "(no response)")}
+                                        </td>
+                                        <td className="py-1 text-right" style={{ color: "hsl(var(--text-secondary))" }}>{c.input_tokens ?? "—"}</td>
+                                        <td className="py-1 text-right" style={{ color: "hsl(var(--text-secondary))" }}>{c.output_tokens ?? "—"}</td>
+                                        <td className="py-1 text-right" style={{ color: "hsl(var(--text-secondary))" }}>{typeof c.elapsed_s === "number" ? `${c.elapsed_s.toFixed(1)}s` : "—"}</td>
+                                        <td className="py-1 text-right" style={{ color: "hsl(var(--text-muted))" }}>{whenLabel}</td>
+                                        <td className="py-1 text-right">
+                                            {hasDetail ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setExpandedRow((cur) => (cur === i ? null : i))}
+                                                    className="text-[10px] underline"
+                                                    style={{ color: "hsl(var(--text-secondary))", cursor: "pointer" }}
+                                                    data-testid={`admin-llm-call-detail-toggle-${i}`}
+                                                    aria-expanded={expandedRow === i}
+                                                >
+                                                    {expandedRow === i ? "hide" : "show"}
+                                                </button>
+                                            ) : (
+                                                <span style={{ color: ok ? "hsl(var(--buy))" : "hsl(var(--text-muted))", fontSize: "10px" }}>
+                                                    {ok ? "✓" : "—"}
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                    {hasDetail && expandedRow === i && (
+                                        <tr>
+                                            <td colSpan={7} style={{ padding: 0 }}>
+                                                <pre
+                                                    data-testid={`admin-llm-call-detail-${i}`}
+                                                    style={{
+                                                        background: "hsl(var(--surface-elevated))",
+                                                        border: "1px solid hsl(var(--border-divider))",
+                                                        color: "hsl(var(--text-secondary))",
+                                                        fontSize: "10.5px",
+                                                        lineHeight: 1.45,
+                                                        padding: "10px 12px",
+                                                        margin: "4px 0 6px 0",
+                                                        whiteSpace: "pre-wrap",
+                                                        wordBreak: "break-word",
+                                                        maxHeight: 220,
+                                                        overflow: "auto",
+                                                        borderRadius: 2,
+                                                    }}
+                                                >
+                                                    {c.error}
+                                                </pre>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }

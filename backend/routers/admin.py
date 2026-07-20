@@ -230,6 +230,63 @@ async def llm_events(
     }
 
 
+@router.get("/llm-calls")
+async def llm_calls(
+    limit: int = 20,
+    hours: int = 24,
+    _admin=Depends(admin_required),
+):
+    """Recent LLM calls — success AND failure — with the model that
+    actually answered and token counts. Distinct from `/llm-events`
+    (failure-only, circuit-breaker diagnostics): this is general call-level
+    visibility so an admin can see "which model, how many tokens in/out"
+    without grepping Railway logs. Backed by `db.llm_calls`, written from
+    services/ai.py's `_run_llm()` on every call.
+
+    Shape:
+      {
+        "calls": [{ts, session, outcome, model, input_tokens,
+                    output_tokens, finish_reason, elapsed_s, error}, ...],
+        "total": <int>, "success": <int>, "failure": <int>,
+        "window_hours": <int>
+      }
+    """
+    import time as _time
+    from core.db import db
+    limit = max(1, min(int(limit), 100))
+    hours = max(1, min(int(hours), 168))
+    since = _time.time() - (hours * 3600)
+    cursor = db.llm_calls.find(
+        {"ts": {"$gte": since}},
+        {"_id": 0},
+    ).sort("ts", -1).limit(limit)
+    calls = await cursor.to_list(length=limit)
+    total = await db.llm_calls.count_documents({"ts": {"$gte": since}})
+    success = await db.llm_calls.count_documents({"ts": {"$gte": since}, "outcome": "success"})
+    return {
+        "calls": calls,
+        "total": total,
+        "success": success,
+        "failure": total - success,
+        "window_hours": hours,
+    }
+
+
+@router.delete("/llm-events")
+async def clear_llm_logs(_admin=Depends(admin_required)):
+    """Wipe the persisted LLM Health history — both the failure-diagnostics
+    collection (`llm_events`) and the general call log (`llm_calls`).
+    Deliberately does NOT touch the live in-memory circuit-breaker state
+    (consec_fail/consec_ok/tripped_at) — that reflects real current
+    health, not historical logs; use "Force reset" on the breaker itself
+    if you need to clear a stuck trip."""
+    from core.db import db
+    from services import llm_call_log
+    events_result = await db.llm_events.delete_many({})
+    calls_deleted = await llm_call_log.clear()
+    return {"ok": True, "events_deleted": events_result.deleted_count, "calls_deleted": calls_deleted}
+
+
 @router.get("/llm-events/recoup-summary")
 async def llm_events_recoup_summary(
     days: int = 30,
