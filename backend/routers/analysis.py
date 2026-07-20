@@ -1,5 +1,6 @@
 """Analysis + Alerts + Share Verdict + Public view."""
 import asyncio
+import logging
 import os
 import uuid
 from datetime import timedelta
@@ -20,6 +21,8 @@ from services.quota import enforce_analysis_quota, plan_for, resolved_plan_for
 from services import llm_circuit_breaker
 from services.llm_providers import OpenRouterExhaustedError
 from routers.disclaimer import require_accepted
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["analysis"])
 
@@ -703,13 +706,24 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
             }},
         )
     except Exception as e:
-        llm_circuit_breaker.record_outcome(
-            "timeout",
-            ticker=ticker,
-            reason=llm_circuit_breaker.REASON_OTHER_EXCEPTION,
-            elapsed_s=_time.monotonic() - started,
-            surface="auth",
-            error_detail=llm_circuit_breaker._format_error_detail(e),
+        # Deliberately does NOT call llm_circuit_breaker.record_outcome().
+        # By this point every genuine LLM-failure mode has its own specific
+        # except clause above (asyncio.TimeoutError, OpenRouterExhaustedError,
+        # HTTPException with an llm_upstream_unavailable/llm_budget_exceeded
+        # error_code) — anything landing HERE is, by construction, an
+        # application bug unrelated to LLM health (a bad function signature,
+        # a KeyError on unexpected data shape, etc.). Counting these toward
+        # the breaker was a real bug: a single mode's crash (e.g. candlestick
+        # mode raising TypeError before any LLM call ever happened — see the
+        # 2026-07-20 incident where a missing macro_context parameter 100%
+        # broke candlestick mode) could trip the GLOBAL breaker and fast-fail
+        # every user's standard/hybrid-mode request too, even though the LLM
+        # itself was perfectly healthy the whole time. Still logged loudly so
+        # it's visible in Railway logs and the per-job error field — just not
+        # folded into the LLM health signal.
+        logger.error(
+            "Analysis job failed with a non-LLM exception (ticker=%s, job_id=%s): %s",
+            ticker, job_id, llm_circuit_breaker._format_error_detail(e),
         )
         await db.analysis_jobs.update_one(
             {"id": job_id},
@@ -1066,8 +1080,7 @@ async def _create_analysis_impl_inner(ticker: str, mode: str, user: dict, job_id
                     rf_opinion_for_calibration = opinion
         except Exception as e:
             # Never fail the whole analysis because of the RF layer
-            import logging
-            logging.getLogger(__name__).warning("RF opinion failed for %s: %s", ticker, e)
+            logger.warning("RF opinion failed for %s: %s", ticker, e)
 
     # Verdict Accuracy v2: post-LLM confidence calibration. Applies the
     # earnings-proximity gate and the RF-disagreement penalty. Mutates
