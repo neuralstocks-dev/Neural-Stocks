@@ -104,6 +104,13 @@ REASON_LLM_SOCKET_HANG = "llm_socket_hang"
 REASON_LITELLM_RETRY_EXHAUSTED = "litellm_retry_exhausted"
 REASON_OTHER_EXCEPTION = "other_exception"
 REASON_CACHE_MISS_FALLBACK = "cache_miss_fallback"  # reserved for future use
+# call_llm() now delegates cross-model failover to OpenRouter's own server-
+# side `models` array (see services/llm_providers.py) instead of a client-
+# side retry loop. This code marks the case where THAT chain was exhausted
+# — every model OpenRouter tried failed — as distinct from a single local
+# exception, since it means the outage is upstream across multiple
+# providers, not just one flaky model.
+REASON_OPENROUTER_ALL_MODELS_EXHAUSTED = "openrouter_all_models_exhausted"
 
 
 def classify_timeout_reason(elapsed_s: float, timeout_budget_s: float) -> str:

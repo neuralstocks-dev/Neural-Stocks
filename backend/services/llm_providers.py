@@ -64,6 +64,16 @@ from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
+
+class OpenRouterExhaustedError(RuntimeError):
+    """Raised when OpenRouter's own server-side model fallback (the
+    `models` array) ran out of models to try, or the one manual
+    JSON-validity retry after that also failed. Callers can catch this
+    specifically to distinguish "every model failed" from an unrelated
+    local exception — see routers/analysis.py's use of
+    llm_circuit_breaker.REASON_OPENROUTER_ALL_MODELS_EXHAUSTED."""
+
+
 # Client
 _client = None
 
@@ -92,19 +102,52 @@ def _get_client() -> OpenAI:
 def _model_cascade(task_type: str) -> list[str]:
     """
     Returns an ordered list of models to try for the given task type.
-    Falls back from paid to cheaper paid to free to free-alt.
+    Falls back from paid-premium to paid-cheap-diversified to free to free-alt.
+
+    `fallback` (glm-4.7-flash by default) sits between the DeepSeek tier and
+    the free tier: it's priced in the same range as LLM_MODEL_FAST (roughly
+    $0.00000006/$0.0000004 per token vs deepseek-v4-flash's $0.0000001/
+    $0.0000002) but served by a completely different backend (Zhipu AI, not
+    DeepSeek) — so it protects against a DeepSeek-wide outage, not just a
+    single model on that provider being slow. See services/llm_circuit_breaker.py
+    for why that distinction matters: deepseek-v4-pro timing out repeatedly is
+    exactly what's been tripping the breaker.
     """
     verdict = os.environ.get("LLM_MODEL_VERDICT", "deepseek/deepseek-v4-pro")
     fast = os.environ.get("LLM_MODEL_FAST", "deepseek/deepseek-v4-flash")
+    fallback = os.environ.get("LLM_MODEL_FALLBACK", "z-ai/glm-4.7-flash")
     free = os.environ.get("LLM_MODEL_FREE", "moonshotai/kimi-k2.6")
     free_alt = os.environ.get("LLM_MODEL_FREE_ALT", "nvidia/nemotron-3-super-120b-a12b:free")
 
     cascades = {
-        "verdict": [verdict, fast, free, free_alt],
-        "fast": [fast, free, free_alt],
+        "verdict": [verdict, fast, fallback, free, free_alt],
+        "fast": [fast, fallback, free, free_alt],
         "free": [free, free_alt],
     }
     return cascades.get(task_type, cascades["fast"])
+
+
+def _extract_openrouter_error(exc: Exception) -> str:
+    """Best-effort extraction of OpenRouter's actual error body from an
+    openai-SDK exception. str(exc) alone is often just "Error code: 429"
+    with no indication of which upstream provider failed or why (rate
+    limit vs no-available-providers vs insufficient credits) — exactly
+    the detail needed to distinguish a real outage from a misconfigured
+    model id when reading logs."""
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        err = body.get("error")
+        if isinstance(err, dict):
+            return f"{err.get('code', '?')}: {err.get('message', str(exc))}"
+        if err:
+            return str(err)
+    response = getattr(exc, "response", None)
+    if response is not None:
+        try:
+            return f"HTTP {response.status_code}: {response.text[:300]}"
+        except Exception:
+            pass
+    return str(exc)
 
 
 # Core call
@@ -116,17 +159,37 @@ def call_llm(
     max_tokens: int = 4096,
 ) -> dict:
     """
-    Call the LLM via OpenRouter with automatic fallback.
+    Call the LLM via OpenRouter, using OpenRouter's own server-side model
+    fallback (the `models` array in the request body — see
+    https://openrouter.ai/docs/guides/routing/model-fallbacks) instead of a
+    client-side retry loop. OpenRouter fails over across "any error"
+    (context-length, moderation, rate-limiting, downtime) within a single
+    request — faster, and catches more failure modes than our own
+    try/except ever could. This directly addresses why deepseek-v4-pro
+    timeouts were tripping the circuit breaker: a client-side loop can't
+    fall back to model 2 until its OWN call to model 1 finishes timing out.
+
+    What OpenRouter's fallback does NOT catch: a 200 response whose content
+    is truncated (finish_reason="length") or isn't valid JSON when
+    json_mode=True — that's a "successful" call from OpenRouter's point of
+    view. We still validate for that locally and, if it happens, move on to
+    the next chunk of the cascade.
+
+    OpenRouter caps the `models` fallback array at 3 entries per request
+    (confirmed live against the real API — not documented on their routing
+    page). Cascades longer than that are split into chunks of <=3 and tried
+    in order; a second HTTP call only happens if the first chunk is fully
+    exhausted or every model in it returns unusable content, so this is
+    still typically ONE call instead of the old client-side loop's up to 4.
 
     Args:
         prompt: The user message / analysis prompt.
         task_type: "verdict" | "fast" | "free"
         json_mode: If True, instructs the model to return JSON only, AND
             validates the response is actually parseable JSON before
-            treating the call as successful (see CHANGE LOG above).
+            treating the call as successful.
         system_prompt: Override the default system prompt.
-        max_tokens: Max tokens in the response (default 4096 - see
-            CHANGE LOG above for why this was raised from 2048).
+        max_tokens: Max tokens in the response.
 
     Returns:
         {
@@ -138,8 +201,8 @@ def call_llm(
         }
 
     Raises:
-        RuntimeError if ALL models in the cascade fail (including models
-        that returned malformed/truncated JSON when json_mode=True).
+        RuntimeError if OpenRouter's own fallback chain is exhausted, or
+        the one manual JSON-validity retry also fails.
     """
     client = _get_client()
     models = _model_cascade(task_type)
@@ -158,77 +221,78 @@ def call_llm(
     if json_mode:
         extra_kwargs["response_format"] = {"type": "json_object"}
 
+    def _attempt(candidate_models: list[str]):
+        """One HTTP call using OpenRouter's native `models` fallback array.
+        Returns (content, model_used, finish_reason, usage) — which may
+        still be a soft JSON/truncation failure the caller must check —
+        or raises if OpenRouter exhausts every model in the list."""
+        logger.info(f"LLM call: {candidate_models} [task={task_type}]")
+        response = client.chat.completions.create(
+            model=candidate_models[0],
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=0.3,
+            timeout=60.0,
+            extra_body={"models": candidate_models},
+            **extra_kwargs,
+        )
+        choice = response.choices[0]
+        content = choice.message.content or ""
+        finish_reason = getattr(choice, "finish_reason", None)
+        model_used = getattr(response, "model", None) or candidate_models[0]
+        usage = response.usage
+        logger.info(
+            f"LLM response: {model_used} | finish_reason={finish_reason} | "
+            f"in={usage.prompt_tokens} out={usage.completion_tokens} tokens"
+        )
+        return content, model_used, finish_reason, usage
+
+    def _validate(content: str, model_used: str, finish_reason) -> str | None:
+        """Returns a diagnostic string if the response is unusable despite
+        a successful transport, else None."""
+        if finish_reason == "length":
+            return f"{model_used} response truncated at max_tokens={max_tokens} (finish_reason=length)"
+        if json_mode:
+            try:
+                json.loads(content)
+            except json.JSONDecodeError as e:
+                return f"{model_used} returned invalid JSON: {e}"
+        return None
+
+    # OpenRouter caps the `models` fallback array at 3 entries per request
+    # (confirmed live — "'models' array must have 3 items or fewer", not
+    # documented on the routing-fallbacks page). Cascades can run longer
+    # than that (verdict has 5 tiers), so we chunk into groups of <=3 and
+    # only issue a second HTTP call if the first chunk is fully exhausted —
+    # still typically ONE call instead of the old loop's up to 4.
+    chunks = [models[i:i + 3] for i in range(0, len(models), 3)]
     last_error = None
-    for model in models:
+    for chunk in chunks:
         try:
-            logger.info(f"LLM call: {model} [task={task_type}]")
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=0.3,
-                **extra_kwargs,
-            )
-            choice = response.choices[0]
-            content = choice.message.content or ""
-            finish_reason = getattr(choice, "finish_reason", None)
-            usage = response.usage
+            content, model_used, finish_reason, usage = _attempt(chunk)
+        except Exception as exc:
+            # OpenRouter's own fallback chain across this whole chunk was
+            # exhausted server-side — move on to the next chunk, if any.
+            last_error = _extract_openrouter_error(exc)
+            logger.error(f"LLM call failed after OpenRouter fallback exhausted {chunk}: {last_error}")
+            continue
 
-            logger.info(
-                f"LLM response: {model} | finish_reason={finish_reason} | "
-                f"in={usage.prompt_tokens} out={usage.completion_tokens} tokens"
-            )
-
-            # A response truncated mid-generation can never be valid JSON
-            # regardless of what the model actually produced. Treat this
-            # as a soft failure so the cascade tries the next model,
-            # instead of returning it as a "success" that will only fail
-            # later, opaquely, inside the caller's JSON parser.
-            if finish_reason == "length":
-                logger.warning(
-                    f"LLM truncated ({model}): hit max_tokens={max_tokens} "
-                    f"before finishing - falling back to next model in cascade."
-                )
-                last_error = RuntimeError(
-                    f"{model} response truncated at max_tokens={max_tokens} "
-                    f"(finish_reason=length)"
-                )
-                continue
-
-            # When JSON was explicitly requested, validate it here rather
-            # than push that burden entirely onto the caller. A 200
-            # response with malformed content used to be returned as a
-            # "success" - the cascade never saw it and never got a chance
-            # to try a better-behaved model.
-            if json_mode:
-                try:
-                    json.loads(content)
-                except json.JSONDecodeError as e:
-                    logger.warning(
-                        f"LLM returned invalid JSON ({model}): {e} - "
-                        f"falling back to next model in cascade."
-                    )
-                    last_error = RuntimeError(
-                        f"{model} returned invalid JSON: {e}"
-                    )
-                    continue
-
-            logger.info(f"LLM success: {model}")
+        bad = _validate(content, model_used, finish_reason)
+        if bad is None:
+            logger.info(f"LLM success: {model_used}")
             return {
                 "content": content,
-                "model_used": model,
+                "model_used": model_used,
                 "input_tokens": usage.prompt_tokens,
                 "output_tokens": usage.completion_tokens,
                 "finish_reason": finish_reason,
             }
 
-        except Exception as exc:
-            last_error = exc
-            logger.warning(f"LLM failed ({model}): {exc}")
-            continue
+        last_error = bad
+        logger.warning(f"{bad} - trying next chunk of cascade.")
 
     logger.error("All LLM models failed.")
-    raise RuntimeError(
+    raise OpenRouterExhaustedError(
         f"All LLM models failed. Last error: {last_error}\n"
         "Check OPENROUTER_API_KEY and model names in Railway variables."
     )
