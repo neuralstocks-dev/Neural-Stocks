@@ -217,7 +217,19 @@ async def _run_llm(system_prompt: str, user_text: str, session_prefix: str) -> t
     """
     Run LLM call via OpenRouter in a thread (keeps asyncio loop free).
     Returns (raw_text, meta) where meta = {"provider": ..., "model": ...}.
-    Raises RuntimeError if all models in the cascade fail.
+    Raises OpenRouterExhaustedError if all models in the cascade fail.
+
+    max_tokens=8192 (raised from 4096 on 2026-07-20): confirmed live on
+    production that candlestick-mode responses were being truncated at
+    exactly the old 4096 ceiling on TWO different models in the same
+    cascade run (deepseek-v4-pro then kimi-k2.6, both finish_reason=
+    "length" at out=4096 tokens) -- this call path also feeds standard and
+    hybrid mode, both of which carry a similarly verbose schema (a 250-550
+    word reasoning field alone, plus 5+ other verbose fields, per the
+    max_tokens=2048->4096 raise noted in services/llm_providers.py's
+    CHANGE LOG). All 5 models in the current cascade support far more than
+    8192 output tokens (lowest ceiling checked was 131k), so this is safe
+    headroom, not a provider-imposed limit.
     """
     def _sync():
         result = call_llm(
@@ -225,7 +237,7 @@ async def _run_llm(system_prompt: str, user_text: str, session_prefix: str) -> t
             task_type="verdict",
             json_mode=True,
             system_prompt=system_prompt,
-            max_tokens=4096,
+            max_tokens=8192,
         )
         return result["content"], {
             "provider": "openrouter",
