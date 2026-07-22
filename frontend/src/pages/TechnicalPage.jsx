@@ -1547,6 +1547,7 @@ histogram  = MACD_line − signal`}
                             <Tr s="Next earnings" src="Finnhub.io" cov="US only (free tier)" cache="1-hr cache" />
                             <Tr s="Candlestick patterns" src="NeuLab Inc. in-house engine" cov="Any ticker with OHLC" cache="Computed per analysis" />
                             <Tr s="Intrinsic-value anchor (Graham + RIM)" src="NeuLab Inc. in-house · yfinance fundamentals input" cov="Any ticker with EPS + bookValue" cache="Computed per analysis" />
+                            <Tr s="Macro context (rates, CPI, USD index)" src="London Strategic Edge · api.londonstrategicedge.com" cov="US + Indonesia macro series, feeds rate-sensitive-sector commentary" cache="12-hr cache" />
                             <Tr s="Verdict + reasoning" src="OpenRouter · DeepSeek V4 Pro (primary) with automatic fallback cascade" cov="All tickers" cache="Persisted in MongoDB" />
                         </tbody>
                     </table>
