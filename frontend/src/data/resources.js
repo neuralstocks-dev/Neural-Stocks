@@ -62,7 +62,7 @@ export const RESOURCES = [
                 paragraph: "The most detailed section covers the most common mistakes users make:",
                 items: [
                     "How to use verdicts correctly — reading executive summaries, checking Bear scenarios, re-analysing before acting",
-                    "Managing your daily quota effectively without wasting analyses",
+                    "Managing your quota effectively without wasting analyses",
                     "IDX-specific risks — Bandarmology reporting lag, low-liquidity stocks, market hours",
                     "US stock risks — earnings announcements, meme stocks, pre-market data gaps",
                     "Things that look like bugs but are not — cold-start behaviour, stable verdicts, low-confidence HOLDs",
