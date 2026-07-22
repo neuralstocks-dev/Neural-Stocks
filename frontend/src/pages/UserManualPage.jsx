@@ -388,7 +388,7 @@ export default function UserManualPage() {
                         Three quick questions: which markets you trade (US / IDX / both), your experience level, and starter watchlist picks. All three are changeable later in Settings.
                     </Step>
                     <Callout tone="info" title="Already have a verdict from the landing page?">
-                        Your anonymous free analysis does not transfer to your account. But signing up immediately gives you 3 fresh analyses per day — run it again on the same ticker from your dashboard.
+                        Your anonymous free analysis does not transfer to your account. But signing up immediately gives you 3 fresh analyses per month — run it again on the same ticker from your dashboard.
                     </Callout>
                 </Section>
 
@@ -738,7 +738,7 @@ export default function UserManualPage() {
 
                 <Section id="plans" icon={BarChart3} kicker="5.1" title="Guest · Free · Pro · Elite · Week Pass">
                     <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                        You can try one analysis without creating an account. Signing up unlocks your full daily quota, watchlist, and all features. Higher tiers buy you{" "}
+                        You can try one analysis without creating an account. Signing up unlocks your full monthly quota, watchlist, and all features. Higher tiers buy you{" "}
                         <em>more of it</em> — bigger watchlist, more analyses per day, batch sweeps.
                         The numbers below always reflect what the backend actually enforces.
                     </p>
@@ -754,7 +754,7 @@ export default function UserManualPage() {
                             <tbody style={{ color: "hsl(var(--text-secondary))" }}>
                                 {[
                                     ["Account required",          "No",      "✓",    "✓",    "✓",    "✓"],
-                                    ["Analyses / day",            "1 *",     "3",    "10",   "15",   "50"],
+                                    ["Analyses",                  "1 *",     "3/mo", "10/day", "15/day", "50/day"],
                                     ["Verdict detail",            "Preview", "Full", "Full", "Full", "Full"],
                                     ["Watchlist",                 "—",       "5",    "10",   "25",   "500"],
                                     ["Three analysis modes",      "—",       "✓",    "✓",    "✓",    "✓"],

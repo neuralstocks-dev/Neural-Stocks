@@ -65,8 +65,15 @@ PLANS = {
         "name": "Free",
         "price_usd": 0,
         "watchlist_limit": 5,
-        "analyses_per_day": 3,
-        "analyses_per_week": 12,
+        # Switched from 3/day + 12/week to a flat 3/month (2026-07-22).
+        # Free users can now use their 3 analyses whenever they like within
+        # the calendar month instead of being throttled by day/week --
+        # enforce_analysis_quota() only checks analyses_per_month for this
+        # tier. Keep analyses_per_day/analyses_per_week present (as None)
+        # since other code paths key off these fields unconditionally.
+        "analyses_per_day": None,
+        "analyses_per_week": None,
+        "analyses_per_month": 3,
         "quick_actions": False,
         "share_verdicts": True,
         "personal_backtest": False,
@@ -80,6 +87,7 @@ PLANS = {
         "watchlist_limit": 25,
         "analyses_per_day": 15,
         "analyses_per_week": 60,
+        "analyses_per_month": None,
         "quick_actions": True,
         "share_verdicts": True,
         "personal_backtest": True,
@@ -94,6 +102,7 @@ PLANS = {
         "watchlist_display": "Unlimited",
         "analyses_per_day": ELITE_FAIR_USE_DAILY,
         "analyses_per_week": None,
+        "analyses_per_month": None,
         "quick_actions": True,
         "share_verdicts": True,
         "personal_backtest": True,
@@ -107,6 +116,7 @@ PLANS = {
         "watchlist_limit": 10,
         "analyses_per_day": 10,
         "analyses_per_week": 50,
+        "analyses_per_month": None,
         "quick_actions": False,
         "share_verdicts": True,
         "personal_backtest": True,

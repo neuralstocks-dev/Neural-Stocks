@@ -43,6 +43,7 @@ class PricingReq(BaseModel):
 class TierLimitBlock(BaseModel):
     analyses_per_day: Optional[int] = Field(default=None, ge=0, le=100000)
     analyses_per_week: Optional[int] = Field(default=None, ge=0, le=1000000)
+    analyses_per_month: Optional[int] = Field(default=None, ge=0, le=1000000)
     share_per_day: Optional[int] = Field(default=None, ge=0, le=100000)
 
 

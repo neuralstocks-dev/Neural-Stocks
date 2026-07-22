@@ -96,6 +96,7 @@ export default function AdminPage() {
                     free: {
                         analyses_per_day: toStr(tl.data.free.analyses_per_day),
                         analyses_per_week: toStr(tl.data.free.analyses_per_week),
+                        analyses_per_month: toStr(tl.data.free.analyses_per_month),
                         share_per_day: toStr(tl.data.free.share_per_day),
                     },
                     pro: {
@@ -223,7 +224,7 @@ export default function AdminPage() {
         try {
             const payload = { free: {}, pro: {}, elite: {}, daypass: {} };
             const KEYS = {
-                free: ["analyses_per_day", "analyses_per_week", "share_per_day"],
+                free: ["analyses_per_day", "analyses_per_week", "analyses_per_month", "share_per_day"],
                 pro: ["analyses_per_day", "analyses_per_week", "share_per_day"],
                 elite: ["analyses_per_day", "analyses_per_week", "share_per_day"],
                 daypass: ["analyses_per_day", "analyses_per_week", "share_per_day", "watchlist_limit"],
@@ -626,7 +627,7 @@ export default function AdminPage() {
                                     </label>
                                 </div>
                                 <p className="text-xs mt-2 font-mono" style={{ color: "hsl(var(--text-muted))" }}>
-                                    Quotas (analyses/day, analyses/week, shares/day, watchlist size) are edited in the Tier limits table below.
+                                    Quotas (analyses/day, analyses/week, analyses/month, shares/day, watchlist size) are edited in the Tier limits table below.
                                     Features: Standard/Candlestick/Hybrid AI + 15-pattern scan are always enabled. Quick batch sweep is disabled.
                                 </p>
                             </div>
@@ -654,7 +655,7 @@ export default function AdminPage() {
                                         Per-tier quotas
                                     </h2>
                                     <p className="text-sm mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
-                                        Adjust the daily &amp; weekly analysis caps plus daily share-verdict caps for Free, Pro, Elite, and the one-time Day Pass (includes watchlist size).
+                                        Adjust the daily, weekly &amp; monthly analysis caps plus daily share-verdict caps for Free, Pro, Elite, and the one-time Day Pass (includes watchlist size). Free uses a monthly cap only.
                                         Leave a field empty to mark that limit as <span style={{ color: "hsl(var(--hold))" }}>Unlimited</span>.
                                     </p>
                                 </div>
@@ -671,7 +672,7 @@ export default function AdminPage() {
                                                 >
                                                     Tier
                                                 </th>
-                                                {["Analyses / day", "Analyses / week", "Shares / day", "Watchlist"].map((h) => (
+                                                {["Analyses / day", "Analyses / week", "Analyses / month", "Shares / day", "Watchlist"].map((h) => (
                                                     <th
                                                         key={h}
                                                         className="text-left text-overline py-3 px-4"
@@ -697,6 +698,8 @@ export default function AdminPage() {
                                                         : "hsl(var(--text-secondary))";
                                                 const KEYS = tier === "daypass"
                                                     ? ["analyses_per_day", "analyses_per_week", "share_per_day", "watchlist_limit"]
+                                                    : tier === "free"
+                                                    ? ["analyses_per_day", "analyses_per_week", "analyses_per_month", "share_per_day"]
                                                     : ["analyses_per_day", "analyses_per_week", "share_per_day"];
                                                 return (
                                                     <tr
@@ -712,7 +715,7 @@ export default function AdminPage() {
                                                                 {tier === "daypass" ? "Day Pass" : tier}
                                                             </span>
                                                         </td>
-                                                        {["analyses_per_day", "analyses_per_week", "share_per_day", "watchlist_limit"].map((k) => {
+                                                        {["analyses_per_day", "analyses_per_week", "analyses_per_month", "share_per_day", "watchlist_limit"].map((k) => {
                                                             if (!KEYS.includes(k)) {
                                                                 return <td key={k} className="py-3 px-4" style={{ color: "hsl(var(--text-muted))" }}>—</td>;
                                                             }

@@ -996,47 +996,85 @@ export default function DashboardPage() {
                                 <p className="text-overline" style={{ fontSize: "0.56rem" }}>Watchlist</p>
                                 <p className="font-mono text-sm mt-1">{quota.watchlist_used} / {quota.watchlist_limit}</p>
                             </div>
-                            <div>
-                                <p className="text-overline" style={{ fontSize: "0.56rem" }}>Analyses · today</p>
-                                <p
-                                    className="font-mono text-sm mt-1"
-                                    style={{
-                                        color: quota.analyses_day_limit !== null && quota.analyses_day_limit - quota.analyses_today <= 2 && quota.analyses_today < quota.analyses_day_limit
-                                            ? "hsl(var(--hold))"
-                                            : quota.analyses_day_limit !== null && quota.analyses_today >= quota.analyses_day_limit
-                                            ? "hsl(var(--sell))"
-                                            : undefined,
-                                    }}
-                                >
-                                    {quota.analyses_today}
-                                    {" / "}
-                                    {quota.analyses_day_limit === null ? "∞" : quota.analyses_day_limit}
-                                    {quota.analyses_day_limit !== null && quota.analyses_day_limit - quota.analyses_today <= 2 && quota.analyses_today < quota.analyses_day_limit && (
-                                        <span className="ml-1" style={{ fontSize: "0.6rem", opacity: 0.8 }}>· {quota.analyses_day_limit - quota.analyses_today} left</span>
-                                    )}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-overline" style={{ fontSize: "0.56rem" }}>Analyses · week</p>
-                                <p className="font-mono text-sm mt-1">
-                                    {quota.analyses_this_week}
-                                    {" / "}
-                                    {quota.analyses_week_limit === null ? "∞" : quota.analyses_week_limit}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-overline" style={{ fontSize: "0.56rem" }}>Resets</p>
-                                <p className="font-mono text-sm mt-1" style={{ color: "hsl(var(--text-muted))" }}>
-                                    {(() => {
-                                        const now = new Date();
-                                        const midnight = new Date();
-                                        midnight.setUTCHours(24, 0, 0, 0);
-                                        const diffH = Math.floor((midnight - now) / 3600000);
-                                        const diffM = Math.floor(((midnight - now) % 3600000) / 60000);
-                                        return diffH > 0 ? diffH + "h " + diffM + "m" : diffM + "m";
-                                    })()}
-                                </p>
-                            </div>
+                            {quota.analyses_month_limit != null ? (
+                                <>
+                                    <div>
+                                        <p className="text-overline" style={{ fontSize: "0.56rem" }}>Analyses · this month</p>
+                                        <p
+                                            className="font-mono text-sm mt-1"
+                                            style={{
+                                                color: quota.analyses_month_limit - quota.analyses_this_month <= 1 && quota.analyses_this_month < quota.analyses_month_limit
+                                                    ? "hsl(var(--hold))"
+                                                    : quota.analyses_this_month >= quota.analyses_month_limit
+                                                    ? "hsl(var(--sell))"
+                                                    : undefined,
+                                            }}
+                                        >
+                                            {quota.analyses_this_month}
+                                            {" / "}
+                                            {quota.analyses_month_limit}
+                                            {quota.analyses_month_limit - quota.analyses_this_month <= 1 && quota.analyses_this_month < quota.analyses_month_limit && (
+                                                <span className="ml-1" style={{ fontSize: "0.6rem", opacity: 0.8 }}>· {quota.analyses_month_limit - quota.analyses_this_month} left</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-overline" style={{ fontSize: "0.56rem" }}>Resets</p>
+                                        <p className="font-mono text-sm mt-1" style={{ color: "hsl(var(--text-muted))" }}>
+                                            {(() => {
+                                                const now = new Date();
+                                                const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+                                                const diffDays = Math.ceil((nextMonth - now) / 86400000);
+                                                return diffDays + "d";
+                                            })()}
+                                        </p>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div>
+                                        <p className="text-overline" style={{ fontSize: "0.56rem" }}>Analyses · today</p>
+                                        <p
+                                            className="font-mono text-sm mt-1"
+                                            style={{
+                                                color: quota.analyses_day_limit !== null && quota.analyses_day_limit - quota.analyses_today <= 2 && quota.analyses_today < quota.analyses_day_limit
+                                                    ? "hsl(var(--hold))"
+                                                    : quota.analyses_day_limit !== null && quota.analyses_today >= quota.analyses_day_limit
+                                                    ? "hsl(var(--sell))"
+                                                    : undefined,
+                                            }}
+                                        >
+                                            {quota.analyses_today}
+                                            {" / "}
+                                            {quota.analyses_day_limit === null ? "∞" : quota.analyses_day_limit}
+                                            {quota.analyses_day_limit !== null && quota.analyses_day_limit - quota.analyses_today <= 2 && quota.analyses_today < quota.analyses_day_limit && (
+                                                <span className="ml-1" style={{ fontSize: "0.6rem", opacity: 0.8 }}>· {quota.analyses_day_limit - quota.analyses_today} left</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-overline" style={{ fontSize: "0.56rem" }}>Analyses · week</p>
+                                        <p className="font-mono text-sm mt-1">
+                                            {quota.analyses_this_week}
+                                            {" / "}
+                                            {quota.analyses_week_limit === null ? "∞" : quota.analyses_week_limit}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-overline" style={{ fontSize: "0.56rem" }}>Resets</p>
+                                        <p className="font-mono text-sm mt-1" style={{ color: "hsl(var(--text-muted))" }}>
+                                            {(() => {
+                                                const now = new Date();
+                                                const midnight = new Date();
+                                                midnight.setUTCHours(24, 0, 0, 0);
+                                                const diffH = Math.floor((midnight - now) / 3600000);
+                                                const diffM = Math.floor(((midnight - now) % 3600000) / 60000);
+                                                return diffH > 0 ? diffH + "h " + diffM + "m" : diffM + "m";
+                                            })()}
+                                        </p>
+                                    </div>
+                                </>
+                            )}
                         </div>
                         {plan !== "elite" && (
                             <Link

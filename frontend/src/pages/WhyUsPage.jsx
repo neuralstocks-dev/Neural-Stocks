@@ -1122,7 +1122,7 @@ export default function WhyUsPage() {
                         <em style={{ color: "hsl(var(--buy))" }}>Confident decisions.</em>
                     </h2>
                     <p className="mt-6 max-w-2xl mx-auto text-base md:text-lg" style={{ color: "hsl(var(--text-secondary))", lineHeight: 1.65 }}>
-                        Free tier includes 5 watchlist tickers and 3 full AI analyses per day.
+                        Free tier includes 5 watchlist tickers and 3 full AI analyses per month.
                         No credit card. Cancel anytime.
                     </p>
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-4">

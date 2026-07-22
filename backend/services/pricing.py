@@ -21,7 +21,7 @@ PRICING_SETTINGS_ID = "pricing"
 LIMITS_SETTINGS_ID = "tier_limits"
 
 # Recurring-plan quota keys (Free / Pro / Elite). Day Pass adds watchlist_limit.
-LIMIT_KEYS = ("analyses_per_day", "analyses_per_week", "share_per_day")
+LIMIT_KEYS = ("analyses_per_day", "analyses_per_week", "analyses_per_month", "share_per_day")
 DAYPASS_LIMIT_KEYS = ("analyses_per_day", "analyses_per_week", "share_per_day", "watchlist_limit")
 
 
@@ -124,8 +124,9 @@ async def set_pricing(
 # ---------- Tier limits ----------
 async def get_tier_limits() -> dict:
     """Return per-tier limits, merging saved overrides with PLANS defaults.
-    Shape: {tier: {analyses_per_day, analyses_per_week, share_per_day[, watchlist_limit]}}
-    where None means unlimited."""
+    Shape: {tier: {analyses_per_day, analyses_per_week, analyses_per_month,
+    share_per_day[, watchlist_limit]}} where None means unlimited (or, for
+    analyses_per_month on tiers other than free, "not this tier's quota shape")."""
     doc = await db.settings.find_one({"id": LIMITS_SETTINGS_ID}, {"_id": 0}) or {}
     overrides = doc.get("tiers") or {}
     out = {}
