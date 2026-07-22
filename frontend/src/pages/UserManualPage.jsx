@@ -553,7 +553,7 @@ export default function UserManualPage() {
                         ]}
                     />
 
-                    <p className="font-semibold text-sm mt-6 mb-2" style={{ color: "hsl(var(--text-primary))" }}>Managing your daily quota</p>
+                    <p className="font-semibold text-sm mt-6 mb-2" style={{ color: "hsl(var(--text-primary))" }}>Managing your quota</p>
                     <DosDonts
                         dos={[
                             "Use batch sweep (Pro+) at start of day to refresh top/bottom movers",

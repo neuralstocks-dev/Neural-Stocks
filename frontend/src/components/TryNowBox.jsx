@@ -93,7 +93,7 @@ export default function TryNowBox({ variant = "default", className = "" }) {
                         value={ticker}
                         onChange={(e) => setTicker(e.target.value.toUpperCase())}
                         placeholder={alreadyUsed
-                            ? "Used today — sign up for 3/day free"
+                            ? "Used today — sign up for 3/month free"
                             : (placeholderExp?.render?.placeholder || PLACEHOLDER_FALLBACK.render.placeholder)}
                         disabled={alreadyUsed || submitting}
                         className="flex-1 min-w-0 bg-transparent outline-none font-mono text-xs sm:text-sm tracking-wide truncate"
