@@ -6,6 +6,13 @@ from core.security import iso, now_utc
 from core.db import db
 
 
+def _calendar_month_start(now: datetime) -> datetime:
+    """UTC calendar-month boundary (the 1st, 00:00:00) -- used for the
+    free-tier monthly analysis cap so it resets on a predictable date
+    instead of a rolling 30-day window."""
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
 async def _plan_overrides() -> dict:
     """Load saved tier-limit overrides from db.settings. Returns {tier: {key: value|None}}."""
     doc = await db.settings.find_one({"id": "tier_limits"}, {"_id": 0}) or {}
@@ -79,12 +86,12 @@ def plan_for(user: dict) -> dict:
 
 
 async def resolved_plan_for(user: dict) -> dict:
-    """Same as plan_for but with db.settings overrides for analyses/day, analyses/week, share/day."""
+    """Same as plan_for but with db.settings overrides for analyses/day, analyses/week, analyses/month, share/day."""
     base = dict(plan_for(user))
     eff = effective_plan_key(user)
     overrides = await _plan_overrides()
     tier_over = overrides.get(eff) or {}
-    for k in ("analyses_per_day", "analyses_per_week", "share_per_day"):
+    for k in ("analyses_per_day", "analyses_per_week", "analyses_per_month", "share_per_day"):
         if k in tier_over:
             base[k] = tier_over[k]
     return base
@@ -107,10 +114,12 @@ async def quota_snapshot(user: dict) -> dict:
         p = dict(p)
         p["analyses_per_day"] = None
         p["analyses_per_week"] = None
+        p["analyses_per_month"] = None
         p["watchlist_limit"] = 9999
         p["share_per_day"] = None
     since_day = now - timedelta(days=1)
     since_week = now - timedelta(days=7)
+    since_month = _calendar_month_start(now)
     # Honour admin-initiated quota resets — analyses before quota_reset_at
     # don't count toward current window limits.
     reset_at = user.get("quota_reset_at")
@@ -122,10 +131,13 @@ async def quota_snapshot(user: dict) -> dict:
                 since_day = reset_dt
             if reset_dt > since_week:
                 since_week = reset_dt
+            if reset_dt > since_month:
+                since_month = reset_dt
         except Exception:
             pass
     used_day = await count_analyses(user["id"], since_day)
     used_week = await count_analyses(user["id"], since_week)
+    used_month = await count_analyses(user["id"], since_month)
     watchlist_used = await db.watchlist.count_documents({"user_id": user["id"]})
     return {
         "plan": eff,
@@ -146,6 +158,8 @@ async def quota_snapshot(user: dict) -> dict:
         "analyses_day_limit": p["analyses_per_day"],
         "analyses_this_week": used_week,
         "analyses_week_limit": p["analyses_per_week"],
+        "analyses_this_month": used_month,
+        "analyses_month_limit": p["analyses_per_month"],
         "watchlist_display": p.get("watchlist_display"),
         "quick_actions": p["quick_actions"],
         "share_verdicts": p["share_verdicts"],
@@ -200,6 +214,16 @@ async def enforce_analysis_quota(user: dict):
             raise HTTPException(
                 status_code=402,
                 detail=f"Weekly analysis limit reached ({p['analyses_per_week']}/week on {p['name']} plan). Upgrade to unlock more.",
+            )
+    if p["analyses_per_month"] is not None:
+        since_month = _calendar_month_start(now)
+        if reset_dt and reset_dt > since_month:
+            since_month = reset_dt
+        used_month = await count_analyses(user["id"], since_month)
+        if used_month >= p["analyses_per_month"]:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Monthly analysis limit reached ({p['analyses_per_month']}/month on {p['name']} plan). Upgrade to unlock more.",
             )
 
 

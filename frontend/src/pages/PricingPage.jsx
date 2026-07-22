@@ -9,8 +9,7 @@ const ORDER = ["free", "pro", "elite"];
 
 const FEATURE_MATRIX = [
     { label: "Watchlist size", key: "watchlist_limit" },
-    { label: "Analyses / day", key: "analyses_per_day" },
-    { label: "Analyses / week", key: "analyses_per_week" },
+    { label: "Analyses", key: "__analyses_quota" },
     { label: "Standard AI analysis", key: "__always", type: "bool" },
     { label: "Candlestick & Hybrid analysis modes", key: "__always", type: "bool" },
     { label: "Watchlist pattern scan (15 candlestick patterns)", key: "quick_actions", type: "bool" },
@@ -28,6 +27,20 @@ function renderValue(plan, feat) {
                 <Check size={16} strokeWidth={1.5} style={{ color: "hsl(var(--buy))" }} />
             </div>
         );
+    }
+    // Analyses quota unit differs by tier now (Free is monthly, everyone
+    // else is daily(+weekly)) -- render per-plan instead of one generic
+    // number/"Unlimited" column so Free's null day/week don't misread as
+    // unlimited.
+    if (feat.key === "__analyses_quota") {
+        if (plan.analyses_per_month != null) {
+            return <span className="font-mono">{plan.analyses_per_month} / month</span>;
+        }
+        if (plan.analyses_per_day != null) {
+            const weekPart = plan.analyses_per_week != null ? ` · ${plan.analyses_per_week}/wk` : "";
+            return <span className="font-mono">{plan.analyses_per_day}/day{weekPart}</span>;
+        }
+        return <span className="font-mono" style={{ color: "hsl(var(--hold))" }}>Unlimited</span>;
     }
     const v = plan[feat.key];
     if (feat.type === "bool") {
@@ -428,16 +441,22 @@ export default function PricingPage() {
                                         )}
 
                                         <ul className="mt-6 space-y-3 flex-1">
-                                            <FeatureLi>
-                                                {p.analyses_per_day === null
-                                                    ? "Unlimited analyses"
-                                                    : `${p.analyses_per_day} analyses per day`}
-                                            </FeatureLi>
-                                            <FeatureLi>
-                                                {p.analyses_per_week === null
-                                                    ? "No weekly cap"
-                                                    : `${p.analyses_per_week} analyses per week`}
-                                            </FeatureLi>
+                                            {p.analyses_per_month != null ? (
+                                                <FeatureLi>{`${p.analyses_per_month} analyses per month`}</FeatureLi>
+                                            ) : (
+                                                <>
+                                                    <FeatureLi>
+                                                        {p.analyses_per_day === null
+                                                            ? "Unlimited analyses"
+                                                            : `${p.analyses_per_day} analyses per day`}
+                                                    </FeatureLi>
+                                                    <FeatureLi>
+                                                        {p.analyses_per_week === null
+                                                            ? "No weekly cap"
+                                                            : `${p.analyses_per_week} analyses per week`}
+                                                    </FeatureLi>
+                                                </>
+                                            )}
                                             <FeatureLi>
                                                 {p.watchlist_display
                                                     ? `${p.watchlist_display} watchlist`

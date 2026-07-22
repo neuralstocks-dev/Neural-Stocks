@@ -256,7 +256,7 @@ export default function PublicTryVerdictPage() {
                             </p>
                             <p className="mt-4 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
                                 {isQuotaError
-                                    ? "You've already used your free analysis today. Sign up to run 3 analyses per day — free forever."
+                                    ? "You've already used your free analysis today. Sign up to run 3 analyses per month — free forever."
                                     : isServerError
                                     ? "The analysis took too long. This can happen during peak load. Try again in a moment."
                                     : isHistoryError
@@ -267,7 +267,7 @@ export default function PublicTryVerdictPage() {
                             </p>
                             {isQuotaError ? (
                                 <Link to="/signup" className="btn-primary mt-6 inline-flex" data-testid="try-error-signup">
-                                    Sign up free — 3 analyses/day →
+                                    Sign up free — 3 analyses/month →
                                 </Link>
                             ) : (
                                 <div className="mt-6 flex flex-col items-center gap-3">
@@ -311,7 +311,7 @@ export default function PublicTryVerdictPage() {
                                         )}
                                     </>
                                 ) : rateLimited ? (
-                                    <><strong>Free daily analysis used.</strong> This is your {rateLimited.previous_ticker} verdict from earlier today. Sign up to unlock 3 analyses per day plus a 5-stock watchlist.</>
+                                    <><strong>Free daily analysis used.</strong> This is your {rateLimited.previous_ticker} verdict from earlier today. Sign up to unlock 3 analyses per month plus a 5-stock watchlist.</>
                                 ) : (
                                     <><strong>Free preview.</strong> Core verdict shown. Pattern details, risk factors, and confidence breakdown are unlocked after signup.</>
                                 )}
@@ -509,7 +509,7 @@ export default function PublicTryVerdictPage() {
                                 Create your account →
                             </Link>
                             <p className="text-[11px] mt-3" style={{ color: "hsl(var(--text-muted))" }}>
-                                Free tier · up to 5 watchlist stocks · 3 analyses / day
+                                Free tier · up to 5 watchlist stocks · 3 analyses / month
                             </p>
                         </div>
 

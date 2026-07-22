@@ -29,6 +29,7 @@ KEYS = (
     "watchlist_limit",
     "analyses_per_day",
     "analyses_per_week",
+    "analyses_per_month",
     "share_per_day",
 )
 

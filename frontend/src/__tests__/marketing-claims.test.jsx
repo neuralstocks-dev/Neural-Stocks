@@ -31,9 +31,12 @@ describe("marketing claims match backend plan limits", () => {
     test("backend snapshot has the canonical free tier we built copy around", () => {
         // Sanity check: if any of these change the test should fail loudly so
         // the dev knows to update marketing copy *and* this assertion.
+        // Free switched from 3/day + 12/week to a flat 3/month (2026-07-22) —
+        // day/week are now null for this tier; the monthly cap is the only one.
         expect(free.watchlist_limit).toBe(5);
-        expect(free.analyses_per_day).toBe(3);
-        expect(free.analyses_per_week).toBe(12);
+        expect(free.analyses_per_day).toBe(null);
+        expect(free.analyses_per_week).toBe(null);
+        expect(free.analyses_per_month).toBe(3);
         expect(free.share_per_day).toBe(5);
     });
 
@@ -46,10 +49,10 @@ describe("marketing claims match backend plan limits", () => {
             );
         });
 
-        test("states the correct free analyses-per-day cap", () => {
+        test("states the correct free analyses-per-month cap", () => {
             expect(src).toMatch(
                 new RegExp(
-                    `${free.analyses_per_day} full AI analyses per day`
+                    `${free.analyses_per_month} full AI analyses per month`
                 )
             );
         });
@@ -75,9 +78,9 @@ describe("marketing claims match backend plan limits", () => {
             );
         });
 
-        test("free-tier strip shows the real analyses-per-day cap", () => {
+        test("free-tier strip shows the real analyses-per-month cap", () => {
             expect(src).toMatch(
-                new RegExp(`${free.analyses_per_day} analyses / day`)
+                new RegExp(`${free.analyses_per_month} analyses / month`)
             );
         });
 
@@ -87,10 +90,10 @@ describe("marketing claims match backend plan limits", () => {
             expect(src).not.toMatch(/Sign up to run unlimited analyses/i);
         });
 
-        test("rate-limited fallback teaser uses the real analyses-per-day", () => {
+        test("rate-limited fallback teaser uses the real analyses-per-month", () => {
             expect(src).toMatch(
                 new RegExp(
-                    `Sign up to unlock ${free.analyses_per_day} analyses per day`
+                    `Sign up to unlock ${free.analyses_per_month} analyses per month`
                 )
             );
         });

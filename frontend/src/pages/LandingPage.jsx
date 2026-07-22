@@ -495,7 +495,7 @@ export default function LandingPage() {
                             marginBottom: 36,
                         }}
                     >
-                        3 free analyses per day. No credit card. US and IDX markets.
+                        3 free analyses per month. No credit card. US and IDX markets.
                     </p>
                     <div
                         style={{
