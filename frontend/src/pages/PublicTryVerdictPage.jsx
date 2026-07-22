@@ -49,11 +49,12 @@ export default function PublicTryVerdictPage() {
 
         const pollJob = async (jobId, attempts = 0) => {
             if (cancelled) return;
-            // 95 × 2s ≈ 190s — matches the backend's anon-job wall-clock
-            // budget (180s) with a small buffer. Previously capped at 120s,
-            // which gave up mid-analysis during LiteLLM retry storms where
-            // the backend was still actively working on the verdict.
-            if (attempts > 95) {
+            // 125 × 2s = 250s — matches the backend's anon-job wall-clock
+            // budget (240s, see ANON_JOB_TIMEOUT_S in anon_try.py) with a
+            // small buffer. Previously 95 attempts / 180s budget; both were
+            // raised together so the frontend never gives up while the
+            // backend job is still legitimately working on the verdict.
+            if (attempts > 125) {
                 setError("Analysis is taking longer than expected. Please try again in a moment.");
                 setLoading(false);
                 return;

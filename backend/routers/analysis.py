@@ -31,13 +31,14 @@ router = APIRouter(tags=["analysis"])
 # the ingress 60s budget. We run tickers sequentially inside the job to
 # avoid saturating the single-worker event loop with concurrent LLM calls.
 # Bumped from 120 → 180s on Feb-2026 after users reported timeouts during
-# transient upstream LLM retry storms (LiteLLM auto-retries 4x on 5xx,
-# each with up to 30s socket budget, easily blowing 120s on a slow path).
+# transient upstream LLM retry storms (OpenRouter's own model-fallback
+# chain can still take up to 60s per attempt across up to 2 chunked
+# requests, easily blowing 120s on a slow path).
 # Env-tunable so we can dial up/down without a redeploy.
 # Backend wall-clock cap on a single /analysis/{ticker}/start job. Needs to
 # be generous enough to cover: yfinance history fetch (slow on IDX), IDX
-# bandarmology + news fetch, candlestick detection, and the Claude LLM call
-# (30-60s steady-state, up to 90s under upstream load). 240s gives ~40%
+# bandarmology + news fetch, candlestick detection, and the OpenRouter LLM
+# call (30-60s steady-state, up to 90s under upstream load). 240s gives ~40%
 # headroom over the worst steady-state case so mobile users don't trip on
 # the occasional slow-LLM minute. Client-side polling must be kept >= this
 # value — see AnalysisReportPage.jsx + DashboardPage.jsx.
@@ -626,8 +627,8 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
             error_detail=(
                 f"asyncio.TimeoutError after {elapsed:.1f}s "
                 f"(budget={QUICK_PER_TASK_TIMEOUT:.0f}s, reason={reason}). "
-                f"Upstream LLM call did not return — likely Universal-Key "
-                f"proxy / Anthropic socket hang."
+                f"Upstream OpenRouter call did not return before the job "
+                f"budget expired."
             ),
         )
         await db.analysis_jobs.update_one(
@@ -668,7 +669,7 @@ async def _run_single_analysis_job(job_id: str, ticker: str, mode: str, user: di
                     f"HTTP {e.status_code} from upstream — "
                     f"error_code={detail_dict.get('error_code')!r}, "
                     f"message={user_msg!r}. "
-                    f"Universal-Key proxy reported upstream unavailable."
+                    f"OpenRouter reported the upstream provider as unavailable."
                 ),
             )
         await db.analysis_jobs.update_one(

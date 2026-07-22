@@ -275,11 +275,15 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
     leaving the client polling forever. A companion `_stage_ticker` task
     streams progress labels into the job doc for the UI to show.
 
-    Wall-clock budget: 180s. Matches `QUICK_PER_TASK_TIMEOUT` on the
+    Wall-clock budget: 240s, matching `QUICK_PER_TASK_TIMEOUT` on the
     authenticated `/start` path — env-tunable via `ANON_JOB_TIMEOUT_S`.
-    When Claude has a bad retry storm the upstream socket can hang for
-    several minutes; without this cap the job doc would never flip to
-    'error' and the client would poll forever.
+    Previously 180s: guests had less headroom than authenticated users
+    for the identical worst-case pipeline (OpenRouter cascade + data
+    fetch + macro context), with no reason guest jobs would run any
+    faster, so guests were timing out that auth users would not. Raised
+    to close that gap. When OpenRouter has a bad retry storm the
+    upstream call can hang for a while; without this cap the job doc
+    would never flip to 'error' and the client would poll forever.
     """
     synthetic = {
         "id": f"anon:{ip_hash}",
@@ -288,7 +292,7 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
         "disclaimer_accepted": True,
         "__anon__": True,
     }
-    anon_timeout = float(os.environ.get("ANON_JOB_TIMEOUT_S", "180"))
+    anon_timeout = float(os.environ.get("ANON_JOB_TIMEOUT_S", "240"))
     ticker_task = asyncio.create_task(_stage_ticker(job_id))
     started = time.monotonic()
     try:
@@ -335,8 +339,8 @@ async def _run_anon_analysis_job(job_id: str, ticker_up: str, mode: str, ip_hash
             error_detail=(
                 f"asyncio.TimeoutError after {elapsed:.1f}s "
                 f"(budget={anon_timeout:.0f}s, reason={reason}). "
-                f"Upstream LLM call did not return — likely Universal-Key "
-                f"proxy / Anthropic socket hang."
+                f"Upstream OpenRouter call did not return before the job "
+                f"budget expired."
             ),
         )
         _log.warning("Anon job timed out after %.0fs (reason=%s) for %s (job %s)", elapsed, reason, ticker_up, job_id)

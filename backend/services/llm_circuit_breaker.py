@@ -1,9 +1,10 @@
 """LLM circuit breaker — protects users from the LLM provider upstream outages.
 
-Problem: when the LLM provider/LiteLLM hits a retry storm (transient 5xx, socket
-hangs), individual analysis jobs still correctly time out at 180s, but
-EVERY guest/paid user who clicks "Analyze" during that window waits 3
-full minutes before seeing an error. That's wasted user patience AND
+Problem: when the LLM provider (OpenRouter) hits a retry storm (transient 5xx,
+socket hangs), individual analysis jobs still correctly time out at their
+configured budget (240s for both guest and authenticated jobs), but
+EVERY guest/paid user who clicks "Analyze" during that window waits the
+full 4-minute budget before seeing an error. That's wasted user patience AND
 wasted LLM-key budget on retries that will fail anyway.
 
 Solution: track the rolling outcome of the last N LLM-backed analysis
@@ -29,7 +30,7 @@ Failure-reason telemetry: each non-success outcome carries a structured
 `reason` code ("llm_timeout" / "litellm_retry_exhausted" /
 "llm_socket_hang" / "other_exception") persisted to a TTL-capped
 MongoDB collection (7 days). The admin dashboard can query this to
-distinguish one-off the LLM provider hiccups from systemic LiteLLM config issues.
+distinguish one-off the LLM provider hiccups from systemic OpenRouter config issues.
 Persistence is best-effort: a mongo write error NEVER affects the
 breaker's in-memory decision logic — the LLM provider health must stay available
 even when the ops database is degraded.
@@ -115,11 +116,15 @@ REASON_OPENROUTER_ALL_MODELS_EXHAUSTED = "openrouter_all_models_exhausted"
 
 def classify_timeout_reason(elapsed_s: float, timeout_budget_s: float) -> str:
     """Heuristic: if the job timed out well before the hard wall-clock
-    budget, it's more likely a LiteLLM retry-exhaustion than a pure
-    socket hang. LiteLLM's default retry schedule is 4 × ~30s so jobs
-    that die right at the budget tend to be deep socket hangs, while
-    jobs that die much earlier (the wrapper cancels the future) point
-    to upstream retry rejection. Rough heuristic, not definitive."""
+    budget, it's more likely OpenRouter's own model-fallback chain
+    (chunks of <=3 models, 60s per attempt -- see services/llm_providers.py)
+    ran out of chunks to try than a pure socket hang. Jobs that die right
+    at the budget tend to be deep socket hangs on the current attempt,
+    while jobs that die much earlier (the wrapper cancels the future
+    after the cascade is exhausted) point to upstream fallback rejection
+    across every model tried. Rough heuristic, not definitive -- the
+    reason code name (`litellm_retry_exhausted`) predates the OpenRouter
+    migration and is kept as-is since it's a persisted/queried field."""
     if elapsed_s >= timeout_budget_s * 0.95:
         return REASON_LLM_SOCKET_HANG
     if elapsed_s >= timeout_budget_s * 0.5:
