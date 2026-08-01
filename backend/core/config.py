@@ -40,6 +40,14 @@ else:
     PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
 PAYPAL_WEBHOOK_ID = os.environ.get("PAYPAL_WEBHOOK_ID", "")
 
+# ---------- Stripe ----------
+# Test vs live is determined by which key you paste in (sk_test_... / sk_live_...) —
+# unlike PayPal there's no separate sandbox API host.
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_MODE = "live" if STRIPE_SECRET_KEY.startswith("sk_live_") else "test"
+
 # ---------- Resend ----------
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")

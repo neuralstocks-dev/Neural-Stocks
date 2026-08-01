@@ -1059,14 +1059,21 @@ async def delete_user(user_id: str, admin=Depends(admin_required)):
         raise HTTPException(status_code=403, detail="Cannot delete an admin account")
     if target["id"] == admin["id"]:
         raise HTTPException(status_code=403, detail="Cannot delete yourself")
-    # Cancel any active PayPal subscription so we don't leave orphans billing
+    # Cancel any active subscription so we don't leave orphans billing
     sid = target.get("paypal_subscription_id")
     if sid:
         try:
-            from services.paypal import cancel_subscription, PayPalError
+            from services.paypal import cancel_subscription
             await cancel_subscription(sid, reason="User account deleted by admin")
         except Exception:
             pass  # best-effort — proceed with local delete regardless
+    stripe_sid = target.get("stripe_subscription_id")
+    if stripe_sid:
+        try:
+            from services.stripe_service import cancel_subscription_immediately
+            await cancel_subscription_immediately(stripe_sid)
+        except Exception:
+            pass
     # Cascade delete owned data
     await db.watchlist.delete_many({"user_id": user_id})
     await db.analyses.delete_many({"user_id": user_id})
@@ -1109,6 +1116,13 @@ async def delete_selected_users(req: UserDeleteReq, admin=Depends(admin_required
                 await cancel_subscription(sid, reason="User account deleted by admin")
             except Exception:
                 pass
+        stripe_sid = target.get("stripe_subscription_id")
+        if stripe_sid:
+            try:
+                from services.stripe_service import cancel_subscription_immediately
+                await cancel_subscription_immediately(stripe_sid)
+            except Exception:
+                pass
         await db.watchlist.delete_many({"user_id": uid})
         await db.analyses.delete_many({"user_id": uid})
         await db.alerts.delete_many({"user_id": uid})
@@ -1123,7 +1137,7 @@ async def delete_selected_users(req: UserDeleteReq, admin=Depends(admin_required
         "ok": True,
         "deleted": deleted,
         "skipped": skipped,
-        "message": f"Deleted {len(deleted)} user(s). Skipped {len(skipped)} (admins or self). Any active PayPal subscriptions were cancelled.",
+        "message": f"Deleted {len(deleted)} user(s). Skipped {len(skipped)} (admins or self). Any active PayPal/Stripe subscriptions were cancelled.",
     }
 
 
