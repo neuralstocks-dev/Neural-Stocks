@@ -72,12 +72,14 @@ async def get_current_user(
                     {
                         "$set": {"plan": "free", "subscription_status": "EXPIRED"},
                         "$unset": {"paypal_subscription_id": "", "paypal_plan": "",
-                                   "paypal_cycle": "", "subscription_cancels_at": ""},
+                                   "paypal_cycle": "", "stripe_subscription_id": "",
+                                   "stripe_cycle": "", "subscription_cancels_at": ""},
                     },
                 )
                 user["plan"] = "free"
                 user["subscription_status"] = "EXPIRED"
-                for k in ("paypal_subscription_id", "paypal_plan", "paypal_cycle", "subscription_cancels_at"):
+                for k in ("paypal_subscription_id", "paypal_plan", "paypal_cycle",
+                          "stripe_subscription_id", "stripe_cycle", "subscription_cancels_at"):
                     user.pop(k, None)
         except Exception:
             pass

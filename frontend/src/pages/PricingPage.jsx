@@ -51,23 +51,27 @@ export default function PricingPage() {
     const { user, refreshUser } = useAuth();
     const [plans, setPlans] = useState(null);
     const [billingConfig, setBillingConfig] = useState(null);
+    const [stripeConfig, setStripeConfig] = useState(null);
     const [quota, setQuota] = useState(null);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [processing, setProcessing] = useState(null);
+    const [stripeProcessing, setStripeProcessing] = useState(null);
     const [cancelling, setCancelling] = useState(false);
     const [cycle, setCycle] = useState("monthly"); // "monthly" | "yearly"
 
     useEffect(() => {
         (async () => {
             try {
-                const [plansRes, cfgRes, quotaRes] = await Promise.all([
+                const [plansRes, cfgRes, stripeCfgRes, quotaRes] = await Promise.all([
                     api.get("/plans"),
                     api.get("/billing/config"),
+                    api.get("/billing/stripe/config").catch(() => ({ data: null })),
                     api.get("/quota"),
                 ]);
                 setPlans(plansRes.data);
                 setBillingConfig(cfgRes.data);
+                setStripeConfig(stripeCfgRes.data);
                 setQuota(quotaRes.data);
             } catch (err) {
                 setError(err?.response?.data?.detail || "Failed to load pricing");
@@ -75,10 +79,44 @@ export default function PricingPage() {
         })();
     }, []);
 
+    // Handle the browser bouncing back from a Stripe Checkout redirect.
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get("stripe_session_id");
+        const stripeFlag = params.get("stripe");
+        if (sessionId) {
+            (async () => {
+                setError(""); setMessage("Confirming payment…");
+                try {
+                    const r = await api.post("/billing/stripe/confirm", { session_id: sessionId });
+                    if (r.data.ok) {
+                        setMessage(r.data.message || "Payment confirmed.");
+                        await refreshUser();
+                        const q = await api.get("/quota");
+                        setQuota(q.data);
+                    } else {
+                        setError(r.data.message || "Payment not completed yet.");
+                    }
+                } catch (err) {
+                    setError(err?.response?.data?.detail || "Could not confirm Stripe payment");
+                } finally {
+                    setTimeout(() => setMessage(""), 8000);
+                    window.history.replaceState({}, "", window.location.pathname);
+                }
+            })();
+        } else if (stripeFlag === "cancelled") {
+            setError("Stripe checkout cancelled — no charge was made.");
+            window.history.replaceState({}, "", window.location.pathname);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const downgradeToFree = async () => {
         setError(""); setMessage(""); setProcessing("free");
         try {
-            if (user?.plan !== "free") await api.post("/billing/cancel");
+            if (user?.plan !== "free") {
+                await api.post(quota?.payment_provider === "stripe" ? "/billing/stripe/cancel" : "/billing/cancel");
+            }
             await refreshUser();
             setMessage("You are now on the Free plan.");
             setTimeout(() => setMessage(""), 5000);
@@ -88,10 +126,11 @@ export default function PricingPage() {
     };
 
     const cancelSubscription = async () => {
-        if (!window.confirm("Cancel your PayPal subscription? You'll keep full access until the end of your current billing period, then revert to Free. No further charges.")) return;
+        const viaStripe = quota?.payment_provider === "stripe";
+        if (!window.confirm(`Cancel your ${viaStripe ? "Stripe" : "PayPal"} subscription? You'll keep full access until the end of your current billing period, then revert to Free. No further charges.`)) return;
         setCancelling(true); setError(""); setMessage("");
         try {
-            const r = await api.post("/billing/cancel");
+            const r = await api.post(viaStripe ? "/billing/stripe/cancel" : "/billing/cancel");
             // Refresh quota to pick up subscription_status=CANCELLED + cancels_at
             const quotaRes = await api.get("/quota");
             setQuota(quotaRes.data);
@@ -101,6 +140,29 @@ export default function PricingPage() {
         } catch (err) {
             setError(err?.response?.data?.detail || "Cancel failed");
         } finally { setCancelling(false); }
+    };
+
+    const startStripeCheckout = async (planKey, planCycle) => {
+        setError(""); setStripeProcessing(`${planKey}_${planCycle}`);
+        try {
+            const r = await api.post("/billing/stripe/checkout", { plan: planKey, cycle: planCycle });
+            window.location.href = r.data.checkout_url;
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Stripe checkout failed");
+            setStripeProcessing(null);
+        }
+    };
+
+    const [daypassStripeProcessing, setDaypassStripeProcessing] = useState(false);
+    const startStripeDaypassCheckout = async () => {
+        setError(""); setDaypassStripeProcessing(true);
+        try {
+            const r = await api.post("/billing/stripe/daypass/checkout");
+            window.location.href = r.data.checkout_url;
+        } catch (err) {
+            setError(err?.response?.data?.detail || "Stripe checkout failed");
+            setDaypassStripeProcessing(false);
+        }
     };
 
     const paypalOptions = useMemo(() => {
@@ -135,7 +197,7 @@ export default function PricingPage() {
                 </h1>
                 <p className="mt-4 max-w-2xl text-base" style={{ color: "hsl(var(--text-secondary))" }}>
                     Start free. Scale your watchlist, unlock quick batch sweeps, and shareable
-                    verdicts as you grow. Billed via PayPal — cancel anytime.
+                    verdicts as you grow. Pay via PayPal or card (Stripe) — cancel anytime.
                 </p>
 
                 {/* Promo banner */}
@@ -175,6 +237,20 @@ export default function PricingPage() {
                         data-testid="sandbox-banner">
                         <ShieldCheck size={12} className="inline mr-2" strokeWidth={1.5} />
                         SANDBOX MODE · Use a PayPal sandbox buyer account. No real charge.
+                    </div>
+                )}
+
+                {stripeConfig?.mode === "test" && (
+                    <div className="mt-3 px-4 py-3 font-mono text-xs"
+                        style={{
+                            border: "1px solid #635BFF",
+                            color: "#635BFF",
+                            background: "rgba(99,91,255,0.06)",
+                            borderRadius: 2,
+                        }}
+                        data-testid="stripe-test-mode-banner">
+                        <ShieldCheck size={12} className="inline mr-2" strokeWidth={1.5} />
+                        STRIPE TEST MODE · Card 4242 4242 4242 4242, any future expiry/CVC. No real charge.
                     </div>
                 )}
 
@@ -462,9 +538,9 @@ export default function PricingPage() {
                                         </ul>
 
                                         {/* Uniform CTA slot — same min-height across all tiers for visual balance */}
-                                        <div className="mt-8 flex flex-col justify-end" style={{ minHeight: 150 }}>
+                                        <div className="mt-8 flex flex-col justify-end" style={{ minHeight: 190 }}>
                                             {(() => {
-                                                const hasPaid = quota?.has_paypal_subscription;
+                                                const hasPaid = quota?.has_paypal_subscription || quota?.has_stripe_subscription;
                                                 const onTestUnlock = quota?.test_unlock_active;
                                                 // For the Free card:
                                                 if (key === "free") {
@@ -549,23 +625,39 @@ export default function PricingPage() {
                                                         </button>
                                                     );
                                                 }
-                                                // Otherwise: show PayPal subscribe block (Pro or Elite, for any user not paying on this tier)
+                                                // Otherwise: show PayPal + Stripe subscribe options (Pro or Elite, for any user not paying on this tier)
                                                 return (
-                                                    <PayPalSubscribeButton
-                                                        planKey={key}
-                                                        cycle={cycle}
-                                                        planId={billingConfig.plan_ids[`${key}_${cycle}`]}
-                                                        planName={p.name}
-                                                        processing={processing === `${key}_${cycle}`}
-                                                        setProcessing={(v) => setProcessing(v ? `${key}_${cycle}` : null)}
-                                                        onSuccess={(msg) => {
-                                                            setMessage(msg);
-                                                            refreshUser();
-                                                            api.get("/quota").then((r) => setQuota(r.data));
-                                                            setTimeout(() => setMessage(""), 6000);
-                                                        }}
-                                                        onError={(m) => setError(m)}
-                                                    />
+                                                    <>
+                                                        <PayPalSubscribeButton
+                                                            planKey={key}
+                                                            cycle={cycle}
+                                                            planId={billingConfig.plan_ids[`${key}_${cycle}`]}
+                                                            planName={p.name}
+                                                            processing={processing === `${key}_${cycle}`}
+                                                            setProcessing={(v) => setProcessing(v ? `${key}_${cycle}` : null)}
+                                                            onSuccess={(msg) => {
+                                                                setMessage(msg);
+                                                                refreshUser();
+                                                                api.get("/quota").then((r) => setQuota(r.data));
+                                                                setTimeout(() => setMessage(""), 6000);
+                                                            }}
+                                                            onError={(m) => setError(m)}
+                                                        />
+                                                        {stripeConfig?.configured && (
+                                                            <>
+                                                                <div className="flex items-center gap-2 my-2">
+                                                                    <div style={{ flex: 1, height: 1, background: "hsl(var(--border-divider))" }} />
+                                                                    <span className="text-overline" style={{ color: "hsl(var(--text-muted))", fontSize: "0.55rem" }}>or</span>
+                                                                    <div style={{ flex: 1, height: 1, background: "hsl(var(--border-divider))" }} />
+                                                                </div>
+                                                                <StripeCheckoutButton
+                                                                    processing={stripeProcessing === `${key}_${cycle}`}
+                                                                    testid={`stripe-${key}-${cycle}-button`}
+                                                                    onClick={() => startStripeCheckout(key, cycle)}
+                                                                />
+                                                            </>
+                                                        )}
+                                                    </>
                                                 );
                                             })()}
                                         </div>
@@ -730,6 +822,20 @@ export default function PricingPage() {
                                                 onError={(err) => setError(err?.message || "PayPal error")}
                                                 onCancel={() => setError("Checkout cancelled")}
                                             />
+                                            {stripeConfig?.configured && (
+                                                <>
+                                                    <div className="flex items-center gap-2 my-2">
+                                                        <div style={{ flex: 1, height: 1, background: "hsl(var(--border-divider))" }} />
+                                                        <span className="text-overline" style={{ color: "hsl(var(--text-muted))", fontSize: "0.55rem" }}>or</span>
+                                                        <div style={{ flex: 1, height: 1, background: "hsl(var(--border-divider))" }} />
+                                                    </div>
+                                                    <StripeCheckoutButton
+                                                        processing={daypassStripeProcessing}
+                                                        testid="stripe-daypass-button"
+                                                        onClick={startStripeDaypassCheckout}
+                                                    />
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -801,7 +907,7 @@ export default function PricingPage() {
 
                 <p className="text-overline mt-8 max-w-3xl leading-relaxed" style={{ color: "hsl(var(--text-muted))", fontSize: "0.62rem" }}>
                     Neural Stock Intelligence&trade; is an AI-assisted analysis tool. Content is for educational and informational
-                    purposes only and is not investment advice. Payment processing by PayPal. Cancel
+                    purposes only and is not investment advice. Payment processing by PayPal or Stripe. Cancel
                     anytime — no refunds for partial billing cycles.
                 </p>
             </div>
@@ -841,6 +947,38 @@ function CTAButton({ variant = "ghost", onClick, disabled, children, testid }) {
             data-testid={testid}
         >
             {children}
+        </button>
+    );
+}
+
+function StripeCheckoutButton({ processing, onClick, testid }) {
+    return (
+        <button
+            onClick={onClick}
+            disabled={processing}
+            className="w-full font-mono text-xs transition-all flex items-center justify-center gap-1.5"
+            style={{
+                height: 42,
+                border: "1px solid hsl(var(--border-default))",
+                background: "hsl(var(--surface-elevated))",
+                color: "hsl(var(--text-primary))",
+                borderRadius: 2,
+                letterSpacing: "0.03em",
+                textTransform: "uppercase",
+                fontWeight: 600,
+            }}
+            data-testid={testid}
+        >
+            {processing ? (
+                <Loader2 size={14} className="animate-spin" />
+            ) : (
+                <>
+                    Pay with Card
+                    <span style={{ color: "#635BFF", fontWeight: 800, fontStyle: "italic", textTransform: "none", letterSpacing: "-0.01em" }}>
+                        Stripe
+                    </span>
+                </>
+            )}
         </button>
     );
 }
