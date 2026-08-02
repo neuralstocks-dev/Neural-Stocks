@@ -9,6 +9,7 @@ requiring them to open the admin panel:
     🔁 Fallback: 12% (deepseek/deepseek-v4-flash ×6)
     ⚠️ Top failure: ChatError ×3
     💳 OpenRouter Credits: 99.43
+    💸 OpenRouter spend today: $4.12
 
 Audience: ONLY users in `ADMIN_EMAILS` who have already linked Telegram.
 Free users / non-admins NEVER receive this digest. Sending lives on a
@@ -36,10 +37,14 @@ import time as _time
 from datetime import datetime, timedelta, timezone
 from typing import List
 
-from core.config import ADMIN_EMAILS
+import httpx
+
+from core.config import ADMIN_EMAILS, OPENROUTER_API_KEY
 from core.db import db
 from core.security import iso, now_utc
 from services.telegram import _send_message, is_configured as _tg_configured
+
+OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +77,7 @@ async def _aggregate_admin_metrics(window_hours: int = 24) -> dict:
         "fallback_top_provider": None,  # e.g. "gemini ×6"
         "top_failure_reason": None,     # e.g. "ChatError ×3"
         "universal_key_balance": None,
+        "openrouter_spend_today": None,  # real $ spend, direct from OpenRouter's own usage_daily
         "window_hours": window_hours,
     }
 
@@ -166,7 +172,37 @@ async def _aggregate_admin_metrics(window_hours: int = 24) -> dict:
     except Exception as e:
         logger.warning("admin_digest: balance fetch failed: %s", e)
 
+    # 5. Real OpenRouter spend for today — pulled live from OpenRouter's own
+    # usage_daily figure (resets at 00:00 UTC), NOT the anchor-based estimate
+    # `universal_key_balance` above uses. This is the actual dollar amount
+    # billed against OPENROUTER_API_KEY so far today.
+    metrics["openrouter_spend_today"] = await _fetch_openrouter_daily_spend()
+
     return metrics
+
+
+async def _fetch_openrouter_daily_spend() -> float | None:
+    """GET /api/v1/key returns the calling key's own usage, including
+    `usage_daily` — credits (== USD) consumed since 00:00 UTC today. This
+    is a live read from OpenRouter itself, not derived from local DB
+    counts, so it stays correct even if per-model pricing changes."""
+    if not OPENROUTER_API_KEY:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as hc:
+            r = await hc.get(
+                OPENROUTER_KEY_URL,
+                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+            )
+        if r.status_code != 200:
+            logger.warning("admin_digest: OpenRouter /key non-200: %s %s", r.status_code, r.text[:200])
+            return None
+        data = (r.json() or {}).get("data") or {}
+        spend = data.get("usage_daily")
+        return round(float(spend), 2) if spend is not None else None
+    except Exception as e:
+        logger.warning("admin_digest: OpenRouter daily spend fetch failed: %s", e)
+        return None
 
 
 def _format_digest(metrics: dict) -> str:
@@ -197,6 +233,8 @@ def _format_digest(metrics: dict) -> str:
         lines.append(f"⚠️ <b>Top failure</b>: {metrics['top_failure_reason']}")
     if metrics.get("universal_key_balance") is not None:
         lines.append(f"💳 <b>OpenRouter Credits</b>: {metrics['universal_key_balance']}")
+    if metrics.get("openrouter_spend_today") is not None:
+        lines.append(f"💸 <b>OpenRouter spend today</b>: ${metrics['openrouter_spend_today']:.2f}")
 
     lines.append("")
     lines.append(
