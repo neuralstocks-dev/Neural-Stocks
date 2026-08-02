@@ -1,8 +1,10 @@
-"""Generate OG share cards (1200×630 PNG) for KidStocks marketing pages.
+"""Generate OG share cards (1200×630 JPEG) for KidStocks marketing pages.
 
 Run once via `python3 /app/scripts/generate_og_cards.py`. Writes:
-  • /app/frontend/public/og-kids-landing.png
-  • /app/frontend/public/og-kids-parents.png
+  • /app/frontend/public/og-kids-landing.jpg
+  • /app/frontend/public/og-kids-parents.jpg
+
+JPEG (not PNG) so the cards render reliably in WhatsApp's link-preview crawler.
 
 Pure Pillow — no headless browser. The cards mirror the in-app design:
 coral/cream/navy palette, KS logo mark on the left, hero copy on the
@@ -109,7 +111,7 @@ def render_card(*, eyebrow: str, headline: str, sub: str, footer: str, out_path:
     draw.text((70, H - 50), footer, font=foot_font, fill=TEXT_MUTED)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    img.save(out_path, "PNG", optimize=True)
+    img.save(out_path, "JPEG", quality=90, optimize=True)
     print(f"wrote {out_path} ({out_path.stat().st_size // 1024} KB)")
 
 
@@ -120,12 +122,12 @@ if __name__ == "__main__":
         headline="Show your kid how the AI thinks.",
         sub="Same engine our adult investors use, rewritten in language a 9-year-old can understand. Virtual money only.",
         footer="kidstocks.net · educational only · not financial advice",
-        out_path=public_dir / "og-kids-landing.png",
+        out_path=public_dir / "og-kids-landing.jpg",
     )
     render_card(
         eyebrow="For parents",
         headline="The investing app that teaches kids to think.",
         sub="See how KidStocks compares to Greenlight, Fidelity Youth, Bibit Junior, and 4 other platforms.",
         footer="kidstocks.net · educational only · not financial advice",
-        out_path=public_dir / "og-kids-parents.png",
+        out_path=public_dir / "og-kids-parents.jpg",
     )

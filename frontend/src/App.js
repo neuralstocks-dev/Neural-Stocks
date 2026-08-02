@@ -141,7 +141,9 @@ function AppRoutes() {
 
         // Per-page OG image override — for-parents page shares its own card.
         const isForParents = location.pathname === "/kids/for-parents";
-        const ogImagePath = isForParents ? "/og-kids-parents.png" : "/og-kids-landing.png";
+        const ogImagePath = onKidSurface
+            ? (isForParents ? "/og-kids-parents.jpg" : "/og-kids-landing.jpg")
+            : "/og-image.jpg";
         const setMeta = (selector, attr, value) => {
             const el = document.querySelector(selector);
             if (el) el.setAttribute(attr, value);
