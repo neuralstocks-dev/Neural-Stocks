@@ -372,6 +372,7 @@ async def analyze_ticker(
 ):
     from services.gal import translate_for_age
     from routers.kids_preview import _adult_to_gal_input
+    from services.kids_quota import enforce_kids_analysis_quota, log_kids_analysis
 
     ticker = ticker.upper().strip()
     if ticker not in KID_TRADABLE:
@@ -379,6 +380,8 @@ async def analyze_ticker(
 
     if lang not in ("en", "id"):
         lang = student.get("lang") or "en"
+
+    await enforce_kids_analysis_quota(student)
 
     cutoff = (datetime.now(timezone.utc) - _MAX_PRICE_AGE).isoformat()
     doc = await db.analyses.find_one(
@@ -394,6 +397,7 @@ async def analyze_ticker(
 
     age_band = student.get("age_band") or "11-13"
     kid_view = await translate_for_age(_adult_to_gal_input(doc), age_band, ticker, lang)
+    await log_kids_analysis(student["id"], ticker)
     quote = doc.get("quote_snapshot") if isinstance(doc.get("quote_snapshot"), dict) else {}
     return {
         "ticker": ticker,

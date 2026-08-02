@@ -23,6 +23,7 @@ import KidsBrandMark from "@/components/KidsBrandMark";
 import { API_BASE } from "@/lib/api";
 import { useKidsLang, t } from "@/lib/kidsI18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { StripeCheckoutButton } from "@/components/StripeCheckoutButton";
 
 const ACCENT = "#ff7676";
 const NAVY = "#1a1a2e";
@@ -226,6 +227,8 @@ export function KidsParentDashboardPage() {
                     <strong>{data.parent_email}</strong>
                 </p>
 
+                <PlanCard token={token} lang={lang} />
+
                 <TelegramCard token={token} telegram={data.telegram} lang={lang} />
 
                 {data.kids.length === 0 && (
@@ -312,6 +315,149 @@ function Stat({ icon, label, items }) {
                 {items.map((it, i) => <li key={i}>{it}</li>)}
             </ul>
         </div>
+    );
+}
+
+// ===========================================================================
+// Plan card — Stripe checkout for "KidStocks Pro" (more AI analyses/day).
+// Mirrors TelegramCard's self-contained pattern: takes token/lang props,
+// makes its own axios calls, manages its own busy/error/message state.
+// ===========================================================================
+
+function PlanCard({ token, lang }) {
+    const [status, setStatus] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [message, setMessage] = useState("");
+    const [error, setError] = useState("");
+
+    const loadStatus = async () => {
+        try {
+            const r = await axios.get(`${API_BASE}/kids/billing/status`, { params: { token } });
+            setStatus(r.data);
+        } catch (_) { /* swallow — dashboard still renders without the plan card */ }
+    };
+
+    // Handle the browser bouncing back from a Stripe Checkout redirect.
+    // Unlike PricingPage, we must preserve `?token=...` when stripping the
+    // Stripe params — it's this page's only credential.
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get("kids_stripe_session_id");
+        const flag = params.get("kids_stripe");
+
+        const stripParams = (...keys) => {
+            const next = new URLSearchParams(window.location.search);
+            keys.forEach((k) => next.delete(k));
+            const qs = next.toString();
+            window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+        };
+
+        if (sessionId) {
+            (async () => {
+                setError(""); setMessage(lang === "id" ? "Mengonfirmasi pembayaran…" : "Confirming payment…");
+                try {
+                    const r = await axios.post(`${API_BASE}/kids/billing/stripe/confirm`, { token, session_id: sessionId });
+                    if (r.data.ok) {
+                        setMessage(r.data.message || (lang === "id" ? "Pembayaran dikonfirmasi." : "Payment confirmed."));
+                        await loadStatus();
+                    } else {
+                        setError(r.data.message || (lang === "id" ? "Pembayaran belum selesai." : "Payment not completed yet."));
+                    }
+                } catch (e) {
+                    setError(e?.response?.data?.detail || (lang === "id" ? "Tidak bisa mengonfirmasi pembayaran." : "Could not confirm payment."));
+                } finally {
+                    setTimeout(() => setMessage(""), 8000);
+                    stripParams("kids_stripe_session_id", "kids_stripe");
+                }
+            })();
+        } else if (flag === "cancelled") {
+            setError(lang === "id" ? "Checkout dibatalkan — tidak ada biaya." : "Checkout cancelled — no charge was made.");
+            stripParams("kids_stripe");
+            loadStatus();
+        } else {
+            loadStatus();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token]);
+
+    const startCheckout = async () => {
+        setBusy(true); setError("");
+        try {
+            const r = await axios.post(`${API_BASE}/kids/billing/stripe/checkout`, { token });
+            window.location.href = r.data.checkout_url;
+        } catch (e) {
+            setError(e?.response?.data?.detail || (lang === "id" ? "Tidak bisa memulai checkout." : "Couldn't start checkout."));
+            setBusy(false);
+        }
+    };
+
+    const cancelPlan = async () => {
+        setBusy(true); setError("");
+        try {
+            const r = await axios.post(`${API_BASE}/kids/billing/stripe/cancel`, { token });
+            setMessage(r.data.message || "");
+            await loadStatus();
+        } catch (e) {
+            setError(e?.response?.data?.detail || (lang === "id" ? "Tidak bisa membatalkan." : "Couldn't cancel."));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    if (!status) return null; // still loading, or the status fetch failed silently
+
+    const isPro = status.plan === "kids_pro";
+    const isCancelling = status.subscription_status === "CANCELLED" && !!status.cancels_at;
+
+    return (
+        <section data-testid="parent-plan-card" style={{
+            marginTop: 18, background: "#fff", border: `1px solid ${SAND_BORDER}`, borderRadius: 16, padding: 18,
+        }}>
+            <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "#7a5a00", fontWeight: 700, margin: 0 }}>
+                {lang === "id" ? "Paket KidStocks" : "KidStocks plan"}
+            </p>
+            <h3 style={{ fontSize: 17, fontWeight: 700, marginTop: 6, marginBottom: 8 }}>
+                {isPro
+                    ? (lang === "id" ? "KidStocks Pro aktif ✓" : "KidStocks Pro is active ✓")
+                    : (lang === "id" ? "Sedang di paket Gratis" : "Currently on the Free plan")}
+            </h3>
+            {!isPro && (
+                <>
+                    <p style={{ fontSize: 13, opacity: 0.8, lineHeight: 1.55, marginTop: 4 }}>
+                        {lang === "id"
+                            ? "Naik ke Pro untuk membuka lebih banyak penjelasan saham AI setiap hari — $4.99/bulan."
+                            : "Upgrade to Pro to unlock more AI stock explanations per day — $4.99/month."}
+                    </p>
+                    <div style={{ marginTop: 12, maxWidth: 220 }}>
+                        <StripeCheckoutButton processing={busy} onClick={startCheckout} testid="parent-plan-upgrade" />
+                    </div>
+                </>
+            )}
+            {isPro && (
+                <>
+                    <p style={{ fontSize: 13, opacity: 0.8, marginTop: 4 }}>
+                        {isCancelling
+                            ? (lang === "id" ? `Berakhir pada ${status.cancels_at.slice(0, 10)} — tidak ada biaya lagi.` : `Ends on ${status.cancels_at.slice(0, 10)} — no further charges.`)
+                            : (lang === "id" ? "Terima kasih sudah berlangganan!" : "Thanks for subscribing!")}
+                    </p>
+                    {!isCancelling && (
+                        <button
+                            onClick={cancelPlan} disabled={busy}
+                            data-testid="parent-plan-cancel"
+                            style={{
+                                marginTop: 12, padding: "8px 14px", background: "transparent", color: NAVY,
+                                border: `1.5px solid ${SAND_BORDER}`, borderRadius: 10, fontSize: 12, fontWeight: 600,
+                                cursor: busy ? "wait" : "pointer",
+                            }}
+                        >
+                            {lang === "id" ? "Batalkan" : "Cancel"}
+                        </button>
+                    )}
+                </>
+            )}
+            {message && <p style={{ marginTop: 10, fontSize: 12, color: GREEN }}>{message}</p>}
+            {error && <p style={{ marginTop: 10, fontSize: 12, color: ACCENT }}>{error}</p>}
+        </section>
     );
 }
 

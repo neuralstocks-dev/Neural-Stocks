@@ -8,13 +8,17 @@
  *   3. Three "why us" cards — translation philosophy, reflection
  *      reward, no-real-money default
  */
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 import { Sparkles, ArrowRight, ShieldCheck, Brain, Coins, Check, X } from "lucide-react";
 import KidsBrandMark from "@/components/KidsBrandMark";
 import { useKidsLang, t } from "@/lib/kidsI18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import KidsFooter from "@/components/KidsFooter";
+import { API_BASE } from "@/lib/api";
+
+const DEFAULT_KIDS_PRO_PRICE = 4.99; // fallback while /kids/billing/config loads
 
 const ACCENT = "#ff7676";
 const NAVY = "#1a1a2e";
@@ -34,6 +38,18 @@ const wrapStyle = { maxWidth: 1180, margin: "0 auto", padding: "24px 20px 60px" 
 
 export default function KidsForParentsPage() {
     const { lang } = useKidsLang();
+    const [kidsProPrice, setKidsProPrice] = useState(DEFAULT_KIDS_PRO_PRICE);
+
+    useEffect(() => {
+        let cancelled = false;
+        axios.get(`${API_BASE}/kids/billing/config`)
+            .then((r) => {
+                const price = r?.data?.plans?.kids_pro?.price_usd;
+                if (!cancelled && typeof price === "number") setKidsProPrice(price);
+            })
+            .catch(() => { /* keep the fallback price */ });
+        return () => { cancelled = true; };
+    }, []);
 
     // Comparison rows + columns: 7 platforms × 6 dimensions.
     const cols = [
@@ -186,6 +202,41 @@ export default function KidsForParentsPage() {
                         <Why icon={<Brain size={24} color={GREEN} />} title={t(lang, "parents.why1_title")} body={t(lang, "parents.why1_body")} />
                         <Why icon={<Coins size={24} color={GOLD} />} title={t(lang, "parents.why2_title")} body={t(lang, "parents.why2_body")} />
                         <Why icon={<ShieldCheck size={24} color={ACCENT} />} title={t(lang, "parents.why3_title")} body={t(lang, "parents.why3_body")} />
+                    </div>
+                </div>
+            </section>
+
+            {/* Plans & billing — checkout itself lives in the Parent Dashboard
+                (parents pay, kids never see a card form); this is just the
+                pitch + CTA into the sign-in flow. */}
+            <section style={{ ...wrapStyle, paddingTop: 28, paddingBottom: 8 }} data-testid="parents-billing-section">
+                <div style={{
+                    background: SAND, border: `1px solid ${SAND_BORDER}`, borderRadius: 20,
+                    padding: "28px 26px", display: "flex", flexWrap: "wrap", gap: 20,
+                    alignItems: "center", justifyContent: "space-between",
+                }}>
+                    <div style={{ maxWidth: 560 }}>
+                        <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: GOLD, fontWeight: 700, margin: 0 }}>
+                            {t(lang, "parents.billing_eyebrow")}
+                        </p>
+                        <h2 style={{ fontSize: "clamp(1.3rem, 3vw, 1.7rem)", fontWeight: 700, marginTop: 8, marginBottom: 10 }}>
+                            {t(lang, "parents.billing_title")}
+                        </h2>
+                        <p style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.8 }}>
+                            {t(lang, "parents.billing_body")}
+                        </p>
+                    </div>
+                    <div style={{ textAlign: "center", flexShrink: 0 }}>
+                        <p style={{ fontSize: 28, fontWeight: 700, color: NAVY, margin: 0 }}>
+                            ${kidsProPrice}<span style={{ fontSize: 14, fontWeight: 600, opacity: 0.6 }}>{lang === "id" ? "/bln" : "/mo"}</span>
+                        </p>
+                        <Link to="/kids/parent/login" data-testid="parents-billing-cta" style={{
+                            display: "inline-flex", alignItems: "center", gap: 8, marginTop: 12,
+                            padding: "12px 22px", background: ACCENT, color: "#fff",
+                            fontSize: 14, fontWeight: 700, borderRadius: 999, textDecoration: "none",
+                        }}>
+                            {t(lang, "parents.billing_cta")}
+                        </Link>
                     </div>
                 </div>
             </section>

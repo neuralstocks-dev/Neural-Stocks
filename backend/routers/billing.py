@@ -30,6 +30,7 @@ from services.stripe_service import (
     cancel_subscription_at_period_end,
     construct_webhook_event,
     StripeError,
+    STRIPE_STATUS_MAP as _STRIPE_STATUS_MAP,
 )
 from services.email import send_receipt_email
 
@@ -334,15 +335,6 @@ async def stripe_billing_config(user=Depends(get_current_user)):
     }
 
 
-# Shared with the customer.subscription.updated webhook handler below —
-# one mapping from Stripe's subscription status vocabulary to ours.
-_STRIPE_STATUS_MAP = {
-    "ACTIVE": "ACTIVE", "TRIALING": "ACTIVE",
-    "PAST_DUE": "PAYMENT_FAILED", "UNPAID": "PAYMENT_FAILED",
-    "CANCELED": "CANCELLED", "INCOMPLETE_EXPIRED": "CANCELLED",
-}
-
-
 async def _activate_subscription_from_session(session: dict) -> dict | None:
     meta = session.get("metadata") or {}
     user_id = meta.get("user_id") or session.get("client_reference_id")
@@ -500,6 +492,9 @@ async def _activate_daypass_from_session(session: dict) -> dict | None:
 
 async def _handle_stripe_checkout_completed(session: dict) -> dict | None:
     meta = session.get("metadata") or {}
+    if meta.get("plan") == "kids_pro":
+        from routers.kids_billing import activate_kids_subscription_from_session
+        return await activate_kids_subscription_from_session(session)
     if meta.get("kind") == "daypass" or session.get("mode") == "payment":
         return await _activate_daypass_from_session(session)
     return await _activate_subscription_from_session(session)
@@ -681,6 +676,11 @@ async def stripe_webhook(request: Request):
                 {"subscription_id": sub_id},
                 {"$set": {"status": "CANCELLED", "updated_at": iso(now_utc())}},
             )
+        else:
+            # Not an adult subscription — check whether it belongs to a
+            # parent's kids_pro subscription instead.
+            from routers.kids_billing import kids_subscription_deleted
+            await kids_subscription_deleted(sub_id)
 
     elif event_type == "customer.subscription.updated":
         sub_id = data_obj.get("id")
@@ -692,6 +692,10 @@ async def stripe_webhook(request: Request):
             await db.subscriptions.update_one(
                 {"subscription_id": sub_id}, {"$set": {"status": mapped, "updated_at": iso(now_utc())}}
             )
+        elif status:
+            from routers.kids_billing import kids_subscription_status_updated
+            mapped = _STRIPE_STATUS_MAP.get(status, status)
+            await kids_subscription_status_updated(sub_id, mapped)
 
     elif event_type == "invoice.paid":
         sub_id = data_obj.get("subscription")

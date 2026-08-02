@@ -5,7 +5,7 @@ from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 
 from core.db import client
-from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry, kids_preview, kids_auth, kids_portfolio, kids_journal, kids_consent, kids_parent, neutools, agents
+from routers import auth, plans, stocks, watchlist, analysis, admin, scorecard, disclaimer, billing, portfolio, telegram, idx, trending, anon_try, experiments, backtest, alerts, telemetry, kids_preview, kids_auth, kids_portfolio, kids_journal, kids_consent, kids_parent, kids_billing, neutools, agents
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,6 +47,7 @@ api_router.include_router(kids_portfolio.router)
 api_router.include_router(kids_journal.router)
 api_router.include_router(kids_consent.router)
 api_router.include_router(kids_parent.router)
+api_router.include_router(kids_billing.router)
 api_router.include_router(neutools.router)
 api_router.include_router(agents.router)
 
@@ -167,6 +168,9 @@ async def start_background_tasks():
         await _db.kids_parent_sessions.create_index("parent_email")
         await _db.kids_parent_telegram.create_index("parent_email", unique=True)
         await _db.kids_parent_telegram_codes.create_index("code", unique=True)
+        await _db.kids_subscriptions.create_index("parent_email", unique=True)
+        await _db.kids_subscriptions.create_index("subscription_id")
+        await _db.kids_analysis_log.create_index([("student_id", 1), ("created_at", 1)])
         logger.info("Ensured KidStocks indexes")
     except Exception as e:
         logger.warning("Failed to ensure KidStocks indexes: %s", e)

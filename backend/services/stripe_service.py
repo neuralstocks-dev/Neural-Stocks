@@ -21,6 +21,16 @@ _stripe.api_key = STRIPE_SECRET_KEY
 
 COUPON_SETTINGS_ID = "stripe_promo_coupons"
 
+# Shared between routers/billing.py's customer.subscription.updated webhook
+# handler and routers/kids_billing.py's — one mapping from Stripe's
+# subscription status vocabulary to ours (ACTIVE/PAYMENT_FAILED/CANCELLED),
+# used identically by both the adult and kids billing flows.
+STRIPE_STATUS_MAP = {
+    "ACTIVE": "ACTIVE", "TRIALING": "ACTIVE",
+    "PAST_DUE": "PAYMENT_FAILED", "UNPAID": "PAYMENT_FAILED",
+    "CANCELED": "CANCELLED", "INCOMPLETE_EXPIRED": "CANCELLED",
+}
+
 
 class StripeError(Exception):
     pass

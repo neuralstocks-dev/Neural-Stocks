@@ -376,6 +376,7 @@ export function KidsAnalyzePage() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [quotaExceeded, setQuotaExceeded] = useState(false);
     const [held, setHeld] = useState(0);
     const [watching, setWatching] = useState(false);
     const [tradeBusy, setTradeBusy] = useState(false);
@@ -390,7 +391,7 @@ export function KidsAnalyzePage() {
     useEffect(() => {
         let cancelled = false;
         (async () => {
-            setLoading(true); setError(""); setData(null); setTradeError(""); setTradeOk("");
+            setLoading(true); setError(""); setQuotaExceeded(false); setData(null); setTradeError(""); setTradeOk("");
             try {
                 // Run analyze + portfolio + watchlist concurrently — held qty
                 // and watch state come from the latter two so we render the
@@ -406,7 +407,14 @@ export function KidsAnalyzePage() {
                 setHeld(pos?.qty || 0);
                 setWatching(!!(w.data.watchlist || []).find((x) => x.ticker === sym));
             } catch (err) {
-                if (!cancelled) setError(err?.response?.data?.detail || "Couldn't load this one — try another stock.");
+                if (!cancelled) {
+                    if (err?.response?.status === 402) {
+                        setQuotaExceeded(true);
+                        setError(err?.response?.data?.detail || "You've used today's free stock explanations.");
+                    } else {
+                        setError(err?.response?.data?.detail || "Couldn't load this one — try another stock.");
+                    }
+                }
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -458,6 +466,15 @@ export function KidsAnalyzePage() {
     }, [sym]);
 
     if (loading) return <div style={{ textAlign: "center", padding: 40 }}><Loader2 className="animate-spin" /></div>;
+    if (quotaExceeded) return (
+        <div style={{ ...cardStyle, textAlign: "center", background: "linear-gradient(135deg, rgba(255,181,112,0.12), rgba(255,118,118,0.08))" }} data-testid="kids-analyze-quota-banner">
+            <Sparkles size={32} color={GOLD} />
+            <p style={{ marginTop: 12, fontWeight: 700, color: NAVY }}>You've hit today's limit!</p>
+            <p style={{ marginTop: 8, opacity: 0.75 }}>{error}</p>
+            <p style={{ marginTop: 4, fontSize: 13, opacity: 0.65 }}>Ask your parent to check the Parent Dashboard to unlock more.</p>
+            <Link to="/kids/discover" style={{ color: ACCENT, fontWeight: 700, marginTop: 12, display: "inline-block", textDecoration: "none" }}>← Back to Discover</Link>
+        </div>
+    );
     if (error) return (
         <div style={{ ...cardStyle, textAlign: "center" }} data-testid="kids-analyze-error">
             <ShieldAlert size={32} color={ACCENT} />

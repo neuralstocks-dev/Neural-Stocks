@@ -87,6 +87,18 @@ const DICT = {
         "landing.cta_signup": "Sign your kid up — free →",
         "landing.cta_preview": "Or try the live AI demo first →",
 
+        // Plans teaser (/kids/about) — informational only, no checkout here.
+        // Checkout lives in the parent dashboard (COPPA: parents pay, not kids).
+        "plans.eyebrow": "Plans",
+        "plans.title": "Free to start. Upgrade for more AI explanations.",
+        "plans.free_name": "Free",
+        "plans.free_price": "$0",
+        "plans.free_body": "3 AI stock explanations a day, virtual StockCoins trading, full access to lessons.",
+        "plans.pro_name": "KidStocks Pro",
+        "plans.pro_price": "$4.99/mo",
+        "plans.pro_body": "15 AI stock explanations a day — for kids who want to dig into more stocks.",
+        "plans.cta": "See plans for parents →",
+
         // For-Parents / Why-Us page (/kids/for-parents)
         "parents.eyebrow": "For parents",
         "parents.hero_title": "The investing app that teaches kids to think.",
@@ -155,6 +167,10 @@ const DICT = {
         "parents.why2_body": "Every virtual buy or sell triggers a 3-question reflection journal (Why? Which signal? When would you sell?). Submitting earns +50 StockCoins, capped at 5/day. The cap is intentional: we don't want to game churn — we want kids to slow down and reason.",
         "parents.why3_title": "We default to no real money.",
         "parents.why3_body": "Every kid starts with 10,000 virtual StockCoins. There is no path to real-money trading inside KidStocks. When they're 18, they graduate to NeuLab — our adult platform — with the reasoning habits already in place.",
+        "parents.billing_eyebrow": "Plans & billing",
+        "parents.billing_title": "Free to start — upgrade any time from your dashboard.",
+        "parents.billing_body": "Kids get 3 free AI stock explanations a day. Upgrade to KidStocks Pro (15/day) from the Parent Dashboard — you pay, your kid never sees a card form.",
+        "parents.billing_cta": "Sign in to manage your plan →",
         "parents.cta_title": "Ready to give your kid an unfair head-start?",
         "parents.cta_body": "Sign-up takes 30 seconds. Under-13s need a quick parental consent (COPPA-compliant — you control the data).",
         "parents.cta_button": "Sign your kid up — free →",
@@ -314,6 +330,19 @@ const DICT = {
         "landing.cta_signup": "Daftarkan anakmu — gratis →",
         "landing.cta_preview": "Atau coba demo AI dulu →",
 
+        // Plans teaser (/kids/about) — hanya informasi, tidak ada checkout
+        // di sini. Checkout ada di dashboard orang tua (COPPA: orang tua
+        // yang bayar, bukan anak).
+        "plans.eyebrow": "Paket",
+        "plans.title": "Gratis untuk mulai. Naik paket untuk lebih banyak penjelasan AI.",
+        "plans.free_name": "Gratis",
+        "plans.free_price": "$0",
+        "plans.free_body": "3 penjelasan saham AI per hari, trading StockCoins virtual, akses penuh ke pelajaran.",
+        "plans.pro_name": "KidStocks Pro",
+        "plans.pro_price": "$4.99/bln",
+        "plans.pro_body": "15 penjelasan saham AI per hari — untuk anak yang ingin eksplor lebih banyak saham.",
+        "plans.cta": "Lihat paket untuk orang tua →",
+
         // For-Parents page
         "parents.eyebrow": "Untuk orang tua",
         "parents.hero_title": "Aplikasi investasi yang mengajarkan anak berpikir.",
@@ -382,6 +411,10 @@ const DICT = {
         "parents.why2_body": "Setiap pembelian atau penjualan virtual memicu jurnal refleksi 3 pertanyaan (Kenapa? Sinyal mana? Kapan jual?). Mengisi mendapat +50 StockCoins, dibatasi 5/hari. Pembatasan disengaja: kami tidak ingin menggairahkan churn — kami ingin anak melambat dan menalar.",
         "parents.why3_title": "Kami default tanpa uang sungguhan.",
         "parents.why3_body": "Setiap anak mulai dengan 10.000 StockCoins virtual. Tidak ada jalur ke trading uang sungguhan di dalam KidStocks. Saat 18 tahun, mereka lulus ke NeuLab — platform dewasa kami — dengan kebiasaan menalar yang sudah terbentuk.",
+        "parents.billing_eyebrow": "Paket & pembayaran",
+        "parents.billing_title": "Gratis untuk mulai — naik paket kapan saja dari dashboard-mu.",
+        "parents.billing_body": "Anak dapat 3 penjelasan saham AI gratis per hari. Naik ke KidStocks Pro (15/hari) dari Dashboard Orang Tua — kamu yang bayar, anak tidak pernah melihat formulir kartu.",
+        "parents.billing_cta": "Masuk untuk kelola paketmu →",
         "parents.cta_title": "Siap memberi anakmu modal awal yang tak adil?",
         "parents.cta_body": "Daftar hanya 30 detik. Usia di bawah 13 butuh persetujuan orang tua singkat (COPPA-compliant — kamu kontrol datanya).",
         "parents.cta_button": "Daftarkan anakmu — gratis →",

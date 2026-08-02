@@ -135,6 +135,29 @@ PLANS = {
     },
 }
 
+# ---------- KidStocks plans ----------
+# Raises the daily cap on kid-facing AI stock explanations (GET
+# /api/kids/analyze/{ticker}). Kids-only — entirely separate from the
+# adult PLANS above (different collection, different attach point:
+# a paid plan here is bought by a parent and applies to every kid under
+# that parent_email, see routers/kids_billing.py).
+DEFAULT_KIDS_PRO_PRICE = 4.99  # monthly only for v1, no yearly cycle
+
+KIDS_PLANS = {
+    "free": {
+        "name": "Free",
+        "price_usd": 0,
+        "analyses_per_day": 3,
+        "tag": "Starter",
+    },
+    "kids_pro": {
+        "name": "KidStocks Pro",
+        "price_usd": DEFAULT_KIDS_PRO_PRICE,
+        "analyses_per_day": 15,
+        "tag": "Most popular",
+    },
+}
+
 UNLOCK_DURATIONS = {
     "1h": 60 * 60,
     "2h": 2 * 60 * 60,

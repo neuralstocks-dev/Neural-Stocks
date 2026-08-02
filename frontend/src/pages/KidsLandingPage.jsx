@@ -151,6 +151,38 @@ export default function KidsLandingPage() {
                 </div>
             </section>
 
+            {/* Plans teaser — informational only. Checkout lives in the parent
+                dashboard (/kids/parent/dashboard), not here — kids never see
+                a payment form. */}
+            <section style={{ background: "#fff", borderTop: `1px solid ${SAND_BORDER}`, borderBottom: `1px solid ${SAND_BORDER}` }} data-testid="landing-plans-section">
+                <div style={{ ...wrapStyle, paddingTop: 48, paddingBottom: 48 }}>
+                    <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: GOLD, fontWeight: 700, margin: 0 }}>
+                        {t(lang, "plans.eyebrow")}
+                    </p>
+                    <h2 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 700, marginTop: 10, marginBottom: 26, maxWidth: 700 }}>
+                        {t(lang, "plans.title")}
+                    </h2>
+                    <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", maxWidth: 680 }}>
+                        <div style={{ background: SAND, border: `1px solid ${SAND_BORDER}`, borderRadius: 16, padding: 22 }} data-testid="landing-plan-free">
+                            <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>{t(lang, "plans.free_name")}</h3>
+                            <p style={{ fontSize: 22, fontWeight: 700, marginTop: 6 }}>{t(lang, "plans.free_price")}</p>
+                            <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, opacity: 0.78 }}>{t(lang, "plans.free_body")}</p>
+                        </div>
+                        <div style={{ background: NAVY, color: "#fff", borderRadius: 16, padding: 22 }} data-testid="landing-plan-pro">
+                            <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>{t(lang, "plans.pro_name")}</h3>
+                            <p style={{ fontSize: 22, fontWeight: 700, marginTop: 6, color: GOLD }}>{t(lang, "plans.pro_price")}</p>
+                            <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, opacity: 0.85 }}>{t(lang, "plans.pro_body")}</p>
+                        </div>
+                    </div>
+                    <Link to="/kids/for-parents" data-testid="landing-plans-cta" style={{
+                        display: "inline-flex", alignItems: "center", gap: 8, marginTop: 22,
+                        color: ACCENT, fontWeight: 700, textDecoration: "none", fontSize: 14,
+                    }}>
+                        {t(lang, "plans.cta")}
+                    </Link>
+                </div>
+            </section>
+
             {/* CTA strip */}
             <section style={{ ...wrapStyle, paddingTop: 28, paddingBottom: 56, textAlign: "center" }}>
                 <Link to="/kids/signup" data-testid="landing-cta-signup" style={{
