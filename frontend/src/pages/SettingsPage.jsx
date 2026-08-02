@@ -400,7 +400,6 @@ export default function SettingsPage() {
                                             {[
                                                 { key: "signal", label: "AI Verdicts (BUY/SELL ≥75%)" },
                                                 { key: "pattern", label: "Pattern Scans" },
-                                                { key: "rf_watchlist_scan", label: "RF Auto-Scan" },
                                             ].map((t) => {
                                                 const active = (tgPrefs.alert_types || []).includes(t.key);
                                                 const sched = tgPrefs.alert_schedule?.[t.key] || "realtime";
@@ -464,8 +463,7 @@ export default function SettingsPage() {
                                             className="text-xs mt-1 mb-2"
                                             style={{ color: "hsl(var(--text-muted))" }}
                                         >
-                                            Only push verdicts run in these modes. (RF Auto-Scan is unaffected — it
-                                            has no mode.)
+                                            Only push verdicts run in these modes.
                                         </p>
                                         <div className="flex flex-wrap gap-2" data-testid="tg-alert-modes-row">
                                             {[
