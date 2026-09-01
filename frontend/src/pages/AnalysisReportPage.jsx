@@ -19,7 +19,6 @@ import AnalysisQueueChip from "@/components/AnalysisQueueChip";
 import AnalysisProgressStepper from "@/components/AnalysisProgressStepper";
 import LLMBudgetBanner from "@/components/LLMBudgetBanner";
 import IntrinsicValueChip from "@/components/IntrinsicValueChip";
-import ConfidenceCalibrationBreadcrumbs from "@/components/ConfidenceCalibrationBreadcrumbs";
 import RisksModule from "@/components/RisksModule";
 import AlternativeScenariosModule from "@/components/AlternativeScenariosModule";
 import WhatCouldChangeViewModule from "@/components/WhatCouldChangeViewModule";
@@ -720,8 +719,6 @@ export default function AnalysisReportPage() {
                                                 </span>
                                             </p>
                                             <LLMProvenanceBadge analysis={analysis} />
-
-                                            <ConfidenceCalibrationBreadcrumbs analysis={analysis} />
                                         </div>
                                     </div>
 

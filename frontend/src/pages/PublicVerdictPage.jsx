@@ -257,18 +257,6 @@ export default function PublicVerdictPage() {
                             </div>
                         </section>
 
-                        {/* Verdict Accuracy v2 calibration block — mirrors the
-                            audit trail visible to the verdict's owner in the
-                            web report. Two states: amber/hold-bordered "fired"
-                            with score breakdown + bullet adjustments + RF/
-                            earnings source line, OR green/buy-bordered clean
-                            empty-state stating both gates ran. Renders only
-                            when calibration_version is present so older shares
-                            don't display the block. */}
-                        {(a.calibration_version === "v2" || Array.isArray(a.confidence_adjustments)) && (
-                            <PublicCalibrationBlock analysis={a} />
-                        )}
-
                         <section className="module p-6 md:p-10 mt-1 md:mt-4">
                             <p className="text-overline">Reasoning</p>
                             <h2
