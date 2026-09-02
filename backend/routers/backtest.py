@@ -61,8 +61,7 @@ async def ml_backtest():
     doc["model_retired_note"] = (
         "The Random-Forest model behind this backtest has been retired after "
         "failing to beat a trivial baseline on properly-tested holdout data. "
-        "These numbers are frozen from before that decision and will not update. "
-        "See the Technical page for the full writeup."
+        "These numbers are frozen from before that decision and will not update."
     )
     return doc
 

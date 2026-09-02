@@ -229,9 +229,9 @@ async def set_auto_scan_prefs(payload: dict, user=Depends(get_current_user)):
                 "Watchlist Auto-Scan has been retired. Its scoring relied on "
                 "our Random-Forest secondary-opinion model, which we've disabled "
                 "after two properly-tested label targets both failed to beat a "
-                "trivial baseline on holdout data. See the Technical page for "
-                "the full writeup. We're not comfortable running a paid feature "
-                "on a model that doesn't outperform guessing the majority class."
+                "trivial baseline on holdout data. We're not comfortable running "
+                "a paid feature on a model that doesn't outperform guessing the "
+                "majority class."
             ),
         )
     u = await db.users.find_one(
@@ -289,8 +289,7 @@ async def set_weekly_digest_prefs(payload: dict, user=Depends(get_current_user))
                 "The Weekly Digest has been retired. Its scoring relied on our "
                 "Random-Forest secondary-opinion model, which we've disabled "
                 "after two properly-tested label targets both failed to beat a "
-                "trivial baseline on holdout data. See the Technical page for "
-                "the full writeup."
+                "trivial baseline on holdout data."
             ),
         )
     await db.users.update_one(
