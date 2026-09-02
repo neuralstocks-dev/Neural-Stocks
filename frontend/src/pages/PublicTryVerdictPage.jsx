@@ -463,12 +463,6 @@ export default function PublicTryVerdictPage() {
                                 wide
                             />
                             <LockedModule
-                                title="Random Forest opinion"
-                                hint="20-day horizon ML model · 344 tickers · isotonic calibration"
-                                show={!!locked.rf_opinion}
-                                wide
-                            />
-                            <LockedModule
                                 title="Risk Factors"
                                 hint="Ranked downside scenarios with probabilities"
                                 show={!!locked.risk_factors}

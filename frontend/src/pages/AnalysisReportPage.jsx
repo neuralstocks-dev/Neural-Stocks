@@ -10,7 +10,6 @@ import AnalysisModeSelector from "@/components/AnalysisModeSelector";
 import CandlestickFindings from "@/components/CandlestickFindings";
 import MarketContextModules from "@/components/MarketContextModules";
 import MethodologyLink from "@/components/MethodologyLink";
-import RandomForestOpinion from "@/components/RandomForestOpinion";
 import BandarmologyCard from "@/components/BandarmologyCard";
 import BrokerFlowCompanionCard from "@/components/BrokerFlowCompanionCard";
 import IdxVerdictCalibrationNote from "@/components/IdxVerdictCalibrationNote";
@@ -819,8 +818,6 @@ export default function AnalysisReportPage() {
                                 {/* Market context — Finnhub: headlines, analyst consensus, earnings */}
                                 <MarketContextModules marketContext={analysis.market_context} />
 
-                                {/* Random Forest secondary opinion (renders only when model loaded) */}
-                                <RandomForestOpinion opinion={analysis.rf_opinion} />
                                 <BandarmologyCard bandarmology={analysis.bandarmology} />
                                 <IdxVerdictCalibrationNote analysis={analysis} />
                                 {analysis.bandarmology && <BrokerFlowCompanionCard />}

@@ -587,7 +587,7 @@ function Step3Reveal({ ticker, result, onClose, onExplore }) {
                 className="text-[11px] mt-5"
                 style={{ color: "hsl(var(--text-muted))" }}
             >
-                Tip: the 4 other modules (Pattern Scan, RF Second Opinion, Risks, Score Card) live
+                Tip: the 3 other modules (Pattern Scan, Risks, Score Card) live
                 on the report page.
             </p>
         </div>

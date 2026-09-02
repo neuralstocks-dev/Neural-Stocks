@@ -72,7 +72,7 @@ const WATCHLIST_PHASE_LABELS = {
     computing_technicals: "Technicals",
     scanning_patterns: "Patterns",
     llm_thinking: "LLM verdict",
-    rf_scoring: "RF score",
+    rf_scoring: "Secondary check",
     calibrating: "Calibrating",
 };
 
@@ -449,7 +449,7 @@ export default function DashboardPage() {
     const [analyzingTicker, setAnalyzingTicker] = useState(null);
     const [wakingUp, setWakingUp] = useState(false); // Railway cold-start detection
     // Live phase label ("Fetching data" | "Technicals" | "Patterns" | "LLM
-    // verdict" | "RF score" | "Calibrating") for the watchlist row pill.
+    // verdict" | "Secondary check" | "Calibrating") for the watchlist row pill.
     // Updated by pollAnalysisJob's onProgress callback so the user sees
     // exactly where in the pipeline we are — same text as the Re-analyze
     // page stepper. Mobile-friendly: just a single label, no full stepper

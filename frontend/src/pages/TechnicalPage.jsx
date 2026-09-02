@@ -33,7 +33,6 @@ import RightRailTOC from "@/components/RightRailTOC";
 
 export default function TechnicalPage() {
     const loc = useLocation();
-    const [rfMeta, setRfMeta] = useState(null);
     // Determine admin status to gate cost-economics cells from public view.
     // Cost-per-verdict is operational data — useful for the operator, but
     // showing it publicly leaks margin info to competitors and primes
@@ -57,11 +56,6 @@ export default function TechnicalPage() {
         rt_p95: null,   // simple rolling p95 over last ~12 polls (60s window)
         last_updated: null,
     });
-    useEffect(() => {
-        api.get("/analysis/rf-model/meta")
-            .then((r) => setRfMeta(r.data))
-            .catch(() => setRfMeta({ available: false }));
-    }, []);
     useEffect(() => {
         let cancelled = false;
         let timer = null;
@@ -575,7 +569,7 @@ histogram  = MACD_line − signal`}
                     />
                 </div>
 
-                {/* Random Forest secondary-opinion model */}
+                {/* Macro context layer */}
                 <SectionHeader
                     icon={Trees}
                     overline="Macro context layer"
@@ -616,340 +610,6 @@ histogram  = MACD_line − signal`}
                     degrades gracefully — analyses proceed without macro context rather than failing.
                 </p>
 
-                <SectionHeader
-                    icon={Trees}
-                    title="The Random Forest layer."
-                    subtitle="We tested an independent probability model alongside the AI verdict for a while. It's currently disabled — see why below. Honest numbers, warts and all."
-                />
-
-                <div id="random-forest" className="mt-8 module p-6 md:p-10 scroll-mt-24" data-testid="tech-random-forest">
-                    {/* Beginner-friendly intro: what RF is in 90 seconds + why
-                        it's the right model for stock probability. */}
-                    <div
-                        className="mb-8 p-5 md:p-6"
-                        style={{
-                            border: "1px solid hsl(var(--border-default))",
-                            borderLeft: "3px solid hsl(var(--buy))",
-                            background: "hsla(142,55%,45%,0.03)",
-                            borderRadius: 2,
-                        }}
-                        data-testid="rf-intro-explainer"
-                    >
-                        <p className="text-overline" style={{ color: "hsl(var(--buy))", fontSize: "0.6rem" }}>
-                            New here? Start with this 90-second primer
-                        </p>
-                        <h4 className="font-serif mt-3 mb-3" style={{ fontSize: "1.4rem", letterSpacing: "-0.005em" }}>
-                            What is a Random Forest, in plain English?
-                        </h4>
-                        <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                            Imagine asking <strong style={{ color: "hsl(var(--text-primary))" }}>400 independent analysts</strong>{" "}
-                            to look at the same stock — but each one is only allowed to see a <em>random subset</em>{" "}
-                            of the price history and a <em>random subset</em> of the indicators. Each analyst writes a
-                            yes/no answer to one question: <em>"will this stock be higher 20 trading days from now?"</em>{" "}
-                            You then take the majority vote, weighted by how confident each one was. That's a
-                            Random Forest. Each "analyst" is a small decision tree; the "forest" is all 400 trees
-                            voting together. The randomness is what makes it robust — no single tree dominates,
-                            so the model doesn't memorise quirks of one stock or one regime.
-                        </p>
-                        <h5 className="font-serif mt-5 mb-2" style={{ fontSize: "1.05rem" }}>
-                            Why this is the right model for stock direction
-                        </h5>
-                        <ul className="space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                            <TLi>
-                                <strong>Hard to overfit on noisy data</strong> — markets are mostly noise, and a single
-                                deep neural network will gleefully memorise that noise. The 400-tree vote averages it out.
-                            </TLi>
-                            <TLi>
-                                <strong>Naturally probabilistic</strong> — the vote share IS a calibrated probability
-                                ("65% of trees said up"). Perfect for the secondary-opinion role: we surface the
-                                probability, not a forced BUY/SELL label.
-                            </TLi>
-                            <TLi>
-                                <strong>Feature importance is free</strong> — RF tells you exactly which inputs (RSI,
-                                SMA-50 ratio, VIX level…) drove the prediction. Black-box neural nets don't.
-                            </TLi>
-                            <TLi>
-                                <strong>Doesn't pretend to time the market</strong> — RF predicts a 20-day-forward
-                                probability, not the next tick. That horizon matches how the average retail investor
-                                actually trades, and survives statistical scrutiny.
-                            </TLi>
-                            <TLi>
-                                <strong>Battle-tested in finance research</strong> — RF + tree ensembles have been
-                                the workhorse of equity-direction studies for 15+ years (Krauss et al. 2017,
-                                Gu/Kelly/Xiu 2020 NBER). It's the model that consistently survives out-of-sample tests.
-                            </TLi>
-                        </ul>
-                        <div
-                            className="mt-5 relative"
-                            style={{
-                                paddingBottom: "56.25%",
-                                height: 0,
-                                overflow: "hidden",
-                                border: "1px solid hsl(var(--border-default))",
-                                borderRadius: 2,
-                                background: "#000",
-                            }}
-                            data-testid="rf-youtube-embed"
-                        >
-                            <iframe
-                                src="https://www.youtube.com/embed/gkXX4h3qYm4"
-                                title="What is a Random Forest? — visual explainer"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                allowFullScreen
-                                style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    width: "100%",
-                                    height: "100%",
-                                    border: 0,
-                                }}
-                            />
-                        </div>
-                        <p className="mt-3 text-xs" style={{ color: "hsl(var(--text-muted))", fontSize: "0.72rem" }}>
-                            ↑ A 5-minute visual walkthrough — recommended before reading the methodology below.
-                        </p>
-                    </div>
-
-                    <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
-                        Every verdict passes through a trained <strong>scikit-learn RandomForestClassifier</strong>{" "}
-                        that produces an independent probability of a positive {rfMeta?.horizon_days ?? 20}-day
-                        forward return. It is the
-                        <em> only</em> trained ML component in the stack. We added it for three reasons:
-                        (1) catch cases where the LLM's narrative reasoning disagrees with what the
-                        historical data actually says, (2) expose feature importances so users see
-                        <em> why</em> the model agrees or disagrees, (3) lay groundwork for the autonomous
-                        trading roadmap item where position sizing needs a calibrated probability.
-                    </p>
-
-                    <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
-                        Training methodology
-                    </h4>
-                    <ul className="space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                        <TLi>
-                            <strong>Universe</strong>: top-liquidity S&amp;P 500 large caps across all 11 GICS sectors —
-                            Tech, Finance, Healthcare, Consumer, Industrials, Energy, Materials, Utilities,
-                            REITs &amp; Comms (~{rfMeta?.universe_size ?? 344} tickers).
-                        </TLi>
-                        <TLi>
-                            <strong>Input features</strong>: 23 numeric features derived from OHLCV +
-                            market context — returns, RSI, SMA ratios, volatility, volume, MACD,
-                            candle-shape, 52-week regime, plus <strong>SPY 20d trailing return</strong>{" "}
-                            and <strong>VIX relative level</strong> (VIX today vs its 252-day mean)
-                            so the model can condition on risk-on vs risk-off regimes.
-                            No look-ahead. No news. No analyst consensus. Pure price-action statistics.
-                        </TLi>
-                        <TLi>
-                            <strong>Label</strong>: binary — did the closing price rise over the next{" "}
-                            {rfMeta?.horizon_days ?? 20} trading days (≈1 calendar month)?
-                            The 0.5% deadband around flat was kept in the dataset (treated as "not up") to
-                            avoid artificially cleaning out ambiguous cases. A longer horizon smooths
-                            single-day noise and lets the model lean on regime-level features.
-                        </TLi>
-                        <TLi>
-                            <strong>Split</strong>: strict walk-forward by calendar date, 80/20.
-                            Every ticker's history is cut at the same date, so no ticker bleeds across train/test.
-                        </TLi>
-                        <TLi>
-                            <strong>Model</strong>: RandomForestClassifier(n_estimators=400, max_depth=12,
-                            min_samples_leaf=50, class_weight='balanced'). Out-of-bag scoring on.
-                        </TLi>
-                    </ul>
-
-                    {rfMeta?.available ? (
-                        <>
-                            <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
-                                Live holdout metrics
-                            </h4>
-                            <p className="text-sm mb-4" style={{ color: "hsl(var(--text-muted))" }}>
-                                These are the numbers the <em>currently deployed</em> model produced on the
-                                unseen hold-out period. They update automatically whenever the model is retrained.
-                                Training window:{" "}
-                                <strong style={{ color: "hsl(var(--text-primary))" }}>
-                                    {rfMeta.training_start_date || "?"} → {rfMeta.training_end_date || "?"}
-                                </strong>{" "}· horizon{" "}
-                                <strong style={{ color: "hsl(var(--text-primary))" }}>
-                                    {rfMeta.horizon_days} trading days
-                                </strong>{" "}· walk-forward cutoff{" "}
-                                <strong style={{ color: "hsl(var(--text-primary))" }}>
-                                    {rfMeta.cutoff_date}
-                                </strong>.
-                            </p>
-                            <div
-                                className="grid grid-cols-2 md:grid-cols-4 gap-0"
-                                style={{ border: "1px solid hsl(var(--border-default))" }}
-                                data-testid="rf-metrics"
-                            >
-                                <MetricCell
-                                    label="Holdout accuracy"
-                                    value={`${(rfMeta.holdout_accuracy * 100).toFixed(2)}%`}
-                                    color={
-                                        rfMeta.holdout_accuracy > rfMeta.baseline_accuracy
-                                            ? "hsl(var(--buy))"
-                                            : "hsl(var(--sell))"
-                                    }
-                                />
-                                <MetricCell label="ROC-AUC" value={rfMeta.holdout_auc.toFixed(3)} />
-                                <MetricCell label="OOB score" value={rfMeta.oob_score.toFixed(3)} />
-                                <MetricCell
-                                    label="Always-majority baseline"
-                                    value={`${(rfMeta.baseline_accuracy * 100).toFixed(2)}%`}
-                                    last
-                                />
-                            </div>
-
-                            <div
-                                className="mt-5 p-4 text-[12px] leading-relaxed"
-                                style={{
-                                    background: rfMeta.holdout_accuracy > rfMeta.baseline_accuracy
-                                        ? "hsla(142,55%,45%,0.06)"
-                                        : "hsla(0,55%,55%,0.04)",
-                                    border: "1px solid hsl(var(--border-divider))",
-                                }}
-                                data-testid="rf-honesty-note"
-                            >
-                                <p style={{ color: "hsl(var(--text-primary))" }}>
-                                    <strong>Honest reading:</strong>{" "}
-                                    {rfMeta.holdout_accuracy > rfMeta.baseline_accuracy ? (
-                                        <>the model beats the always-majority baseline by{" "}
-                                            <strong style={{ color: "hsl(var(--buy))" }}>
-                                                {((rfMeta.holdout_accuracy - rfMeta.baseline_accuracy) * 100).toFixed(2)} pp
-                                            </strong> on unseen data. That's a meaningful edge — but a modest one, as
-                                            it should be for single-stock direction.</>
-                                    ) : (
-                                        <>the model underperforms the always-majority baseline on 2025 holdout by{" "}
-                                            <strong style={{ color: "hsl(var(--sell))" }}>
-                                                {((rfMeta.baseline_accuracy - rfMeta.holdout_accuracy) * 100).toFixed(2)} pp
-                                            </strong>. This reflects a regime change between the training window
-                                            and the forward window — not a bug. We ship the model anyway as a
-                                            <em> skeptic layer</em>: when the model has no confidence
-                                            (|p − 0.5| &lt; 0.08) the UI explicitly says "No meaningful edge"
-                                            rather than display a misleading number.</>
-                                    )}
-                                </p>
-                                <p className="mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
-                                    The historical training-period OOB score of <strong>{(rfMeta.oob_score * 100).toFixed(1)}%</strong> shows the model <em>did</em> learn in-distribution patterns — the shortfall on 2025 is regime drift, the classic ML-in-markets problem.
-                                </p>
-                            </div>
-
-                            {rfMeta.calibration_method ? (
-                                <div
-                                    className="mt-5 p-4 text-[12px] leading-relaxed"
-                                    style={{
-                                        background: "hsla(220,30%,40%,0.05)",
-                                        border: "1px solid hsl(var(--border-divider))",
-                                    }}
-                                    data-testid="rf-calibration-note"
-                                >
-                                    <p style={{ color: "hsl(var(--text-primary))" }}>
-                                        <strong>Probability calibration:</strong>{" "}
-                                        <code>{rfMeta.calibration_method.replace("_", " / ")}</code>
-                                        {" "}on {rfMeta.calibration_rows?.toLocaleString()} held-out rows. Brier score on 2025 holdout:{" "}
-                                        <strong style={{ color: rfMeta.calibrated_brier <= rfMeta.uncalibrated_brier ? "hsl(var(--buy))" : "hsl(var(--sell))" }}>
-                                            {rfMeta.calibrated_brier?.toFixed(4)}
-                                        </strong>{" "}(calibrated) vs{" "}
-                                        <strong style={{ color: "hsl(var(--text-muted))" }}>
-                                            {rfMeta.uncalibrated_brier?.toFixed(4)}
-                                        </strong>{" "}(uncalibrated). Lower is better — closer to 0 means stated probabilities match observed frequencies.
-                                    </p>
-                                    <p className="mt-2" style={{ color: "hsl(var(--text-secondary))" }}>
-                                        {rfMeta.calibrated_brier <= rfMeta.uncalibrated_brier ? (
-                                            <>Isotonic calibration tightened the probability surface — when the model says 65%, it really means ~65% of the time in holdout.</>
-                                        ) : (
-                                            <>Honest note: on this particular 2025 holdout, the uncalibrated probabilities score <em>slightly better</em> on Brier. This is the regime-shift in the holdout window showing up again — the calibrator was fit on 2024 data whose probability landscape differs from 2025. We keep the calibrated wrapper shipped because (a) its probability distribution is smoother and less step-function, (b) future retrains on fresher data should restore the calibration benefit. Still: trust the <em>"No meaningful edge"</em> chip over the raw number.</>
-                                        )}
-                                    </p>
-                                </div>
-                            ) : null}
-
-                            <h4 className="font-serif mt-8 mb-3" style={{ fontSize: "1.3rem" }}>
-                                Top-10 feature importance
-                            </h4>
-                            <p className="text-xs mb-3 font-mono" style={{ color: "hsl(var(--text-muted))" }}>
-                                Aggregate Gini importance across 400 trees. These are the variables the model
-                                <em> relied on</em> — correlations, not causes.
-                            </p>
-                            <div data-testid="rf-feature-importance">
-                                {(rfMeta.feature_importance || []).map((f, i) => (
-                                    <FeatureBar
-                                        key={f.name}
-                                        rank={i + 1}
-                                        name={f.name}
-                                        value={f.importance}
-                                        max={rfMeta.feature_importance[0].importance}
-                                    />
-                                ))}
-                            </div>
-
-                            <p
-                                className="text-xs font-mono mt-6 pt-4"
-                                style={{ color: "hsl(var(--text-muted))", borderTop: "1px solid hsl(var(--border-divider))" }}
-                            >
-                                Trained: {rfMeta.trained_at?.slice(0, 10)} · Universe: {rfMeta.universe_size} tickers · Training window: {rfMeta.years_of_history} years · Cutoff: {rfMeta.cutoff_date} · Train rows: {rfMeta.train_rows?.toLocaleString()} · Test rows: {rfMeta.test_rows?.toLocaleString()}
-                            </p>
-                        </>
-                    ) : (
-                        <div
-                            className="mt-8 p-5"
-                            style={{
-                                background: "hsla(220,20%,50%,0.05)",
-                                border: "1px solid hsl(var(--border-divider))",
-                            }}
-                            data-testid="rf-retired-note"
-                        >
-                            <p className="text-overline" style={{ color: "hsl(var(--text-muted))" }}>
-                                Retired · not currently in production
-                            </p>
-                            <p className="mt-2 text-sm leading-relaxed" style={{ color: "hsl(var(--text-primary))" }}>
-                                We tested two different prediction targets for this model — absolute
-                                N-day direction, then relative outperformance vs. the S&amp;P 500 — and neither
-                                found a learnable signal in the available technical/fundamental features.
-                                The absolute-direction version held out at <strong>50.85%</strong> accuracy
-                                (barely above chance). The relative-vs-SPY retrain, tested on a proper
-                                78,000-row walk-forward holdout (not a short or skewed window), came back at{" "}
-                                <strong style={{ color: "hsl(var(--sell))" }}>49.62%</strong> accuracy and{" "}
-                                <strong style={{ color: "hsl(var(--sell))" }}>0.4824 ROC-AUC</strong> — worse
-                                than simply guessing the majority class every time (57.89% baseline), and an
-                                AUC below 0.50 indicates no usable predictive signal at all, not noise from a
-                                small sample.
-                            </p>
-                            <p className="mt-3 text-sm leading-relaxed" style={{ color: "hsl(var(--text-secondary))" }}>
-                                Rather than ship a secondary opinion that performs worse than a trivial
-                                baseline, we've disabled it. This isn't a deploy issue or a temporary gap —
-                                it's a considered decision based on two properly-tested label targets. If a
-                                genuinely different approach (different features, a longer horizon, or
-                                sector-relative rather than index-relative labeling) shows real, stable
-                                promise in the future, we'll revisit it — but re-enabling requires a
-                                deliberate decision, not an automatic flip whenever some future retrain's
-                                number happens to clear a baseline once.
-                            </p>
-                        </div>
-                    )}
-
-                    <h4 className="font-serif mt-10 mb-3" style={{ fontSize: "1.3rem" }}>
-                        How the UI combines LLM + RF
-                    </h4>
-                    <ul className="space-y-2 text-sm" style={{ color: "hsl(var(--text-secondary))" }}>
-                        <TLi>
-                            Each analysis ships with both the AI verdict <em>and</em> the RF probability as separate,
-                            independent signals. Neither suppresses the other.
-                        </TLi>
-                        <TLi>
-                            When the RF edge is <code>none</code> (|p − 0.5| &lt; 0.08), we explicitly render
-                            "No meaningful edge" rather than a fake number.
-                        </TLi>
-                        <TLi>
-                            When the RF <em>disagrees</em> with a high-confidence AI verdict, the UI shows a
-                            red "Disagrees" chip. This is a prompt to re-examine the reasoning before acting.
-                        </TLi>
-                        <TLi>
-                            The RF is <strong>never used for position sizing or any trading action</strong> in
-                            the current product. It's informational only. The autonomous-trading roadmap item
-                            will introduce a separate calibrated model trained specifically for risk sizing,
-                            documented here before it ships.
-                        </TLi>
-                    </ul>
-                </div>
 
                 {/* Intrinsic-value anchor (Graham + RIM) deep-dive */}
                 <div
@@ -1445,8 +1105,8 @@ histogram  = MACD_line − signal`}
                             {
                                 num: "02",
                                 title: "Watchlist triage at scale",
-                                desc: "You track 30+ IDX names across LQ45, IDX30, sector watchlists. Auto-Scan + RF scoring tells you which 2–3 currently warrant a deep-dive read TODAY without you having to open Stockbit on each one. Pattern-Scan flags double-bottoms and engulfing patterns the RF model has front-tested for hit-rate.",
-                                signal: "RF score ≥ 0.6 + bullish pattern detected + IDX top-picks rank",
+                                desc: "You track 30+ IDX names across LQ45, IDX30, sector watchlists. Pattern-Scan flags double-bottoms and engulfing patterns across your list so you know which 2–3 currently warrant a deep-dive read TODAY without you having to open Stockbit on each one.",
+                                signal: "Bullish pattern detected + IDX top-picks rank",
                             },
                             {
                                 num: "03",
@@ -1682,8 +1342,8 @@ histogram  = MACD_line − signal`}
                             <strong>The AI model is not infallible — but it has guardrails.</strong> LLM reasoning can still
                             miss context, especially around sector-specific regulatory events or macro shifts that move
                             faster than news feeds. We mitigate via three disciplined layers: (1) the <em>Earnings-Proximity
-                            Gate</em> caps confidence at 65 within 7 days of earnings; (2) the <em>Random-Forest disagreement
-                            penalty</em> reduces displayed confidence when our independent statistical model disagrees with
+                            Gate</em> caps confidence at 65 within 7 days of earnings; (2) a <em>secondary-model disagreement
+                            penalty</em> reduces displayed confidence when an independent statistical model disagrees with
                             the AI's direction; (3) an <em>LLM circuit breaker</em> fast-fails new analyses when the
                             upstream is degraded so you don't burn your turn on a doomed call. Use Neural alongside your
                             own judgment, not instead of it.
@@ -1980,7 +1640,6 @@ function TechTOC({ isAdmin }) {
         const base = [
             { id: "tech-pipeline-section", label: "Pipeline" },
             { id: "confidence", label: "Confidence" },
-            { id: "random-forest", label: "Random Forest" },
             { id: "intrinsic-anchor", label: "Intrinsic anchor" },
             { id: "ev-multiples", label: "EV multiples" },
             { id: "macro-context", label: "Macro context" },
@@ -2233,51 +1892,3 @@ function TLi({ children }) {
     );
 }
 
-function MetricCell({ label, value, color, last = false }) {
-    return (
-        <div
-            className="p-5"
-            style={{
-                borderRight: last ? "none" : "1px solid hsl(var(--border-divider))",
-                borderBottom: "1px solid hsl(var(--border-divider))",
-            }}
-        >
-            <p className="text-overline mb-2" style={{ fontSize: "0.58rem" }}>{label}</p>
-            <p
-                className="font-mono"
-                style={{ fontSize: "1.6rem", color: color || "hsl(var(--text-primary))", letterSpacing: "-0.01em" }}
-            >
-                {value}
-            </p>
-        </div>
-    );
-}
-
-function FeatureBar({ rank, name, value, max }) {
-    const pct = Math.max((value / max) * 100, 1);
-    return (
-        <div className="flex items-center gap-3 py-1.5" data-testid={`rf-importance-${name}`}>
-            <span
-                className="font-mono text-[10px] w-5 text-right"
-                style={{ color: "hsl(var(--text-muted))" }}
-            >
-                {rank}
-            </span>
-            <span className="font-mono text-xs flex-1 md:flex-initial md:w-48" style={{ color: "hsl(var(--text-primary))" }}>
-                {name}
-            </span>
-            <div className="flex-1 h-2" style={{ background: "hsl(var(--border-divider))", borderRadius: 1, overflow: "hidden" }}>
-                <div
-                    style={{
-                        width: `${pct}%`,
-                        height: "100%",
-                        background: "hsl(var(--hold))",
-                    }}
-                />
-            </div>
-            <span className="font-mono text-[11px] w-16 text-right" style={{ color: "hsl(var(--text-muted))" }}>
-                {(value * 100).toFixed(2)}%
-            </span>
-        </div>
-    );
-}

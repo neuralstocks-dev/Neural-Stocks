@@ -183,8 +183,7 @@ export default function LLMBudgetBanner({ error }) {
                                             <strong style={{ color: "hsl(var(--text-primary))" }}>
                                                 What still works right now
                                             </strong>
-                                            : every existing verdict (with V2 calibration breadcrumbs
-                                            + RF probabilities), charts, watchlists, Bandarmology,
+                                            : every existing verdict, charts, watchlists, Bandarmology,
                                             backtests, scorecard, alerts, Telegram, PDF exports.
                                         </span>
                                     </li>

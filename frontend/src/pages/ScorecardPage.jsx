@@ -330,7 +330,7 @@ export default function ScorecardPage() {
                             />
                             <p className="text-xs pb-4" style={{ color: "hsl(var(--text-muted))" }}>
                                 {bandView === "final"
-                                    ? "Bucketed by the confidence score actually shown to you, after the earnings-proximity and RF-disagreement calibration rules run."
+                                    ? "Bucketed by the confidence score actually shown to you, after the calibration rules run."
                                     : "Bucketed by the AI's raw confidence before calibration adjustments. Compare against the calibrated view \u2014 if calibration is working, this view should look less well-sorted than the calibrated one."}
                             </p>
                         </div>
