@@ -402,7 +402,7 @@ export default function BacktestPage() {
                         guarantee future results. Use this as a sanity check on
                         Neural Stock Intelligence™'s reasoning, not as a promise of returns.{" "}
                         <Link
-                            to="/technical#random-forest"
+                            to="/technical#confidence"
                             className="link-underline"
                             style={{ color: "hsl(var(--hold))" }}
                         >
@@ -858,15 +858,7 @@ function MlBacktestSection({ ml }) {
                     SPY. Monthly rebalance, top-{m.top_k} of {m.universe_size}{" "}
                     mega-cap names ranked by model probability, equal-weight,
                     pure-RF (no LLM). This is the same walk-forward window used
-                    for the model's holdout accuracy on the{" "}
-                    <Link
-                        to="/technical#random-forest"
-                        className="link-underline"
-                        style={{ color: "hsl(var(--hold))" }}
-                    >
-                        Technical page
-                    </Link>
-                    .
+                    for the model's holdout accuracy before it was retired.
                 </p>
 
                 {ml?.model_retired && (

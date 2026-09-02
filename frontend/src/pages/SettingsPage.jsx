@@ -746,7 +746,7 @@ export default function SettingsPage() {
                                 learnable signal in the available data — the most recent version performed
                                 worse than simply guessing the majority outcome every time. Rather than run
                                 a paid feature on a model that doesn't outperform a coin flip, we've
-                                disabled it. See the <Link to="/technical#random-forest" className="underline" style={{ color: "hsl(var(--text-primary))" }}>Technical page</Link> for the full numbers.
+                                disabled it.
                             </p>
                         </div>
                         {effectiveAutoScan && (
@@ -814,7 +814,6 @@ export default function SettingsPage() {
                                 We tested two different prediction targets for it, and neither found a
                                 learnable signal in the available data. Rather than keep sending an email
                                 built on a model that doesn't outperform a coin flip, we've disabled it.
-                                See the <Link to="/technical#random-forest" className="underline" style={{ color: "hsl(var(--text-primary))" }}>Technical page</Link> for the full numbers.
                             </p>
                         </div>
                         {digest && (
